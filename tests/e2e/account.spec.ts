@@ -1,7 +1,7 @@
 // Accounts through the screens (protocol section 10), and the API from another origin, which is
 // what the phone app is.
 import { PASSWORD } from '../sync/harness.ts';
-import { accountWith, join, ready, server, signIn, statusLine, username } from './app.ts';
+import { accountWith, go, join, ready, server, signIn, statusLine, username } from './app.ts';
 import { ADDR } from './server.ts';
 import { expect, test } from './devices.ts';
 
@@ -35,11 +35,14 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect(statusLine(a.page)).toHaveText('');
 
+  await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   await a.page.getByRole('button', { name: 'Sign out' }).click();
   await expect(a.page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   // While A is away, B pauses: A can only know that from the server.
   await b.page.getByRole('button', { name: 'Pause' }).click();
   await signIn(a.page, name);
+  // Signing in again opens where signing out was done, Settings; the lap is on Focus.
+  await go(a.page, 'Focus');
   await expect(a.page.getByRole('button', { name: 'Resume' })).toBeVisible({ timeout: 5000 });
   await expect(a.page.getByText('Lap 1 of 4, paused')).toBeVisible();
 });

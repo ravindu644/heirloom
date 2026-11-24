@@ -58,8 +58,12 @@ export async function sessionsWhen(name: string, ok: (rows: Record<string, unkno
 /** The big digits: "24:59". */
 export const digits = (page: Page) => page.getByText(/^\d\d:\d\d$/);
 
-/** The app's own status line. The result view has a status of its own above it; this one comes last. */
-export const statusLine = (page: Page) => page.getByRole('status').last();
+/**
+ * The app's own status line. Screens have status regions of their own above it (the result, the
+ * Undo bar); this one comes last. Hidden is included: on a screen that does not keep its space,
+ * the line is hidden while it has nothing to say, and "nothing to say" is what a test checks.
+ */
+export const statusLine = (page: Page) => page.getByRole('status', { includeHidden: true }).last();
 
 /**
  * Call before the tap that starts a lap. Resolves with the ms from that tap until the running
