@@ -311,3 +311,57 @@ Fixture: `session.json`. `close` cases call the closing rule with `state`, `end`
 (true when a rang row is already held), and expect `null` or the row, its `id`, and `stamp_at`
 (`written` for a bell's row, or `null` for an ordinary stamp). `bell` cases ask whether to write, from the
 timer cell's stamp, the device, `in_step` and `has_row`.
+
+## 12. Today
+
+The rules behind the Today screen. They are worked out on the device from `task`, `project`,
+`session` and `settings` rows; the server knows none of them.
+
+**Quick add.** One line of text makes one task. If the trimmed text ends in a space, `~` and a
+number from 1 to 99, that number is the estimate in laps and the rest, trimmed, is the title.
+Anything else is all title. An empty title adds nothing.
+
+**Repeat.** `repeat` is `null`, `{"every":"day"}`, or `{"every":"week","days":<mask>}` (bit 0
+Monday to bit 6 Sunday; a weekly task is a mask of one day). The day after a given day is the
+first day strictly later that the rule allows.
+
+**The next one.** Marking a repeating task done makes the next task of the series, a row of its
+own, so each day's laps stay with that day's task:
+
+- its `due` is the day after the later of today and the done task's own `due` (days missed are
+  not owed);
+- its id is the series id, `-`, and that day as eight digits: `task-read-20261125`. The series id
+  is the done task's id without such an ending. Two devices that mark the same task done offline
+  therefore make the same row;
+- it copies `project`, `title`, `notes`, `estimate`, `repeat`, `when` and `order`. Subtasks are
+  not copied.
+
+Marking it not done again sets `deleted` on that next row; done again clears it.
+
+**Order.** `order` is a fractional index: 1 to 64 characters of `0-9 A-Z a-z`, compared as a plain
+string, never ending in `0`. Moving a row writes one new key between its new neighbours. Rows sort
+by `order`, then by row id, so two devices that picked the same key still agree.
+
+**What is on Today**, for the local day:
+
+| List | Rows |
+|---|---|
+| Today | not done, not deleted, no `parent`, and `due` is unset or today or earlier. By order. The first that is not running is "next" |
+| Upcoming | the same, with `due` after today. By `due`, then order |
+| Done | `done` falls on today. By when it was done |
+| Recently deleted | `deleted` in the last 30 days. Newest first |
+
+A subtask shows inside its parent only.
+
+**Laps on a task.** From the work sessions of that task, oldest first: a `rang` session is one lap
+and one whole square; a `stopped` one is a part square, its running time over its planned length;
+a `void` one is nothing. The lap in progress on the task adds a part square that fills as it runs,
+unless its row is already there. "2 of 4" counts laps; the squares may pass the estimate.
+
+**Planned, left.** Over the Today list: the sum of each task's estimate minus its laps, never
+under 0 for a task. A task without an estimate adds nothing.
+
+Fixture: `today.json`. `quick_add`: text in, title and estimate out, or `null`. `repeat`: the
+rule and a day in, the next day out. `next`: a done task's id, `due`, today and rule in, the next
+row's id and `due` out. `order`: property checks, described in the file. `squares`: sessions, the
+timer state, `now` and a task in, `laps` and `squares` out.

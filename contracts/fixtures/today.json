@@ -1,0 +1,1174 @@
+{
+ "about": "The Today screen's rules. contracts/protocol.md section 12.",
+ "quick_add": [
+  {
+   "text": "pointers chapter 3 ~4",
+   "expect": {
+    "title": "pointers chapter 3",
+    "estimate": 4
+   }
+  },
+  {
+   "text": "  Thinking in React, steps 1 to 3  ~2  ",
+   "expect": {
+    "title": "Thinking in React, steps 1 to 3",
+    "estimate": 2
+   }
+  },
+  {
+   "text": "read the K&R preface",
+   "expect": {
+    "title": "read the K&R preface",
+    "estimate": null
+   }
+  },
+  {
+   "text": "exercise 5-3 ~12",
+   "expect": {
+    "title": "exercise 5-3",
+    "estimate": 12
+   }
+  },
+  {
+   "text": "~3",
+   "expect": null
+  },
+  {
+   "text": "   ",
+   "expect": null
+  },
+  {
+   "text": "",
+   "expect": null
+  },
+  {
+   "text": "about ~3 hours of reading",
+   "expect": {
+    "title": "about ~3 hours of reading",
+    "estimate": null
+   }
+  },
+  {
+   "text": "ends with a tilde ~",
+   "expect": {
+    "title": "ends with a tilde ~",
+    "estimate": null
+   }
+  },
+  {
+   "text": "no space~4",
+   "expect": {
+    "title": "no space~4",
+    "estimate": null
+   }
+  },
+  {
+   "text": "zero is not an estimate ~0",
+   "expect": {
+    "title": "zero is not an estimate ~0",
+    "estimate": null
+   }
+  },
+  {
+   "text": "a hundred is not either ~100",
+   "expect": {
+    "title": "a hundred is not either ~100",
+    "estimate": null
+   }
+  },
+  {
+   "text": "first ~2 then ~5",
+   "expect": {
+    "title": "first ~2 then",
+    "estimate": 5
+   }
+  }
+ ],
+ "repeat": [
+  {
+   "name": "every day: tomorrow",
+   "repeat": {
+    "every": "day"
+   },
+   "after": "2026-11-24",
+   "expect": "2026-11-25"
+  },
+  {
+   "name": "every day, across a month end",
+   "repeat": {
+    "every": "day"
+   },
+   "after": "2026-11-30",
+   "expect": "2026-12-01"
+  },
+  {
+   "name": "Mondays, from a Tuesday: next Monday",
+   "repeat": {
+    "every": "week",
+    "days": 1
+   },
+   "after": "2026-11-24",
+   "expect": "2026-11-30"
+  },
+  {
+   "name": "Mondays, from a Monday: the Monday after, never the same day",
+   "repeat": {
+    "every": "week",
+    "days": 1
+   },
+   "after": "2026-11-23",
+   "expect": "2026-11-30"
+  },
+  {
+   "name": "Monday, Wednesday, Friday, from Tuesday: Wednesday",
+   "repeat": {
+    "every": "week",
+    "days": 21
+   },
+   "after": "2026-11-24",
+   "expect": "2026-11-25"
+  },
+  {
+   "name": "Monday, Wednesday, Friday, from Friday: Monday",
+   "repeat": {
+    "every": "week",
+    "days": 21
+   },
+   "after": "2026-11-27",
+   "expect": "2026-11-30"
+  },
+  {
+   "name": "weekends, from Saturday: Sunday",
+   "repeat": {
+    "every": "week",
+    "days": 96
+   },
+   "after": "2026-11-28",
+   "expect": "2026-11-29"
+  },
+  {
+   "name": "Sundays, from Sunday: next Sunday",
+   "repeat": {
+    "every": "week",
+    "days": 64
+   },
+   "after": "2026-11-29",
+   "expect": "2026-12-06"
+  },
+  {
+   "name": "every weekday in the mask is the same as every day",
+   "repeat": {
+    "every": "week",
+    "days": 127
+   },
+   "after": "2026-12-31",
+   "expect": "2027-01-01"
+  }
+ ],
+ "next": [
+  {
+   "name": "done on its day: the next one is the day after",
+   "id": "task-read",
+   "due": "2026-11-24",
+   "today": "2026-11-24",
+   "repeat": {
+    "every": "day"
+   },
+   "expect": {
+    "id": "task-read-20261125",
+    "due": "2026-11-25"
+   }
+  },
+  {
+   "name": "done late: the days missed are not owed, the next one is after today",
+   "id": "task-read",
+   "due": "2026-11-20",
+   "today": "2026-11-24",
+   "repeat": {
+    "every": "day"
+   },
+   "expect": {
+    "id": "task-read-20261125",
+    "due": "2026-11-25"
+   }
+  },
+  {
+   "name": "done early: the next one is after its own day",
+   "id": "task-read",
+   "due": "2026-11-27",
+   "today": "2026-11-24",
+   "repeat": {
+    "every": "week",
+    "days": 16
+   },
+   "expect": {
+    "id": "task-read-20261204",
+    "due": "2026-12-04"
+   }
+  },
+  {
+   "name": "no due date: counted from today",
+   "id": "task-read",
+   "due": null,
+   "today": "2026-11-24",
+   "repeat": {
+    "every": "week",
+    "days": 1
+   },
+   "expect": {
+    "id": "task-read-20261130",
+    "due": "2026-11-30"
+   }
+  },
+  {
+   "name": "the next of a next keeps the first id, so the series never grows a tail",
+   "id": "task-read-20261125",
+   "due": "2026-11-25",
+   "today": "2026-11-25",
+   "repeat": {
+    "every": "day"
+   },
+   "expect": {
+    "id": "task-read-20261126",
+    "due": "2026-11-26"
+   }
+  },
+  {
+   "name": "a row id that is a uuid",
+   "id": "3f2b8c1e-9a4d-4e21-b7c6-0d5f8a1e2b3c",
+   "due": "2026-11-24",
+   "today": "2026-11-24",
+   "repeat": {
+    "every": "day"
+   },
+   "expect": {
+    "id": "3f2b8c1e-9a4d-4e21-b7c6-0d5f8a1e2b3c-20261125",
+    "due": "2026-11-25"
+   }
+  }
+ ],
+ "order": {
+  "about": "Each pair asks for a key between a and b (null is the open end). Any key is right that is 1 to 64 of 0-9 A-Z a-z, sorts after a and before b as a plain string, and does not end in 0 (nothing fits before a key that does). Each list starts empty and inserts at the given positions; the keys must sort in list order after every insert.",
+  "between": [
+   [
+    null,
+    null
+   ],
+   [
+    "a0",
+    null
+   ],
+   [
+    null,
+    "a0"
+   ],
+   [
+    "a0",
+    "a1"
+   ],
+   [
+    "a0",
+    "a0V"
+   ],
+   [
+    "Zz",
+    "a0"
+   ],
+   [
+    "a1",
+    "b"
+   ],
+   [
+    "a0",
+    "a00001"
+   ],
+   [
+    "zzzz",
+    null
+   ],
+   [
+    null,
+    "0001"
+   ]
+  ],
+  "inserts": [
+   {
+    "name": "always at the end, 200 times",
+    "at": [
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end",
+     "end"
+    ]
+   },
+   {
+    "name": "always at the front, 200 times",
+    "at": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   {
+    "name": "always in the same gap, 200 times",
+    "at": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "here and there",
+    "at": [
+     0,
+     0,
+     1,
+     "end",
+     2,
+     1,
+     0,
+     3,
+     "end",
+     4,
+     2,
+     2,
+     5,
+     0,
+     "end",
+     1,
+     6,
+     3
+    ]
+   }
+  ]
+ },
+ "squares": [
+  {
+   "name": "rang laps are whole squares, in the order they ran",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "other",
+     "kind": "work",
+     "task": "task-other",
+     "started": 1795489200000,
+     "ended": 1795490700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 2,
+    "squares": [
+     1,
+     1
+    ]
+   }
+  },
+  {
+   "name": "a stopped lap is a part square and not a lap",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795492800000,
+     "ended": 1795493700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 1,
+    "squares": [
+     1,
+     0.6
+    ]
+   }
+  },
+  {
+   "name": "a lap set aside leaves no square",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795491000000,
+     "ended": 1795491600000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 0,
+    "squares": []
+   }
+  },
+  {
+   "name": "the lap in progress fills as it runs",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": "task-pointers",
+    "started": 1795494000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 1,
+    "squares": [
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "name": "a lap on another task, or a break, adds nothing here",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": "task-other",
+    "started": 1795494000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-b",
+     "kind": "short",
+     "task": "task-pointers",
+     "started": 1795492800000,
+     "ended": 1795493100000,
+     "planned_ms": 300000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 0,
+    "squares": []
+   }
+  },
+  {
+   "name": "the lap in progress is not counted twice once its row is there",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": "task-pointers",
+    "started": 1795492800000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-now",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 1,
+    "squares": [
+     1
+    ]
+   }
+  }
+ ]
+}

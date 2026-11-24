@@ -26,7 +26,9 @@ function walk(node, where, unknown) {
   if (!node || typeof node !== 'object') return;
   if ('stamp' in node && 'dataset' in node) return cell(node, where, unknown);
   for (const [k, v] of Object.entries(node)) {
-    if (k === 'sessions') {
+    if (k === 'order' && where.endsWith('today.json')) {
+      // Keys to sort by, not rows: nothing here for a schema to check.
+    } else if (k === 'sessions') {
       v.forEach(({ id, ...row }, i) => datasets.session.row(row) || problems.push(`${where}.sessions[${i}] (${id}): ${said(datasets.session.row)}`));
     } else if (k === 'row' && v) {
       datasets.session.row(v) || problems.push(`${where}.row: ${said(datasets.session.row)}`);

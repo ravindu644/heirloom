@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "properties": {
     "name": { "type": "string" },
-    "color": { "type": "string", "description": "A DESIGN.md role name. The roles are pinned in roadmap section 4." },
+    "color": { "enum": ["you", "rest", "ink", "ghost", "heat-2"], "description": "A DESIGN.md colour role. DESIGN.md says why only these." },
     "order": { "type": "string" },
     "archived": { "type": ["integer", "null"], "description": "Server-time ms, null while active." },
     "deleted": { "type": ["integer", "null"] }
