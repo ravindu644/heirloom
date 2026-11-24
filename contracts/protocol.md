@@ -414,3 +414,29 @@ an empty string.
 
 These are checked by the core lane's own tests; `stats.json` and `streak.json` hold the parts the
 server will share for rooms.
+
+## 14. Habits
+
+Worked out on the device from `habit` and `checkin` rows.
+
+- A habit is planned on the weekdays in `days` (bit 0 Monday to bit 6 Sunday) and is done for a
+  day when that day's live check-ins reach `target`. A check-in is live while its `deleted` is unset.
+- **Checking in** makes one `checkin` row: `habit`, `day` (the local day of the tap) and `at`,
+  written together. It never changes a number. Two devices checking in offline make two rows.
+- **Undo** sets `deleted` on the latest live check-in of that habit for today. It never removes a
+  row and never touches another day.
+- A check-in on a day the habit is not planned for is kept and shown on that day, and counts for
+  nothing else.
+- **The streak** is section 8's function with the habit's `days` as the mask and its done days as
+  the kept days, over the same 45 day window as the focus streak. The target used is today's, for
+  every past day.
+- **This week against last:** the check-ins of all habits (not archived, not deleted) from Monday
+  to now, and last week's from its Monday to the same weekday and time.
+- `remind` is a local time of day, `07:30`. The reminder is for the days the habit is planned and
+  is not shown on a day the habit is already done. It is a device's own notification; nothing is
+  sent by the server.
+- Order, delete and restore work as for tasks (section 12): `order` is a fractional index,
+  `deleted` a time, restorable for 30 days. `archived` takes a habit off the list and keeps its
+  record.
+
+These are checked by the core lane's own tests; `streak.json` holds the streak rule.

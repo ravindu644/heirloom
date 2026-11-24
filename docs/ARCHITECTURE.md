@@ -75,7 +75,7 @@ Datasets are synced as cells. Field names here are the contract; `contracts/prot
 | `session` | one per pomodoro or break run | `kind` (work, short, long), `task`, `started`, `ended`, `planned_ms`, `paused_ms`, `outcome` (rang, stopped, void), `device`, `note` | created once; only `task`, `note` and `outcome` change later |
 | `task` | one per task | `project`, `title`, `notes`, `estimate` (whole pomodoros), `parent`, `due`, `repeat`, `when`, `done`, `order`, `deleted` | mutable per field |
 | `project` | one per project | `name`, `color` (a DESIGN.md role name), `order`, `archived`, `deleted` | mutable per field |
-| `habit` | one per habit | `title`, `days` (weekday mask), `target`, `order`, `archived`, `deleted` | mutable per field |
+| `habit` | one per habit | `title`, `days` (weekday mask), `target`, `remind` (local time of day), `order`, `archived`, `deleted` | mutable per field |
 | `checkin` | one per check-in | `habit`, `day` (local `YYYY-MM-DD`), `at`, `deleted` | created once; undo sets `deleted` |
 | `day` | one per local day with a note (`row` = the day) | `note` | mutable per field |
 | `settings` | one per account | durations, auto-start flags, sounds, celebrations on or off, what rooms may see | mutable per field |
