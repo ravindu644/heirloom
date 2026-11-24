@@ -65,12 +65,12 @@ The first thing the user can touch: one timer, live on two screens.
 
 ## 3. The phone
 
-- [ ] [android] Capacitor 8 project, `USE_EXACT_ALARM`, app icon and splash from DESIGN.md
-- [ ] [android] Notifier for Capacitor: reschedule the exact alarm on every timer change from any
+- [x] [android] Capacitor 8 project, `USE_EXACT_ALARM`, app icon and splash from DESIGN.md
+- [x] [android] Notifier for Capacitor: reschedule the exact alarm on every timer change from any
       device; sound and vibration
-- [ ] [android] Countdown notification plugin (`setChronometerCountDown`), started and cleared with
+- [x] [android] Countdown notification plugin (`setChronometerCountDown`), started and cleared with
       the phase
-- [ ] [ui] Safe areas, back button, keyboard, touch sizes on the phone
+- [x] [ui] Safe areas, back button, keyboard, touch sizes on the phone
 - [ ] [qa] On the user's phone over adb: 1-minute timer, screen off, alarm fires within 2 s
       (`dumpsys alarm` and the notification log as proof); timer started on the laptop rings on
       the phone
@@ -83,13 +83,13 @@ The first thing the user can touch: one timer, live on two screens.
 - [ ] [ui] Projects with colours, one level of subtasks, due dates, repeats, optional "when"
 - [ ] [ui] Start a pomodoro from a task; the Focus screen shows the task
 - [ ] [ui] Recently deleted with Restore
-- [ ] [core] Fractional ordering; repeat rule expansion; fixtures added to `contracts/`
+- [x] [core] Fractional ordering; repeat rule expansion; fixtures added to `contracts/`
 - [ ] [design-review] Today at both sizes
 - [ ] Gate
 
 ## 5. Progress
 
-- [ ] [core] Stats from sessions: per day, week against week, per project, estimate accuracy,
+- [x] [core] Stats from sessions: per day, week against week, per project, estimate accuracy,
       personal bests, the forgiving streak ("41 of the last 45"); `stats.json` and `streak.json`
 - [ ] [ui] Heatmap of the year (hand-drawn SVG, no chart library)
 - [ ] [ui] This week against last week; time per project; estimate accuracy
@@ -108,7 +108,7 @@ The first thing the user can touch: one timer, live on two screens.
 
 ## 7. Rooms
 
-- [ ] [server] Rooms: create, invite code, join, leave, members; presence from the timer cell and
+- [x] [server] Rooms: create, invite code, join, leave, members; presence from the timer cell and
       socket liveness; today's and this week's totals from sessions; cheers
 - [ ] [ui] Room screen: who is focusing, phase and time left, today and week, the shared weekly
       target, cheer with one tap; opt-in ranked view; task titles only when allowed
