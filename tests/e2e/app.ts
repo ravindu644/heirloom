@@ -90,3 +90,28 @@ export function timerOnDisk(page: Page): Promise<number> {
     }
   });
 }
+
+/** A screen, by its link in the navigation. */
+export const go = (page: Page, screen: 'Focus' | 'Today') =>
+  page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: screen, exact: true }).click();
+
+/** Quick add: one line, then Enter, as a person types it. */
+export async function quickAdd(page: Page, text: string) {
+  const box = page.getByLabel('Add a task', { exact: true });
+  await box.fill(text);
+  await box.press('Enter');
+}
+
+/** A task's row on Today, found by its box. */
+export const taskRow = (page: Page, title: string) => page.getByRole('checkbox', { name: `Done: ${title}`, exact: true }).locator('xpath=..');
+
+/** A task row's squares, oldest first: 1 for a lap that rang, a share for one stopped or running, 0 for one to come. */
+export const squaresOf = (row: ReturnType<typeof taskRow>) =>
+  row.locator('i[style*="--share"]').evaluateAll((els) => els.map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
+
+/** The titles of every task row on the screen, top to bottom. */
+export const titles = (page: Page) =>
+  page.getByRole('checkbox', { name: /^Done: / }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')!.slice('Done: '.length)));
+
+/** A list on Today, by the start of its heading (Later today carries its count): Next, Later today, Upcoming, Done. */
+export const list = (page: Page, heading: string) => page.locator('section').filter({ has: page.getByRole('heading', { name: new RegExp(`^${heading}`) }) });

@@ -1,13 +1,16 @@
 // A run leaves a row only after a minute of running (protocol section 11), so this waits a real
-// minute. Two accounts share the wait: one stops and logs, the other sets its lap aside.
-import { accountWith, ready, sessionsWhen, signIn, username } from './app.ts';
+// minute. Two accounts share the wait: one stops and logs (a part square on its task), the other
+// sets its lap aside.
+import { accountWith, go, ready, sessionsWhen, signIn, squaresOf, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 test('a minute in, stop and log keeps a stopped row on both laptops; set aside keeps a void row', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
   test.setTimeout(120000);
   const logged = username('logged');
   const aside = username('aside');
-  await accountWith(logged);
+  // The lap that is stopped is on a task: Start lap 1 starts on today's next task.
+  const node = await accountWith(logged);
+  node.engine.write('task', 'proofs', { title: 'proofs', estimate: 2, order: 'V' });
   await accountWith(aside);
   for (const [d, name] of [[a, logged], [b, logged], [c, aside]] as const) {
     await signIn(d.page, name);
@@ -28,6 +31,14 @@ test('a minute in, stop and log keeps a stopped row on both laptops; set aside k
   const [kept] = await sessionsWhen(logged, (rows) => rows.length > 0);
   expect(kept).toMatchObject({ kind: 'work', outcome: 'stopped', paused_ms: 0 });
   expect((kept!.ended as number) - (kept!.started as number)).toBeGreaterThanOrEqual(60000);
+  expect(kept).toMatchObject({ task: 'proofs' });
+  // On Today the stopped minute is a part of a square, and no lap: "0 of 2".
+  await go(b.page, 'Today');
+  const row = taskRow(b.page, 'proofs');
+  await expect(row).toContainText('0 of 2');
+  const [part, empty] = await squaresOf(row);
+  expect(part, 'a minute of a 25 minute lap').toBeCloseTo(((kept!.ended as number) - (kept!.started as number)) / 1500000, 3);
+  expect(empty).toBe(0);
 
   await c.page.getByRole('button', { name: 'Set aside' }).click();
   await expect(c.page.getByText('Set aside. It stays in your timeline and counts nowhere.')).toBeVisible();
