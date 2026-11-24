@@ -214,4 +214,9 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-24 | An unsent edit loses to an incoming cell with a higher stamp (was: incoming values ignored) | Ignoring them left the device showing a value the server had already replaced |
 | 2026-11-24 | Server SQLite driver: `modernc.org/sqlite` | Pure Go, bundles its own SQLite, builds with `CGO_ENABLED=0`; a test asserts 3.51.3 or later |
 | 2026-11-24 | One root `package.json`; core tests on `node --test`, no test framework | Capacitor wants `android/` beside its config; Node 22 runs `.ts` itself |
+| 2026-11-25 | Server packages for section 1: `github.com/coder/websocket`, `golang.org/x/crypto` (argon2id) | Go's standard library has neither a WebSocket server nor argon2 |
+| 2026-11-25 | Client: `@preact/signals-core` as a direct dependency; `fake-indexeddb` for the store's Node tests | The engine runs in Node for the simulator, so it cannot import Preact; the real IndexedDB is proved by e2e from section 2 |
+| 2026-11-25 | No cookies; the API and the socket answer any origin | The Capacitor WebView is another origin, and a token in the body cannot be sent by a page that does not hold it |
+| 2026-11-25 | Invites are made with `heirloomd -invite` on the server | The owner already has a shell there; no admin screen in v1 |
+| 2026-11-25 | The stats and streak functions are built in section 1, not 5 | Their fixtures exist and `make check` goes green one section earlier; section 5 extends them |
 | 2026-11-24 | Dev-only packages: `@playwright/test`, `@google/design.md`, `yaml`, `ajv`, `@preact/preset-vite` | e2e, the DESIGN.md lint, reading its front matter, checking fixtures against schemas, JSX and hot reload |

@@ -21,7 +21,7 @@ these; a newer one is a decision with a line here, not a surprise in a lockfile.
 | Tool | Version | Note |
 |---|---|---|
 | Capacitor | 8.6.2 (arrives in roadmap section 3) | Needs Node 22 or later and JDK 21 |
-| JDK | 17.0.19 (Temurin) is installed. **Capacitor 8 compiles with Java 21.** | Install a JDK 21 before section 3 |
+| JDK | Temurin 21.0.12.1 at `~/.jdks/jdk-21`. Capacitor 8 compiles with Java 21 | `java` on the PATH is 17.0.19, so the Android build sets `JAVA_HOME=$HOME/.jdks/jdk-21` |
 | Android SDK | platforms 34, 36, 37; build-tools 34.0.0, 35.0.0, 36.0.0 | `~/Android/Sdk` |
 | `compileSdk` / `targetSdk` | 36 | Capacitor 8's default |
 | `minSdk` | 24 | Capacitor 8's floor; `setChronometerCountDown` needs 24 |

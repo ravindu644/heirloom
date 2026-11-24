@@ -138,6 +138,8 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
   `token-like-ignored` on `motion` (our key, read by tools/tokens.mjs) are expected.
 - `node --test tools/` fails: Node 22 wants a quoted glob (`node --test "tools/*.test.mjs"`), not a directory.
 - `go.mod` says `go 1.26.0`, not `go 1.26`: the SQLite driver sets that floor and Go rewrites the line.
+- Never pass a cancellable context to a SQLite call in `server/`: a cancelled call makes the driver
+  drop the connection, the checkpoint at close is skipped and a `-wal` file is left behind.
 - SQLite before 3.51.3 can corrupt a WAL database; Ubuntu 24.04 ships 3.45.1. Use the bundled one.
 - Node does not support the S10's kernel (4.14). The server is Go for that reason.
 - `@capacitor/local-notifications` silently falls back to an inexact alarm without the exact-alarm
