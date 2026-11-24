@@ -9,7 +9,7 @@ when it is done.
 - [9] Signing out offline with nothing unsent forgets the token locally but the server still holds it. Harmless (nobody has it), but it never expires.
 - [any] Five wrong sign-ins lock a username for 15 minutes for everyone, the owner included (protocol section 10). Anyone who knows a username can do it. Accepted on an invite-only server among friends.
 - [9] The server reads no frames during catch-up, so a pong can be late by the length of a catch-up. Over a slow link with years of cells the device may declare the socket dead and reconnect; it still makes progress each time. Measure on the S10 with a large account.
-- [9] argon2id's peak memory (19 MiB a hash) was measured on the laptop only (32 MB RSS during sign-ins). Measure on the S10.
+- [9] heirloomd runs on the S10 as a service since 2026-11-25 (`make deploy`), on localhost only. Still to measure there: RSS with 20 simulated devices, the peak during sign-ins (19 MiB a hash; 34 MB on the laptop), and room totals. The tunnel needs the user's Cloudflare account.
 - [8] With both automatic starts on, a device that wakes within two hours of a bell writes the break and the laps that would have run by themselves meanwhile, up to the long break, as rung. That is what automatic means, and it is off by default; the settings screen should say so in a line.
 - [8] Lengths under a minute read as zero ("Start 0 min break", "0 minutes today."). The schema allows down to 1 s for tests; the settings screen should offer whole minutes only.
 - [9] The service worker makes the page open offline; a web manifest and icons (install as an app) and Web Push come with section 9. They need `manifest-src`, `img-src` in the server's CSP, whose test fails on any change so each gets a reason.

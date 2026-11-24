@@ -37,4 +37,6 @@ these; a newer one is a decision with a line here, not a surprise in a lockfile.
 | Memory | 1024 MB, no swap, about 15 MB in use before heirloomd |
 | Installed for us | Nothing, on purpose. `heirloomd` is one static binary (`CGO_ENABLED=0`, `linux/arm64`). `cloudflared` arrives in section 9 |
 | SQLite | 3.54.1, the one inside the binary (`modernc.org/sqlite` v1.63.0). The system has none, and Ubuntu's 3.45.1 would have the WAL bug |
-| heirloomd, idle | 6.8 to 8.0 MB RSS over six runs of `make s10-rss` on 2026-11-25 (budget 50 MB). The binary is 9.4 MB (budget 25 MB) |
+| heirloomd, idle | 11.5 MB RSS as a systemd service on 2026-11-25, sync, rooms, the web app and a start-up backup included (budget 50 MB). The skeleton of section 0 was 6.8 to 8.0 MB. The binary is 10.3 MB (budget 25 MB) |
+| The unit on this kernel | Runs under every hardening option but one: systemd logs `bpf-firewall: Preparation of BPF allow maps failed`, so `IPAddressDeny`/`IPAddressAllow` do nothing on 4.14 (the server binds to 127.0.0.1 anyway). `MemoryCurrent` reads `[not set]`: the container does no memory accounting, so `MemoryMax` is not enforced and `GOMEMLIMIT=64MiB` is the limit that counts |
+| Already there | `nginx.service` and `sp-webdav.service`, the user's own. heirloomd uses port 8787 on localhost, which was free |
