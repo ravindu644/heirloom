@@ -26,6 +26,9 @@ when it is done.
 - [3] Nothing in section 3 has run on the phone: wireless adb dropped overnight. The commands are in the android lane's report, copied to `reviews/3/device-run.md`.
 - [any] An edit is durable 8 to 19 ms after the tap on this laptop, median 14 (one IndexedDB transaction with strict durability; measured by the e2e run). A page killed inside that window loses that one edit; a browser offers no synchronous way to close it.
 - [3] `java` on the PATH is 17; `make apk` must set `JAVA_HOME=$HOME/.jdks/jdk-21` (Capacitor 8 needs 21).
+- [4] From the second design pass, none blocking, for the ui lane's next round: on a tablet the lap bar is 8px narrower on Focus than on the result (one measure for both); the race sentence can break inside "last Tuesday" (a no-break space in `pastDay`); two sentences leave one word hanging ("safe on / it.", "A / code works once."); the `unsaved` sign-in error and `status.signOutUnsent` have no picture at 412 and 360; clamp a long task title to one line on a short screen.
+- [4] At 360x640 the race panel is cut by the stuck buttons (it fits whole from about 740px tall). If a real phone lands in that band, short screens need their own rule and a fourth size in DESIGN.md.
+- [8] "This phone" is chosen by pointer, so a tablet used with a finger is called a phone.
 - [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
 - [5] The end-of-day look back's one-line note has nowhere to live.
 - [5] Stats use the viewer's current UTC offset for every day. A country with summer time shifts old laps by an hour across midnight.

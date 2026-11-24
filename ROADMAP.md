@@ -51,16 +51,16 @@ The part that has to be right. No screens yet.
 
 The first thing the user can touch: one timer, live on two screens.
 
-- [ ] [ui] App shell: navigation between Focus, Today, Progress, Habits, Rooms; tokens loaded;
+- [x] [ui] App shell: navigation between Focus, Today, Progress, Habits, Rooms; tokens loaded;
       light and dark
-- [ ] [ui] Focus screen from `DESIGN.md`: start, pause, resume, stop, void, extend, phase and set
+- [x] [ui] Focus screen from `DESIGN.md`: start, pause, resume, stop, void, extend, phase and set
       of four, the bell
-- [ ] [core] Session writing: one row per run id, outcome rules, overlap marking
-- [ ] [ui] The completion moment for a pomodoro and for a set of four (motion rules from DESIGN.md)
-- [ ] [server] Serves the built web app from the binary
-- [ ] [qa] e2e: start on device A, see it on B within 1 s; pause on B, see it on A; both offline,
+- [x] [core] Session writing: one row per run id, outcome rules, overlap marking
+- [x] [ui] The completion moment for a pomodoro and for a set of four (motion rules from DESIGN.md)
+- [x] [server] Serves the built web app from the binary
+- [x] [qa] e2e: start on device A, see it on B within 1 s; pause on B, see it on A; both offline,
       both run, reconnect, nothing lost and the overlap marked
-- [ ] [design-review] Focus screen against DESIGN.md at phone and laptop sizes, light and dark
+- [x] [design-review] Focus screen against DESIGN.md at phone and laptop sizes, light and dark
 - [ ] Gate (the user runs a pomodoro on two laptops' browsers)
 
 ## 3. The phone

@@ -1,15 +1,38 @@
 # Section 2: the result of a lap
 
+## Second pass, 2026-11-25. Verdict: PASS (no regression)
+
+All 213 pictures opened (taken 01:47 to 01:48, after the last UI change at 01:46): phone, small,
+and the light laptop and tablet sets at full size or close to it, the dark laptop and tablet sets at
+about 80%. DESIGN.md read again: Colors, Layout, Components.
+
+- The set's 24px lap bar is in DESIGN.md (`lane-set`, Components). `set-done-*`: unchanged, right.
+- The ghost outline is 2px on the result lanes, as DESIGN.md now says. `lap-level-laptop-light`,
+  `lap-behind-phone-light`: the ghost reads as a hollow block at arm's length, in both themes.
+- The empty part of a result lane is `line` on the ground. The scale is visible again
+  (`lap-first-day-laptop-light`).
+- The level chip is ink on `you-tint`, as the Split chip line says (`lap-level-*`). Behind and
+  level now share a colour; the sign and the word tell them apart, which is the rule.
+- Retaken with the rest. At 360x640 the whole result fits without a scroll (`lap-*-small-*`,
+  `set-done-small-*`), and "Level with / last Tuesday." breaks well.
+
+Not blocking:
+
+- On the tablet the result's lap bar is 8px wider than Focus's (x=992 against 984). See focus.md.
+- The two moments still cannot be judged from stills.
+
+## First pass, 2026-11-25 (kept as written)
+
 Pictures: `lap-level`, `lap-ahead`, `lap-behind`, `lap-first-day`, `set-done`, `break-over`, each
 at 412x915 and 1440x900, light and dark. All 24 opened, beside
 `design/routes/b-pacer/screens/done-*`.
 
-## Verdict: PASS
+### Verdict: PASS
 
 The reward is a race result in words over two lanes, and behind is said as the lap that closes
 it. Two lines of DESIGN.md are owed by the lead before this merges, and the pictures are stale.
 
-## Problems
+### Problems
 
 1. **For the lead: the set's lap bar is a size DESIGN.md does not have.** `set-done-*`: the four
    segments are 24px tall (`.big i` takes `--space-lg`). DESIGN.md Components: "Lap bar: four
@@ -37,7 +60,7 @@ Not blocking:
 - The lap-done (700ms) and set-done (1200ms) moments cannot be judged from stills. The code keeps
   to transform and opacity, plays once, and skips on any tap or key. The user gate should watch both.
 
-## The Look table
+### The Look table
 
 | Test | Result |
 |---|---|
@@ -51,7 +74,7 @@ Not blocking:
 | Dark | Pass. Neutral ground, `dark-you` figure 6.7:1 on ground, no glow. |
 | Tells | None. No confetti, trophy, star or emoji. One exclamation mark, on the set. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **Phone: the result centred, the buttons at the bottom: upheld.** There are 230px between "Take
   five." and its button, which is the cost. It buys the break button in the same rectangle as
@@ -72,7 +95,7 @@ Not blocking:
 - **Break over is the idle screen with "Short break, over": upheld.** PRODUCT.md section 6 asks
   for a quieter moment for breaks. A label and a full-width "Start lap 3" is quiet.
 
-## The words
+### The words
 
 Every string in `result` and the ones `race` and `focus` lend to this view.
 
@@ -88,7 +111,7 @@ Every string in `result` and the ones `race` and `focus` lend to this view.
 - Pass: "Lap 2 of 4, done", "Short break, over".
 - No "Great job", no title case, no padding word, no em dash.
 
-## Keep
+### Keep
 
 Behind is never a verdict. The headline names the lap that draws you level, the chip is pale
 `you-tint` while the ahead chip is the filled one, and the ghost's finish line is the same ink as

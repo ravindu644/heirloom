@@ -1,15 +1,69 @@
 # Section 2: Focus
 
+## Second pass, 2026-11-25. Verdict: PASS
+
+All 213 pictures opened (taken 01:47 to 01:48, after the last UI change at 01:46): phone, small,
+and the light laptop and tablet sets at full size or close to it, the dark laptop and tablet sets at
+about 80%. DESIGN.md read again: Colors, Layout, Components.
+
+### The three findings
+
+| # | Finding | Now | The picture |
+|---|---|---|---|
+| 1 | "5 more minutes" on a break | Fixed. Gone from both breaks; the link shows only while a lap runs. | `break-phone-light`, `long-break-laptop-light` |
+| 2 | Pictures older than the code | Fixed. All retaken, with 360x640 and 1024x768 added. | the whole set |
+| 3 | Empty lap bar at 1.09:1 | Fixed. Empty segments on the ground are `line`, and DESIGN.md Colors says so. | `idle-phone-light`, `idle-laptop-light` |
+
+From the notes: the race sentence is balanced and the figure no longer sits alone
+(`running-ahead-*`); the first-day heading is "Today so far" (`first-day-*`).
+
+### What the fixes cost or added
+
+- **The small phone, 360x640: acceptable, with its cost written down.** `running-behind-small-*`:
+  the time, the phase, the lap bar and the buttons are whole and in their usual places; 106px of
+  the 204px race panel show and the Ghost row is cut through its letters by the stuck buttons.
+  The rest is one scroll away and nothing is lost. No layout fits at this height: the screen is
+  98px short as built, releasing every kept row wins back only 40 of them while a lap runs, and
+  the digits are not what gives. By the same measure the panel fits whole from about 740px tall,
+  so 360x760 and 360x800 are clear and the cut belongs to old 16:9 phones and split screen. It
+  does look like a fault rather than a
+  scroll, so it goes in `findings.md`: if the user's or a friend's phone is in that band, give
+  short screens their own rule (release `.quiet`'s empty row and the second kept lines) and add
+  the height to DESIGN.md's list of sizes. Not before.
+- **`long-title-small-*`: the same case, worse.** Only the panel's top 30px show and its heading is
+  cut through. Section 4 owns the task title: clamp it to one line on a short screen there.
+- **The tablet, 1024x768: pass.** `*-tablet-*`: the 168px digits, the panel at the column's full
+  720px with the sentence on one line, the buttons under it, 48px sidebar rows. It reads as the
+  phone's order with room. One wobble: the lap bar ends at x=984 here and at x=992 on the result
+  (`lap-level-tablet-light`), because Focus is capped at 80ch and the result is not. Give both the
+  same measure; at 1279 wide the bar would jump about 260px at the bell.
+- **Undo beside "Stopped. 6 minutes kept.": pass.** `undo-stop-*`, `undo-aside-*`: the sentence in
+  `muted`, Undo after it as an underlined `label`, on the same line or at the end of the second.
+  It sits on the words it undoes, takes no row of its own, and the digits do not move. The lap bar
+  drops the unfinished segment and the total keeps or loses the minutes as the sentence says.
+- **"Today so far": pass.** It no longer shares a word with the tab, and it says what the lane is.
+
+### Still open
+
+Nothing blocks. Two small things:
+
+- `long-break-phone-*`, `long-break-laptop-*`: the balanced sentence now breaks as "Last /
+  Tuesday finished on 3h 20m." A no-break space inside the day's name ("last Tuesday") in
+  `pastDay` keeps it whole everywhere.
+- The lap bar's width on the tablet, above.
+
+## First pass, 2026-11-25 (kept as written)
+
 Pictures: `idle`, `first-day`, `next-day`, `running-behind`, `running-ahead`, `paused`, `break`,
 `long-break`, `long-title`, `undo-stop`, `undo-aside`, each at 412x915 and 1440x900, light and
 dark. All opened, beside `design/routes/b-pacer/screens/focus-*`.
 
-## Verdict: FAIL
+### Verdict: FAIL
 
 One control that is not in v1, and a set of pictures that is older than the code. The screen
 itself is the reference, kept honest.
 
-## Problems
+### Problems
 
 1. **"5 more minutes" on a break is not in v1.** `break-*`, `long-break-*`: the link sits above
    "Start lap 3 now". PRODUCT.md section 1 has "Extend the current pomodoro", a small button
@@ -42,7 +96,7 @@ Not blocking:
 - "It stays in your timeline": the timeline arrives in section 5. True in v1, a dead word until then.
 - Motion cannot be judged from stills. The user gate should watch one lap end.
 
-## The Look table
+### The Look table
 
 Run on the 30% contact sheet of ten phone states, light and dark, and on blurred copies.
 
@@ -57,7 +111,7 @@ Run on the 30% contact sheet of ten phone states, light and dark, and on blurred
 | Thumb | Pass. The main button is at y=777 to 825 of 915 in every state. |
 | Dark | Pass. Neutral ground, no glow. `rest` on ground 8.4:1, `muted` digits 8.0:1, chip text 13.6:1 behind and 6.9:1 ahead. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **Actions at the bottom, digits centred in the free space: upheld.** DESIGN.md puts the primary
   action in the lower half and the phone mockup did not (Pause at y=411). The screen does not
@@ -82,7 +136,7 @@ Run on the 30% contact sheet of ten phone states, light and dark, and on blurred
   margins at any width. `168 / 412` and `411px` belong in DESIGN.md (shell.md problem 5). The
   360x640 picture is the proof still owed.
 
-## The words
+### The words
 
 Every string in `focus` and `race` read against the Voice section.
 
@@ -99,7 +153,7 @@ Every string in `focus` and `race` read against the Voice section.
 - Out of scope: "5 more minutes" on a break, problem 1.
 - No exclamation mark, sentence case on every button, no padding word, no em dash.
 
-## Keep
+### Keep
 
 One rectangle for the button a thumb wants, in every state, and digits that do not move when it
 is pressed. Kept rows (`.quiet`, `.say`, `.sub`) pay for it with a few empty lines. A later
