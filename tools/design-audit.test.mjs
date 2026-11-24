@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { colour, columns, edge, header, press, rhythm, shape, space, spec, type } from './design-audit.mjs';
+import { colour, columns, edge, fluid, header, press, rhythm, scroll, shape, space, spec, type } from './design-audit.mjs';
 
 const s = spec(fs.readFileSync('DESIGN.md', 'utf8'));
 let n = 0;
@@ -67,11 +67,13 @@ test('type: a role passes; a weight, a line height or a family of no role fails'
   assert.deepEqual(type(el({ hasText: false, font: { family: 'Inter', size: 9, weight: 100, lh: 1 } }), s, 412), []);
 });
 
-test('type: the phone timer scales below 412px and is exact at 412', () => {
-  const at = (w, size) => el({ font: { family: 'Barlow Condensed', size, weight: 600, lh: size * 0.9 } });
-  assert.deepEqual(type(at(360, (168 * 360) / 412), s, 360), []);
-  assert.deepEqual(type(at(412, 168), s, 412), []);
-  assert.equal(type(at(412, 160), s, 412).length, 1);
+test('type: under 720px the timer is figure-xl times the width over 412', () => {
+  const at = (size) => el({ font: { family: 'Barlow Condensed', size, weight: 600, lh: size * 0.9 } });
+  assert.deepEqual(type(at((168 * 360) / 412), s, 360), []);
+  assert.deepEqual(type(at(168), s, 412), []);
+  assert.equal(type(at(160), s, 412).length, 1);
+  assert.deepEqual(type(at((168 * 471) / 412), s, 471), []);
+  assert.equal(type(at(168), s, 471).length, 1, 'on the wide phone 168px is the wrong share');
 });
 
 test('shape: radii from rounded, borders of 0, 1 or 2px', () => {
@@ -106,8 +108,16 @@ test('edge: a figure may sit left by its bearing; 3px off is not one edge', () =
   const ok = (b) => edge(column(block(0, 40), b, block(250, 40)), s);
   assert.deepEqual(ok(digits(20 + -0.066 * 168, '18:42')), []);
   assert.deepEqual(ok(digits(20 + -0.047 * 168, '18:42')), []);
-  assert.deepEqual(ok(digits(20, '18:42')), []);
+  assert.equal(ok(digits(20, '18:42')).length, 1, 'from figure-lg up the bearing is required');
   assert.equal(ok(digits(20 + -0.066 * 168, '25:00')).length, 1, "a 2 leads: the 1's bearing is wrong");
+  // The streak's 60 in figure-lg, 2px right of the dots under it.
+  const lg = (x) => block(80, 44, { figure: true, text: '60', rect: { x, y: 80, w: 60, h: 44 }, font: { family: 'Barlow Condensed', size: 44, weight: 600, lh: 44 } });
+  assert.deepEqual(ok(lg(20 + -0.057 * 44)), []);
+  assert.match(ok(lg(22))[0].allowed, /pulled back by its bearing/);
+  // At figure-md and under none is applied.
+  const md = (x) => block(80, 29, { figure: true, text: '2h 11m', rect: { x, y: 80, w: 60, h: 29 }, font: { family: 'Barlow Condensed', size: 26, weight: 500, lh: 28.6 } });
+  assert.deepEqual(ok(md(20)), []);
+  assert.equal(ok(md(20 + -0.047 * 26)).length, 1);
   assert.match(ok(block(80, 40, { rect: { x: 23, y: 80, w: 300, h: 40 } }))[0].what, /starts 3px right/);
   assert.equal(ok(block(80, 40, { rect: { x: 20 + -0.047 * 168, y: 80, w: 300, h: 40 } })).length, 1, 'only a figure has a bearing');
 });
@@ -119,6 +129,18 @@ test('rhythm: one space that grows, above the action row on a phone', () => {
   assert.equal(rhythm(column(a, b, actions), s, 'laptop', true).length, 1);
   // Inside a panel it is not the screen's action row.
   assert.equal(rhythm(column(a, b, actions), s, 'phone', false).length, 1);
+});
+
+test('rhythm: on a phone the space may lie above the sentence that explains the action row', () => {
+  const top = block(0, 100), sentence = block(400, 24, { text: 'Start now and it ends at 09:30.' }), actions = block(432, 48, { holdsPress: true });
+  assert.deepEqual(rhythm(column(top, sentence, actions), s, 'phone', true), []);
+  assert.deepEqual(rhythm(column(top, sentence, actions), s, 'wide', true), []);
+  // A sentence left at the top while its button waits at the bottom splits the group.
+  const split = rhythm(column(block(0, 100), block(124, 24, { text: 'Take five.' }), actions), s, 'phone', true);
+  assert.deepEqual(split, [], 'the space right above the action row is still the one allowed');
+  const far = rhythm(column(top, block(300, 24, { text: 'Take five.' }), block(400, 48, { holdsPress: true })), s, 'phone', true);
+  assert.equal(far.length, 1, 'a sentence 76px above its row is not directly above it: it floats');
+  assert.match(far[0].what, /^200px between/);
 });
 
 test('rhythm: two large spaces, or one with a smaller one after it, are violations', () => {
@@ -150,4 +172,39 @@ test('header: a state whose header differs from the others is named', () => {
   assert.equal(found[0].state, 'c');
   assert.match(found[0].what, /header\[0\]\.at\[2\]: 280 here, 300 in 2 other states/);
   assert.deepEqual(header({ a: h(300), b: h(300) }), []);
+});
+
+test('scroll: on a phone the page never scrolls, and nothing scrolls sideways', () => {
+  const doc = (more) => ({ scrollH: 915, viewH: 915, scrollW: 412, viewW: 412, lowest: null, rightmost: null, ...more });
+  assert.deepEqual(scroll(doc(), 'phone'), []);
+  assert.deepEqual(scroll(doc({ scrollH: 915.6 }), 'phone'), [], 'within a pixel');
+  const tall = scroll(doc({ scrollH: 1403, lowest: { path: 'section > p.sr', text: 'streak', edge: 1403 } }), 'wide');
+  assert.equal(tall.length, 1);
+  assert.equal(tall[0].path, 'section > p.sr');
+  assert.match(tall[0].what, /1403px tall in a 915px screen/);
+  // A laptop page may scroll down; nothing scrolls sideways anywhere.
+  assert.deepEqual(scroll(doc({ scrollH: 1403, viewW: 1440, scrollW: 1440 }), 'laptop'), []);
+  assert.match(scroll(doc({ scrollW: 430, rightmost: { path: 'div.year', text: '', edge: 430 } }), 'phone')[0].what, /430px wide/);
+});
+
+test('fluid: under 720px a block held narrower by its max-width is a violation; short content is not', () => {
+  const col = (b) => ({ box: el({ path: 'col', content: { left: 20, right: 451, top: 0 } }), blocks: [block(0, 40), b] });
+  const capped = block(64, 80, { maxWidth: '352px', rect: { x: 20, y: 64, w: 352, h: 80 } });
+  assert.match(fluid(col(capped), 'wide')[0].what, /held to 352px by its max-width in a 431px column/);
+  assert.deepEqual(fluid(col(capped), 'laptop'), [], 'from 720px a measure may cap a line');
+  assert.deepEqual(fluid(col(block(64, 48, { maxWidth: 'none', rect: { x: 20, y: 64, w: 120, h: 48 } })), 'phone'), [], 'a lone button');
+  assert.deepEqual(fluid(col(block(64, 80, { maxWidth: '500px', rect: { x: 20, y: 64, w: 431, h: 80 } })), 'phone'), [], 'a cap wider than the column');
+  assert.deepEqual(fluid(col(block(64, 80, { maxWidth: '100%', rect: { x: 20, y: 64, w: 100, h: 80 } })), 'phone'), [], 'a percentage is not a measure');
+});
+
+test('edge: a big figure that leads a row starts the column, so it carries its bearing', () => {
+  const box = el({ rect: { x: 20, y: 0, w: 300, h: 200 }, content: { left: 20, right: 320, top: 0 }, display: 'grid' });
+  const dots = { ...block(0, 12), parent: box.i };
+  const row = { ...block(28, 44, { display: 'flex', textFirst: false }), parent: box.i };
+  const sixty = (x, more) => ({ ...block(28, 44, { figure: true, text: '60', rect: { x, y: 28, w: 40, h: 44 }, font: { family: 'Barlow Condensed', size: 44, weight: 600, lh: 44 }, ...more }), parent: row.i });
+  const run = (...rest) => columns([box, dots, ...rest]).flatMap((c) => edge(c, s));
+  assert.match(run({ ...row }, sixty(20))[0].allowed, /pulled back by its bearing/, 'the streak at 0 is 2px right of its dots');
+  assert.deepEqual(run({ ...row }, sixty(20 + -0.057 * 44)), []);
+  // Words before the number: the words start the column, not the figure.
+  assert.deepEqual(run({ ...row, textFirst: true }, sixty(80)), []);
 });

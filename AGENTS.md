@@ -129,7 +129,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | `make deploy`, `make s10-rss` | Copy the arm64 binary to the S10 / run it there for 3 s and print its memory |
 | `tools/tokens.mjs` | DESIGN.md to `client/src/ui/tokens.css`, fonts included. Run by `make tokens` |
 | `tools/style-check.mjs` | Fails on a colour, font name or duration literal in `client/src/ui/` |
-| `tools/design-audit.mjs` | Every demo state in a browser against DESIGN.md: type, colour, shape, space, left edge, rhythm, touch, header |
+| `tools/design-audit.mjs` | Every demo state, built, in a browser at 412, 471 and 1440 against DESIGN.md: type, colour, shape, space, left edge, bearing, rhythm, touch, header, scroll |
 | `tools/budget.mjs` | Built JS, CSS, fonts and the server binary against ARCHITECTURE section 7 |
 | `tools/contracts-check.mjs` | Every cell, session and timer state in the fixtures against the schemas |
 
