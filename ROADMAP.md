@@ -128,7 +128,7 @@ The first thing the user can touch: one timer, live on two screens.
 ## 9. Live on the S10
 
 - [x] [server] systemd unit, data directory, daily `VACUUM INTO` backup kept for 7 days
-- [ ] [server] Web Push with VAPID at phase end for laptop browsers
+- [x] [server] Web Push with VAPID at phase end for laptop browsers
 - [ ] [lead] Exposure: Cloudflare named Tunnel on the user's domain (`cloudflared` on the S10
       container, its RSS measured); WebSocket and the 25 s heartbeat tested through it
 - [ ] [ui] Export and import as JSON

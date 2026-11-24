@@ -28,6 +28,23 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
   e.respondWith(caches.match(url.pathname, { cacheName: VERSION }).then((hit) => hit ?? fetch(e.request)));
 });
+// The server's push at a bell (protocol.md section 17). Every open window is told the run has
+// rung, so a page whose own late timer fires afterwards stays quiet. A window that is looking
+// rings by itself; only when none is does this show the notification.
+self.addEventListener('push', (e) => {
+  let d = null;
+  try { d = e.data.json(); } catch {}
+  if (!d || d.t !== 'ring') return;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    for (const w of windows) w.postMessage({ t: 'rang', run: d.run, at: d.at });
+    if (windows.some((w) => w.visibilityState === 'visible')) return;
+    return self.registration.showNotification(d.title, { body: d.body, tag: 'heirloom-ring' });
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((windows) => (windows[0] ? windows[0].focus() : self.clients.openWindow('/'))));
+});
 `,
     });
   },

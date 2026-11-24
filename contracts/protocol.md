@@ -577,7 +577,7 @@ own VAPID key pair at first start and keeps it in its database.
 `words` is what the notification will say, written by the app in its own voice so the server
 holds no copy of its own: `{"lap":["Lap 1 of 4, done.", four in all],"take":["Take five.",
 four in all, the fourth for the long break],"break":"Break over.","next":["Lap 1 is next.",
-four in all]}`. Each string is at most 80 characters.
+four in all]}`. Each string is 1 to 80 characters.
 
 - **When.** At the moment an account's timer cell says a run ends (section 6: running, not
   paused, `ends_at` reached), the server sends one push to each subscribed device of that
@@ -586,7 +586,11 @@ four in all]}`. Each string is at most 80 characters.
   not a bell.
 - **What.** The encrypted payload (RFC 8291, `aes128gcm`) is
   `{"t":"ring","run":"<run id>","at":<ends_at>,"title":"...","body":"..."}`, the title and body
-  picked from that device's `words` by the phase and `set_index`. TTL 60 s, urgency high.
+  picked from that device's `words` by the phase and `set_index`: a lap at index i says
+  `lap[i]` and `take[i]`; a short break after it says `break` and `next[i + 1]`, wrapping; a
+  long break says `break` and `next[0]`. TTL 60 s, urgency high. A device is rung once for a
+  run and its end; a device that subscribes, or a timer that arrives, less than 60 s after a
+  bell is still rung for it.
 - **The browser's side.** The service worker shows the notification with the tag
   `heirloom-ring`, unless a window of the app is visible, in which case the page rings itself
   and the worker shows nothing. Either way it tells every open window the run has rung, so a
