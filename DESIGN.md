@@ -32,6 +32,13 @@ colors:
   dark-heat-3: "#BE543E"
   dark-rest: "#5DBE8D"
 typography:
+  figure-xxl:
+    fontFamily: Barlow Condensed
+    fontSize: 300px
+    fontWeight: 600
+    lineHeight: 0.9
+    letterSpacing: -0.01em
+    fontFeature: '"tnum" 1'
   figure-xl:
     fontFamily: Barlow Condensed
     fontSize: 168px
@@ -182,7 +189,8 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 ## Typography
 
 Barlow Condensed for every figure, Barlow for words. One superfamily, two widths: the condensed
-digits let the timer run at 168px on a 412px phone (300px on a laptop), and their DIN-like shapes
+digits let the timer run at 168px on a 412px phone (`figure-xl`) and 300px on a laptop
+(`figure-xxl`), and their DIN-like shapes
 are the faces of timing boards, made to be read at a distance. Tabular figures (`tnum`) wherever a
 number updates, so digits do not jiggle.
 
