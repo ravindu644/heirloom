@@ -175,7 +175,17 @@ layout:
   lane: 8px
   lane-set: 24px
   lane-result: 40px
-  figure-bearing: -0.04em
+  figure-bearing: -0.047em
+  figure-bearing-0: -0.046em
+  figure-bearing-1: -0.066em
+  figure-bearing-2: -0.048em
+  figure-bearing-3: -0.044em
+  figure-bearing-4: -0.024em
+  figure-bearing-5: -0.057em
+  figure-bearing-6: -0.057em
+  figure-bearing-7: -0.046em
+  figure-bearing-8: -0.052em
+  figure-bearing-9: -0.038em
 state:
   hover: 12%
   press: 24%
@@ -259,8 +269,11 @@ first, the rest after first paint.
   destinations.
 - **One left edge.** In a column every block starts at the same x: headings, figures, sentences,
   panels, buttons. The big figures are set so their ink sits on that edge, not their box: the
-  digits of Barlow Condensed carry space at their left, and `layout.figure-bearing` (in em of the
-  figure's own size) pulls them back. A sentence under the digits starts exactly under the digits.
+  tabular digits of Barlow Condensed 600 each carry their own space at the left (a 1 the most, a
+  4 the least), measured from pixels and kept as `layout.figure-bearing-0` to `-9`, in em of the
+  figure's own size. The timer is pulled back by the bearing of whichever digit leads, so the
+  sentence under the digits starts exactly under their ink at 25:00 and at 18:42 alike. Smaller
+  figures, where the difference is under a pixel, use the one `layout.figure-bearing`.
 - **Rhythm.** Every vertical space is a step of the spacing scale. Things that belong together
   sit `xs` or `sm` apart (the line under the digits belongs to the digits); parts of one block
   `md`; one block from the next `lg`. Nothing related is ever further apart than `lg`.
