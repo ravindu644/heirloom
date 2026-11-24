@@ -11,7 +11,8 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
-import { createWebNotifier, pageBell, timer } from './web.ts';
+import { bellOnDemand } from './sound.ts';
+import { createWebNotifier, timer } from './web.ts';
 
 /** The one bell. Planning reuses the id, so a new plan always takes the old one's place. */
 export const RING_ID = 1;
@@ -137,11 +138,23 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   };
 }
 
+/**
+ * The phone's "the app is in front again": Capacitor's 'resume', from the activity's onResume. It
+ * fires on coming back from another app, from Android's settings, and on unlocking with heirloom on
+ * top; only after a pause, so never at the first start. Nothing fires when the screen comes on over
+ * the lock screen: the activity stays stopped behind it, and the page reports `visible` throughout,
+ * so `visibilitychange` never fires on the phone at all (seen in the device run).
+ */
+export function whenResumed(app: { addListener(event: 'resume', run: () => void): unknown }): (run: () => void) => void {
+  return (run) => void app.addListener('resume', run);
+}
+
+export const onFront = whenResumed(App);
+
 /** The phone's notifier, on the real plugins. */
 export function capacitorNotifier(channels: Channels): Notifier {
-  const bell = pageBell();
-  // Capacitor's WebView plays media without a gesture, so the bell can be unlocked at once.
-  bell.unlock();
+  // Only for a bell Android cannot give: Capacitor's WebView plays audio without a gesture.
+  const bell = bellOnDemand(() => new AudioContext(), timer);
   return createCapacitorNotifier({
     alarms: LocalNotifications,
     countdown: registerPlugin<Countdown>('Countdown'),
@@ -152,13 +165,12 @@ export function capacitorNotifier(channels: Channels): Notifier {
       now: () => Date.now(),
       schedule: timer,
       hidden: () => document.hidden,
-      onShow: (look) => void App.addListener('resume', look),
+      onShow: onFront,
       // Out of sight, the page stays quiet: see apply.
-      bell: () => document.hidden || bell.play(),
+      bell: () => document.hidden || bell(),
     }),
-    // Capacitor's 'resume' comes from the activity's onResume, so it fires on the way back from
-    // Android's settings too. It fires only after a pause, never at the first start.
-    onResume: (run) => void App.addListener('resume', run),
+    // Permission may have been given in Android's settings: 'resume' fires on the way back.
+    onResume: onFront,
   });
 }
 

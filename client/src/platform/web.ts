@@ -88,12 +88,17 @@ export function timer(run: () => void, ms: number): () => void {
 }
 
 /** The bell in this page. The first tap or key anywhere unlocks it. */
-export function pageBell(): Bell {
+function pageBell(): Bell {
   const bell = createBell(() => new AudioContext());
   // Every gesture, not just the first: unlock is cheap once running, and it revives a context the
   // system suspended. pointerup, not pointerdown: a touch's pointerdown does not count as a gesture.
   for (const type of ['pointerup', 'keydown']) addEventListener(type, bell.unlock, { capture: true, passive: true });
   return bell;
+}
+
+/** Runs `run` each time the page comes back into view: the browser's "the app is in front again". */
+export function whenVisible(doc: Pick<Document, 'hidden' | 'addEventListener'>): (run: () => void) => void {
+  return (run) => doc.addEventListener('visibilitychange', () => doc.hidden || run());
 }
 
 /** The app's notifier in the browser. */
@@ -102,7 +107,7 @@ export function webNotifier(): Notifier {
     now: () => Date.now(),
     schedule: timer,
     hidden: () => document.hidden,
-    onShow: (look) => document.addEventListener('visibilitychange', () => document.hidden || look()),
+    onShow: whenVisible(document),
     bell: pageBell().play,
     Notification: typeof Notification === 'undefined' ? undefined : Notification,
   });

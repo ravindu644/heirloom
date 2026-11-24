@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeTime, settle } from '../sync/fakes.ts';
-import { RING_ID, createCapacitorNotifier } from './capacitor.ts';
+import { RING_ID, createCapacitorNotifier, whenResumed } from './capacitor.ts';
 import type { Alarms, Countdown } from './capacitor.ts';
 import { createWebNotifier } from './web.ts';
 
@@ -250,3 +250,15 @@ describe('the phone notifier', () => {
     assert.deepEqual(pageRings, []);
   });
 });
+
+describe('in front again, on the phone', () => {
+  it("is Capacitor's resume", () => {
+    const seen: [string, () => void][] = [];
+    let runs = 0;
+    whenResumed({ addListener: (event, run) => seen.push([event, run]) })(() => runs++);
+    assert.deepEqual(seen.map(([event]) => event), ['resume']);
+    seen[0]![1]();
+    assert.equal(runs, 1);
+  });
+});
+

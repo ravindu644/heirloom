@@ -39,6 +39,34 @@ export interface Bell {
   unlock(): void;
 }
 
+/** How long the audio stays open after a strike: the bell's 1.25 s and a little over. */
+export const REST_MS = 2000;
+
+/**
+ * A bell that opens audio only to ring, for the phone, where the WebView needs no gesture to play
+ * and Android rings the bell itself whenever it can. A context left running keeps an audio stream
+ * open for as long as the app lives; suspended, the stream is let go.
+ */
+export function bellOnDemand(make: () => AudioContext, schedule: (run: () => void, ms: number) => () => void): () => void {
+  let ctx: AudioContext | undefined;
+  let rest = () => {};
+  return () => {
+    try {
+      ctx ??= make();
+    } catch {
+      return; // no audio here
+    }
+    const c = ctx;
+    c.resume()
+      .then(() => {
+        strike(c);
+        rest();
+        rest = schedule(() => void c.suspend().catch(() => {}), REST_MS);
+      })
+      .catch(() => {});
+  };
+}
+
 /** `make` builds the audio context; it may be missing or throw, as in Node or an old browser. */
 export function createBell(make: () => AudioContext): Bell {
   let ctx: AudioContext | undefined;

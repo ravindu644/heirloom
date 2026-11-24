@@ -1,6 +1,6 @@
 import { effect } from '@preact/signals-core';
 import { render } from 'preact';
-import { startPlatform } from './platform/index.ts';
+import { onFront, startPlatform } from './platform/index.ts';
 import { startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
@@ -10,7 +10,15 @@ const root = document.getElementById('app')!;
 
 async function start() {
   // The phone app is another origin, built knowing its server. In a browser the server is the page's own.
-  const { engine, focus, today } = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
+  const app = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
+  const { engine, focus, today } = app;
+  // The phone's WebView says it is visible right through screen off, so the browser's own
+  // "visible again" never fires there. The platform knows when the app is really in front again:
+  // reconnect then, and let everything that depends on the day look at the clock.
+  onFront(() => {
+    engine.wake();
+    for (const part of [app.today, app.progress, app.habits]) part.wake();
+  });
   // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
   const notifier = await startPlatform({ ring: ring.bellChannel, countdown: ring.countdownChannel });
 

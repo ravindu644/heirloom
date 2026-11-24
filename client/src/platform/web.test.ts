@@ -3,9 +3,9 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { T0, fakeTime } from '../sync/fakes.ts';
-import { createBell } from './sound.ts';
-import { LATE_MS, createWebNotifier } from './web.ts';
+import { T0, fakeTime, settle } from '../sync/fakes.ts';
+import { REST_MS, bellOnDemand, createBell } from './sound.ts';
+import { LATE_MS, createWebNotifier, whenVisible } from './web.ts';
 import type { NotificationApi, WebEnv } from './web.ts';
 
 const MIN = 60_000;
@@ -221,3 +221,78 @@ describe('the bell', () => {
     assert.equal(strikes, 0);
   });
 });
+
+// Enough of an AudioContext for a strike, counting what the bell asks of it.
+function fakeAudio() {
+  const log = { made: 0, resumed: 0, suspended: 0, oscillators: 0 };
+  const param = { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} };
+  const node = { frequency: param, gain: param, connect: (next: unknown) => next, start() {}, stop() {} };
+  const make = () => {
+    log.made++;
+    return {
+      currentTime: 0,
+      destination: {},
+      createOscillator: () => (log.oscillators++, node),
+      createGain: () => node,
+      resume: async () => void log.resumed++,
+      suspend: async () => void log.suspended++,
+    } as unknown as AudioContext;
+  };
+  return { log, make };
+}
+
+describe('the bell on demand (the phone)', () => {
+  it('opens no audio until it rings, then strikes, and lets the stream go once the bell has died away', async () => {
+    const time = fakeTime();
+    const { log, make } = fakeAudio();
+    const ring = bellOnDemand(make, time.schedule);
+    assert.equal(log.made, 0);
+    ring();
+    await settle();
+    assert.deepEqual([log.made, log.resumed, log.suspended], [1, 1, 0]);
+    assert.ok(log.oscillators > 0);
+    time.advance(REST_MS - 1);
+    assert.equal(log.suspended, 0);
+    time.advance(1);
+    await settle();
+    assert.equal(log.suspended, 1);
+  });
+
+  it('a second ring inside the rest keeps the stream open for that one too, on the same context', async () => {
+    const time = fakeTime();
+    const { log, make } = fakeAudio();
+    const ring = bellOnDemand(make, time.schedule);
+    ring();
+    await settle();
+    time.advance(REST_MS / 2);
+    ring();
+    await settle();
+    time.advance(REST_MS - 1);
+    assert.equal(log.suspended, 0);
+    time.advance(1);
+    await settle();
+    assert.deepEqual([log.made, log.suspended], [1, 1]);
+  });
+
+  it('where audio cannot be made, a ring is quiet', () => {
+    const ring = bellOnDemand(() => {
+      throw new ReferenceError('AudioContext is not defined');
+    }, fakeTime().schedule);
+    assert.doesNotThrow(ring);
+  });
+});
+
+describe('in front again, in the browser', () => {
+  it('runs when the page comes back into view, not when it goes out of it', () => {
+    const listeners: (() => void)[] = [];
+    const doc = { hidden: true, addEventListener: (_: string, run: () => void) => listeners.push(run) };
+    let runs = 0;
+    whenVisible(doc as unknown as Document)(() => runs++);
+    listeners.forEach((l) => l());
+    assert.equal(runs, 0);
+    doc.hidden = false;
+    listeners.forEach((l) => l());
+    assert.equal(runs, 1);
+  });
+});
+
