@@ -267,7 +267,7 @@ Sample strings, the register to match:
 
 - "Finish this lap and you draw level."
 - "Level with last Tuesday."
-- "Thursday the 19th was your rest day. One a week keeps the streak going."
+- "Thursday the 19th was a rest day. Two a week keep the streak going."
 - "41 of the last 45 days."
 - "Not sharing what they are on."
 - "Needs a connection. Your laps are safe on this phone."
