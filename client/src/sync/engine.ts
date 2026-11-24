@@ -7,7 +7,7 @@
 
 import { batch, computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal, Signal } from '@preact/signals-core';
-import { ZERO, eventStamp, see, stamp } from '../core/hlc.ts';
+import { ZERO, eventStamp, isStamp, see, stamp } from '../core/hlc.ts';
 import type { Clock, Stamp } from '../core/hlc.ts';
 import { applyCell, cellKey, restamp } from '../core/merge.ts';
 import type { Cell, Cells } from '../core/merge.ts';
@@ -71,9 +71,16 @@ export interface Engine {
    * Sets fields of a row. Shown at once, saved, then sent. Writes made in the same turn are saved as one transaction.
    * With `at`, every cell is stamped at that moment (core/hlc.ts `eventStamp`) and the clock is
    * left alone: for a row that must be the same whoever writes it and whenever (protocol section 11).
-   * Such a cell is dropped where a newer one is already held.
+   * Such a cell is dropped where a newer one is already held. `counter` is for an event that
+   * follows another of the same moment (protocol section 16); it is 0 otherwise.
    */
-  write(dataset: string, row: string, fields: Record<string, unknown>, at?: number): void;
+  write(dataset: string, row: string, fields: Record<string, unknown>, at?: number, counter?: number): void;
+  /**
+   * Takes cells that bring their own stamps, from a person's exported copy: each goes through the
+   * ordinary merge, and those that were kept are saved and put in the outbox, as if this device
+   * had just written them. Cells the server could not store are left out. Returns how many were kept.
+   */
+  merge(cells: readonly unknown[]): number;
   /** The stamp of the cell held for a field: when it was last written, and by which device. */
   stamp(dataset: string, row: string, field: string): Stamp | undefined;
   /** Applies a timer action at `now()` and writes the timer cell if it changed anything. */
@@ -95,10 +102,14 @@ export interface Engine {
    * in. The same time limit and codes as the account calls; `offline` when it cannot be asked.
    */
   request(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string }>;
-  /** A value kept on this device for the signed-in account, never sent: what `keep` last put under `name`. */
-  kept(name: string): unknown;
-  /** Saved with whatever else is being written. Gone with the account's database at sign out. */
-  keep(name: string, value: unknown): void;
+  /**
+   * A value kept on this device and never sent: what `keep` last put under `name`. By default
+   * it belongs to the signed-in account. With `'device'` it belongs to the install, whoever is
+   * signed in or nobody: it outlives a sign out.
+   */
+  kept(name: string, scope?: 'account' | 'device'): unknown;
+  /** An account's value is saved with whatever else is being written and goes with its database at sign out. A device's goes into the install's own store. */
+  keep(name: string, value: unknown, scope?: 'account' | 'device'): void;
   /** Every cell held, for tests and the simulator to compare devices. */
   cells(): Cell[];
   /** Saves what is pending, closes the wire and the stores. Rejects, after closing, if unsent edits could not be saved. */
@@ -175,6 +186,8 @@ export async function createEngine(env: Env): Promise<Engine> {
     await install.write({ meta: { device } });
   }
   const me = device;
+  // Values kept for this install, whoever is signed in (`keep` with 'device').
+  const mine = new Map<string, unknown>(Object.entries(saved).flatMap(([name, value]) => (name.startsWith(LOCAL) ? [[name.slice(LOCAL.length), value]] : [])));
 
   let db: Replica | null = null;
   let offset: number | null = null;
@@ -559,7 +572,7 @@ export async function createEngine(env: Env): Promise<Engine> {
 
     stamp: (dataset, row, field) => db?.cells.get(cellKey({ dataset, row, field }))?.stamp,
 
-    write(dataset, row, fields, at) {
+    write(dataset, row, fields, at, counter) {
       const r = db;
       if (!r) throw new Error('write before sign in: there is no account to write to');
       const made: Cell[] = [];
@@ -573,7 +586,7 @@ export async function createEngine(env: Env): Promise<Engine> {
         const json = JSON.stringify(given);
         if (json === undefined) throw new Error(`${dataset}/${row}/${field}: write null to clear a field`);
         // An event stamp says when the thing happened, not when it is written down: the clock is not asked and does not move.
-        const next = at === undefined ? stamp(clock, now(), me) : { clock, stamp: eventStamp(at, me) };
+        const next = at === undefined ? stamp(clock, now(), me) : { clock, stamp: eventStamp(at, me, counter) };
         clock = next.clock;
         // Through JSON and back: what is held here is exactly what the server will get, and the
         // caller changing its object afterwards changes nothing.
@@ -639,9 +652,36 @@ export async function createEngine(env: Env): Promise<Engine> {
       return answer.ok ? answer : { ok: false, error: answer.error };
     },
 
-    kept: (name) => db?.local.get(name),
+    merge(cells) {
+      const r = db;
+      if (!r) return 0;
+      const kept: Cell[] = [];
+      for (const cell of cells) {
+        // What the server would refuse must not get as far as the outbox: it would sit there for good.
+        if (!isCell(cell) || !isStamp(cell.stamp) || ![cell.dataset, cell.row, cell.field].every((name) => NAME.test(name)) || cell.value === undefined) continue;
+        const { stamp: stamped, dataset, row, field, value } = cell;
+        const own: Cell = { stamp: stamped, dataset, row, field, value };
+        if (bytes(own) > CELL_BYTES) continue;
+        r.clock = see(r.clock, own.stamp);
+        if (!applyCell(r.cells, own)) continue;
+        r.outbox.add(cellKey(own));
+        kept.push(own);
+      }
+      if (kept.length) {
+        save(r, { cells: kept, outbox: kept.map((cell) => [cellKey(cell), true]) });
+        show(kept);
+      }
+      return kept.length;
+    },
 
-    keep(name, value) {
+    kept: (name, scope) => (scope === 'device' ? mine.get(name) : db?.local.get(name)),
+
+    keep(name, value, scope) {
+      if (scope === 'device') {
+        mine.set(name, value);
+        // The install's store is written on its own. If it refuses, the value holds until the app closes.
+        return void install.write({ meta: { [LOCAL + name]: value } }).catch(() => {});
+      }
       const r = db;
       if (!r) return;
       r.local.set(name, value);

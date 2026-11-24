@@ -532,23 +532,28 @@ devices that both see it must write the same one, or one of them would close the
 replaced:
 
 - its `started` is the bell's own time (`ends_at` of the run that rang), not the time of writing;
-- its `run` is the rung run's id with `+` appended (so `run-7f3a`, `run-7f3a+`, `run-7f3a++`);
-- its stamp is made as a rang row's is (section 11): the time of the timer cell it follows,
-  counter 1, the writer's device id. Anything a person does afterwards is newer.
+- its `run` is the rung run's id with `_` appended (so `run-7f3a`, `run-7f3a_`, `run-7f3a__`):
+  a run id becomes a row id, and `_` is a character a name may hold;
+- its stamp is the stamp of the timer cell it follows with the counter one higher, and the
+  writer's device id: always newer than the cell it follows, the same on every device that
+  writes it, and older than anything a person does afterwards.
 
-An automatic start is written only by a device that may write the bell (section 11), and never
-more than two hours after the bell: someone who comes back the next morning finds the timer
+An automatic start is written only by the device that writes the bell's row, in the same write
+(section 11 says who may), and never more than two hours after the bell: someone who comes back the next morning finds the timer
 idle, not a break that started itself nine hours ago. A set of four never chains past its long
 break: after a long break's bell nothing starts by itself.
 
 **Marks.** A mark is for something achieved, never for opening the app. Three kinds: the total of
 laps that rang reaching 1, 4, 25, 100, 250, 500, 1000 or 2500; a task marked done with its laps at
 or under its estimate; a week's focus passing the best week before it (only once there is a week
-before it). A mark is shown once per account: the device that shows it writes
+before it). A mark is for what was done on this device (the lap's bell, the task's done, the week's latest
+lap was written here), and is shown once per account: the device that shows it writes
 `settings/current` field `marks`, an object of mark keys to the time shown (`laps-25`,
-`estimate-<task id>`, `week-<monday>`), and no device shows a mark whose key is there. With
-`celebrate` off nothing is shown and nothing is written, so turning it on later does not replay
-the past: marks older than a day are written as seen without being shown.
+`estimate-<task id>`, `week-<monday>`), and no device shows a mark whose key is there. A mark
+achieved more than a day ago is never shown, so the object need not remember everything: keys
+older than two days are dropped when the next is written, and it stays a few keys long. With
+`celebrate` off nothing is shown and nothing is written, and turning it on later replays
+nothing older than a day.
 
 **A person's own copy.** Export is one JSON text: `{"heirloom": 1, "exported": <ms>, "account":
 "<username>", "cells": [...]}` with every cell the device holds, stamps included. Import applies

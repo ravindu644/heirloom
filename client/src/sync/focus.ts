@@ -7,7 +7,8 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { stampDevice, stampMs } from '../core/hlc.ts';
+import { stampCounter, stampDevice, stampMs } from '../core/hlc.ts';
+import type { Stamp } from '../core/hlc.ts';
 import { closeRun, mayWriteBell } from '../core/session.ts';
 import type { End } from '../core/session.ts';
 import type { Race } from '../core/stats.ts';
@@ -60,6 +61,11 @@ export interface FocusEnv {
   runId(): string;
   /** Runs `run` once after `ms`. Returns a function that cancels it. */
   schedule(run: () => void, ms: number): () => void;
+  /**
+   * The task at the top of today's list, if there is one. A lap that starts by itself after a
+   * break goes on with it when the lap before the break was on it. Left out, such a lap is for no task.
+   */
+  topTask?(): string | null;
 }
 
 /** What Focus uses of the engine. */
@@ -69,6 +75,12 @@ export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'ro
 export const EXTEND_MS = 300000;
 /** How long a stop can be taken back. */
 export const UNDO_MS = 10000;
+// A bell older than this starts nothing by itself: someone who comes back the next morning finds
+// the timer idle, not a break that began nine hours ago.
+const AUTO_LATE_MS = 2 * 60 * 60 * 1000;
+// What the run that starts by itself adds to the id of the run that rang. Two devices that both
+// see the bell make the same id, so they write the same state.
+const AUTO_SUFFIX = '_';
 // The longest the watch waits before looking again: a browser runs a timer set further out than 2^31 ms at once.
 const DAY_MS = 86400000;
 
@@ -190,6 +202,36 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     if (next !== s) put(next);
   }
 
+  // Automatic starts, protocol section 16: the break a lap has earned, or the lap after a short
+  // break, begun at the bell by the device that writes the bell. Never after a long break, so a
+  // set of four does not chain into the next.
+  function follow(s: TimerState, stamp: Stamp, bell: number, now: number) {
+    const set = engine.rows('settings').peek().get('current');
+    const wanted = s.phase === 'work' ? set?.auto_break === true : s.phase === 'short' && set?.auto_work === true;
+    if (!wanted || s.run === null || now - bell > AUTO_LATE_MS) return;
+    const { phase } = view(s, bell).next;
+    // Everything is worked out as of the bell, not of the moment of writing, so a second device
+    // that sees the same bell a little later writes the very same state.
+    const start: TimerAction = { do: 'start', phase, run: s.run + AUTO_SUFFIX, task: phase === 'work' ? taskAfter(s) : null, planned_ms: lengths.peek()[`${phase}_ms`] };
+    const next = act(s, start, bell);
+    // Stamped just after the cell it follows, as a rang row is stamped at it: anything a person
+    // does afterwards is newer, and a stop made elsewhere before the bell is too.
+    engine.write('timer', 'current', { state: next }, stampMs(stamp), stampCounter(stamp) + 1);
+    own = { state: next, written: stampMs(stamp) };
+  }
+
+  // The task a lap begun by itself after this break is for: the one at the top of today's list,
+  // if the lap that rang before the break was on it. Otherwise none: starting on something else
+  // is the person's to say.
+  function taskAfter(rest: TimerState): string | null {
+    const before = counts.sessions
+      .peek()
+      .filter((row) => row.kind === 'work' && row.outcome === 'rang' && row.ended <= (rest.started ?? 0))
+      .sort((a, b) => b.ended - a.ended)[0];
+    const top = env.topTask?.() ?? null;
+    return before?.task && before.task === top ? top : null;
+  }
+
   // The watch. It runs when the timer cell, the sync state or the session rows change, and when
   // the bell is due: so a device that wakes late, comes back online or catches up does the right thing.
   const due = signal(0);
@@ -218,7 +260,11 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
       if (!over) {
         cancel = env.schedule(() => void due.value++, Math.min(ends_at - now, DAY_MS));
       } else if (mayWriteBell(stamp, me, inStep, covered(s.run, ends_at, stampMs(stamp)))) {
-        keep(s, 'bell', now, stampMs(stamp));
+        // One turn, so one store transaction: the row of the bell, and what starts by itself at it.
+        batch(() => {
+          keep(s, 'bell', now, stampMs(stamp));
+          follow(s, stamp, ends_at, now);
+        });
       }
     });
   });

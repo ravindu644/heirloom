@@ -41,9 +41,16 @@ export function see(clock: Clock, seen: Stamp): Clock {
 
 /**
  * The stamp of something that happened at a known moment, whenever it is written down: the bell
- * of a lap (protocol section 11). Counter 0, and no clock is read or moved.
+ * of a lap (protocol section 11). No clock is read or moved. The counter is 0 unless the thing
+ * follows another event of the same moment and must sort after it.
  */
-export const eventStamp = (ms: number, device: string): Stamp => write({ ms, counter: 0 }, device);
+export const eventStamp = (ms: number, device: string, counter = 0): Stamp => write({ ms, counter }, device);
+
+/** The counter of a stamp. */
+export const stampCounter = (stamp: Stamp): number => read(stamp).counter;
+
+/** A stamp of exactly the shape section 2 gives: what the server will take. */
+export const isStamp = (v: unknown): v is Stamp => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z-[0-9a-f]{4}-[0-9a-f]{16}$/.test(v) && !Number.isNaN(read(v).ms);
 
 /** When a stamp was made, in ms. */
 export const stampMs = (stamp: Stamp): number => read(stamp).ms;

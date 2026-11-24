@@ -12,6 +12,7 @@ import { createFocus } from './focus.ts';
 import { createHabits } from './habits.ts';
 import { createProgress } from './progress.ts';
 import { createRooms } from './rooms.ts';
+import { createSettings } from './settings.ts';
 import { createToday } from './today.ts';
 import type { Handlers, Push, Transport } from './transport.ts';
 
@@ -87,17 +88,20 @@ export function world() {
     if (!engine.account.value) await engine.signIn('ravi', 'correct horse');
     const wire = () => wires.at(-1)!;
 
+    // Made when a test first asks for it, so tests of Focus alone see only Focus's timers.
+    let today: ReturnType<typeof createToday> | undefined;
     const focus = createFocus(engine, {
       utcOffsetMin: () => OFFSET,
       runId: () => `run-${++runs}`,
       schedule: (run, ms) => (waits.push(ms), time.schedule(run, ms)),
+      // As startApp wires it: the top of today's list, asked for when a lap starts by itself.
+      topTask: () => today?.list.peek()[0]?.id ?? null,
     });
 
-    // Made when a test first asks for it, so tests of Focus alone see only Focus's timers.
-    let today: ReturnType<typeof createToday> | undefined;
     let progress: ReturnType<typeof createProgress> | undefined;
     let habits: ReturnType<typeof createHabits> | undefined;
     let rooms: ReturnType<typeof createRooms> | undefined;
+    let settings: ReturnType<typeof createSettings> | undefined;
 
     const d = {
       name,
@@ -115,12 +119,16 @@ export function world() {
       get rooms() {
         return (rooms ??= createRooms(engine, { schedule: time.schedule }));
       },
+      get settings() {
+        return (settings ??= createSettings(engine, { utcOffsetMin: () => OFFSET }));
+      },
       close() {
         focus.close();
         today?.close();
         progress?.close();
         habits?.close();
         rooms?.close();
+        settings?.close();
       },
       stores,
       wire,
