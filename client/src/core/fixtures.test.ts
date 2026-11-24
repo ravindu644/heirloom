@@ -15,6 +15,8 @@ import type { Race, Session, Stats } from './stats.ts';
 import { streak } from './streak.ts';
 import type { Streak } from './streak.ts';
 import { IDLE, act, view } from './timer.ts';
+import { dayAfter, keyBetween, nextTask, quickAdd, squares } from './today.ts';
+import type { Repeat } from './today.ts';
 import type { TimerAction, TimerState } from './timer.ts';
 
 // Read from contracts/ itself: a copy here could pass while the server runs something else.
@@ -139,6 +141,63 @@ describe('session.json close', () => {
 describe('session.json bell', () => {
   for (const c of session.bell) {
     it(c.name, () => assert.equal(mayWriteBell(c.timer_stamp, c.device, c.in_step, c.has_row), c.expect));
+  }
+});
+
+const today: {
+  quick_add: { text: string; expect: { title: string; estimate: number | null } | null }[];
+  repeat: { name: string; repeat: Repeat; after: string; expect: string }[];
+  next: { name: string; id: string; due: string | null; today: string; repeat: Repeat; expect: { id: string; due: string } }[];
+  order: { between: [string | null, string | null][]; inserts: { name: string; at: (number | 'end')[] }[] };
+  squares: { name: string; task: string; now: number; state: TimerState; sessions: Session[]; expect: { laps: number; squares: number[] } }[];
+} = load('today.json');
+
+describe('today.json quick_add', () => {
+  for (const c of today.quick_add) {
+    it(JSON.stringify(c.text), () => assert.deepEqual(quickAdd(c.text), c.expect));
+  }
+});
+
+describe('today.json repeat', () => {
+  for (const c of today.repeat) {
+    it(c.name, () => assert.equal(dayAfter(c.repeat, c.after), c.expect));
+  }
+});
+
+describe('today.json next', () => {
+  for (const c of today.next) {
+    it(c.name, () => assert.deepEqual(nextTask(c.id, c.due, c.today, c.repeat), c.expect));
+  }
+});
+
+// What the fixture's `about` asks of any key: the alphabet, the length, and no 0 at the end.
+const isKey = (key: string) => /^[0-9A-Za-z]{1,64}$/.test(key) && !key.endsWith('0');
+
+describe('today.json order', () => {
+  for (const [a, b] of today.order.between) {
+    it(`a key between ${a} and ${b}`, () => {
+      const key = keyBetween(a, b);
+      assert.ok(isKey(key), `${key} is not a key`);
+      assert.ok(a === null || key > a, `${key} does not sort after ${a}`);
+      assert.ok(b === null || key < b, `${key} does not sort before ${b}`);
+    });
+  }
+  for (const c of today.order.inserts) {
+    it(c.name, () => {
+      const list: string[] = [];
+      c.at.forEach((at, n) => {
+        const i = at === 'end' ? list.length : at;
+        list.splice(i, 0, keyBetween(list[i - 1] ?? null, list[i] ?? null));
+        assert.ok(list.every(isKey), `insert ${n}: ${list[i]} is not a key`);
+        assert.ok(list.every((key, j) => j === 0 || list[j - 1]! < key), `insert ${n}: ${list[i]} is out of order`);
+      });
+    });
+  }
+});
+
+describe('today.json squares', () => {
+  for (const c of today.squares) {
+    it(c.name, () => assert.deepEqual(squares(c.sessions, c.state, c.now, c.task), c.expect));
   }
 });
 

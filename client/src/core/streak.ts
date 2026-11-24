@@ -22,7 +22,7 @@ export interface Streak {
 const DAY_MS = 86400000;
 // Days are worked on as UTC midnights, so no time zone or summer time can shift one.
 // 1970-01-01 was a Thursday: weekday 3 when Monday is 0.
-const weekday = (ms: number) => (ms / DAY_MS + 3) % 7;
+export const weekday = (ms: number) => (ms / DAY_MS + 3) % 7;
 
 export function streak({ today, kept, window, daysMask = 127 }: StreakInput): Streak {
   const planned = (ms: number) => ((daysMask >> weekday(ms)) & 1) === 1;

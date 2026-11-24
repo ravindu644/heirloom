@@ -2,11 +2,18 @@
 // could build to it at the same time; the core lane fills in createToday.
 // Rules: contracts/protocol.md section 12, and section 7 for the ghost.
 
+import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { localDay } from '../core/stats.ts';
+import { view } from '../core/timer.ts';
+import { asRepeat, asTask, byOrder, keyBetween, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
+import type { Repeat, Task } from '../core/today.ts';
+import { createCounts, lapLengths } from './counts.ts';
 import type { Engine } from './engine.ts';
 
+export type { Repeat } from '../core/today.ts';
+
 export type ProjectColor = 'you' | 'rest' | 'ink' | 'ghost' | 'heat-2';
-export type Repeat = { every: 'day' } | { every: 'week'; days: number } | null;
 
 export interface ProjectView {
   id: string;
@@ -112,6 +119,281 @@ export interface TodayEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
+const COLORS: readonly ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
+const DAY_MS = 86400000;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+// How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
+const PULSE_MS = 15000;
+const KEY_MAX = 64;
+
+const sameRule = (a: Repeat, b: Repeat) => a?.every === b?.every && (a?.every !== 'week' || a.days === (b as typeof a).days);
+
+/** `close()` stops the midnight and lap timers: for tests and for Node, where a waiting timer keeps the process alive. */
 export function createToday(engine: Engine, env: TodayEnv): Today & { close(): void } {
-  throw new Error('not built yet: createToday, roadmap section 4');
+  const counts = createCounts(engine, env.utcOffsetMin);
+  const taskRows = engine.rows('task');
+  const projectRows = engine.rows('project');
+  const settings = () => engine.rows('settings').value.get('current');
+  const dayNow = () => localDay(engine.now(), env.utcOffsetMin());
+
+  // The day turns over by itself. The wait is to the next local midnight, checked again when it
+  // comes: a clock that was corrected meanwhile may say it is not midnight yet.
+  const day = signal(dayNow());
+  let cancelMidnight = () => {};
+  function armMidnight() {
+    const midnight = Date.parse(day.peek()) + DAY_MS - env.utcOffsetMin() * 60000;
+    cancelMidnight = env.schedule(
+      () => {
+        day.value = dayNow();
+        armMidnight();
+      },
+      Math.min(Math.max(midnight - engine.now(), 1000), DAY_MS),
+    );
+  }
+  armMidnight();
+
+  // While a lap runs on a task its square fills, so the lists are worked out again every few
+  // seconds, and once more at the bell. Nothing else here moves with the clock.
+  const pulse = signal(0);
+  let cancelPulse = () => {};
+  const stopPulse = effect(() => {
+    const s = engine.timer.value;
+    void pulse.value;
+    untracked(() => {
+      cancelPulse();
+      cancelPulse = () => {};
+      const now = engine.now();
+      const { over, ends_at } = view(s, now);
+      if (s.phase !== 'work' || s.task === null || over || ends_at === null) return;
+      cancelPulse = env.schedule(() => void pulse.value++, Math.min(PULSE_MS, ends_at - now));
+    });
+  });
+
+  const model = computed(() => {
+    const today = day.value;
+    void pulse.value;
+    const state = engine.timer.value;
+    const now = engine.now();
+
+    const projects: ProjectView[] = [...projectRows.value.values()]
+      .filter((p) => typeof p.name === 'string' && typeof p.deleted !== 'number' && typeof p.archived !== 'number')
+      .map((p) => ({ id: p.id, order: typeof p.order === 'string' ? p.order : '', name: p.name as string, color: COLORS.find((c) => c === p.color) ?? 'ink' }))
+      .sort(byOrder)
+      .map(({ id, name, color }) => ({ id, name, color }));
+    const project = new Map(projects.map((p) => [p.id, p]));
+
+    const tasks = new Map<string, Task>();
+    for (const [id, row] of taskRows.value) {
+      const task = asTask(id, row);
+      if (task) tasks.set(id, task);
+    }
+    const lists = plan([...tasks.values()], today, now, env.utcOffsetMin());
+    const sessions = counts.live(state, now);
+
+    const show = (t: Task): TaskView => ({
+      id: t.id,
+      title: t.title,
+      notes: t.notes,
+      // A project that was deleted or archived is no longer shown on its tasks.
+      project: (t.project !== null && project.get(t.project)) || null,
+      estimate: t.estimate,
+      ...squares(sessions, state, now, t.id),
+      running: state.phase === 'work' && state.task === t.id,
+      due: t.due,
+      when: t.when,
+      repeat: t.repeat,
+      done: t.done !== null,
+      subtasks: (lists.subtasks.get(t.id) ?? []).map((sub) => ({ id: sub.id, title: sub.title, done: sub.done !== null })),
+    });
+    const todays = lists.today.map(show);
+    return {
+      tasks,
+      lists,
+      projects,
+      ...upNext(todays, state.phase === 'work' ? state.task : null),
+      left: plannedLeft(todays),
+      upcoming: lists.upcoming.map(show),
+      done: lists.done.map(show),
+      deleted: lists.deleted.map(show),
+    };
+  });
+
+  const task = (id: string) => model.peek().tasks.get(id);
+  // A key after the last of a list: where a new row goes.
+  const atEnd = (list: readonly { order: string }[]) => keyBetween(list.at(-1)?.order || null, null);
+
+  // The rows a task is ordered among: its parent's subtasks, today's list, or the tasks due the same day.
+  function siblings(t: Task): Task[] {
+    const { lists } = model.peek();
+    if (t.parent !== null) return lists.subtasks.get(t.parent) ?? [];
+    return lists.today.includes(t) ? lists.today : lists.upcoming.filter((other) => other.due === t.due);
+  }
+
+  // The next task of the series is still exactly the copy that was made: nobody has edited it,
+  // moved it, broken it down, or run a lap on it. Only then is it ours to take away or bring back.
+  function untouched(next: Task, of: Task, due: string): boolean {
+    const copied = next.project === of.project && next.title === of.title && next.notes === of.notes && next.estimate === of.estimate;
+    const placed = next.when === of.when && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
+    const used = next.done !== null || model.peek().lists.subtasks.has(next.id) || engine.timer.peek().task === next.id;
+    return copied && placed && !used && !counts.sessions.peek().some((s) => s.task === next.id);
+  }
+
+  const today: Today & { close(): void } = {
+    day,
+    next: computed(() => model.value.next),
+    running: computed(() => model.value.running),
+    later: computed(() => model.value.later),
+    upcoming: computed(() => model.value.upcoming),
+    done: computed(() => model.value.done),
+    deleted: computed(() => model.value.deleted),
+    projects: computed(() => model.value.projects),
+
+    figures() {
+      const { left } = model.value;
+      const { you_ms, ghost } = counts.race();
+      const target = settings()?.day_target;
+      return {
+        done_ms: you_ms,
+        laps: counts.lapsToday(),
+        left_laps: left,
+        left_ms: left * lapLengths(settings()).work_ms,
+        target: typeof target === 'number' && Number.isInteger(target) && target > 0 ? target : 0,
+        ghost: ghost && { day: ghost.day, total_ms: ghost.total_ms, laps: counts.lapsOn(ghost.day) },
+      };
+    },
+
+    add(line) {
+      const parsed = quickAdd(line);
+      if (!parsed) return null;
+      const id = env.id();
+      engine.write('task', id, { ...parsed, due: dayNow(), order: atEnd(model.peek().lists.today) });
+      return id;
+    },
+
+    edit(id, fields) {
+      if (!task(id)) return;
+      const write: Record<string, unknown> = {};
+      const title = fields.title?.trim();
+      if (title) write.title = title;
+      if (fields.notes !== undefined) write.notes = fields.notes;
+      if (fields.project !== undefined) write.project = fields.project;
+      const { estimate, due, when, repeat } = fields;
+      if (estimate === null || (typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1)) write.estimate = estimate;
+      if (due === null || (typeof due === 'string' && DAY.test(due))) write.due = due;
+      if (when !== undefined) write.when = when?.trim().slice(0, 80) || null;
+      if (repeat !== undefined) write.repeat = asRepeat(repeat);
+      if (Object.keys(write).length) engine.write('task', id, write);
+    },
+
+    setDone(id, done) {
+      const t = task(id);
+      if (!t || (t.done !== null) === done) return;
+      const now = engine.now();
+      const { tasks } = model.peek();
+      // One turn, so one store transaction: the task done and the whole next one of its series.
+      batch(() => {
+        engine.write('task', id, { done: done ? now : null });
+        if (!t.repeat || t.parent !== null) return;
+        // Undoing finds the row by the day the task was done on, which may not be today any more.
+        const next = nextTask(id, t.due, done ? dayNow() : localDay(t.done!, env.utcOffsetMin()), t.repeat);
+        const held = tasks.get(next.id);
+        if (!held) {
+          if (!done) return;
+          const { project, title, notes, estimate, repeat, when, order } = t;
+          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, order, due: next.due });
+        } else if ((held.deleted === null) !== done && untouched(held, t, next.due)) {
+          engine.write('task', next.id, { deleted: done ? null : now });
+        }
+      });
+    },
+
+    remove(id) {
+      if (task(id)?.deleted === null) engine.write('task', id, { deleted: engine.now() });
+    },
+
+    restore(id) {
+      const t = task(id);
+      if (t && t.deleted !== null) engine.write('task', id, { deleted: null });
+    },
+
+    move(id, before) {
+      const t = task(id);
+      if (!t) return;
+      const list = siblings(t).filter((other) => other.id !== id);
+      const found = before === null ? -1 : list.findIndex((other) => other.id === before);
+      const at = found < 0 ? list.length : found;
+      const low = list[at - 1]?.order || null;
+      const high = list[at]?.order ?? null;
+      batch(() => {
+        if (high === null || (low ?? '') < high) {
+          const key = keyBetween(low, high);
+          if (key.length <= KEY_MAX) return engine.write('task', id, { order: key });
+          // The gap has been halved until no key of 64 characters fits. Once in a few hundred
+          // moves into one gap: the whole list gets fresh keys, short and evenly stepped.
+          let last: string | null = null;
+          for (const row of [...list.slice(0, at), t, ...list.slice(at)]) engine.write('task', row.id, { order: (last = keyBetween(last, null)) });
+          return;
+        }
+        // The neighbours hold the same key: two devices each picked it. Nothing sorts between
+        // them, so the rows that share it from here on move up, into the room before the first
+        // larger key, and this one takes the room they leave. Usually that is one row.
+        const run = list.slice(at).filter((other) => other.order === high);
+        const ceiling = list[at + run.length]?.order ?? null;
+        let last = keyBetween(low, ceiling);
+        engine.write('task', id, { order: last });
+        for (const row of run) engine.write('task', row.id, { order: (last = keyBetween(last, ceiling)) });
+      });
+    },
+
+    addSubtask(parent, title) {
+      const name = title.trim();
+      const of = task(parent);
+      // One level: a subtask has none of its own.
+      if (!name || !of || of.parent !== null) return null;
+      const id = env.id();
+      engine.write('task', id, { parent, title: name, order: atEnd(model.peek().lists.subtasks.get(parent) ?? []) });
+      return id;
+    },
+
+    editSubtask(id, fields) {
+      const t = task(id);
+      if (!t) return;
+      const write: Record<string, unknown> = {};
+      const title = fields.title?.trim();
+      if (title) write.title = title;
+      if (fields.done !== undefined && fields.done !== (t.done !== null)) write.done = fields.done ? engine.now() : null;
+      if (Object.keys(write).length) engine.write('task', id, write);
+    },
+
+    addProject(name, color) {
+      const title = name.trim();
+      if (!title || !COLORS.includes(color)) return null;
+      const id = env.id();
+      const keys = [...projectRows.peek().values()].map((p) => ({ order: typeof p.order === 'string' ? p.order : '' })).sort((a, b) => (a.order < b.order ? -1 : 1));
+      engine.write('project', id, { name: title, color, order: atEnd(keys) });
+      return id;
+    },
+
+    editProject(id, fields) {
+      const held = projectRows.peek().get(id);
+      if (typeof held?.name !== 'string') return;
+      const write: Record<string, unknown> = {};
+      const name = fields.name?.trim();
+      if (name) write.name = name;
+      if (fields.color !== undefined && COLORS.includes(fields.color)) write.color = fields.color;
+      if (fields.archived !== undefined && fields.archived !== (typeof held.archived === 'number')) write.archived = fields.archived ? engine.now() : null;
+      if (Object.keys(write).length) engine.write('project', id, write);
+    },
+
+    setTarget(laps) {
+      if (Number.isFinite(laps)) engine.write('settings', 'current', { day_target: Math.max(0, Math.floor(laps)) });
+    },
+
+    close() {
+      stopPulse();
+      cancelPulse();
+      cancelMidnight();
+    },
+  };
+  return today;
 }

@@ -10,10 +10,10 @@ import type { ReadonlySignal } from '@preact/signals-core';
 import { stampDevice, stampMs } from '../core/hlc.ts';
 import { closeRun, mayWriteBell } from '../core/session.ts';
 import type { End } from '../core/session.ts';
-import { localDay, race } from '../core/stats.ts';
-import type { Race, Session } from '../core/stats.ts';
+import type { Race } from '../core/stats.ts';
 import { act, view } from '../core/timer.ts';
 import type { TimerAction, TimerState, TimerView } from '../core/timer.ts';
+import { createCounts, lapLengths } from './counts.ts';
 import type { Engine } from './engine.ts';
 
 export type { Race } from '../core/stats.ts';
@@ -68,34 +68,16 @@ export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'ro
 /** What `extend()` adds. */
 export const EXTEND_MS = 300000;
 const UNDO_MS = 10000;
-// The longest a length may be (the settings schema's maximum), and the longest the watch waits
-// before looking again: a browser runs a timer set further out than 2^31 ms at once.
+// The longest the watch waits before looking again: a browser runs a timer set further out than 2^31 ms at once.
 const DAY_MS = 86400000;
-const LENGTHS = { work_ms: 1500000, short_ms: 300000, long_ms: 900000 };
-
-// A row still arriving cell by cell, or one from a build that writes something else, is not counted yet.
-const isSession = (row: Record<string, unknown>) =>
-  ['started', 'ended', 'paused_ms'].every((field) => typeof row[field] === 'number') &&
-  ['kind', 'outcome', 'device'].every((field) => typeof row[field] === 'string');
 
 /** `close()` stops the bell watch: for tests and for Node, where a waiting timer keeps the process alive. */
 export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close(): void } {
   const me = engine.device;
   const state = engine.timer;
-  const rows = engine.rows('session');
-  const sessions = computed(() => [...rows.value.values()].filter(isSession) as unknown as Session[]);
-
-  const lengths = computed(() => {
-    const set = engine.rows('settings').value.get('current');
-    const length = (name: keyof typeof LENGTHS) => {
-      const value = set?.[name];
-      return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= DAY_MS ? value : LENGTHS[name];
-    };
-    return { work_ms: length('work_ms'), short_ms: length('short_ms'), long_ms: length('long_ms') };
-  });
-
-  const timerStamp = () => engine.stamp('timer', 'current', 'state');
-  const today = (ms: number) => localDay(ms, env.utcOffsetMin());
+  const counts = createCounts(engine, env.utcOffsetMin);
+  const { rows, timerStamp, today, current, covered, rangOnce } = counts;
+  const lengths = computed(() => lapLengths(engine.rows('settings').value.get('current')));
 
   // The timer last did something on an earlier local day: its bell if it rang, else the last
   // time someone touched it. Then the next lap is lap one, and yesterday's half set earns no break.
@@ -110,20 +92,6 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     return newDay(s, v, now) ? { ...v, next: { phase: 'work', set_index: 0 } } : v;
   }
 
-  // The row held for a run was written no earlier than the timer cell that shows the run. A row
-  // from before is about a run that has since gone on: a stop that was undone.
-  function current(run: string, written: number): boolean {
-    const stamp = engine.stamp('session', run, 'ended');
-    return stamp !== undefined && stampMs(stamp) >= written;
-  }
-
-  // A row already tells this run's story up to this bell. A row that ends earlier does not: the
-  // lap was extended after it rang, or went on here after another device stopped it.
-  function covered(run: string, endsAt: number, written: number): boolean {
-    const ended = rows.peek().get(run)?.ended;
-    return typeof ended === 'number' && ended >= endsAt && current(run, written);
-  }
-
   // Closes a run as protocol section 11 says and writes the row it leaves, if any. `written` is
   // the time in the stamp of the timer cell that held `s`.
   function keep(s: TimerState, how: End, now: number, written: number) {
@@ -133,8 +101,6 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     if (closed.stamp_at !== null && covered(closed.id, closed.row.ended, written)) return;
     engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
   }
-
-  const rangOnce = (s: TimerState) => s.run !== null && rows.peek().get(s.run)?.outcome === 'rang';
 
   // The idle state a run leaves behind. A run that holds a rang row reached its bell once, so for
   // the set of four it is done, even when an extension has reopened it: the pure rule only sees a
@@ -262,28 +228,8 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     view: () => look(state.value, engine.now()),
     ran: () => state.value.planned_ms - view(state.value, engine.now()).left_ms,
 
-    race() {
-      const s = state.value;
-      const now = engine.now();
-      // A row that ends before the run has got to (see `covered`) would hide the lap in progress.
-      const end = s.paused_at ?? Math.min(now, view(s, now).ends_at ?? now);
-      const list = sessions.value.filter((row) => !(row.id === s.run && row.ended < end));
-      return race(list, s, now, env.utcOffsetMin());
-    },
-
-    lapsToday() {
-      const s = state.value;
-      const now = engine.now();
-      const day = today(now);
-      const laps = sessions.value.filter((row) => row.kind === 'work' && row.outcome === 'rang' && today(row.started) === day).length;
-      // As the race does: a lap whose bell has gone counts before its row is written, which may
-      // be a while on a device that is offline with another device's timer.
-      const { over, ends_at } = view(s, now);
-      const stamp = timerStamp();
-      if (s.phase !== 'work' || !over || s.run === null || s.started === null || ends_at === null || !stamp) return laps;
-      // Not twice: a rang row is in the count already, and a row that covers this bell has the last word on it.
-      return today(s.started) !== day || rangOnce(s) || covered(s.run, ends_at, stampMs(stamp)) ? laps : laps + 1;
-    },
+    race: counts.race,
+    lapsToday: counts.lapsToday,
 
     start: (task) => begin(false, task),
     skipBreak: (task) => begin(true, task),
