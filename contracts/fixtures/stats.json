@@ -1,0 +1,462 @@
+{
+ "about": "Totals from sessions. Rules: contracts/protocol.md section 7. Sri Lanka time (+05:30) throughout; 04:30Z is 10:00 there.",
+ "cases": [
+  {
+   "name": "one lap that rang",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "rang, stopped and set aside: the minutes of two, the lap of one",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795498200000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 2400000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "a day with only a lap set aside is an empty day",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495200000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {},
+    "overlaps": []
+   }
+  },
+  {
+   "name": "a stopped lap gives minutes and no lap",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 900000,
+      "laps": 0
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "paused minutes are not focus",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496520000,
+     "planned_ms": 1500000,
+     "paused_ms": 420000,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "an extended lap counts every minute, once",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496400000,
+     "planned_ms": 1800000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1800000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "breaks are rest, not focus",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "short",
+     "task": null,
+     "started": 1795496100000,
+     "ended": 1795496400000,
+     "planned_ms": 300000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "long",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 900000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "two devices, overlapping laps: the minutes once, both laps, the pair marked",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-a",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-b",
+     "kind": "work",
+     "task": null,
+     "started": 1795495200000,
+     "ended": 1795496700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 2100000,
+      "laps": 2
+     }
+    },
+    "overlaps": [
+     [
+      "run-a",
+      "run-b"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "one lap inside another",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-a",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-b",
+     "kind": "work",
+     "task": null,
+     "started": 1795494900000,
+     "ended": 1795495500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": [
+     [
+      "run-a",
+      "run-b"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "once one of the pair is set aside, it is no longer an overlap",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-a",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-b",
+     "kind": "work",
+     "task": null,
+     "started": 1795495200000,
+     "ended": 1795496700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "back to back on two devices is not an overlap",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-a",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-b",
+     "kind": "work",
+     "task": null,
+     "started": 1795496100000,
+     "ended": 1795497600000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 3000000,
+      "laps": 2
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "a lap is counted from where its pauses end: no overlap with what ran before that",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-a",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496700000,
+     "planned_ms": 1500000,
+     "paused_ms": 600000,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-b",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495080000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1980000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "the day is the local day the lap started in",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795544400000,
+     "ended": 1795545900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795546200000,
+     "ended": 1795547700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 1500000,
+      "laps": 1
+     },
+     "2026-11-25": {
+      "focus_ms": 1500000,
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "project",
+  "description": "One row per project.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string" },
+    "color": { "type": "string", "description": "A DESIGN.md role name. The roles are pinned in roadmap section 4." },
+    "order": { "type": "string" },
+    "archived": { "type": ["integer", "null"], "description": "Server-time ms, null while active." },
+    "deleted": { "type": ["integer", "null"] }
+  }
+}

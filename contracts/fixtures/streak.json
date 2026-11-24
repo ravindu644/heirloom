@@ -1,0 +1,319 @@
+{
+ "about": "The forgiving streak. Rules: contracts/protocol.md section 8. 2026-11-16 and 2026-11-23 are Mondays. \"kept\" in is the days that count (one rang lap, or a habit at its target); \"window\" is how many days back \"kept of\" looks.",
+ "cases": [
+  {
+   "name": "nothing yet",
+   "today": "2026-11-24",
+   "kept": [],
+   "window": 45,
+   "expect": {
+    "streak": 0,
+    "rest": [],
+    "kept": 0,
+    "of": 0
+   }
+  },
+  {
+   "name": "the first lap starts a streak",
+   "today": "2026-11-24",
+   "kept": [
+    "2026-11-24"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 1,
+    "rest": [],
+    "kept": 1,
+    "of": 1
+   }
+  },
+  {
+   "name": "today is not over, so it is not an empty day",
+   "today": "2026-11-24",
+   "kept": [
+    "2026-11-22",
+    "2026-11-23"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 2,
+    "rest": [],
+    "kept": 2,
+    "of": 2
+   }
+  },
+  {
+   "name": "one empty day in a week is a rest day",
+   "today": "2026-11-20",
+   "kept": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-19",
+    "2026-11-20"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 4,
+    "rest": [
+     "2026-11-18"
+    ],
+    "kept": 4,
+    "of": 5
+   }
+  },
+  {
+   "name": "two empty days in a week are both rest days",
+   "today": "2026-11-22",
+   "kept": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-19",
+    "2026-11-21",
+    "2026-11-22"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 5,
+    "rest": [
+     "2026-11-18",
+     "2026-11-20"
+    ],
+    "kept": 5,
+    "of": 7
+   }
+  },
+  {
+   "name": "a third empty day in the week is a miss, and the streak starts again after it",
+   "today": "2026-11-22",
+   "kept": [
+    "2026-11-16",
+    "2026-11-20",
+    "2026-11-21",
+    "2026-11-22"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 3,
+    "rest": [
+     "2026-11-17",
+     "2026-11-18"
+    ],
+    "kept": 4,
+    "of": 7
+   }
+  },
+  {
+   "name": "after a miss with nothing since, the streak is zero and the days kept still show",
+   "today": "2026-11-20",
+   "kept": [
+    "2026-11-16"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 0,
+    "rest": [
+     "2026-11-17",
+     "2026-11-18"
+    ],
+    "kept": 1,
+    "of": 4
+   }
+  },
+  {
+   "name": "rest days are counted per week, Monday to Sunday",
+   "today": "2026-11-25",
+   "kept": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-25"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 6,
+    "rest": [
+     "2026-11-21",
+     "2026-11-22",
+     "2026-11-23",
+     "2026-11-24"
+    ],
+    "kept": 6,
+    "of": 10
+   }
+  },
+  {
+   "name": "41 of the last 45 days",
+   "today": "2026-11-24",
+   "kept": [
+    "2026-10-11",
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-17",
+    "2026-10-18",
+    "2026-10-19",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-23",
+    "2026-10-24",
+    "2026-10-25",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30",
+    "2026-10-31",
+    "2026-11-01",
+    "2026-11-02",
+    "2026-11-06",
+    "2026-11-07",
+    "2026-11-08",
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-13",
+    "2026-11-14",
+    "2026-11-15",
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-21",
+    "2026-11-22",
+    "2026-11-23",
+    "2026-11-24"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 19,
+    "rest": [
+     "2026-10-20",
+     "2026-11-03",
+     "2026-11-04"
+    ],
+    "kept": 41,
+    "of": 45
+   }
+  },
+  {
+   "name": "the window looks back only as far as it is told",
+   "today": "2026-11-24",
+   "kept": [
+    "2026-11-01",
+    "2026-11-02",
+    "2026-11-03",
+    "2026-11-04",
+    "2026-11-05",
+    "2026-11-06",
+    "2026-11-07",
+    "2026-11-08",
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-13",
+    "2026-11-14",
+    "2026-11-15",
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-21",
+    "2026-11-22",
+    "2026-11-23",
+    "2026-11-24"
+   ],
+   "window": 7,
+   "expect": {
+    "streak": 24,
+    "rest": [],
+    "kept": 7,
+    "of": 7
+   }
+  },
+  {
+   "name": "a weekday habit skips the weekend, and a check-in on a day off does not count",
+   "today": "2026-11-24",
+   "days_mask": 31,
+   "kept": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-21",
+    "2026-11-23",
+    "2026-11-24"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 7,
+    "rest": [],
+    "kept": 7,
+    "of": 7
+   }
+  },
+  {
+   "name": "the window is calendar days, and only planned days in it are counted",
+   "today": "2026-11-24",
+   "days_mask": 31,
+   "kept": [
+    "2026-11-16",
+    "2026-11-17",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20",
+    "2026-11-23",
+    "2026-11-24"
+   ],
+   "window": 7,
+   "expect": {
+    "streak": 7,
+    "rest": [],
+    "kept": 5,
+    "of": 5
+   }
+  },
+  {
+   "name": "kept days that all fall outside the plan are no record at all",
+   "today": "2026-11-24",
+   "days_mask": 31,
+   "kept": [
+    "2026-11-21",
+    "2026-11-22"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 0,
+    "rest": [],
+    "kept": 0,
+    "of": 0
+   }
+  },
+  {
+   "name": "a habit rests only on the days it is planned for",
+   "today": "2026-11-23",
+   "days_mask": 21,
+   "kept": [
+    "2026-11-16",
+    "2026-11-20"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 2,
+    "rest": [
+     "2026-11-18"
+    ],
+    "kept": 2,
+    "of": 3
+   }
+  }
+ ]
+}

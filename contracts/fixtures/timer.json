@@ -1,0 +1,937 @@
+{
+ "about": "Timer math. Each case starts idle at set_index 0 unless it gives \"from\". A step either does something or expects something; an expect lists only the values it pins. Rules: contracts/protocol.md section 6.",
+ "cases": [
+  {
+   "name": "a lap from start to bell, and the cell does not change when it rings",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": "task-pointers",
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000000000,
+     "expect": {
+      "phase": "work",
+      "left_ms": 1500000,
+      "ends_at": 1800001500000,
+      "over": false,
+      "paused": false,
+      "set_index": 0,
+      "next": {
+       "phase": "short",
+       "set_index": 0
+      },
+      "state": {
+       "phase": "work",
+       "run": "run-1",
+       "task": "task-pointers",
+       "started": 1800000000000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 0
+      }
+     }
+    },
+    {
+     "at": 1800000600000,
+     "expect": {
+      "left_ms": 900000,
+      "over": false
+     }
+    },
+    {
+     "at": 1800001499999,
+     "expect": {
+      "left_ms": 1,
+      "over": false
+     }
+    },
+    {
+     "at": 1800001500000,
+     "expect": {
+      "left_ms": 0,
+      "over": true,
+      "ends_at": 1800001500000
+     }
+    },
+    {
+     "at": 1800002400000,
+     "expect": {
+      "phase": "work",
+      "left_ms": 0,
+      "over": true,
+      "next": {
+       "phase": "short",
+       "set_index": 0
+      },
+      "state": {
+       "phase": "work",
+       "run": "run-1",
+       "task": "task-pointers",
+       "started": 1800000000000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "pause stops the clock, resume moves the end",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000300000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000480000,
+     "expect": {
+      "left_ms": 1200000,
+      "ends_at": null,
+      "paused": true,
+      "over": false
+     }
+    },
+    {
+     "at": 1800000600000,
+     "do": "resume"
+    },
+    {
+     "at": 1800000600000,
+     "expect": {
+      "left_ms": 1200000,
+      "ends_at": 1800001800000,
+      "paused": false
+     }
+    },
+    {
+     "at": 1800000720000,
+     "expect": {
+      "left_ms": 1080000
+     }
+    },
+    {
+     "at": 1800001200000,
+     "do": "pause"
+    },
+    {
+     "at": 1800001260000,
+     "do": "resume"
+    },
+    {
+     "at": 1800001260000,
+     "expect": {
+      "left_ms": 600000,
+      "ends_at": 1800001860000,
+      "state": {
+       "phase": "work",
+       "run": "run-1",
+       "task": null,
+       "started": 1800000000000,
+       "paused_at": null,
+       "paused_ms": 360000,
+       "planned_ms": 1500000,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a paused lap never rings",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001440000,
+     "do": "pause"
+    },
+    {
+     "at": 1800005400000,
+     "expect": {
+      "left_ms": 60000,
+      "over": false,
+      "ends_at": null,
+      "paused": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "extend adds to the plan, running or paused",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001200000,
+     "do": "extend",
+     "ms": 300000
+    },
+    {
+     "at": 1800001200000,
+     "expect": {
+      "left_ms": 600000,
+      "ends_at": 1800001800000
+     }
+    },
+    {
+     "at": 1800001320000,
+     "do": "pause"
+    },
+    {
+     "at": 1800001380000,
+     "do": "extend",
+     "ms": 300000
+    },
+    {
+     "at": 1800001380000,
+     "expect": {
+      "left_ms": 780000,
+      "ends_at": null
+     }
+    },
+    {
+     "at": 1800001440000,
+     "do": "resume"
+    },
+    {
+     "at": 1800001440000,
+     "expect": {
+      "left_ms": 780000,
+      "ends_at": 1800002220000,
+      "state": {
+       "phase": "work",
+       "run": "run-1",
+       "task": null,
+       "started": 1800000000000,
+       "paused_at": null,
+       "paused_ms": 120000,
+       "planned_ms": 2100000,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "extend after the bell reopens the lap",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "over": true,
+      "left_ms": 0
+     }
+    },
+    {
+     "at": 1800001560000,
+     "do": "extend",
+     "ms": 300000
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "over": false,
+      "left_ms": 240000,
+      "ends_at": 1800001800000
+     }
+    }
+   ]
+  },
+  {
+   "name": "a set of four, then the long break, then lap one again",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001500000,
+     "expect": {
+      "over": true,
+      "set_index": 0,
+      "next": {
+       "phase": "short",
+       "set_index": 0
+      }
+     }
+    },
+    {
+     "at": 1800001500000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800001500000,
+     "expect": {
+      "phase": "short",
+      "left_ms": 300000,
+      "set_index": 0,
+      "next": {
+       "phase": "work",
+       "set_index": 1
+      }
+     }
+    },
+    {
+     "at": 1800001800000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-3",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001800000,
+     "expect": {
+      "phase": "work",
+      "set_index": 1,
+      "next": {
+       "phase": "short",
+       "set_index": 1
+      }
+     }
+    },
+    {
+     "at": 1800003300000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-4",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800003600000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-5",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800003600000,
+     "expect": {
+      "set_index": 2
+     }
+    },
+    {
+     "at": 1800005100000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-6",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800005400000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-7",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800005400000,
+     "expect": {
+      "set_index": 3,
+      "next": {
+       "phase": "long",
+       "set_index": 3
+      }
+     }
+    },
+    {
+     "at": 1800006900000,
+     "expect": {
+      "over": true,
+      "next": {
+       "phase": "long",
+       "set_index": 3
+      }
+     }
+    },
+    {
+     "at": 1800006900000,
+     "do": "start",
+     "phase": "long",
+     "run": "run-8",
+     "task": null,
+     "planned_ms": 900000
+    },
+    {
+     "at": 1800006900000,
+     "expect": {
+      "phase": "long",
+      "left_ms": 900000,
+      "set_index": 3,
+      "next": {
+       "phase": "work",
+       "set_index": 0
+      }
+     }
+    },
+    {
+     "at": 1800007800000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-9",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800007800000,
+     "expect": {
+      "phase": "work",
+      "set_index": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "stopped mid-lap: idle, and the next start is a fresh lap in the same place",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "expect": {
+      "phase": "idle",
+      "left_ms": 0,
+      "ends_at": null,
+      "over": false,
+      "paused": false,
+      "set_index": 1,
+      "next": {
+       "phase": "work",
+       "set_index": 1
+      }
+     }
+    },
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000000000,
+     "expect": {
+      "set_index": 1
+     }
+    },
+    {
+     "at": 1800000900000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000900000,
+     "expect": {
+      "phase": "idle",
+      "left_ms": 0,
+      "ends_at": null,
+      "over": false,
+      "next": {
+       "phase": "work",
+       "set_index": 1
+      },
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 1
+      }
+     }
+    },
+    {
+     "at": 1800000960000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000960000,
+     "expect": {
+      "left_ms": 1500000,
+      "state": {
+       "phase": "work",
+       "run": "run-2",
+       "task": null,
+       "started": 1800000960000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "stop after the bell: the lap is done, the set moves on",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "do": "stop"
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "stop after the fourth bell starts a new set",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 3
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "do": "stop"
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a break cut short still moves the set on",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001500000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800001620000,
+     "do": "stop"
+    },
+    {
+     "at": 1800001620000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "skipping the break: a lap started after the bell is the next lap",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "phase": "work",
+      "set_index": 1,
+      "left_ms": 1500000
+     }
+    }
+   ]
+  },
+  {
+   "name": "skipping the long break starts a new set",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 3
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001560000,
+     "expect": {
+      "set_index": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "stop during the long break starts a new set",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 3
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001500000,
+     "do": "start",
+     "phase": "long",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 900000
+    },
+    {
+     "at": 1800001800000,
+     "do": "stop"
+    },
+    {
+     "at": 1800001800000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a short break taken after the fourth lap still wraps to lap one",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 3
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800000000000,
+     "expect": {
+      "phase": "short",
+      "set_index": 3,
+      "next": {
+       "phase": "work",
+       "set_index": 0
+      }
+     }
+    },
+    {
+     "at": 1800000300000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000300000,
+     "expect": {
+      "set_index": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "a lap restarted before the bell keeps its place",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 2
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000600000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000600000,
+     "expect": {
+      "set_index": 2,
+      "left_ms": 1500000,
+      "state": {
+       "phase": "work",
+       "run": "run-2",
+       "task": null,
+       "started": 1800000600000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "pause, resume and extend do nothing when there is nothing to act on",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000000000,
+     "do": "resume"
+    },
+    {
+     "at": 1800000000000,
+     "do": "extend",
+     "ms": 300000
+    },
+    {
+     "at": 1800000000000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 0
+      }
+     }
+    },
+    {
+     "at": 1800000060000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000120000,
+     "do": "resume"
+    },
+    {
+     "at": 1800000120000,
+     "expect": {
+      "left_ms": 1440000,
+      "paused": false
+     }
+    },
+    {
+     "at": 1800000180000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000240000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000300000,
+     "expect": {
+      "left_ms": 1380000,
+      "paused": true
+     }
+    },
+    {
+     "at": 1800000300000,
+     "do": "resume"
+    },
+    {
+     "at": 1800002400000,
+     "do": "pause"
+    },
+    {
+     "at": 1800002400000,
+     "expect": {
+      "over": true,
+      "paused": false,
+      "left_ms": 0
+     }
+    }
+   ]
+  }
+ ]
+}

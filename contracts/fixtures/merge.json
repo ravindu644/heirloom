@@ -1,0 +1,723 @@
+{
+ "about": "Stamps, the merge of cells, and the clock rule. Rules: contracts/protocol.md sections 2 and 3.",
+ "unknown": [
+  "mood.level",
+  "task.energy"
+ ],
+ "stamps": [
+  {
+   "name": "the first stamp is the wall time",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "edits in one millisecond count up, the next millisecond starts again",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600001,
+     "stamp": "2026-11-24T04:30:00.001Z-0000-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "a clock that steps back never stamps backwards",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494595000,
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494596000,
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600001,
+     "stamp": "2026-11-24T04:30:00.001Z-0000-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "after seeing a newer stamp, the next edit is later than it",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "see": "2026-11-24T04:31:30.000Z-0007-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494601000,
+     "stamp": "2026-11-24T04:31:30.000Z-0008-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "seeing an older stamp changes nothing",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "see": "2026-11-24T04:29:59.000Z-0009-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "same millisecond: the higher counter seen is the one to pass",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "see": "2026-11-24T04:30:00.000Z-0004-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0005-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "a full counter rolls into the next millisecond",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "see": "2026-11-24T04:30:00.000Z-ffff-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.001Z-0000-a1b2c3d4e5f60718"
+    }
+   ]
+  }
+ ],
+ "merge": [
+  {
+   "name": "the later edit wins, whichever arrives first",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:31:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers, chapter 3"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:31:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers, chapter 3"
+    }
+   ]
+  },
+  {
+   "name": "same millisecond: the higher counter wins before the device id is looked at",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from A"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0001-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from B"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from A"
+    }
+   ]
+  },
+  {
+   "name": "same millisecond and counter: the device id settles it",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from A"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from B"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "from B"
+    }
+   ]
+  },
+  {
+   "name": "the same cell twice is one cell",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    }
+   ]
+  },
+  {
+   "name": "a slow clock loses even when it wrote last in real time",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:28:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "written later, stamped earlier"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    }
+   ]
+  },
+  {
+   "name": "two fields of one task, edited on two devices, both stay",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:30:02.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "estimate",
+     "value": 4
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:30:02.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "estimate",
+     "value": 4
+    }
+   ]
+  },
+  {
+   "name": "deleted on one device, edited on the other: both stay and the delete stands",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "deleted",
+     "value": 1795494600000
+    },
+    {
+     "stamp": "2026-11-24T04:35:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers and arrays"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "deleted",
+     "value": 1795494600000
+    },
+    {
+     "stamp": "2026-11-24T04:35:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers and arrays"
+    }
+   ]
+  },
+  {
+   "name": "restore is a newer write of the same field",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "deleted",
+     "value": 1795494600000
+    },
+    {
+     "stamp": "2026-11-24T05:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "deleted",
+     "value": null
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T05:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "deleted",
+     "value": null
+    }
+   ]
+  },
+  {
+   "name": "clearing a due date is a write like any other",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "due",
+     "value": "2026-11-30"
+    },
+    {
+     "stamp": "2026-11-24T04:30:01.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "due",
+     "value": null
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:01.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "due",
+     "value": null
+    }
+   ]
+  },
+  {
+   "name": "two devices reorder a list: the newer order key wins",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "order",
+     "value": "a0V"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.500Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "order",
+     "value": "a2"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.500Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "order",
+     "value": "a2"
+    }
+   ]
+  },
+  {
+   "name": "the timer is one value: the newer state whole, never half of each",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "timer",
+     "row": "current",
+     "field": "state",
+     "value": {
+      "phase": "work",
+      "run": "run-7f3a",
+      "task": "task-pointers",
+      "started": 1795494600000,
+      "paused_at": null,
+      "paused_ms": 0,
+      "planned_ms": 1500000,
+      "set_index": 1
+     }
+    },
+    {
+     "stamp": "2026-11-24T04:36:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "timer",
+     "row": "current",
+     "field": "state",
+     "value": {
+      "phase": "work",
+      "run": "run-7f3a",
+      "task": "task-pointers",
+      "started": 1795494600000,
+      "paused_at": 1795494960000,
+      "paused_ms": 0,
+      "planned_ms": 1500000,
+      "set_index": 1
+     }
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:36:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "timer",
+     "row": "current",
+     "field": "state",
+     "value": {
+      "phase": "work",
+      "run": "run-7f3a",
+      "task": "task-pointers",
+      "started": 1795494600000,
+      "paused_at": 1795494960000,
+      "paused_ms": 0,
+      "planned_ms": 1500000,
+      "set_index": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "two check-ins on two devices are two rows, and both stay",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "habit",
+     "value": "habit-read"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "day",
+     "value": "2026-11-24"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "at",
+     "value": 1795494600000
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0000-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "habit",
+     "value": "habit-read"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0001-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "day",
+     "value": "2026-11-24"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0002-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "at",
+     "value": 1795494600400
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "habit",
+     "value": "habit-read"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "day",
+     "value": "2026-11-24"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718",
+     "dataset": "checkin",
+     "row": "checkin-a-0931",
+     "field": "at",
+     "value": 1795494600000
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0000-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "habit",
+     "value": "habit-read"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0001-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "day",
+     "value": "2026-11-24"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.400Z-0002-b2c3d4e5f6071829",
+     "dataset": "checkin",
+     "row": "checkin-b-0931",
+     "field": "at",
+     "value": 1795494600400
+    }
+   ]
+  },
+  {
+   "name": "both devices saw the same lap end: one session row, the newer cells",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:55:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "outcome",
+     "value": "rang"
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.000Z-0001-a1b2c3d4e5f60718",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "ended",
+     "value": 1795496100000
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.000Z-0002-a1b2c3d4e5f60718",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "device",
+     "value": "a1b2c3d4e5f60718"
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0000-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "outcome",
+     "value": "rang"
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0001-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "ended",
+     "value": 1795496100000
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0002-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "device",
+     "value": "b2c3d4e5f6071829"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0000-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "outcome",
+     "value": "rang"
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0001-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "ended",
+     "value": 1795496100000
+    },
+    {
+     "stamp": "2026-11-24T04:55:00.300Z-0002-b2c3d4e5f6071829",
+     "dataset": "session",
+     "row": "run-7f3a",
+     "field": "device",
+     "value": "b2c3d4e5f6071829"
+    }
+   ]
+  },
+  {
+   "name": "a dataset from a newer build is kept and passed on",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "mood",
+     "row": "mood-1124",
+     "field": "level",
+     "value": 3
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "mood",
+     "row": "mood-1124",
+     "field": "level",
+     "value": 3
+    }
+   ]
+  },
+  {
+   "name": "a field from a newer build is kept beside the ones this build knows",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0001-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "energy",
+     "value": "low"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "title",
+     "value": "Pointers chapter 3"
+    },
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0001-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "energy",
+     "value": "low"
+    }
+   ]
+  }
+ ],
+ "drift": [
+  {
+   "name": "a stamp at server time is accepted",
+   "server_time": 1795494600000,
+   "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+   "accept": true
+  },
+  {
+   "name": "exactly five minutes ahead is accepted",
+   "server_time": 1795494600000,
+   "stamp": "2026-11-24T04:35:00.000Z-0000-a1b2c3d4e5f60718",
+   "accept": true
+  },
+  {
+   "name": "the counter does not count as time",
+   "server_time": 1795494600000,
+   "stamp": "2026-11-24T04:35:00.000Z-ffff-b2c3d4e5f6071829",
+   "accept": true
+  },
+  {
+   "name": "one millisecond past five minutes is refused",
+   "server_time": 1795494600000,
+   "stamp": "2026-11-24T04:35:00.001Z-0000-a1b2c3d4e5f60718",
+   "accept": false
+  },
+  {
+   "name": "a device three weeks offline is accepted",
+   "server_time": 1795494600000,
+   "stamp": "2026-11-03T04:30:00.000Z-0000-b2c3d4e5f6071829",
+   "accept": true
+  }
+ ]
+}

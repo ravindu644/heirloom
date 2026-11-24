@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "timer",
+  "description": "One row per account, row id \"current\". One field, so two devices can never leave the timer half of each.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "run", "task", "started", "paused_at", "paused_ms", "planned_ms", "set_index"],
+      "properties": {
+        "phase": { "enum": ["idle", "work", "short", "long"] },
+        "run": { "type": ["string", "null"], "description": "Id of this interval. It becomes the session's row id. Null when idle." },
+        "task": { "type": ["string", "null"] },
+        "started": { "type": ["integer", "null"], "description": "Server-time ms. Null when idle." },
+        "paused_at": { "type": ["integer", "null"], "description": "Server-time ms the pause began. Null while running." },
+        "paused_ms": { "type": "integer", "minimum": 0, "description": "Total of the pauses that have ended." },
+        "planned_ms": { "type": "integer", "minimum": 0, "description": "Planned length, extensions included." },
+        "set_index": { "type": "integer", "minimum": 0, "maximum": 3, "description": "Which lap of the set of four: this lap, the lap this break follows, or, when idle, the lap that comes next." }
+      }
+    }
+  }
+}
