@@ -72,6 +72,8 @@ export interface RoomsEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
+type RoomNow = Extract<RoomMessage, { type: 'room' }>;
+
 // A cheer still to be sent: which lap of whom, in which room.
 interface Cheer {
   room: string;
@@ -91,7 +93,7 @@ const amount = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : 0);
  */
 export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): void } {
   // The last message for each room, as it came. Kept on the device, so the screen is not empty offline.
-  const rooms = signal<ReadonlyMap<string, RoomMessage>>(new Map());
+  const rooms = signal<ReadonlyMap<string, RoomNow>>(new Map());
   // Cheers the server has not answered yet. Kept too: one made in a tunnel is sent after it, restart or not.
   const waiting = signal<readonly Cheer[]>([]);
   // Cheers this run of the app has sent and had accepted, so they stay shown until the server's message says so itself.
@@ -99,7 +101,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   const flying = new Set<string>();
   const connected = computed(() => engine.sync.value === 'syncing' || engine.sync.value === 'in-step');
 
-  function remember(next: ReadonlyMap<string, RoomMessage>) {
+  function remember(next: ReadonlyMap<string, RoomNow>) {
     rooms.value = next;
     engine.keep('rooms', [...next.values()]);
   }
@@ -115,21 +117,24 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
       const held = engine.kept('rooms');
       const cheers = engine.kept('cheers');
       batch(() => {
-        rooms.value = new Map((Array.isArray(held) ? (held as RoomMessage[]) : []).filter((msg) => typeof msg?.room === 'string').map((msg) => [msg.room, msg]));
+        rooms.value = new Map((Array.isArray(held) ? (held as RoomNow[]) : []).filter((msg) => typeof msg?.room === 'string').map((msg) => [msg.room, msg]));
         waiting.value = Array.isArray(cheers) ? (cheers as Cheer[]).filter((c) => [c?.room, c?.to, c?.run].every((part) => typeof part === 'string')) : [];
         accepted.value = new Set();
       });
     });
   });
 
+  // A room that is no more, and the cheers waiting for it, which have nowhere to go.
+  function forget(gone: (room: string) => boolean) {
+    if (waiting.peek().some((cheer) => gone(cheer.room))) queue(waiting.peek().filter((cheer) => !gone(cheer.room)));
+    if ([...rooms.peek().keys()].some(gone)) remember(new Map([...rooms.peek()].filter(([id]) => !gone(id))));
+  }
+
   const stopRooms = engine.onRoom((msg) => {
-    const next = new Map(rooms.peek());
-    if (msg.gone === true) {
-      next.delete(msg.room);
-      // Its cheers have nowhere to go.
-      if (waiting.peek().some((cheer) => cheer.room === msg.room)) queue(waiting.peek().filter((cheer) => cheer.room !== msg.room));
-    } else next.set(msg.room, msg);
-    remember(next);
+    // The whole set: a room it does not name was left, or ended, while this device was away.
+    if (msg.type === 'rooms') return forget((id) => !msg.rooms.includes(id));
+    if (msg.gone === true) return forget((id) => id === msg.room);
+    remember(new Map(rooms.peek()).set(msg.room, msg));
   });
 
   // A member's bell goes at `ends_at` whether or not the server says so in time. The list is
@@ -208,9 +213,10 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     flying.add(key);
     const answer = await engine.request('/api/rooms/cheer', cheer);
     flying.delete(key);
-    // `run`: that lap is gone or was set aside, so there is nothing to cheer. Dropped quietly.
-    // Any other failure keeps it for the next connection.
-    if (!answer.ok && answer.error !== 'run') return;
+    // `run`: that lap is gone or was set aside. `room`: the room is, or this account is out of
+    // it. Either way there is nothing left to cheer, and it is dropped quietly. Any other failure
+    // keeps it for the next connection.
+    if (!answer.ok && answer.error !== 'run' && answer.error !== 'room') return;
     batch(() => {
       if (answer.ok) accepted.value = new Set([...accepted.peek(), key]);
       queue(waiting.peek().filter((other) => keyOf(other) !== key));

@@ -131,6 +131,49 @@ describe('the list', () => {
     assert.equal(again.rooms.stale.value, false);
   });
 
+  it('a welcome names the account\'s rooms: one it does not name was left while this device was away, and goes with its waiting cheers', async () => {
+    const { w, d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { last: lastLap() })]));
+    say(d, room('r_2', [member(ME, 'ravi'), member(NIMAL, 'nimal', { last: lastLap() })], { name: 'Night owls' }));
+    d.disconnect();
+    r.cheer('r_1', SACHI);
+    r.cheer('r_2', NIMAL);
+    // Back online. Meanwhile the account left r_1 from another device.
+    d.online = true;
+    d.wire().handlers.message({ type: 'welcome', server_time: 0, head: 0, rooms: ['r_2'] });
+    await settle();
+    assert.deepEqual(r.list.value.map((v) => v.id), ['r_2']);
+    assert.deepEqual(cheers(w).map((c) => [c.body.room, c.body.to]), [['r_2', NIMAL]], 'the cheer for the room that is gone was never sent');
+    // And that is what is kept: a restart offline does not bring the room back.
+    const again = await w.restart(d, { online: false });
+    assert.deepEqual(again.rooms.list.value.map((v) => v.id), ['r_2']);
+  });
+
+  it('a welcome that names no rooms at all is an older server: nothing is dropped. An empty list means none', async () => {
+    const { d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi')]));
+    say(d, room('r_2', [member(ME, 'ravi')]));
+    d.wire().handlers.down();
+    d.wire().handlers.message({ type: 'welcome', server_time: 0, head: 0 });
+    assert.deepEqual(r.list.value.map((v) => v.id), ['r_1', 'r_2']);
+    d.wire().handlers.down();
+    d.wire().handlers.message({ type: 'welcome', server_time: 0, head: 0, rooms: 'r_1' } as never);
+    assert.deepEqual(r.list.value.map((v) => v.id), ['r_1', 'r_2'], 'not a list: not said');
+    d.wire().handlers.down();
+    d.wire().handlers.message({ type: 'welcome', server_time: 0, head: 0, rooms: [] });
+    assert.deepEqual(r.list.value, []);
+  });
+
+  it('a POST reply\'s rooms are the whole set too: a room it did not name is dropped', async () => {
+    const { d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi')]));
+    say(d, room('r_2', [member(ME, 'ravi')]));
+    // As the transport hands a reply on: each room, then the ids of all of them.
+    say(d, room('r_2', [member(ME, 'ravi'), member(SACHI, 'sachi')]));
+    d.wire().handlers.message({ type: 'rooms', rooms: ['r_2'] });
+    assert.deepEqual(r.list.value.map((v) => [v.id, v.members.length]), [['r_2', 2]]);
+  });
+
   it('each account has its own rooms: signing in as someone else shows none of them', async () => {
     const { d, r } = await one();
     say(d, room('r_1', [member(ME, 'ravi')]));
@@ -265,6 +308,23 @@ describe('cheering', () => {
     await d.connect();
     await settle();
     assert.equal(cheers(w).length, 1, 'not tried again');
+  });
+
+  it('a cheer the server answers `room` to is dropped the same way: the room is gone, or this account is out of it', async () => {
+    const { w, d, r } = await one();
+    withSachi(d);
+    w.server.reply = () => ({ status: 404, body: { error: 'room' } });
+    r.cheer('r_1', SACHI);
+    await settle();
+    assert.equal(sachi(d).last?.cheered, false);
+    d.disconnect();
+    await d.connect();
+    await settle();
+    assert.equal(cheers(w).length, 1, 'not tried again');
+    const again = await w.restart(d);
+    void again.rooms.list.value;
+    await settle();
+    assert.equal(cheers(w).length, 1, 'nor kept for after a restart');
   });
 
   it('a cheer the server fails on is kept, still shown, and sent again at the next connection', async () => {

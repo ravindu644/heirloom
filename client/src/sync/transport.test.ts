@@ -402,7 +402,17 @@ describe('without a socket', () => {
       { type: 'cells', from: 0, to: 0, cells: [] },
       { type: 'room', room: 'r_1', name: 'Sachi and me', members: [] },
       { type: 'room', room: 'r_2', gone: true },
+      // The array is the whole set: the engine is told which rooms there are, so any other can go.
+      { type: 'rooms', rooms: ['r_1', 'r_2'] },
     ]);
+    // An empty array says there are none. No array at all says nothing.
+    r.time.advance(POLL_MS);
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [], rooms: [] } });
+    assert.deepEqual(r.seen.at(-1), { type: 'rooms', rooms: [] });
+    r.time.advance(POLL_MS);
+    const seen = r.seen.length;
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    assert.deepEqual(r.seen.slice(seen).map((m) => (m === 'down' ? m : m.type)), ['cells']);
   });
 
   it('a nack comes through the same way', async () => {

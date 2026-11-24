@@ -6,13 +6,15 @@
 import type { Cell } from '../core/merge.ts';
 
 export type ServerMessage =
-  | { type: 'welcome'; server_time: number; head: number }
+  | { type: 'welcome'; server_time: number; head: number; rooms?: string[] }
   | { type: 'cells'; from: number; to: number; cells: Cell[] }
   | { type: 'ack'; batch: string; from: number; cursor: number }
   | { type: 'nack'; batch: string; reason: string; server_time: number }
   | { type: 'bye'; reason: string }
   // One room as the server sees it now: protocol section 15. sync/rooms.ts reads the rest of it.
-  | ({ type: 'room'; room: string } & Record<string, unknown>);
+  | ({ type: 'room'; room: string } & Record<string, unknown>)
+  // Not on the wire: every room the account is in, as a welcome or a POST reply named them.
+  | { type: 'rooms'; rooms: string[] };
 
 export interface Push {
   type: 'push';
@@ -294,6 +296,8 @@ export function connect(wire: Wire, on: Handlers): Transport {
     if (!pollUp) steps.unshift({ type: 'welcome', server_time: reply.server_time, head: reply.head });
     // The rooms ride in the reply as they would arrive on a socket: one message each.
     for (const room of reply.rooms ?? []) steps.push({ ...room, type: 'room' });
+    // The array is the whole set, so it also says which rooms are no more. No array says nothing.
+    if (Array.isArray(reply.rooms)) steps.push({ type: 'rooms', rooms: reply.rooms.map((room: { room: string }) => room.room) });
     if (reply.ack) steps.push({ type: 'ack', ...reply.ack });
     if (reply.nack) steps.push({ type: 'nack', ...reply.nack });
     // Up before the welcome is handed over: the engine answers a welcome with a push, and it must be taken.

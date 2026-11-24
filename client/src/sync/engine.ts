@@ -105,7 +105,8 @@ export interface Engine {
   stop(): Promise<void>;
 }
 
-export type RoomMessage = Extract<ServerMessage, { type: 'room' }>;
+/** One room as the server sees it now, or (`rooms`) the ids of every room the account is in. */
+export type RoomMessage = Extract<ServerMessage, { type: 'room' | 'rooms' }>;
 
 interface Session extends Account {
   token: string;
@@ -352,6 +353,13 @@ export async function createEngine(env: Env): Promise<Engine> {
           save(r, { outbox: [...r.cells.keys()].map((key) => [key, true]) });
           unsent.value = r.outbox.size;
         }
+        // The welcome names the account's rooms. An older server names none: that is "not said",
+        // not "none". Said before anyone hears there is a connection, so nothing waiting for a
+        // room that is gone is sent into it.
+        if (Array.isArray(msg.rooms)) {
+          const rooms = msg.rooms.filter((id) => typeof id === 'string');
+          roomListeners.forEach((listener) => listener({ type: 'rooms', rooms }));
+        }
         batch(() => {
           connected.value = true;
           caughtUp.value = r.cursor >= r.head;
@@ -416,6 +424,7 @@ export async function createEngine(env: Env): Promise<Engine> {
       }
 
       case 'room':
+      case 'rooms':
         return roomListeners.forEach((listener) => listener(msg));
 
       case 'bye':
