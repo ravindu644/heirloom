@@ -458,5 +458,395 @@
     "overlaps": []
    }
   }
+ ],
+ "race": [
+  {
+   "name": "the first day has no ghost",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 1500000,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "the ghost is the same weekday last week, up to this time of day",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "old-1",
+     "kind": "work",
+     "task": null,
+     "started": 1794886200000,
+     "ended": 1794887700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "old-2",
+     "kind": "work",
+     "task": null,
+     "started": 1794888000000,
+     "ended": 1794889500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "old-3",
+     "kind": "work",
+     "task": null,
+     "started": 1794925800000,
+     "ended": 1794927300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 1500000,
+    "ghost": {
+     "day": "2026-11-17",
+     "ms": 3000000,
+     "total_ms": 4500000
+    },
+    "split_ms": -1500000
+   }
+  },
+  {
+   "name": "a lap the ghost was in the middle of counts up to this minute, and so does yours",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": null,
+    "started": 1795494360000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "old-1",
+     "kind": "work",
+     "task": null,
+     "started": 1794889200000,
+     "ended": 1794890700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 240000,
+    "ghost": {
+     "day": "2026-11-17",
+     "ms": 600000,
+     "total_ms": 1500000
+    },
+    "split_ms": -360000
+   }
+  },
+  {
+   "name": "a paused lap stops counting",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": null,
+    "started": 1795493400000,
+    "paused_at": 1795494000000,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [],
+   "expect": {
+    "you_ms": 600000,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "a lap that rang but has no row yet counts in full",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": null,
+    "started": 1795492800000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [],
+   "expect": {
+    "you_ms": 1500000,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "once its row is written, the same lap is not counted twice",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": null,
+    "started": 1795492800000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-now",
+     "kind": "work",
+     "task": null,
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 1500000,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "a break in progress adds nothing",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "short",
+    "run": "run-now",
+    "task": null,
+    "started": 1795494360000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 1500000,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "last week's day was empty: the ghost is the latest day with focus before today",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "old-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795318200000,
+     "ended": 1795319700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "older",
+     "kind": "work",
+     "task": null,
+     "started": 1794713400000,
+     "ended": 1794714900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 0,
+    "ghost": {
+     "day": "2026-11-22",
+     "ms": 1500000,
+     "total_ms": 1500000
+    },
+    "split_ms": -1500000
+   }
+  },
+  {
+   "name": "a day with only a lap set aside is nobody's ghost",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "old-1",
+     "kind": "work",
+     "task": null,
+     "started": 1794886200000,
+     "ended": 1794887700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 0,
+    "ghost": null,
+    "split_ms": null
+   }
+  },
+  {
+   "name": "ahead of the ghost",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "old-1",
+     "kind": "work",
+     "task": null,
+     "started": 1794886200000,
+     "ended": 1794887700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795492800000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 3000000,
+    "ghost": {
+     "day": "2026-11-17",
+     "ms": 1500000,
+     "total_ms": 1500000
+    },
+    "split_ms": 1500000
+   }
+  }
  ]
 }

@@ -1,0 +1,531 @@
+{
+ "about": "When a run becomes a session row, and who may write it. Rules: contracts/protocol.md section 11.",
+ "close": [
+  {
+   "name": "the bell: the row ends at the planned end and is stamped there, whenever it is written",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800001860000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800001500000,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800001500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "the bell after pauses and an extension",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 240000,
+    "planned_ms": 1800000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800002040000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800002040000,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800002040000,
+     "planned_ms": 1800000,
+     "paused_ms": 240000,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "no bell before the end",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800001440000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "no bell for a paused lap",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": 1800001200000,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800005400000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "stopped: the minutes so far, stamped as the edit it is",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800000900000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "stopped while paused: it ended when the pause began",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": 1800000600000,
+    "paused_ms": 120000,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800001200000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000600000,
+     "planned_ms": 1500000,
+     "paused_ms": 120000,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a stop under 60 s of running leaves no row",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800000059999,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "a stop at 60 s leaves one",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800000060000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000060000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "pauses do not count toward the 60 s",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 600000,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800000650000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "set aside: kept for the timeline, counted nowhere",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "void",
+   "now": 1800000900000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "set aside under 60 s leaves no row either",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "void",
+   "now": 1800000030000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "stop after the bell: the lap rang",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800001620000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800001500000,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800001500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "set aside after the bell: the whole lap, set aside",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "void",
+   "now": 1800001620000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800001500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "replaced by another device while running: stopped at that moment",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "replaced",
+   "now": 1800000720000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000720000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "replaced after the bell: it rang",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "end": "replaced",
+   "now": 1800002400000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800001500000,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800001500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a lap of a few seconds that rang is a lap: the 60 s floor is for stops",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": "task-pointers",
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 3000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800000003000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800000003000,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000003000,
+     "planned_ms": 3000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a break that rang",
+   "state": {
+    "phase": "short",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 1
+   },
+   "end": "bell",
+   "now": 1800000300000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": 1800000300000,
+    "row": {
+     "kind": "short",
+     "task": null,
+     "started": 1800000000000,
+     "ended": 1800000300000,
+     "planned_ms": 300000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a break cut short",
+   "state": {
+    "phase": "long",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 900000,
+    "set_index": 1
+   },
+   "end": "stop",
+   "now": 1800000240000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "long",
+     "task": null,
+     "started": 1800000000000,
+     "ended": 1800000240000,
+     "planned_ms": 900000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "nothing to close when idle",
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 2
+   },
+   "end": "stop",
+   "now": 1800000300000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  }
+ ],
+ "bell": [
+  {
+   "name": "in step with the server and no row yet: write it",
+   "timer_stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+   "device": "a1b2c3d4e5f60718",
+   "in_step": true,
+   "has_row": false,
+   "expect": true
+  },
+  {
+   "name": "a row is already there: never write it twice",
+   "timer_stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+   "device": "a1b2c3d4e5f60718",
+   "in_step": true,
+   "has_row": true,
+   "expect": false
+  },
+  {
+   "name": "offline, but this device wrote the timer last: its own lap, write it",
+   "timer_stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+   "device": "a1b2c3d4e5f60718",
+   "in_step": false,
+   "has_row": false,
+   "expect": true
+  },
+  {
+   "name": "offline with another device's timer: it may have been stopped there, so wait",
+   "timer_stamp": "2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829",
+   "device": "a1b2c3d4e5f60718",
+   "in_step": false,
+   "has_row": false,
+   "expect": false
+  }
+ ]
+}

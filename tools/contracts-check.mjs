@@ -28,6 +28,8 @@ function walk(node, where, unknown) {
   for (const [k, v] of Object.entries(node)) {
     if (k === 'sessions') {
       v.forEach(({ id, ...row }, i) => datasets.session.row(row) || problems.push(`${where}.sessions[${i}] (${id}): ${said(datasets.session.row)}`));
+    } else if (k === 'row' && v) {
+      datasets.session.row(v) || problems.push(`${where}.row: ${said(datasets.session.row)}`);
     } else if (k === 'state' || k === 'from') {
       datasets.timer.fields.state(v) || problems.push(`${where}.${k}: ${said(datasets.timer.fields.state)}`);
     } else walk(v, `${where}.${k}`, unknown);

@@ -118,6 +118,47 @@
      "stamp": "2026-11-24T04:30:00.001Z-0000-a1b2c3d4e5f60718"
     }
    ]
+  },
+  {
+   "name": "after a nack: a fresh clock sees what the server sent, then unsent edits are stamped again in order",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "see": "2026-11-24T04:21:00.000Z-0003-b2c3d4e5f6071829"
+    },
+    {
+     "see": "2026-11-24T04:29:00.000Z-0000-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0001-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:30:00.000Z-0002-a1b2c3d4e5f60718"
+    }
+   ]
+  },
+  {
+   "name": "after a nack: a server cell a little ahead still comes first",
+   "device": "a1b2c3d4e5f60718",
+   "steps": [
+    {
+     "see": "2026-11-24T04:32:00.000Z-0005-b2c3d4e5f6071829"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:32:00.000Z-0006-a1b2c3d4e5f60718"
+    },
+    {
+     "now": 1795494600000,
+     "stamp": "2026-11-24T04:32:00.000Z-0007-a1b2c3d4e5f60718"
+    }
+   ]
   }
  ],
  "merge": [

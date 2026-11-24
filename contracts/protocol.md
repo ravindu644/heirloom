@@ -42,9 +42,11 @@ or seen.
 - **On seeing a stamp** from anywhere: if its `(ms, counter)` is higher than the clock, the clock
   becomes it. So the next edit is later than everything this device has seen.
 - **Drift:** the server refuses a push that holds a stamp whose time is more than 300000 ms past
-  server time. Nothing from that batch is stored. The device sets its offset from the `nack`, moves
-  its clock back to the corrected time, gives every unsent cell a new stamp in the order they were
-  made, and pushes again.
+  server time. Nothing from that batch is stored. The device sets its offset from the `nack`, then
+  starts its clock again from zero, shows it the stamp of every cell it holds that is not waiting
+  in the outbox, and gives every unsent cell a new stamp at the corrected time, in the order they
+  were made. Each new cell replaces the old one in the device's own store (the old stamp is higher,
+  so this is a replacement, not a merge), and the outbox is pushed again.
 
 Fixture: `merge.json`, `stamps` and `drift`.
 
@@ -81,6 +83,7 @@ Times are ms since the epoch.
 | server to device | `{"type":"ack","batch":"k3v9","from":1049,"cursor":1054}` | Every cell is stored or was already beaten by a newer one. `from` is the newest sequence number before this batch and `cursor` the newest after it: the numbers between them are this batch's own cells. |
 | server to device | `{"type":"nack","batch":"k3v9","reason":"clock","server_time":1795494600150}` | Nothing was stored. See Drift. |
 | server to device | `{"type":"room","room":"...","members":[...]}` | Presence and totals. The member shape is pinned in roadmap section 7. |
+| server to device | `{"type":"bye","reason":"token"}` | Sent just before the server closes the socket for good. `token`: the token is unknown or signed out; the device stops reconnecting, keeps its data and its outbox, and asks the person to sign in. `protocol`: the first frame was not a valid `hello`, or a frame broke a limit. |
 | both ways | `{"type":"ping","t":1795494625000}` answered by `{"type":"pong","t":1795494625000,"server_time":1795494625140}` | Every 25 s from the device, so the tunnel keeps the socket open. `t` is echoed. The device's offset is `server_time - (sent + received) / 2`, smoothed. |
 
 Rules:
@@ -97,6 +100,17 @@ Rules:
 - A device does not get its own push back live. It may see those cells again after a reconnect;
   applying them changes nothing.
 - An unknown `type` is ignored, by both sides.
+- Limits the server enforces: a frame of at most 1 MB, 500 cells a push, 16 KB a cell (bytes of
+  its JSON), names as in section 1, a stamp of exactly the shape in section 2, exactly the five
+  keys of a cell, valid UTF-8. A push that breaks one is answered with `nack`, reason `invalid`,
+  and nothing stored. A device that gets one sends that batch again a cell at a time to find the
+  cell, and sets it aside without dropping it.
+- The server reads a device's frames only once that device has caught up. A push or a ping sent
+  earlier waits in the socket, so a device never gets its own push back and every ack starts at
+  the number the device has reached. A device does not push before it has caught up either.
+- A `hello` or a POST with a cursor past the server's head (the server was restored from an older
+  copy) is answered from 0: the device is sent everything.
+- A page of `cells` also stops near 1 MB, whatever the count.
 
 ## 5. Without a socket
 
@@ -107,7 +121,7 @@ Rules:
   "push": { "batch": "k3v9", "cells": [] } }
 ```
 
-`push` may be left out. The reply:
+`push` may be left out. A bad token is answered with 401 `token` (section 10). The reply:
 
 ```json
 { "server_time": 1795494600150, "head": 1054, "from": 1042, "to": 1054, "cells": [],
@@ -136,7 +150,7 @@ Actions, each a pure function of the state, the action and `now`:
 
 | Action | New state |
 |---|---|
-| `start` (`phase`, `run`, `task`, `planned_ms`) | That phase, `started = now`, no pause. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
+| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the timer cell was last written on an earlier local day, so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
 | `pause` | `paused_at = now`. Nothing when idle, paused or over |
 | `resume` | `paused_ms += now - paused_at`, `paused_at = null`. Nothing unless paused |
 | `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap |
@@ -163,7 +177,19 @@ From `session` rows and the viewer's offset from UTC in minutes.
 - An interval that would end before it begins counts as 0. Two overlapping laps that started on
   different local days each count in their own day; the mark still shows the pair.
 
-Fixture: `stats.json`. Roadmap section 5 adds weeks, projects, estimates and bests to it.
+**The race.** Every screen answers "how am I doing against my usual day", so there is one more
+function: from the sessions, the timer state, `now` and the offset.
+
+- `you_ms`: today's focus up to `now`, plus the lap in progress: a work run with no session row
+  yet counts its running time so far (to the pause if paused, to the planned end if the bell has
+  gone). A break in progress adds nothing.
+- The ghost is a past day: the same weekday last week if it has any counted focus, else the latest
+  day before today that has, else there is none (`ghost` and `split_ms` are `null`).
+- `ghost.ms` is that day's focus up to the same time of day as `now`; `ghost.total_ms` is its
+  whole day. `split_ms` is `you_ms - ghost.ms`: under 0 is behind.
+
+Fixture: `stats.json`, `cases` for the totals and `race` for the race. Roadmap section 5 adds
+weeks, projects, estimates and bests to it.
 
 ## 8. The streak
 
@@ -188,12 +214,85 @@ Fixture: `streak.json`.
 
 | File | A runner does |
 |---|---|
-| `merge.json` `stamps` | Makes a clock for `device`. A step with `now` stamps an edit and must get `stamp`; a step with `see` shows the clock that stamp |
+| `merge.json` `stamps` (devices only; the server never stamps) | Makes a clock for `device`. A step with `now` stamps an edit and must get `stamp`; a step with `see` shows the clock that stamp |
 | `merge.json` `merge` | Applies `cells` to an empty store, in the given order and in reverse (every order when there are six or fewer), and must end with exactly the cells in `expect` |
 | `merge.json` `drift` | Asks whether `stamp` is acceptable at `server_time` and must get `accept` |
 | `timer.json` | Starts each case from `from`, or idle at index 0. A step with `do` applies that action at `at`; a step with `expect` compares only the keys it lists. A key is a field of the state, one of section 6's worked-out values, or `state` for the whole state |
-| `stats.json` | Computes from `sessions` and `utc_offset_min` and must equal `expect` |
+| `stats.json` `cases` | Computes from `sessions` and `utc_offset_min` and must equal `expect` |
+| `stats.json` `race` | Computes from `sessions`, `state` (the timer), `now` and `utc_offset_min` and must equal `expect` |
 | `streak.json` | Computes from `today`, `kept`, `days_mask` and `window` and must equal `expect` |
 
 `tools/contracts-check.mjs` checks every cell, session and timer state in these files against the
 schemas. A fixture lists under `unknown` the fields it uses on purpose that no schema has.
+
+## 10. Accounts
+
+Plain HTTP with JSON bodies, beside the socket. Registration is by invite only. There are no
+cookies: the token travels in the body or the `hello`, so nothing rides along with a request by
+itself. That is why every `/api/` route, the socket included, answers any origin (the phone app's
+WebView is a different origin from the server) and answers the browser's `OPTIONS` preflight.
+
+| Request | Body | 200 reply |
+|---|---|---|
+| `POST /api/register` | `{"invite":"...","username":"ravi","password":"...","device":"a1b2c3d4e5f60718"}` | `{"token":"...","account":"...","username":"ravi"}` |
+| `POST /api/login` | `{"username":"ravi","password":"...","device":"a1b2c3d4e5f60718"}` | the same |
+| `POST /api/logout` | `{"token":"..."}` | `{}`. The token stops working at once, on an open socket too |
+
+- An invite is made on the server by its owner: `heirloomd -data <dir> -invite` prints one code and
+  exits. It works while the server is running. A code registers one account, once.
+- `username`: 3 to 32 of `a-z 0-9 _`. The server lowercases it. `password`: 8 to 256 characters,
+  hashed with argon2id.
+- `token`: an opaque string for this device, stored hashed. It works only with the device id it
+  was made for. Signing in again from the same device id replaces that device's old token and
+  cuts its open socket with `bye`, reason `token`. `account` is an opaque id; a device keeps each account's
+  data in its own local database, named by it.
+- Every error is a status and `{"error":"<code>"}`:
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `bad_request` | A field is missing or breaks a rule above |
+| 403 | `invite` | The invite is unknown or used |
+| 409 | `taken` | The username exists |
+| 401 | `credentials` | Wrong username or password; the reply does not say which |
+| 429 | `slow_down` | After 5 failed sign-ins for a username inside 15 minutes, every sign-in for it until the 15 minutes pass, right password or not. `Retry-After` carries the seconds |
+| 401 | `token` | `logout` or `/api/sync` with a token that is unknown or signed out |
+| 500 | `server` | The server's own fault. Nothing was stored; the device tries again |
+
+A device signs out only after its outbox is empty, and refuses, with the reason, while it is
+offline with unsent work. Otherwise signing out would be a way to lose a lap.
+
+## 11. Sessions
+
+A run of the timer becomes a `session` row (id: the run id) when it ends. How it ended decides the
+row, and who may write it.
+
+**Closing a run.** From the timer state, what ended it, `now` and the writer's device id:
+
+| What ended it | Row |
+|---|---|
+| The bell (the run is over) | `outcome: rang`, `ended` the planned end (`ends_at`). Every cell of the row is stamped at `ends_at`, counter 0, with the writer's device id, not at the time of writing |
+| Stop, before the bell | `outcome: stopped`, `ended` now, or the moment the pause began if it is paused |
+| Set aside (void), before or after the bell | `outcome: void`, `ended` as above, or the planned end if the bell has gone |
+| Replaced: a newer timer state for another run arrives while this device's run is open | As stop |
+| Stop or replaced, after the bell | It rang: the row of the first line |
+
+- `kind`, `task`, `started`, `planned_ms` and `paused_ms` are the state's; `device` is the writer.
+- A run that did not reach the bell and had under 60000 ms of running time (`ended - started -
+  paused_ms`) leaves no row. A run that rang always leaves one, however short.
+- Stopped and void rows are things a person did, so their cells take ordinary stamps from the clock.
+- Starting a run while another is open closes the open one first, as stop.
+
+Why a rang row is stamped at the bell: it is the same row whoever writes it and whenever. The
+laptop may write it at the bell while the phone, asleep, writes it an hour later. With the stamp
+at the bell the two are one row, and anything a person did to it after the bell (set it aside,
+moved it to another task) is newer than both.
+
+**Who writes the bell.** A device that sees a run over writes the rang row only when it holds no
+row for that run, and either it is in step with the server (caught up, connected) or it was the
+last to write the timer cell (the cell's stamp ends in its own device id). A device that is
+offline with another device's timer waits: that lap may have been stopped where it was running.
+
+Fixture: `session.json`. `close` cases call the closing rule with `state`, `end` (`bell`, `stop`,
+`void`, `replaced`), `now` and `device`, and expect `null` or the row, its `id`, and `stamp_at`
+(the bell's time, or `null` for an ordinary stamp). `bell` cases ask whether to write, from the
+timer cell's stamp, the device, `in_step` and `has_row`.
