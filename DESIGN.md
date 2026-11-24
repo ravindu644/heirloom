@@ -225,7 +225,8 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **rest:** breaks and rest days only, the calyx green of the tomato.
 - **A project's colour** is one of five roles this palette already has: `you`, `rest`, `ink`,
   `ghost`, `heat-2`. It shows as a small square before the project's name, never alone and never
-  as a fill behind text. A second hue family would break the one rule the look stands on: red
+  as a fill behind text. This square is the one place `rest` is not a break, `ghost` is filled and
+  `you` is not your own mark; it never sits beside lap squares, which would read as one more lap. A second hue family would break the one rule the look stands on: red
   means you. Five tones tell five projects apart; beyond that the name does the work.
 - **heat-1 to heat-3, then you:** the four steps of the heatmap, you mixed into the surface at 22,
   45 and 72 percent, so the scale is one hue getting darker. Zero is `raised`.
@@ -284,7 +285,17 @@ Built once in `client/src/ui/kit/` and reused.
   on the tall lanes of a result (`lane-result`, 40px), where 1px thins to a hairline.
 - **Split chip:** "-19m" in ink on you-tint when behind, "level" in ink on you-tint, "+6m" in
   on-you on a you fill when ahead (you on you-tint is under 4.5:1 at this size).
-- **Task row:** title, project, laps as small squares (filled, in progress, empty), "2 of 4".
+- **Task row:** a 48px box to mark it done (the app's one stock control), the title, under it the
+  project's square and name, and at the right the laps as small squares (filled, in progress,
+  empty) with "2 of 4" in `figure-sm` beside them. The count never outweighs the title.
+- **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
+  the task, and one button drawn as an outline in `ground`. When the lap has rung, its button to
+  start the break takes the `you` fill and is the screen's primary; the list's Start steps down
+  to secondary.
+- **What the last tap did:** an `ink` bar as wide as the list, one line (the title clamps), with a
+  quiet underlined Undo. It never covers the row it speaks of.
+- **The status line** keeps its space only where buttons sit at the bottom of a phone screen
+  (Focus). Elsewhere it takes room when it has something to say and none when it is silent.
 - **Heat cell:** a 12px square, 2px gaps, zero to four steps; a rest day carries the rest mark.
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
   figure-md, the task only if shared, and a Cheer button.

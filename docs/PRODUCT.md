@@ -130,3 +130,4 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-24 | The look is route B, Pacer: you against your own past as a ghost; see DESIGN.md |
 | 2026-11-24 | A pomodoro ends one of three ways: rang (minutes and a lap), stopped (minutes, no lap), set aside (neither). A stop under 60 s is not recorded |
 | 2026-11-24 | Two rest days a week, counted Monday to Sunday; the streak's day needs one pomodoro that rang |
+| 2026-11-25 | Today's tasks can be put in order by hand (the lead's reading: "Next" needs an order, and ARCHITECTURE section 4 already rules on two devices reordering). Notes on a task are not in v1: the field exists in the data, no screen shows it, until the user says so |

@@ -29,6 +29,8 @@ when it is done.
 - [4] From the second design pass, none blocking, for the ui lane's next round: on a tablet the lap bar is 8px narrower on Focus than on the result (one measure for both); the race sentence can break inside "last Tuesday" (a no-break space in `pastDay`); two sentences leave one word hanging ("safe on / it.", "A / code works once."); the `unsaved` sign-in error and `status.signOutUnsent` have no picture at 412 and 360; clamp a long task title to one line on a short screen.
 - [4] At 360x640 the race panel is cut by the stuck buttons (it fits whole from about 740px tall). If a real phone lands in that band, short screens need their own rule and a fourth size in DESIGN.md.
 - [8] "This phone" is chosen by pointer, so a tablet used with a finger is called a phone.
+- [4] A task's `notes` field has no screen: PRODUCT section 2 does not list notes, so the design review had it taken out of the sheet. The user's call.
+- [4] A project may be tomato (`you`), which is also the colour of every lap. The five project tones are the lead's bridge between PRODUCT ("projects with a colour") and DESIGN ("one hue"); the user may want real hues instead.
 - [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
 - [5] Stats use the viewer's current UTC offset for every day. A country with summer time shifts old laps by an hour across midnight.
 - [6] A habit's reminder time has no field.
