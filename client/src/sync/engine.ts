@@ -13,6 +13,7 @@ import { applyCell, cellKey, restamp } from '../core/merge.ts';
 import type { Cell, Cells } from '../core/merge.ts';
 import { IDLE, act } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
+import { StoreGone } from '../store/store.ts';
 import type { OpenStore, Store, Write } from '../store/store.ts';
 import { connect, smoothOffset } from './transport.ts';
 import type { Connect, Handlers, Push, ServerMessage, Transport, Wire } from './transport.ts';
@@ -39,7 +40,9 @@ export interface Account {
 
 /**
  * `error` is a code from protocol section 10, or one of ours: `offline` (the server could not be
- * reached), `unsent` (sign out refused: edits are waiting and cannot be sent now).
+ * reached), `unsent` (sign out refused: edits are waiting and cannot be sent now), `unsaved` (sign
+ * in refused: the account open now has unsent edits this device could not save, and leaving it
+ * would drop them).
  */
 export type AccountResult = { ok: true } | { ok: false; error: string; retry_after?: number };
 
@@ -75,11 +78,11 @@ export interface Engine {
   signOut(): Promise<AccountResult>;
   /** Reconnect now: call it when the network returns or the app comes to the front. */
   wake(): void;
-  /** Resolves when everything written so far is in the store. */
+  /** Resolves when everything written so far is in the store. Rejects if the store refuses it. */
   saved(): Promise<void>;
   /** Every cell held, for tests and the simulator to compare devices. */
   cells(): Cell[];
-  /** Saves what is pending, closes the wire and the stores. */
+  /** Saves what is pending, closes the wire and the stores. Rejects, after closing, if unsent edits could not be saved. */
   stop(): Promise<void>;
 }
 
@@ -210,7 +213,17 @@ export async function createEngine(env: Env): Promise<Engine> {
       try {
         await r.store.write(write);
         if (db === r) unsaved.value = false;
-      } catch {
+      } catch (err) {
+        if (err instanceof StoreGone) {
+          // Signed out in another tab, and the database deleted with it. There is nothing to
+          // write into and nobody to write for: this engine is signed out too.
+          r.pending = null;
+          if (db === r) {
+            detach(r);
+            account.value = null;
+          }
+          break;
+        }
         if (db === r) unsaved.value = true;
         // Not saved, so not forgotten: it goes back in front of whatever came since and is tried
         // again. Meanwhile it is still pushed, because the server is the other safe place.
@@ -223,6 +236,28 @@ export async function createEngine(env: Env): Promise<Engine> {
     }
     r.saving = null;
     if (db === r) pump();
+  }
+
+  // Waits until nothing is left to save. False when the store refused: the edits are still in
+  // `pending`, in memory only. A failed write is tried once more here before saying so.
+  async function settle(r: Replica): Promise<boolean> {
+    while (r.saving || r.pending) {
+      await (r.saving ??= flush(r));
+      if (r.pending && !r.saving) return false;
+    }
+    return true;
+  }
+
+  // Lets go of the account in one turn, so no write can land between a check made just before
+  // this and whatever the caller does next.
+  function detach(r: Replica) {
+    r.transport.stop();
+    db = null;
+    batch(() => {
+      for (const set of sets.values()) set.value = new Map();
+      connected.value = caughtUp.value = unsaved.value = false;
+      unsent.value = 0;
+    });
   }
 
   // Sends the next batch, one at a time. It waits for the save in progress: a cell the server has
@@ -253,7 +288,17 @@ export async function createEngine(env: Env): Promise<Engine> {
       case 'welcome':
         // A new conversation: whatever was in the air on the old one is sent again.
         r.flight = null;
+        r.oneByOne = false;
         r.head = msg.head;
+        if (msg.head < r.cursor) {
+          // The server knows less than we were sent: it was restored from an older copy and may
+          // have lost any cell. It will send everything from 0, and it gets everything we hold.
+          // Pushing a cell it still has is harmless.
+          r.cursor = 0;
+          for (const key of r.cells.keys()) r.outbox.add(key);
+          save(r, { outbox: [...r.cells.keys()].map((key) => [key, true]) });
+          unsent.value = r.outbox.size;
+        }
         batch(() => {
           connected.value = true;
           caughtUp.value = r.cursor >= r.head;
@@ -311,6 +356,8 @@ export async function createEngine(env: Env): Promise<Engine> {
           // This one cell cannot be stored by this server. It stays in the store and the outbox,
           // is tried again at the next start, and no longer blocks the cells behind it.
           r.parked.add(flight.cells[0]![0]);
+          // Found. The rest can go together again.
+          r.oneByOne = false;
         }
         return pump();
       }
@@ -370,20 +417,15 @@ export async function createEngine(env: Env): Promise<Engine> {
     r.transport.start();
   }
 
-  // `forget`: delete the account's database too. Only for a sign out, when the outbox is empty.
-  async function close(forget = false) {
+  // Callers that must not lose what the store refused ask `settle` first and decide.
+  async function close() {
     const r = db;
     if (!r) return;
     r.transport.stop();
-    while (r.saving) await r.saving;
-    db = null;
-    batch(() => {
-      for (const set of sets.values()) set.value = new Map();
-      connected.value = caughtUp.value = unsaved.value = false;
-      unsent.value = 0;
-    });
-    if (forget) await r.store.destroy();
-    else r.store.close();
+    await settle(r);
+    if (db !== r) return;
+    detach(r);
+    r.store.close();
   }
 
   async function ask(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }> {
@@ -412,6 +454,9 @@ export async function createEngine(env: Env): Promise<Engine> {
 
   const enter = (path: string, body: object) =>
     inTurn<AccountResult>(async () => {
+      // Before the server is asked: a new token for this device would cut the open account's socket.
+      const here = db;
+      if (here && !(await settle(here)) && here.outbox.size) return { ok: false, error: 'unsaved' };
       const reply = await ask(path, { ...body, device: me });
       if (!reply.ok) return reply;
       const { token, account: id, username } = reply.data;
@@ -496,28 +541,43 @@ export async function createEngine(env: Env): Promise<Engine> {
         if (!r) return { ok: true };
         // Signing out with edits unsent would be a way to lose a lap. Give them a moment to go, then refuse.
         if (r.outbox.size) await drained();
+        // A save in progress may be the ack that empties the outbox, or an edit that fills it again.
+        await settle(r);
+        if (db !== r) return { ok: true };
         if (r.outbox.size) return { ok: false, error: 'unsent' };
+        // No await between that check and here: from this line no write can be made, so none can
+        // be deleted with the database. The token is still good until the server is told, so a
+        // refusal above leaves the person properly signed in.
+        detach(r);
         // Best effort: offline with nothing to send, the device still signs out. The token is forgotten here either way.
         await ask('/api/logout', { token: r.session.token });
-        // Everything here is on the server by now. Left on a shared laptop it would be the next person's to read.
-        await close(true);
         await install.write({ meta: { session: null } });
         account.value = null;
+        // Everything here is on the server. Left on a shared laptop it would be the next person's to read.
+        await r.store.destroy();
         return { ok: true };
       }),
 
     wake: () => db?.transport.wake(),
 
     async saved() {
-      while (db?.saving) await db.saving;
+      if (db && !(await settle(db))) throw new Error('the store refused the write: it is held in memory only');
     },
 
     cells: () => [...(db?.cells.values() ?? [])],
 
     stop: () =>
       inTurn(async () => {
-        await close();
+        // Closing is all that is left to do when the app goes away, so it closes either way. But
+        // edits that were neither sent nor saved are gone with it, and that is not done quietly.
+        const r = db;
+        const lost = r && !(await settle(r)) ? r.outbox.size : 0;
+        if (r && db === r) {
+          detach(r);
+          r.store.close();
+        }
         install.close();
+        if (lost) throw new Error(`closed with ${lost} unsent edits the store refused to save`);
       }),
   };
 

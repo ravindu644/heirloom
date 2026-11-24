@@ -4,17 +4,20 @@
 
 import { cellKey } from '../core/merge.ts';
 import type { Cell } from '../core/merge.ts';
+import { StoreGone } from './store.ts';
 import type { OpenStore, Write } from './store.ts';
 
 /** One device's disk. Open the same name twice and the second sees what the first wrote. */
 export function memoryStores(): OpenStore {
-  const disk = new Map<string, { cells: Map<string, Cell>; outbox: Set<string>; meta: Map<string, unknown> }>();
+  const disk = new Map<string, { cells: Map<string, Cell>; outbox: Set<string>; meta: Map<string, unknown>; gone: boolean }>();
   return async (name) => {
     let db = disk.get(name);
-    if (!db) disk.set(name, (db = { cells: new Map(), outbox: new Set(), meta: new Map() }));
+    if (!db) disk.set(name, (db = { cells: new Map(), outbox: new Set(), meta: new Map(), gone: false }));
     const held = db;
     let open = true;
     const mustBeOpen = () => {
+      // Deleted through another open store, as another tab would: this one must not write into nothing.
+      if (held.gone) throw new StoreGone(`store ${name} was deleted`);
       if (!open) throw new Error(`store ${name} is closed`);
     };
     return {
@@ -39,6 +42,7 @@ export function memoryStores(): OpenStore {
       },
       async destroy() {
         open = false;
+        held.gone = true;
         disk.delete(name);
       },
     };

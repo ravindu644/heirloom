@@ -24,6 +24,8 @@ const write = (clock: Clock, device: string): Stamp =>
 
 /** Stamps one edit at `now` (server-corrected ms). Keep the returned clock, or the next stamp can repeat this one. */
 export function stamp(clock: Clock, now: number, device: string): { clock: Clock; stamp: Stamp } {
+  // Whole ms, whoever calls: a fraction here would sit in the clock and make its next comparison wrong.
+  now = Math.floor(now);
   let next = now > clock.ms ? { ms: now, counter: 0 } : { ms: clock.ms, counter: clock.counter + 1 };
   if (next.counter > 0xffff) next = { ms: next.ms + 1, counter: 0 };
   return { clock: next, stamp: write(next, device) };

@@ -7,6 +7,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import type { Cell } from '../core/merge.ts';
 import { idbStores } from './idb.ts';
 import { memoryStores } from './memory.ts';
+import { StoreGone } from './store.ts';
 import type { OpenStore, Snapshot } from './store.ts';
 
 const cell = (row: string, field: string, value: unknown, stamp = '2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718'): Cell => ({
@@ -121,6 +122,18 @@ for (const [kind, make] of kinds) {
       await assert.rejects(mine.write({ meta: { cursor: 5 } }));
       assert.deepEqual(await (await open('heirloom-acct-a')).load(), { cells: [], outbox: [], meta: {} });
       assert.deepEqual((await other.load()).cells, [cell('t1', 'title', 'theirs')]);
+    });
+
+    it('deleted through another open store, as a sign out in another tab does: the delete goes through, and this one says it is gone', async () => {
+      const open = make();
+      const here = await open('heirloom-acct-a');
+      const otherTab = await open('heirloom-acct-a');
+      await here.write({ cells: [cell('t1', 'title', 'mine')] });
+      await otherTab.destroy();
+      await assert.rejects(here.write({ cells: [cell('t2', 'title', 'into nothing')] }), StoreGone);
+      await assert.rejects(here.load(), StoreGone);
+      // The name is free again: it opens, and it is new.
+      assert.deepEqual(await (await open('heirloom-acct-a')).load(), { cells: [], outbox: [], meta: {} });
     });
 
     it('what goes in and what comes out are copies', async () => {

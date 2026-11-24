@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeSockets, fakeTime, settle } from './fakes.ts';
-import { HELLO_MS, PING_MS, POLL_MS, backoffMs, connect, smoothOffset } from './transport.ts';
+import { HELLO_MS, PING_MS, POLL_MS, POST_MS, backoffMs, connect, smoothOffset } from './transport.ts';
 import type { Fetch, Push, ServerMessage } from './transport.ts';
 
 function rig(random = 1) {
@@ -186,10 +186,12 @@ describe('the socket', () => {
     assert.equal(r.sockets.all.length, 2);
     r.sockets.last().accept();
     assert.equal(r.sockets.last().sent[0].cursor, 3);
+    // The engine is told it is down until the new socket says welcome: that socket may never come up.
+    assert.deepEqual(r.seen.map((m) => (m === 'down' ? m : m.type)), ['welcome', 'down']);
     // The old socket is disowned: nothing it says or does counts.
     r.sockets.all[0]!.say({ type: 'cells', from: 0, to: 9, cells: [] });
     r.sockets.all[0]!.fail();
-    assert.equal(r.seen.length, 1);
+    assert.equal(r.seen.length, 2);
   });
 
   it('wake() tries now instead of waiting out the backoff', () => {
@@ -360,6 +362,39 @@ describe('without a socket', () => {
     await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
     assert.deepEqual(r.seen.slice(-2).map((m) => (m === 'down' ? m : m.type)), ['welcome', 'cells']);
     assert.equal(r.seen.filter((m) => m === 'down').length, 1);
+  });
+
+  it('a POST that never answers is given up after twenty seconds: down, and the polling goes on', async () => {
+    const r = rig();
+    blocked(r);
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    r.time.advance(POLL_MS);
+    assert.equal(r.posts.length, 2);
+    // The second POST hangs.
+    r.time.advance(POST_MS - 1);
+    await settle();
+    assert.equal(r.posts.length, 2);
+    assert.equal(r.seen.includes('down'), false);
+    r.time.advance(1);
+    await settle();
+    assert.equal(r.seen.at(-1), 'down');
+    r.time.advance(1000);
+    assert.equal(r.posts.length, 3);
+    // The hung request answers at last. Nobody is listening for it any more.
+    const seen = r.seen.length;
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 9, from: 0, to: 9, cells: [] } });
+    assert.equal(r.seen.length, seen);
+    // The one that replaced it is the one that counts.
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    assert.deepEqual(r.seen.slice(seen).map((m) => (m === 'down' ? m : m.type)), ['welcome', 'cells']);
+  });
+
+  it('a POST that answers in time leaves no timer behind to fail it later', async () => {
+    const r = rig();
+    blocked(r);
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    r.transport.stop();
+    assert.equal(r.time.waiting(), 0);
   });
 
   it('401 is the bye of this path: passed on as bye token, and everything stops', async () => {

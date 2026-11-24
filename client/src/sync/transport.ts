@@ -81,6 +81,8 @@ export const PING_MS = 25000;
 export const POLL_MS = 5000;
 /** How long a new socket has to say welcome. A proxy may accept the socket and then pass nothing on. */
 export const HELLO_MS = 10000;
+/** How long one POST may take. A request that hangs must not stop the polling for as long as the browser lets it. */
+export const POST_MS = 20000;
 /** Socket attempts in a row with no welcome before POST takes over. */
 export const SOCKET_TRIES = 3;
 const BACKOFF_BASE_MS = 1000;
@@ -228,17 +230,29 @@ export function connect(wire: Wire, on: Handlers): Transport {
     queued = null;
     const sent = wire.now();
     let reply;
+    let cancelLimit = never;
     try {
       const body = { ...on.hello(), client_time: sent, ...(push && { push: { batch: push.batch, cells: push.cells } }) };
-      const res = await post(wire.url + '/api/sync', { ...JSON_POST, body: JSON.stringify(body) });
+      const answered = (async () => {
+        const res = await post(wire.url + '/api/sync', { ...JSON_POST, body: JSON.stringify(body) });
+        return { status: res.status, ok: res.ok, reply: res.ok ? await res.json() : null };
+      })();
+      // If the limit wins, whatever this request does later is nobody's business.
+      answered.catch(() => {});
+      const limit = new Promise<never>((_, reject) => {
+        cancelLimit = wire.schedule(() => reject(new Error('sync did not answer')), POST_MS);
+      });
+      const res = await Promise.race([answered, limit]);
+      cancelLimit();
       if (mine !== polls) return;
       if (res.status === 401) {
         stop();
         return on.message({ type: 'bye', reason: 'token' });
       }
       if (!res.ok) throw new Error(`sync answered ${res.status}`);
-      reply = await res.json();
+      reply = res.reply;
     } catch {
+      cancelLimit();
       if (mine !== polls) return;
       posting = false;
       pollFailures += 1;
@@ -298,8 +312,10 @@ export function connect(wire: Wire, on: Handlers): Transport {
     },
     again() {
       if (!running) return;
-      if (polling) poll();
-      else open();
+      if (polling) return void poll();
+      // The engine is told: if the new socket fails, it must not go on thinking it is connected.
+      if (live) on.down();
+      open();
     },
     wake() {
       if (!running || live) return;

@@ -74,8 +74,12 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
       return state.paused_at === null
         ? state
         : { ...state, paused_ms: state.paused_ms + now - state.paused_at, paused_at: null };
-    case 'extend':
-      return state.phase === 'idle' ? state : { ...state, planned_ms: state.planned_ms + action.ms };
+    case 'extend': {
+      if (state.phase === 'idle') return state;
+      const longer = { ...state, planned_ms: state.planned_ms + action.ms };
+      // After the bell it must reopen the lap. An end that is still behind now would only add minutes nobody worked.
+      return over && view(longer, now).over ? state : longer;
+    }
     case 'stop':
       return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state, over) };
   }

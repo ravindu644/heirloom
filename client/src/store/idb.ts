@@ -1,6 +1,7 @@
 // The browser's store: one IndexedDB database per name, one transaction per write.
 
 import { cellKey } from '../core/merge.ts';
+import { StoreGone } from './store.ts';
 import type { OpenStore, Snapshot, Store, Write } from './store.ts';
 
 const STORES = ['cells', 'outbox', 'meta'];
@@ -30,9 +31,21 @@ export function idbStores(factory: IDBFactory = indexedDB, persist: () => unknow
 }
 
 function wrap(db: IDBDatabase, askOnce: () => void, remove: () => IDBOpenDBRequest): Store {
+  // Another tab is deleting the database (a sign out there). Let go, or its delete waits on this
+  // connection for good and the name can never be opened again.
+  let gone = false;
+  db.onversionchange = () => {
+    gone = true;
+    db.close();
+  };
+  const mustBeThere = () => {
+    if (gone) throw new StoreGone(`${db.name} was deleted`);
+  };
+
   return {
     load: () =>
       new Promise<Snapshot>((resolve, reject) => {
+        mustBeThere();
         const tx = db.transaction(STORES, 'readonly');
         const cells = tx.objectStore('cells').getAll();
         const outbox = tx.objectStore('outbox').getAllKeys();
@@ -50,6 +63,7 @@ function wrap(db: IDBDatabase, askOnce: () => void, remove: () => IDBOpenDBReque
 
     write: (write: Write) =>
       new Promise<void>((resolve, reject) => {
+        mustBeThere();
         // strict: the write is on disk when this resolves. A lap must not vanish because the battery died a second later.
         const tx = db.transaction(STORES, 'readwrite', { durability: 'strict' });
         let failed: unknown;

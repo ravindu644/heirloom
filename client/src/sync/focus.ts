@@ -44,6 +44,13 @@ export interface Focus {
   stop(): void;
   /** Ends the run and sets it aside: kept in the timeline, counted nowhere. */
   setAside(): void;
+  /**
+   * True for ten seconds after `stop()` or `setAside()` on this device, while the timer cell is
+   * still the idle state that stop wrote. Any other write to the timer, here or elsewhere, ends it.
+   */
+  readonly undoable: ReadonlySignal<boolean>;
+  /** Puts the timer back as it was before that stop: the same run, the seconds since counted as running. Nothing when not undoable. */
+  undo(): void;
 }
 
 export interface FocusEnv {
@@ -58,7 +65,12 @@ export interface FocusEnv {
 /** What Focus uses of the engine. */
 export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'rows' | 'write' | 'stamp'>;
 
-const EXTEND_MS = 300000;
+/** What `extend()` adds. */
+export const EXTEND_MS = 300000;
+const UNDO_MS = 10000;
+// The longest a length may be (the settings schema's maximum), and the longest the watch waits
+// before looking again: a browser runs a timer set further out than 2^31 ms at once.
+const DAY_MS = 86400000;
 const LENGTHS = { work_ms: 1500000, short_ms: 300000, long_ms: 900000 };
 
 // A row still arriving cell by cell, or one from a build that writes something else, is not counted yet.
@@ -77,7 +89,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     const set = engine.rows('settings').value.get('current');
     const length = (name: keyof typeof LENGTHS) => {
       const value = set?.[name];
-      return typeof value === 'number' && Number.isInteger(value) && value >= 1000 ? value : LENGTHS[name];
+      return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= DAY_MS ? value : LENGTHS[name];
     };
     return { work_ms: length('work_ms'), short_ms: length('short_ms'), long_ms: length('long_ms') };
   });
@@ -98,11 +110,18 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     return newDay(s, v, now) ? { ...v, next: { phase: 'work', set_index: 0 } } : v;
   }
 
+  // The row held for a run was written no earlier than the timer cell that shows the run. A row
+  // from before is about a run that has since gone on: a stop that was undone.
+  function current(run: string, written: number): boolean {
+    const stamp = engine.stamp('session', run, 'ended');
+    return stamp !== undefined && stampMs(stamp) >= written;
+  }
+
   // A row already tells this run's story up to this bell. A row that ends earlier does not: the
   // lap was extended after it rang, or went on here after another device stopped it.
-  function covered(run: string, endsAt: number): boolean {
+  function covered(run: string, endsAt: number, written: number): boolean {
     const ended = rows.peek().get(run)?.ended;
-    return typeof ended === 'number' && ended >= endsAt;
+    return typeof ended === 'number' && ended >= endsAt && current(run, written);
   }
 
   // Closes a run as protocol section 11 says and writes the row it leaves, if any. `written` is
@@ -111,7 +130,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     const closed = closeRun(s, how, { now, device: me, written, rang: rangOnce(s) });
     if (!closed) return;
     // The same rang row twice is harmless, but it is a push for nothing.
-    if (closed.stamp_at !== null && covered(closed.id, closed.row.ended)) return;
+    if (closed.stamp_at !== null && covered(closed.id, closed.row.ended, written)) return;
     engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
   }
 
@@ -165,6 +184,18 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     });
   }
 
+  // The last stop made here, for as long as it can be taken back: the state before it, and the
+  // stamp of the idle cell it wrote, which no longer matches once anyone writes the timer again.
+  let undone: { before: TimerState; stamp: string | undefined } | null = null;
+  let cancelUndo = () => {};
+  const undoable = signal(false);
+
+  function forget() {
+    cancelUndo();
+    undone = null;
+    undoable.value = false;
+  }
+
   function end(how: 'stop' | 'void') {
     const s = state.peek();
     if (s.phase === 'idle') return;
@@ -174,6 +205,16 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
       keep(s, how, now, written());
       put(idle);
     });
+    undone = { before: s, stamp: timerStamp() };
+    undoable.value = true;
+    cancelUndo = env.schedule(forget, UNDO_MS);
+  }
+
+  // Only the timer is put back. The row the stop left stays until the run rings, is stopped
+  // again or is replaced: that row is then written from a newer timer cell, so it is the newer row.
+  // The watch forgets the stop the moment the timer cell is written, by this too.
+  function undo() {
+    if (undone) put(undone.before);
   }
 
   function change(action: TimerAction) {
@@ -193,10 +234,11 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     void due.value;
     untracked(() => {
       const now = engine.now();
+      if (undone && timerStamp() !== undone.stamp) forget();
       // Another device's run has the timer and ours never ended: it ends here, unless a row says
       // it already did. An idle timer is not this: whoever stopped our run wrote its row.
       const ours = own?.state.run;
-      if (own && ours && s.run !== null && s.run !== ours && !rows.peek().has(ours)) {
+      if (own && ours && s.run !== null && s.run !== ours && !current(ours, own.written)) {
         keep(own.state, 'replaced', now, own.written);
       }
       const stamp = timerStamp();
@@ -207,8 +249,8 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
       const { over, ends_at } = view(s, now);
       if (!stamp || s.run === null || ends_at === null) return;
       if (!over) {
-        cancel = env.schedule(() => void due.value++, ends_at - now);
-      } else if (mayWriteBell(stamp, me, inStep, covered(s.run, ends_at))) {
+        cancel = env.schedule(() => void due.value++, Math.min(ends_at - now, DAY_MS));
+      } else if (mayWriteBell(stamp, me, inStep, covered(s.run, ends_at, stampMs(stamp)))) {
         keep(s, 'bell', now, stampMs(stamp));
       }
     });
@@ -230,8 +272,17 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     },
 
     lapsToday() {
-      const day = today(engine.now());
-      return sessions.value.filter((row) => row.kind === 'work' && row.outcome === 'rang' && today(row.started) === day).length;
+      const s = state.value;
+      const now = engine.now();
+      const day = today(now);
+      const laps = sessions.value.filter((row) => row.kind === 'work' && row.outcome === 'rang' && today(row.started) === day).length;
+      // As the race does: a lap whose bell has gone counts before its row is written, which may
+      // be a while on a device that is offline with another device's timer.
+      const { over, ends_at } = view(s, now);
+      const stamp = timerStamp();
+      if (s.phase !== 'work' || !over || s.run === null || s.started === null || ends_at === null || !stamp) return laps;
+      // Not twice: a rang row is in the count already, and a row that covers this bell has the last word on it.
+      return today(s.started) !== day || rangOnce(s) || covered(s.run, ends_at, stampMs(stamp)) ? laps : laps + 1;
     },
 
     start: (task) => begin(false, task),
@@ -241,10 +292,13 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     extend: () => change({ do: 'extend', ms: EXTEND_MS }),
     stop: () => end('stop'),
     setAside: () => end('void'),
+    undoable,
+    undo,
 
     close() {
       stopWatch();
       cancel();
+      forget();
     },
   };
 }

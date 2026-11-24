@@ -44,12 +44,19 @@ function fakeWire(handlers: Handlers) {
 
 // The account routes of a server, enough of them.
 function fakeAccounts() {
-  const server = { reachable: true, calls: [] as { path: string; body: any }[], fail: null as null | { status: number; error: string; retryAfter?: string } };
+  const server = {
+    reachable: true,
+    calls: [] as { path: string; body: any }[],
+    fail: null as null | { status: number; error: string; retryAfter?: string },
+    /** Set, and the next logout waits for it: the request is on its way and has not come back. */
+    logoutWaits: null as null | Promise<void>,
+  };
   const fetch: Fetch = async (url, init) => {
     if (!server.reachable) throw new TypeError('fetch failed');
     const path = new URL(url).pathname;
     const body = JSON.parse(init.body);
     server.calls.push({ path, body });
+    if (path === '/api/logout') await server.logoutWaits;
     const fail = server.fail;
     if (fail) {
       return { ok: false, status: fail.status, headers: { get: () => fail.retryAfter ?? null }, json: async () => ({ error: fail.error }) };
@@ -401,6 +408,21 @@ describe('the outbox', () => {
     // Still held and still counted: it is tried again at the next start.
     assert.equal(d.engine.unsent.value, 1);
     assert.equal(d.engine.rows('task').value.get('t1')?.notes, 'the server dislikes this one');
+    // The one cell was found, so the rest go together again: three edits, one push.
+    d.engine.write('task', 't3', { title: 'a', notes: 'b', estimate: 3 });
+    await d.engine.saved();
+    assert.equal(d.wire().sent.at(-1)!.cells.length, 3);
+  });
+
+  it('a new connection starts over: after a welcome the batch is tried whole again, not a cell at a time', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'one', notes: 'two' });
+    await d.engine.saved();
+    d.wire().handlers.message({ type: 'nack', batch: d.wire().sent.at(-1)!.batch, reason: 'invalid', server_time: 0 });
+    assert.equal(d.wire().sent.at(-1)!.cells.length, 1);
+    d.wire().handlers.down();
+    d.wire().welcome();
+    assert.equal(d.wire().sent.at(-1)!.cells.length, 2);
   });
 });
 
@@ -599,12 +621,13 @@ describe('a crash, then a restart', () => {
     assert.equal(d.engine.unsaved.value, false);
     broken.now = true;
     d.engine.write('task', 't1', { title: 'the disk was full' });
-    await d.engine.saved();
+    // saved() does not say saved when it is not.
+    await assert.rejects(d.engine.saved(), /refused/);
     assert.equal(d.engine.unsaved.value, true, 'the indicator can say: could not save on this device');
     assert.deepEqual(d.wire().sent[0]!.cells.map((c) => c.value), ['the disk was full']);
     // Still refusing at the next try: still true.
     d.time.advance(5000);
-    await d.engine.saved();
+    await assert.rejects(d.engine.saved(), /refused/);
     assert.equal(d.engine.unsaved.value, true);
     broken.now = false;
     d.time.advance(5000);
@@ -614,6 +637,136 @@ describe('a crash, then a restart', () => {
     const again = await device({ stores: d.stores });
     assert.equal(title(again), 'the disk was full');
     assert.equal(again.engine.unsent.value, 1);
+  });
+
+  // A store that refuses writes while `broken.now` is set.
+  const breakable = (broken: { now: boolean }) => (open: OpenStore): OpenStore => async (name) => {
+    const store = await open(name);
+    return { ...store, write: (write) => (broken.now ? Promise.reject(new Error('disk full')) : store.write(write)) };
+  };
+
+  it('closing after a refused write tries it once more: an edit that can be saved by then is saved, not dropped', async () => {
+    const broken = { now: false };
+    const d = await signedIn({ head: null, wrap: breakable(broken) });
+    broken.now = true;
+    d.engine.write('task', 't1', { title: 'refused, then the disk had room' });
+    await assert.rejects(d.engine.saved());
+    // The store works again, and the app is closed before the five second retry comes round.
+    broken.now = false;
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(title(again), 'refused, then the disk had room');
+    assert.equal(again.engine.unsent.value, 1);
+  });
+
+  it('closing while the store still refuses unsent edits is not done quietly: stop() closes and says what was lost', async () => {
+    const broken = { now: false };
+    const d = await signedIn({ head: null, wrap: breakable(broken) });
+    d.engine.write('task', 't0', { title: 'saved' });
+    await d.engine.saved();
+    broken.now = true;
+    d.engine.write('task', 't1', { title: 'never saved, never sent' });
+    await assert.rejects(d.engine.stop(), /2 unsent edits the store refused/);
+    const again = await device({ stores: d.stores });
+    assert.deepEqual(again.engine.cells().map((c) => c.value), ['saved']);
+  });
+
+  it('closing while the store refuses is quiet when the server has everything: nothing is lost', async () => {
+    const broken = { now: false };
+    const d = await signedIn({ wrap: breakable(broken) });
+    broken.now = true;
+    d.engine.write('task', 't1', { title: 'sent and acked, not saved' });
+    await assert.rejects(d.engine.saved());
+    d.wire().ack(0, 1);
+    await d.engine.stop();
+  });
+
+  it('signing in as someone else is refused while unsent edits of the account here cannot be saved, before the server is asked', async () => {
+    const broken = { now: false };
+    const d = await signedIn({ head: null, wrap: breakable(broken) });
+    broken.now = true;
+    d.engine.write('task', 't1', { title: 'held in memory only' });
+    const calls = d.server.calls.length;
+    assert.deepEqual(await d.engine.signIn('nimal', 'another password'), { ok: false, error: 'unsaved' });
+    assert.equal(d.server.calls.length, calls, 'a new token would have cut this account off');
+    assert.equal(d.engine.account.value?.username, 'ravi');
+    assert.equal(title(d), 'held in memory only');
+    // Once it can be saved, it is, and then the other account may come in.
+    broken.now = false;
+    assert.deepEqual(await d.engine.signIn('nimal', 'another password'), { ok: true });
+    assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 1);
+  });
+
+  it('the account database deleted from another tab: this engine is signed out too, and does not go on writing into nothing', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'before' });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    const wire = d.wire();
+    await (await d.stores('heirloom-acct-ravi')).destroy();
+    d.engine.write('task', 't2', { title: 'typed in the tab that did not know' });
+    await d.engine.saved();
+    assert.equal(d.engine.account.value, null);
+    assert.equal(d.engine.sync.value, 'signed-out');
+    assert.equal(d.engine.unsaved.value, false);
+    assert.equal(wire.running, false);
+    assert.deepEqual(d.engine.cells(), []);
+    assert.throws(() => d.engine.write('task', 't3', { title: 'x' }), /sign in/);
+    // No retry is left ticking.
+    assert.equal(d.time.waiting(), 0);
+  });
+});
+
+describe('a server restored from an older copy', () => {
+  it('a welcome with a head below our cursor: the cursor goes to 0 and every cell held is sent again, ours and theirs', async () => {
+    const d = await signedIn({ head: 2 });
+    d.wire().cells(0, 2, [theirs(1, 't1', 'title', 'from another device'), theirs(2, 't2', 'title', 'the server will lose this one')]);
+    d.engine.write('task', 't3', { title: 'ours, acked long ago' });
+    await d.engine.saved();
+    d.wire().ack(2, 3);
+    await d.engine.saved();
+    assert.equal(d.wire().handlers.hello().cursor, 3);
+    assert.equal(d.engine.sync.value, 'in-step');
+    const held = d.engine.cells();
+
+    // The server comes back from last night's copy: it has one cell.
+    d.wire().handlers.down();
+    const pushes = d.wire().sent.length;
+    d.wire().welcome(1);
+    assert.equal(d.wire().handlers.hello().cursor, 0);
+    assert.equal(d.engine.unsent.value, 3);
+    assert.equal(d.engine.sync.value, 'syncing');
+    assert.equal(d.wire().sent.length, pushes, 'it listens first: the server sends what it has from 0');
+    d.wire().cells(0, 1, [theirs(1, 't1', 'title', 'from another device')]);
+    await d.engine.saved();
+    const push = d.wire().sent.at(-1)!;
+    assert.deepEqual(push.cells.toSorted((a, b) => (a.stamp < b.stamp ? -1 : 1)), held.toSorted((a, b) => (a.stamp < b.stamp ? -1 : 1)));
+    d.wire().ack(1, 3);
+    assert.equal(d.engine.sync.value, 'in-step');
+    assert.deepEqual(d.engine.cells(), held, 'nothing here changed: the same cells, the same stamps');
+  });
+
+  it('what it decided survives a restart in the middle: the cursor at 0 and the outbox full', async () => {
+    const d = await signedIn({ head: 2 });
+    d.wire().cells(0, 2, [theirs(1, 't1', 'title', 'one'), theirs(2, 't2', 'title', 'two')]);
+    await d.engine.saved();
+    d.wire().handlers.down();
+    d.wire().welcome(0);
+    await d.engine.saved();
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.wire().handlers.hello().cursor, 0);
+    assert.equal(again.engine.unsent.value, 2);
+  });
+
+  it('a head at or past our cursor is the ordinary case: nothing is sent again', async () => {
+    const d = await signedIn({ head: 2 });
+    d.wire().cells(0, 2, [theirs(1, 't1', 'title', 'one'), theirs(2, 't2', 'title', 'two')]);
+    d.wire().handlers.down();
+    d.wire().welcome(2);
+    assert.equal(d.engine.unsent.value, 0);
+    assert.equal(d.wire().handlers.hello().cursor, 2);
   });
 });
 
@@ -767,6 +920,45 @@ describe('accounts', () => {
     assert.equal(again.engine.device, d.engine.device, 'the device id outlives the sign out');
   });
 
+  it('a write made while the server is being told of the sign out is refused, never taken and then deleted with the database', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'sent' });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    let release = () => {};
+    d.server.logoutWaits = new Promise((resolve) => (release = resolve));
+    const leaving = d.engine.signOut();
+    await settle();
+    assert.equal(d.server.calls.at(-1)?.path, '/api/logout', 'the request is on its way');
+    // The bell falls due, or a thumb lands on stop. There is no account to write to any more,
+    // and saying so is the honest answer: the timer is on the server, untouched.
+    assert.throws(() => d.engine.write('session', 'run-1', { outcome: 'rang' }), /sign in/);
+    assert.deepEqual([...d.engine.rows('task').value], []);
+    release();
+    assert.deepEqual(await leaving, { ok: true });
+    assert.equal(d.engine.account.value, null);
+  });
+
+  it('an edit that lands just as the outbox empties stops the sign out: still signed in, the server not told, the edit kept', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'first' });
+    await d.engine.saved();
+    const leaving = d.engine.signOut();
+    await settle();
+    d.wire().ack(0, 1);
+    d.engine.write('session', 'run-1', { outcome: 'rang' });
+    assert.deepEqual(await leaving, { ok: false, error: 'unsent' });
+    assert.equal(d.engine.account.value?.username, 'ravi');
+    assert.equal(d.server.calls.some((c) => c.path === '/api/logout'), false);
+    assert.equal(d.engine.rows('session').value.get('run-1')?.outcome, 'rang');
+    assert.equal(d.wire().running, true);
+    // It is sent like any other, and then the sign out goes through.
+    await d.engine.saved();
+    d.wire().ack(1, 2);
+    assert.deepEqual(await d.engine.signOut(), { ok: true });
+  });
+
   it('sign out gives up after ten seconds if the edits will not go', async () => {
     const d = await signedIn();
     d.engine.write('task', 't1', { title: 'the server never acks' });
@@ -871,6 +1063,34 @@ describe('the engine over the real transport', () => {
     };
     return { log, fetch };
   }
+
+  it('after a gap the engine asks for a new hello and shows offline until one is answered, not syncing on a socket that may never open', async () => {
+    const time = fakeTime();
+    const sockets = fakeSockets();
+    const engine = await createEngine({
+      url: 'https://heirloom.test',
+      now: time.now,
+      schedule: time.schedule,
+      random: () => 1,
+      WebSocket: sockets.FakeSocket,
+      fetch: tinyServer().fetch,
+      openStore: memoryStores(),
+    });
+    await engine.register('invite-code', 'ravi', 'correct horse');
+    sockets.last().accept();
+    sockets.last().say({ type: 'welcome', server_time: time.now(), head: 0 });
+    assert.equal(engine.sync.value, 'in-step');
+    sockets.last().say({ type: 'cells', from: 4, to: 5, cells: [] });
+    assert.equal(sockets.all.length, 2);
+    assert.equal(engine.sync.value, 'offline');
+    sockets.last().fail();
+    assert.equal(engine.sync.value, 'offline');
+    time.advance(1000);
+    sockets.last().accept();
+    sockets.last().say({ type: 'welcome', server_time: time.now(), head: 0 });
+    assert.equal(engine.sync.value, 'in-step');
+    await engine.stop();
+  });
 
   it('when no socket gets through, an edit still reaches the server by POST and comes back acked', async () => {
     const server = tinyServer();

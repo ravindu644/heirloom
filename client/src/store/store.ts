@@ -21,6 +21,9 @@ export interface Write {
   meta?: Record<string, unknown>;
 }
 
+/** The database was deleted while this store was open: the account was signed out from another tab. */
+export class StoreGone extends Error {}
+
 export interface Store {
   load(): Promise<Snapshot>;
   write(write: Write): Promise<void>;
