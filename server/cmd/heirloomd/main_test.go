@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestHealthz(t *testing.T) {
-	h := handler("3.51.3")
+	h, _ := newAPI(nil, time.Now, "3.51.3")
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))

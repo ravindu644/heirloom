@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"heirloom/server/auth"
 	"heirloom/server/store"
 )
 
@@ -32,6 +32,7 @@ func run() error {
 	addr := flag.String("addr", "127.0.0.1:8787", "address to listen on")
 	data := flag.String("data", "./data", "directory for the database, created if missing")
 	showVersion := flag.Bool("version", false, "print the version and exit")
+	invite := flag.Bool("invite", false, "print one invite code for the database in -data and exit")
 	flag.Parse()
 
 	sqliteVersion, err := store.SQLiteVersion()
@@ -40,6 +41,15 @@ func run() error {
 	}
 	if *showVersion {
 		fmt.Printf("heirloomd %s sqlite %s\n", version, sqliteVersion)
+		return nil
+	}
+
+	if *invite {
+		code, err := newInvite(*data)
+		if err != nil {
+			return err
+		}
+		fmt.Println(code)
 		return nil
 	}
 
@@ -54,8 +64,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("start: %w", err) // net's error already names the address
 	}
-	// Without a header timeout one idle client can hold a connection open forever.
-	srv := &http.Server{Handler: handler(sqliteVersion), ReadHeaderTimeout: 10 * time.Second}
+	api, sockets := newAPI(db, time.Now, sqliteVersion)
+	// Without these one idle client can hold a connection, and a megabyte of body, forever.
+	// A socket is not cut by them: the deadlines are lifted when it takes the connection over.
+	srv := &http.Server{Handler: api, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -78,6 +90,8 @@ func run() error {
 	if err := <-served; !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve: %w", err)
 	}
+	// Shutdown does not know about sockets. Close them and wait, so nothing is mid-write.
+	sockets.Close()
 	// Closing the last connection checkpoints the WAL and removes the -wal and -shm files.
 	if err := db.Close(); err != nil {
 		return fmt.Errorf("close database: %w", err)
@@ -85,20 +99,13 @@ func run() error {
 	return nil
 }
 
-func handler(sqliteVersion string) http.Handler {
-	// The e2e run polls /healthz and reads these three fields; the shape is fixed.
-	body, err := json.Marshal(struct {
-		OK      bool   `json:"ok"`
-		Version string `json:"version"`
-		SQLite  string `json:"sqlite"`
-	}{true, version, sqliteVersion})
+// newInvite is "heirloomd -invite". It opens the database for itself, which is safe beside
+// a running server: SQLite lets a second process write between the first one's commits.
+func newInvite(data string) (string, error) {
+	db, err := store.Open(data)
 	if err != nil {
-		panic(err) // two strings and a bool always marshal
+		return "", err
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(body)
-	})
-	return mux
+	defer db.Close()
+	return auth.New(db, time.Now, nil).Invite()
 }

@@ -102,3 +102,44 @@ func TestOpenUsesWALAndClosesClean(t *testing.T) {
 		t.Errorf("after Close the data directory holds %v, want only heirloom.db", names)
 	}
 }
+
+func TestSchemaIsMadeOnceAndANewerOneIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	db, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var version, tables int
+	if err := db.QueryRow("pragma user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow("select count(*) from sqlite_schema where type = 'table' and name in ('account', 'invite', 'token', 'cell')").Scan(&tables); err != nil {
+		t.Fatal(err)
+	}
+	if version != len(migrations) || tables != 4 {
+		t.Errorf("schema version %d with %d of our tables, want %d and 4", version, tables, len(migrations))
+	}
+	// Opening again, as every restart and every "heirloomd -invite" does, must keep what is there.
+	if _, err := db.Exec("insert into account (public_id, username, password, created) values ('a', 'ravi', '', 0)"); err != nil {
+		t.Fatal(err)
+	}
+	second, err := Open(dir)
+	if err != nil {
+		t.Fatalf("opening a database that is already open and already migrated: %v", err)
+	}
+	var accounts int
+	if err := second.QueryRow("select count(*) from account").Scan(&accounts); err != nil || accounts != 1 {
+		t.Errorf("after opening again: %d accounts, %v; want the one that was there", accounts, err)
+	}
+	second.Close()
+
+	// A database written by a newer build is not ours to touch.
+	if _, err := db.Exec("pragma user_version = 99"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if newer, err := Open(dir); err == nil {
+		newer.Close()
+		t.Error("opened a database from a newer build without complaint")
+	}
+}
