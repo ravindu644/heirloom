@@ -4,6 +4,8 @@
   padding: var(--layout-margin);
   border-radius: var(--radius-md);
   background: var(--surface);
+  --track: var(--raised);
 }
 .panel h2 { font: var(--type-body-strong); }
-.panel p { text-wrap: pretty; }
+/* Balanced, so a figure is never left alone on the last line. */
+.panel p { text-wrap: balance; }

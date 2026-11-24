@@ -90,20 +90,19 @@ export function App({ engine, focus }: { engine: Engine; focus: Focus }) {
       </main>
       <p class={css.status} role="status">
         {said}
-        {sync === 'signed-out' && (
-          <>
-            {' '}
-            <Button kind="small" onClick={() => setAgain(true)}>
-              {s.status.signInAgain}
-            </Button>
-          </>
-        )}
       </p>
       <div class={css.account}>
         <span>{account.username}</span>
-        <Button kind="small" onClick={signOut}>
-          {s.status.signOut}
-        </Button>
+        {/* The server has already signed this device out: the one thing left to offer is the way back in. */}
+        {sync === 'signed-out' ? (
+          <Button kind="small" onClick={() => setAgain(true)}>
+            {s.status.signInAgain}
+          </Button>
+        ) : (
+          <Button kind="small" onClick={signOut}>
+            {s.status.signOut}
+          </Button>
+        )}
       </div>
     </div>
   );

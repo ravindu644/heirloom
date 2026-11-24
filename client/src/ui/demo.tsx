@@ -63,6 +63,7 @@ const SCENES: Record<string, Scene> = {
   offline: { about: 'No connection, 3 edits unsent', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, sync: 'offline', unsent: 3 },
   'next-day': { about: 'Opened the morning after a lap that rang last night', at: [9, 5], run: { ...lap2, left: 0 }, ghost: [5 * MIN, 200 * MIN], newDay: true },
   unsaved: { about: 'The store is refusing writes', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, unsaved: true },
+  'unsaved-offline': { about: 'No connection and the store refusing writes: the worst case', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, unsaved: true, sync: 'offline', unsent: 3 },
   refused: { about: 'The server signed this device out', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, sync: 'signed-out' },
   'long-title': { about: 'A lap on the longest task title', run: { ...lap2, task: 'long' }, you: 125 * MIN, laps: 5, ghost: tuesday },
   'undo-stop': { about: 'Just stopped: the sentence, and Undo for ten seconds', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Stop' },

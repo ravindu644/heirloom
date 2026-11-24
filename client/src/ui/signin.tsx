@@ -1,5 +1,5 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Engine } from '../sync/engine.ts';
 import { Brand } from './kit/brand.tsx';
 import { Button } from './kit/button.tsx';
@@ -12,6 +12,23 @@ export function SignIn({ engine, again, onDone }: { engine: Engine; again?: stri
   const [joining, setJoining] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  // With the keyboard up there is half a screen. Bring the button into view, then the field being
+  // typed in: both when they fit, and the field when they do not. The keyboard opening is a resize.
+  const actions = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const show = () => {
+      if (!(document.activeElement instanceof HTMLInputElement)) return;
+      actions.current?.scrollIntoView({ block: 'nearest' });
+      document.activeElement.scrollIntoView({ block: 'nearest' });
+    };
+    addEventListener('resize', show);
+    addEventListener('focusin', show);
+    return () => {
+      removeEventListener('resize', show);
+      removeEventListener('focusin', show);
+    };
+  }, []);
 
   const submit = async (event: TargetedSubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,7 +79,7 @@ export function SignIn({ engine, again, onDone }: { engine: Engine; again?: stri
           required
           autocomplete={joining ? 'new-password' : 'current-password'}
         />
-        <div class={css.actions}>
+        <div class={css.actions} ref={actions}>
           <Button kind="primary" type="submit" disabled={busy}>
             {joining ? (busy ? s.account.joining : s.account.joinGo) : busy ? s.account.signingIn : s.account.signIn}
           </Button>

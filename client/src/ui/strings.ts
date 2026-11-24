@@ -104,7 +104,7 @@ export const focus = {
 
 export const race = {
   against: (day: string) => `Against ${day}`,
-  today: 'Today',
+  today: 'Today so far',
   you: 'You',
   ghost: 'Ghost',
   /** The chip: a sign and a number, or the word. */
@@ -150,7 +150,7 @@ export const status = {
   // connection; with neither, the laps are only in the open app.
   unsaved: (device: string, offline: boolean) =>
     offline
-      ? `No connection, and this ${device} cannot save right now. Keep heirloom open until one comes back.`
+      ? `No connection, and this ${device} cannot save right now. Keep heirloom open until the connection comes back.`
       : `This ${device} cannot save right now. Your laps still reach the server.`,
   refused: (device: string) => `The server signed this ${device} out. Your laps are safe on it.`,
   signInAgain: 'Sign in again',
@@ -167,6 +167,12 @@ export const ring = {
   lapDone: (n: number) => (n === 4 ? result.set : `Lap ${n} of 4, done.`),
   breakOver: 'Break over.',
   lapNext: (n: number) => `Lap ${n} is next.`,
+  // Beside the countdown in the phone's notification shade, while a phase runs.
+  lapRunning: (n: number) => focus.lap(n),
+  breakRunning: (long: boolean) => (long ? focus.longBreak : focus.shortBreak),
+  // The two kinds of notification, as the phone's settings list them.
+  bellChannel: 'Bell',
+  countdownChannel: 'Time left',
 };
 
 export const elsewhere = 'heirloom is open in another tab of this browser. Close that one and this one takes over by itself.';
@@ -178,7 +184,7 @@ export const account = {
   joinIntro: 'Accounts here are by invite. One code makes one account.',
   invite: 'Invite code',
   username: 'Username',
-  usernameHint: '3 to 32 of a to z, 0 to 9 and _',
+  usernameHint: '3 to 32 characters: a to z, 0 to 9 and _',
   password: 'Password',
   passwordHint: '8 characters or more',
   signingIn: 'Signing in',
@@ -194,7 +200,7 @@ export const account = {
       invite: 'That invite is not known here, or it has been used. A code works once.',
       taken: 'That username is taken. Pick another.',
       slow_down: `Too many tries. This username can sign in again in ${plural(Math.max(1, Math.ceil((retryAfter ?? 60) / 60)), 'minute', 'minutes')}.`,
-      bad_request: 'Usernames are 3 to 32 of a to z, 0 to 9 and _. Passwords are 8 characters or more.',
+      bad_request: 'Usernames are 3 to 32 characters: a to z, 0 to 9 and _. Passwords are 8 characters or more.',
       offline: 'Needs a connection. Nothing was sent.',
       // Storage is refusing writes and edits are unsent: another account now would lose them.
       unsaved: 'Not yet. Your last changes could not be saved here, and signing in now would lose them. Try again in a moment.',

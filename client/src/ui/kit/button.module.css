@@ -12,8 +12,8 @@
 .button:disabled { cursor: default; }
 
 .primary { background: var(--you); color: var(--on-you); }
-.primary:hover { background: color-mix(in srgb, var(--you), var(--ink) 12%); }
-.primary:active { background: color-mix(in srgb, var(--you), var(--ink) 24%); }
+.primary:hover { background: color-mix(in srgb, var(--you), var(--ink) var(--state-hover)); }
+.primary:active { background: color-mix(in srgb, var(--you), var(--ink) var(--state-press)); }
 
 .secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .secondary:hover, .secondary:active { background: var(--raised); }
@@ -22,6 +22,7 @@
 .text:hover, .text:active { color: var(--ink); }
 
 .small {
+  min-width: var(--layout-touch);
   padding: 0;
   font: var(--type-label);
   color: var(--muted);

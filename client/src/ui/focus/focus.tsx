@@ -270,7 +270,7 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
           )}
         </div>
         <div class={css.quiet}>
-          {!ready && !view.paused && (
+          {!ready && !view.paused && state.phase === 'work' && (
             <Button kind="small" onClick={() => focus.extend()}>
               {s.focus.extend(EXTEND_MS)}
             </Button>

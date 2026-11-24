@@ -71,7 +71,7 @@
 
 /* DESIGN.md sets the digits at 168px on a 412px phone. A narrower phone keeps that proportion,
    or the last digit would leave the screen. */
-@media (max-width: 411px) {
+@media (width < 412px) {
   .digits { font-size: calc(100vw * 168 / 412); }
 }
 

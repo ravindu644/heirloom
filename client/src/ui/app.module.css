@@ -6,6 +6,9 @@
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas: "brand account" "main main" "status status" "nav nav";
   height: 100dvh;
+  /* Edge to edge inside the phone app: the status bar and a landscape notch stay clear. The
+     bottom bar takes the bottom inset itself, so its ground runs under the gesture bar. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
 .brand {
@@ -32,8 +35,17 @@
 .main { grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
 .canvas { max-width: var(--layout-canvas); height: 100%; }
 
-/* Its line is kept when it has nothing to say: losing the connection must not move the buttons. */
-.status { grid-area: status; min-height: calc(1lh + var(--space-sm)); padding: 0 var(--layout-margin) var(--space-sm); font: var(--type-label); color: var(--muted); }
+/* Two lines are kept even when it has nothing to say: losing the connection, the worst case with
+   it, must not move the buttons. One line sits low, clear of the button above it. */
+.status {
+  grid-area: status;
+  display: grid;
+  align-content: end;
+  min-height: calc(2lh + 2 * var(--space-sm));
+  padding: var(--space-sm) var(--layout-margin);
+  font: var(--type-label);
+  color: var(--muted);
+}
 
 .nav {
   grid-area: nav;
@@ -58,7 +70,7 @@
 .later h1 { font: var(--type-title); }
 .later p { color: var(--muted); }
 
-.elsewhere { display: grid; align-content: center; gap: var(--layout-gap); max-width: calc(44ch + 2 * var(--layout-margin)); min-height: 100dvh; margin: 0 auto; padding: var(--layout-margin); }
+.elsewhere { display: grid; align-content: center; gap: var(--layout-gap); max-width: calc(44ch + 2 * var(--layout-margin)); min-height: 100dvh; margin: 0 auto; padding: calc(var(--layout-margin) + env(safe-area-inset-top)) var(--layout-margin) calc(var(--layout-margin) + env(safe-area-inset-bottom)); }
 .elsewhere p:first-child { display: flex; align-items: center; font: var(--type-body-strong); }
 
 /* Laptop: a labelled sidebar on the ground, the canvas beside it. */
@@ -72,7 +84,7 @@
   .nav { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-md); border: 0; }
   .nav a {
     place-items: center start;
-    min-height: calc(var(--space-xl) - var(--space-xs));
+    min-height: var(--layout-touch);
     padding: 0 var(--space-sm);
     border: 0;
     border-radius: var(--radius-sm);
@@ -81,7 +93,7 @@
   .nav a:hover { background: var(--raised); }
   .nav a[aria-current] { background: var(--raised); }
   .nav b { font-weight: inherit; }
-  .main { padding: var(--layout-gutter) var(--layout-gutter) var(--layout-gutter) var(--space-sm); }
-  .status { padding: 0 var(--layout-gap) var(--space-sm); }
+  .main { padding: var(--layout-gutter); }
+  .status { min-height: 0; padding: 0 var(--layout-gap) var(--space-sm); }
   .account { justify-content: space-between; padding: 0 var(--layout-gap) var(--space-md); }
 }

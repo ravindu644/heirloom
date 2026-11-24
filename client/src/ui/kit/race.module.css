@@ -5,7 +5,7 @@
   gap: var(--space-sm) var(--space-md);
 }
 .who { font: var(--type-label); color: var(--muted); }
-.lane { position: relative; height: var(--space-md); background: var(--raised); }
+.lane { position: relative; height: var(--space-md); background: var(--track, var(--line)); }
 .bar { position: absolute; inset: 0 auto 0 0; background: var(--you); transform-origin: left; }
 /* Past you is only a memory: hollow, dashed, no hue. */
 .ghost .bar { background: none; border: 1px dashed var(--ghost); }
@@ -20,7 +20,9 @@
 /* The result. The finish lines reach half the gap past each lane, so when you are level the two
    meet and the lanes end on one line. */
 .big { gap: var(--space-md); }
-.big .lane { height: var(--space-xl); }
+.big .lane { height: var(--layout-lane-result); }
+/* On the tall lanes 1px thins to a hairline. */
+.big .ghost .bar { border-width: 2px; }
 .big .value { font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); }
 .big .yours { color: var(--you); }
 .line {
@@ -49,7 +51,6 @@
   line-height: var(--space-md);
 }
 .ahead { background: var(--you); color: var(--on-you); }
-.level { background: var(--raised); }
 /* lap-done: the chip turns over once your bar is nearly home. */
 .turning { animation: turn calc(var(--motion-lap-done) * 0.3) var(--motion-ease) calc(var(--motion-lap-done) * 0.4) both; }
 @keyframes turn { from { transform: rotateX(90deg); } }

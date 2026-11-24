@@ -1,5 +1,6 @@
 .laps { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-xs); }
-.laps i { position: relative; height: var(--space-sm); overflow: hidden; background: var(--raised); }
+/* The empty part of a lane is `line` on the ground and `raised` on a panel, which sets --track. */
+.laps i { position: relative; height: var(--layout-lane); overflow: hidden; background: var(--track, var(--line)); }
 .laps i::after {
   content: "";
   position: absolute;
@@ -8,7 +9,7 @@
   transform: scaleX(var(--share));
   transform-origin: left;
 }
-.big i { height: var(--space-lg); }
+.big i { height: var(--layout-lane-set); }
 
 /* set-done: each segment takes a sixth of the moment and starts a sixth after the one before,
    which leaves the last sixth for the words. */

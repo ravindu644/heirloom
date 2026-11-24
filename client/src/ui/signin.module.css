@@ -1,5 +1,14 @@
-.page { display: grid; place-items: center; min-height: 100dvh; padding: var(--layout-gap) var(--layout-margin); }
-.form { display: grid; gap: var(--space-md); width: 100%; max-width: 44ch; }
+/* The page is its own scroller, and nothing in it sticks, so nothing can cover a field when the
+   keyboard takes half the screen. signin.tsx scrolls the button and the field into view. */
+.page {
+  display: grid;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: calc(var(--layout-gap) + env(safe-area-inset-top)) var(--layout-margin) calc(var(--layout-gap) + env(safe-area-inset-bottom));
+  scroll-padding: var(--space-md) 0;
+}
+/* Auto margins centre it and, unlike centring the grid, never push its top out of reach. */
+.form { display: grid; gap: var(--space-md); width: 100%; max-width: 44ch; margin: auto; }
 .form h1 { font: var(--type-headline); letter-spacing: var(--tracking-headline); }
 .brand { display: flex; align-items: center; margin-bottom: var(--space-xl); font: var(--type-body-strong); }
 .intro, .error { min-height: 2lh; margin-bottom: var(--space-sm); }
