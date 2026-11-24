@@ -11,6 +11,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
+import { createWebNotifier, pageBell, timer } from './web.ts';
 
 /** The one bell. Planning reuses the id, so a new plan always takes the old one's place. */
 export const RING_ID = 1;
@@ -39,9 +40,13 @@ export interface PhoneEnv {
   channels: Channels;
   /** Where a failed bridge call is reported. Nothing is thrown into the timer's effect. */
   warn(error: unknown): void;
+  /** The bell in the page, for when Android may not ring: a web notifier whose bell sounds only in view. */
+  page: Notifier;
+  /** Runs `run` each time the app comes back to the foreground. */
+  onResume(run: () => void): void;
 }
 
-export function createCapacitorNotifier({ alarms, countdown, now, channels, warn }: PhoneEnv): Notifier {
+export function createCapacitorNotifier({ alarms, countdown, now, channels, warn, page, onResume }: PhoneEnv): Notifier {
   // Anything but a plan's JSON, so the first plan always runs: an alarm left from the app's last
   // life must be cancelled when the timer it was for has since been stopped.
   let applied: string | undefined;
@@ -71,7 +76,15 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   const apply = async (ring: Ring | null) => {
     await alarms.cancel({ notifications: [{ id: RING_ID }] });
     live = 'null';
-    if (!ring || !(await can())) return countdown.clear();
+    if (!ring || !(await can())) {
+      // Without permission Android rings nothing, so the page does, if it is on screen at the bell.
+      // In the background there is nothing honest to do: no notification, and a page out of sight
+      // cannot be counted on to run. allow() and coming back to the app try the alarm again.
+      page.plan(ring);
+      return countdown.clear();
+    }
+    // The notification's own sound is the bell; the page must not ring a second one.
+    page.plan(null);
     // Whole ms: the native side reads the end as a long, and a fraction would read as nothing.
     const at = Math.round(ring.at);
     await alarms.schedule({
@@ -92,6 +105,15 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     await (ring.during ? countdown.show({ title: ring.during, end: at, channel: 'countdown' }) : countdown.clear());
   };
 
+  // Sets the pending bell if Android does not hold it yet, once the plans before this have run.
+  const fill = () =>
+    run(async () => {
+      const planned = current && current.at - now() >= MOMENT_MS ? current : null;
+      if (JSON.stringify(planned) !== live) await apply(planned);
+    });
+  // Permission may have been given in Android's settings while the person was away.
+  onResume(fill);
+
   return {
     plan(ring) {
       // A phase that has already ended, or is ending now, rings nowhere.
@@ -108,13 +130,8 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
         (await alarms.requestPermissions()).display === 'granted' &&
         (await alarms.checkExactNotificationSetting()).exact_alarm === 'granted')().catch((error) => (warn(error), false));
       // The start that asked also planned its bell, likely while the prompt was up and nothing
-      // could be scheduled. Once the plans before this have run, set it if it is still missing.
-      if (ok) {
-        run(async () => {
-          const planned = current && current.at - now() >= MOMENT_MS ? current : null;
-          if (JSON.stringify(planned) !== live) await apply(planned);
-        });
-      }
+      // could be scheduled.
+      if (ok) fill();
       return ok;
     },
   };
@@ -122,12 +139,26 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
 
 /** The phone's notifier, on the real plugins. */
 export function capacitorNotifier(channels: Channels): Notifier {
+  const bell = pageBell();
+  // Capacitor's WebView plays media without a gesture, so the bell can be unlocked at once.
+  bell.unlock();
   return createCapacitorNotifier({
     alarms: LocalNotifications,
     countdown: registerPlugin<Countdown>('Countdown'),
     now: () => Date.now(),
     channels,
     warn: (error) => console.warn('heirloom: notifier', error),
+    page: createWebNotifier({
+      now: () => Date.now(),
+      schedule: timer,
+      hidden: () => document.hidden,
+      onShow: (look) => void App.addListener('resume', look),
+      // Out of sight, the page stays quiet: see apply.
+      bell: () => document.hidden || bell.play(),
+    }),
+    // Capacitor's 'resume' comes from the activity's onResume, so it fires on the way back from
+    // Android's settings too. It fires only after a pause, never at the first start.
+    onResume: (run) => void App.addListener('resume', run),
   });
 }
 

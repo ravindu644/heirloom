@@ -9,6 +9,7 @@
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
 import { createBell } from './sound.ts';
+import type { Bell } from './sound.ts';
 /** A ring this late is still worth hearing: past it, the person has moved on. Covers the throttle. */
 export const LATE_MS = 2 * 60_000;
 
@@ -80,21 +81,29 @@ export function createWebNotifier(env: WebEnv): Notifier {
   };
 }
 
-/** The app's notifier in the browser. The first tap or key anywhere unlocks the bell. */
-export function webNotifier(): Notifier {
+/** setTimeout as the notifiers take it: a function that cancels. */
+export function timer(run: () => void, ms: number): () => void {
+  const id = setTimeout(run, ms);
+  return () => clearTimeout(id);
+}
+
+/** The bell in this page. The first tap or key anywhere unlocks it. */
+export function pageBell(): Bell {
   const bell = createBell(() => new AudioContext());
   // Every gesture, not just the first: unlock is cheap once running, and it revives a context the
   // system suspended. pointerup, not pointerdown: a touch's pointerdown does not count as a gesture.
   for (const type of ['pointerup', 'keydown']) addEventListener(type, bell.unlock, { capture: true, passive: true });
+  return bell;
+}
+
+/** The app's notifier in the browser. */
+export function webNotifier(): Notifier {
   return createWebNotifier({
     now: () => Date.now(),
-    schedule: (run, ms) => {
-      const timer = setTimeout(run, ms);
-      return () => clearTimeout(timer);
-    },
+    schedule: timer,
     hidden: () => document.hidden,
     onShow: (look) => document.addEventListener('visibilitychange', () => document.hidden || look()),
-    bell: bell.play,
+    bell: pageBell().play,
     Notification: typeof Notification === 'undefined' ? undefined : Notification,
   });
 }

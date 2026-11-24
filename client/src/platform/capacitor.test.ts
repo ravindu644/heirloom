@@ -6,12 +6,23 @@ import { describe, it } from 'node:test';
 import { T0, fakeTime, settle } from '../sync/fakes.ts';
 import { RING_ID, createCapacitorNotifier } from './capacitor.ts';
 import type { Alarms, Countdown } from './capacitor.ts';
+import { createWebNotifier } from './web.ts';
 
 const MIN = 60_000;
 type Grant = 'granted' | 'denied' | 'prompt';
 
-function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0 } = {}) {
+function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0, hidden = false } = {}) {
   const time = fakeTime();
+  // The page: the browser's own notifier on the same fake clock, its bell heard only in view.
+  const app = { hidden, resume: [] as (() => void)[] };
+  const pageRings: number[] = [];
+  const page = createWebNotifier({
+    now: time.now,
+    schedule: time.schedule,
+    hidden: () => app.hidden,
+    onShow: (look) => app.resume.push(look),
+    bell: () => app.hidden || pageRings.push(time.now()),
+  });
   const calls: string[] = [];
   const scheduled: any[] = [];
   const shown: any[] = [];
@@ -58,12 +69,15 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     now: time.now,
     channels: { ring: 'Bell', countdown: 'Time left' },
     warn: (error) => warned.push(error),
+    page,
+    onResume: (run) => app.resume.push(run),
   });
+  const resume = () => app.resume.forEach((run) => run());
   const ring = (inMs: number, during?: string) => ({ at: T0 + inMs, title: 'Time for a break', body: '5 minutes', during });
   const done = async () => {
     for (let i = 0; i < 20; i++) await settle();
   };
-  return { time, calls, scheduled, shown, warned, state, notifier, ring, done };
+  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume };
 }
 
 describe('the phone notifier', () => {
@@ -187,5 +201,52 @@ describe('the phone notifier', () => {
     await done();
     assert.equal(scheduled[0].schedule.at.getTime(), T0 + 25 * MIN + 1);
     assert.equal(shown[0].end, T0 + 25 * MIN + 1);
+  });
+
+  it('without permission, the page rings the bell once if it is on screen at the time', async () => {
+    const { time, pageRings, notifier, ring, done } = rig({ display: 'denied' });
+    notifier.plan(ring(25 * MIN));
+    await done();
+    time.advance(60 * MIN);
+    assert.deepEqual(pageRings, [T0 + 25 * MIN]);
+  });
+
+  it('without permission and out of sight, nothing rings, then or on coming back', async () => {
+    const { time, app, pageRings, scheduled, notifier, ring, done, resume } = rig({ display: 'denied', hidden: true });
+    notifier.plan(ring(25 * MIN));
+    await done();
+    time.advance(25 * MIN + 30_000);
+    app.hidden = false;
+    resume();
+    await done();
+    time.advance(60 * MIN);
+    assert.deepEqual(pageRings, []);
+    assert.equal(scheduled.length, 0);
+  });
+
+  it('permission given in settings while away: coming back schedules the pending bell, once', async () => {
+    const { time, state, scheduled, pageRings, notifier, ring, done, resume } = rig({ display: 'denied' });
+    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
+    await done();
+    assert.equal(scheduled.length, 0);
+    time.advance(5 * MIN);
+    state.display = 'granted';
+    resume();
+    resume();
+    await done();
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].schedule.at.getTime(), T0 + 25 * MIN);
+    // Android has it now: the page keeps quiet at the bell.
+    time.advance(60 * MIN);
+    assert.deepEqual(pageRings, []);
+  });
+
+  it('with permission, the notification is the bell and the page does not ring a second one', async () => {
+    const { time, scheduled, pageRings, notifier, ring, done } = rig();
+    notifier.plan(ring(25 * MIN));
+    await done();
+    time.advance(60 * MIN);
+    assert.equal(scheduled.length, 1);
+    assert.deepEqual(pageRings, []);
   });
 });
