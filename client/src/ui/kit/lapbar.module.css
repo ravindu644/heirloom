@@ -1,0 +1,18 @@
+.laps { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-xs); }
+.laps i { position: relative; height: var(--space-sm); overflow: hidden; background: var(--raised); }
+.laps i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--you);
+  transform: scaleX(var(--share));
+  transform-origin: left;
+}
+.big i { height: var(--space-lg); }
+
+/* set-done: each segment takes a sixth of the moment and starts a sixth after the one before,
+   which leaves the last sixth for the words. */
+.lighting i::after {
+  animation: light calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * var(--i) / 6) both;
+}
+@keyframes light { from { transform: scaleX(0); } }

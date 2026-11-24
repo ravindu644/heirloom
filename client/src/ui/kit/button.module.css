@@ -1,0 +1,32 @@
+.button {
+  min-height: var(--layout-touch);
+  padding: 0 var(--layout-margin);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: var(--type-body-strong);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--motion-press) var(--motion-ease), color var(--motion-press) var(--motion-ease);
+}
+.button:disabled { cursor: default; }
+
+.primary { background: var(--you); color: var(--on-you); }
+.primary:hover { background: color-mix(in srgb, var(--you), var(--ink) 12%); }
+.primary:active { background: color-mix(in srgb, var(--you), var(--ink) 24%); }
+
+.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.secondary:hover, .secondary:active { background: var(--raised); }
+
+.text { color: var(--muted); }
+.text:hover, .text:active { color: var(--ink); }
+
+.small {
+  padding: 0;
+  font: var(--type-label);
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--ghost);
+  text-underline-offset: var(--space-xs);
+}
+.small:hover, .small:active { color: var(--ink); }

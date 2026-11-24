@@ -1,0 +1,7 @@
+.page { display: grid; place-items: center; min-height: 100dvh; padding: var(--layout-gap) var(--layout-margin); }
+.form { display: grid; gap: var(--space-md); width: 100%; max-width: 44ch; }
+.form h1 { font: var(--type-headline); letter-spacing: var(--tracking-headline); }
+.brand { display: flex; align-items: center; margin-bottom: var(--space-xl); font: var(--type-body-strong); }
+.intro, .error { min-height: 2lh; margin-bottom: var(--space-sm); }
+.intro { color: var(--muted); }
+.actions { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }

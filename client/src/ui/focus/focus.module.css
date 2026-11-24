@@ -1,0 +1,109 @@
+/* Phone first. The clock sits in the middle of the free space and the actions at the bottom, so
+   the button a thumb wants is in the same place in every state. */
+.focus { display: flex; flex-direction: column; gap: var(--layout-gap); min-height: 100%; }
+
+.lapline {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  font: var(--type-label);
+  color: var(--muted);
+}
+.lapline b { color: var(--ink); }
+.rest {
+  display: inline-block;
+  width: var(--space-sm);
+  height: var(--space-sm);
+  margin-right: var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--rest);
+}
+
+.clock { display: flex; flex: 1; flex-direction: column; }
+.face { display: flex; flex: 1; flex-direction: column; justify-content: center; padding-top: var(--layout-gap); }
+.task {
+  display: -webkit-box;
+  margin-bottom: var(--space-md);
+  overflow: hidden;
+  font: var(--type-title);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+/* The timer never animates: the digits change. */
+.digits {
+  margin-left: calc(var(--space-xs) * -1);
+  font: var(--type-figure-xl);
+  font-feature-settings: var(--feature-figure-xl);
+  letter-spacing: var(--tracking-figure-xl);
+  white-space: nowrap;
+}
+/* Read from across the desk: ink is a lap running, green is a break, grey is time standing still.
+   The lap line says the same in words. */
+.resting { color: var(--rest); }
+.held { color: var(--muted); }
+/* Two lines kept on the phone, so a longer sentence after a tap does not move the digits. */
+.sub { min-height: 2lh; margin-top: var(--space-sm); color: var(--muted); }
+/* A full target for a thumb that takes no more room than the words beside it. */
+.undo { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
+
+/* Reversed on the phone: the asides sit above, so the main row never moves when they come and go.
+   Stuck to the bottom, so on a short phone the screen scrolls behind the buttons, never over them. */
+.actions { position: sticky; bottom: 0; display: flex; flex-direction: column-reverse; background: var(--ground); }
+.main { display: flex; gap: var(--space-sm); }
+.main > * { flex: 1; }
+/* The asides keep their row and the sentence its two lines even when empty: starting a lap, or
+   the ghost pulling ahead, must not move the digits. */
+.quiet { display: flex; justify-content: space-between; gap: var(--layout-gap); min-height: var(--layout-touch); }
+.say { min-height: 2lh; }
+
+/* The result of a lap. */
+.told { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: var(--layout-gap); }
+.headline { font: var(--type-headline); letter-spacing: var(--tracking-headline); text-wrap: balance; }
+.facts { max-width: 60ch; }
+
+/* lap-done: the bar runs and the chip turns in the kit; the words come last. */
+.lapMoment .words { animation: say calc(var(--motion-lap-done) * 0.3) var(--motion-ease) calc(var(--motion-lap-done) * 0.7) both; }
+/* set-done: the four segments light in turn, then the result and the long break are offered. */
+.setMoment .told { animation: say calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * 5 / 6) both; }
+@keyframes say { from { opacity: 0; } }
+
+/* DESIGN.md sets the digits at 168px on a 412px phone. A narrower phone keeps that proportion,
+   or the last digit would leave the screen. */
+@media (max-width: 411px) {
+  .digits { font-size: calc(100vw * 168 / 412); }
+}
+
+@media (min-width: 720px) {
+  .focus { min-height: 0; max-width: 80ch; }
+  .actions { position: static; }
+  .clock, .face, .told { flex: none; }
+  .face { padding-top: var(--space-xl); }
+  .actions { flex-direction: column; }
+  .main > * { flex: none; }
+  .quiet { justify-content: flex-start; min-height: 0; }
+  .say, .sub { min-height: 0; }
+  .result { max-width: none; gap: var(--space-xl); }
+  .headline { font: var(--type-headline-lg); letter-spacing: var(--tracking-headline-lg); }
+}
+
+/* Room for the 300px digits with the race beside them. */
+@media (min-width: 1280px) {
+  .focus {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-areas: "clock rail" "actions rail";
+    align-content: start;
+    max-width: none;
+  }
+  .clock { grid-area: clock; }
+  .rail { grid-area: rail; }
+  .actions { grid-area: actions; }
+  .digits {
+    font: var(--type-figure-xxl);
+    font-feature-settings: var(--feature-figure-xxl);
+    letter-spacing: var(--tracking-figure-xxl);
+  }
+  .result { display: flex; }
+}

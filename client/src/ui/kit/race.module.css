@@ -1,0 +1,55 @@
+.race {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+}
+.who { font: var(--type-label); color: var(--muted); }
+.lane { position: relative; height: var(--space-md); background: var(--raised); }
+.bar { position: absolute; inset: 0 auto 0 0; background: var(--you); transform-origin: left; }
+/* Past you is only a memory: hollow, dashed, no hue. */
+.ghost .bar { background: none; border: 1px dashed var(--ghost); }
+.value {
+  font: var(--type-figure-md);
+  font-feature-settings: var(--feature-figure-md);
+  text-align: right;
+  color: var(--muted);
+}
+.yours { color: var(--ink); }
+
+/* The result. The finish lines reach half the gap past each lane, so when you are level the two
+   meet and the lanes end on one line. */
+.big { gap: var(--space-md); }
+.big .lane { height: var(--space-xl); }
+.big .value { font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); }
+.big .yours { color: var(--you); }
+.line {
+  position: absolute;
+  top: calc(var(--space-sm) * -1);
+  bottom: calc(var(--space-sm) * -1);
+  width: var(--space-xs);
+  margin-left: calc(var(--space-xs) / -2);
+  background: var(--ink);
+}
+
+/* lap-done: your bar runs the lap it has just finished, to its line. The ghost's line is already there. */
+.running .bar { animation: run calc(var(--motion-lap-done) * 0.6) var(--motion-ease) both; }
+.running .line { animation: land calc(var(--motion-lap-done) * 0.1) var(--motion-ease) calc(var(--motion-lap-done) * 0.55) both; }
+@keyframes run { from { transform: scaleX(var(--from)); } }
+@keyframes land { from { opacity: 0; } }
+
+.chip {
+  display: inline-block;
+  padding: calc(var(--space-xs) / 2) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--you-tint);
+  color: var(--ink);
+  font: var(--type-figure-sm);
+  font-feature-settings: var(--feature-figure-sm);
+  line-height: var(--space-md);
+}
+.ahead { background: var(--you); color: var(--on-you); }
+.level { background: var(--raised); }
+/* lap-done: the chip turns over once your bar is nearly home. */
+.turning { animation: turn calc(var(--motion-lap-done) * 0.3) var(--motion-ease) calc(var(--motion-lap-done) * 0.4) both; }
+@keyframes turn { from { transform: rotateX(90deg); } }

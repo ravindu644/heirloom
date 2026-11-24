@@ -1,0 +1,9 @@
+.panel {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--layout-margin);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.panel h2 { font: var(--type-body-strong); }
+.panel p { text-wrap: pretty; }

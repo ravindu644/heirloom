@@ -1,0 +1,34 @@
+/* The ground every screen stands on. Values come from tokens.css; nothing here is a look of its own. */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html, body, #app { height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: var(--type-body);
+  /* Every weight used is a file we ship; a faked bold would not be Barlow. */
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  /* A tap on a phone answers at once, with no grey flash and no wait for a double tap. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* For a screen reader only. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* DESIGN.md: under reduced motion every moment shows its final state at once. One rule, so no
+   component can forget it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

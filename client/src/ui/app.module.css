@@ -1,0 +1,87 @@
+/* Phone: the brand and the account on top, the screen, what the connection has to say, and the
+   five destinations at the bottom. One set of elements; the laptop only places them differently. */
+.app {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "brand account" "main main" "status status" "nav nav";
+  height: 100dvh;
+}
+
+.brand {
+  grid-area: brand;
+  display: flex;
+  align-items: center;
+  min-height: var(--layout-touch);
+  padding: 0 var(--layout-margin);
+  font: var(--type-body-strong);
+}
+
+.account {
+  grid-area: account;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--layout-margin);
+  font: var(--type-label);
+  color: var(--muted);
+}
+
+/* No padding below: the status line is the space under the screen, and a screen's own buttons
+   may stick to the very bottom of the scroll. */
+.main { grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
+.canvas { max-width: var(--layout-canvas); height: 100%; }
+
+/* Its line is kept when it has nothing to say: losing the connection must not move the buttons. */
+.status { grid-area: status; min-height: calc(1lh + var(--space-sm)); padding: 0 var(--layout-margin) var(--space-sm); font: var(--type-label); color: var(--muted); }
+
+.nav {
+  grid-area: nav;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 0 var(--space-sm) env(safe-area-inset-bottom);
+  border-top: 1px solid var(--line);
+}
+.nav a {
+  display: grid;
+  place-items: center;
+  min-height: calc(var(--layout-touch) + var(--space-md));
+  border-top: 2px solid transparent;
+  font: var(--type-label);
+  color: var(--muted);
+  transition: color var(--motion-press) var(--motion-ease), background-color var(--motion-press) var(--motion-ease);
+}
+.nav a:hover { color: var(--ink); }
+.nav a[aria-current] { border-top-color: var(--you); color: var(--ink); }
+
+.later { display: grid; gap: var(--space-md); max-width: 60ch; padding-top: var(--space-md); }
+.later h1 { font: var(--type-title); }
+.later p { color: var(--muted); }
+
+.elsewhere { display: grid; align-content: center; gap: var(--layout-gap); max-width: calc(44ch + 2 * var(--layout-margin)); min-height: 100dvh; margin: 0 auto; padding: var(--layout-margin); }
+.elsewhere p:first-child { display: flex; align-items: center; font: var(--type-body-strong); }
+
+/* Laptop: a labelled sidebar on the ground, the canvas beside it. */
+@media (min-width: 720px) {
+  .app {
+    grid-template-columns: var(--layout-sidebar) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas: "brand main" "nav main" ". main" "status main" "account main";
+  }
+  .brand { padding: var(--layout-gap) var(--layout-gap) var(--space-md); }
+  .nav { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-md); border: 0; }
+  .nav a {
+    place-items: center start;
+    min-height: calc(var(--space-xl) - var(--space-xs));
+    padding: 0 var(--space-sm);
+    border: 0;
+    border-radius: var(--radius-sm);
+    font: var(--type-body);
+  }
+  .nav a:hover { background: var(--raised); }
+  .nav a[aria-current] { background: var(--raised); }
+  .nav b { font-weight: inherit; }
+  .main { padding: var(--layout-gutter) var(--layout-gutter) var(--layout-gutter) var(--space-sm); }
+  .status { padding: 0 var(--layout-gap) var(--space-sm); }
+  .account { justify-content: space-between; padding: 0 var(--layout-gap) var(--space-md); }
+}

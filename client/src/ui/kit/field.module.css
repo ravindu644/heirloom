@@ -1,0 +1,14 @@
+.field { display: grid; gap: var(--space-xs); }
+.field span { font: var(--type-label); color: var(--muted); }
+.field small { font: var(--type-label); color: var(--muted); }
+.field input {
+  width: 100%;
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color var(--motion-press) var(--motion-ease);
+}
+.field input:hover { border-color: var(--ghost); }
+.field input:focus-visible { border-color: var(--ink); outline-offset: 0; }
