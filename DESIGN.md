@@ -175,6 +175,12 @@ layout:
   lane: 8px
   lane-set: 24px
   lane-result: 40px
+  chart: 192px
+  heat-cell: 12px
+  heat-gap: 2px
+  dot: 12px
+  stroke: 2px
+  hair: 1px
   figure-bearing: -0.047em
   figure-bearing-0: -0.046em
   figure-bearing-1: -0.066em
@@ -330,7 +336,22 @@ Built once in `client/src/ui/kit/` and reused.
   quiet underlined Undo. It never covers the row it speaks of.
 - **The status line** keeps its space only where buttons sit at the bottom of a phone screen
   (Focus). Elsewhere it takes room when it has something to say and none when it is silent.
-- **Heat cell:** a 12px square, 2px gaps, zero to four steps; a rest day carries the rest mark.
+- **Heat cell:** a 12px square, 2px gaps (`layout.heat-cell`, `heat-gap`), zero to four steps; a
+  rest day carries the rest mark, a hollow `rest` ring inside the square. Today has a `hair`
+  outline in ink, the chosen day a `stroke` one.
+- **The week's chart:** drawn by hand, `layout.chart` tall. Your running total is a solid `you`
+  line of `stroke` width that ends in a `dot` with its figure; last week's is a dashed `ghost`
+  line with its total at its end. Grid lines are `hair` in `line`. No fill under a line, no
+  legend box, no gradient: a line is labelled where it ends, and a sentence under the chart
+  says what it shows.
+- **The row of days:** fourteen `dot`s, `xs` apart: a kept day filled in `you`, a rest day the
+  hollow `rest` ring, an empty day an empty-track dot, today open until it has a lap. The
+  states differ by shape as well as colour.
+- **A day's timeline:** a `lane-set` lane on an hour axis: laps in `you`, breaks in `rest`, a
+  lap set aside hollow. Two laps that ran on two devices at once sit on two rows and say so
+  in words. Under it the same sessions as rows, because a block is too small to press.
+- **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
+  mark for the seven days before.
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
   figure-md, the task only if shared, and a Cheer button.
 - **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
