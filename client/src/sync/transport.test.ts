@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeSockets, fakeTime, settle } from './fakes.ts';
-import { HELLO_MS, PING_MS, POLL_MS, POST_MS, backoffMs, connect, smoothOffset } from './transport.ts';
+import { HELLO_MS, PING_MS, POLL_MS, PONG_MS, POST_MS, backoffMs, connect, smoothOffset } from './transport.ts';
 import type { Fetch, Push, ServerMessage } from './transport.ts';
 
 function rig(random = 1) {
@@ -103,15 +103,82 @@ describe('the socket', () => {
     assert.equal(r.seen.length, 1);
   });
 
-  it('a ping with no pong by the next one means the socket is dead: down, then a new hello', () => {
+  it('a ping with no pong in ten seconds means the socket is dead: down, then a new hello', () => {
     const r = rig();
     welcomed(r);
-    r.time.advance(PING_MS);
-    r.time.advance(PING_MS);
+    r.time.advance(PING_MS + PONG_MS - 1);
+    assert.equal(r.sockets.all[0]!.closed, false);
+    assert.equal(r.seen.includes('down'), false);
+    r.time.advance(1);
     assert.equal(r.sockets.all[0]!.closed, true);
     assert.equal(r.seen.at(-1), 'down');
     r.time.advance(1000);
     assert.equal(r.sockets.all.length, 2);
+  });
+
+  it('a pong that comes after the socket was given up does not bring it back, and is not taken for a measurement', () => {
+    const r = rig();
+    welcomed(r);
+    r.time.advance(PING_MS + PONG_MS);
+    const samples = r.samples.length;
+    r.sockets.all[0]!.say({ type: 'pong', t: T0 + PING_MS, server_time: T0 + PING_MS + 9000 });
+    assert.equal(r.samples.length, samples);
+    assert.equal(r.sockets.all[0]!.closed, true);
+    // The transport is on its way to a new socket, and that one is the only one it listens to.
+    r.time.advance(1000);
+    r.sockets.last().accept();
+    r.sockets.last().say({ type: 'welcome', server_time: r.time.now(), head: 0 });
+    r.transport.send({ type: 'push', batch: 'b', cells: [] });
+    assert.equal(r.sockets.all[1]!.sent.at(-1).batch, 'b');
+    assert.equal(r.sockets.all[0]!.sent.some((m) => m.type === 'push'), false);
+  });
+
+  it('the wait for a pong ends with its socket: it cannot fall due on the socket that came after', () => {
+    const r = rig();
+    welcomed(r);
+    r.time.advance(PING_MS);
+    // One second into the wait the socket closes by itself, and a new one is up a second later.
+    r.time.advance(1000);
+    r.sockets.last().fail();
+    r.time.advance(1000);
+    r.sockets.last().accept();
+    r.sockets.last().say({ type: 'welcome', server_time: r.time.now(), head: 0 });
+    r.time.advance(PONG_MS);
+    assert.equal(r.sockets.all.length, 2);
+    assert.equal(r.sockets.last().closed, false);
+    assert.equal(r.seen.filter((m) => m === 'down').length, 1);
+  });
+
+  it('a slow pong inside the ten seconds is just a slow pong: the socket stays, and the next ping goes at 25 s as ever', () => {
+    const r = rig();
+    welcomed(r);
+    r.time.advance(PING_MS);
+    r.time.advance(PONG_MS - 1);
+    r.sockets.last().say({ type: 'pong', t: T0 + PING_MS, server_time: r.time.now() });
+    r.time.advance(PING_MS);
+    assert.equal(r.sockets.all.length, 1);
+    assert.equal(r.sockets.last().closed, false);
+    assert.deepEqual(r.sockets.last().sent.filter((m) => m.type === 'ping').map((m) => m.t), [T0 + PING_MS, T0 + 2 * PING_MS]);
+    assert.equal(r.seen.includes('down'), false);
+  });
+
+  it('offline(): the device says the network is gone, so the socket is given up at once, and wake() brings it back', () => {
+    const r = rig();
+    welcomed(r);
+    r.transport.offline();
+    assert.equal(r.sockets.all[0]!.closed, true);
+    assert.equal(r.seen.at(-1), 'down');
+    // It goes to its backoff like any lost socket. Offline, those tries fail.
+    r.time.advance(1000);
+    assert.equal(r.sockets.all.length, 2);
+    r.sockets.last().fail();
+    // A second word that it is offline changes nothing: there is nothing left to give up.
+    r.transport.offline();
+    assert.equal(r.seen.filter((m) => m === 'down').length, 1);
+    r.transport.wake();
+    r.sockets.last().accept();
+    r.sockets.last().say({ type: 'welcome', server_time: r.time.now(), head: 0 });
+    assert.equal((r.seen.at(-1) as { type: string }).type, 'welcome');
   });
 
   it('answers a ping from the server', () => {
@@ -395,6 +462,17 @@ describe('without a socket', () => {
     await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
     r.transport.stop();
     assert.equal(r.time.waiting(), 0);
+  });
+
+  it('offline() on the POST path: down at once, and the next poll that works says welcome again', async () => {
+    const r = rig();
+    blocked(r);
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    r.transport.offline();
+    assert.equal(r.seen.at(-1), 'down');
+    r.time.advance(POLL_MS);
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [] } });
+    assert.deepEqual(r.seen.slice(-3).map((m) => (m === 'down' ? m : m.type)), ['down', 'welcome', 'cells']);
   });
 
   it('401 is the bye of this path: passed on as bye token, and everything stops', async () => {

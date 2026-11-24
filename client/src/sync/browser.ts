@@ -6,6 +6,8 @@ import { createEngine } from './engine.ts';
 import type { Engine, Env } from './engine.ts';
 import { createFocus } from './focus.ts';
 import type { Focus } from './focus.ts';
+import { connect } from './transport.ts';
+import type { Transport } from './transport.ts';
 
 export function browserEnv(url: string = location.origin): Env {
   return {
@@ -29,6 +31,9 @@ export function browserEnv(url: string = location.origin): Env {
  */
 export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus }> {
   const env = browserEnv(url);
+  // The wire is made here, so the browser's own word that the network is gone can reach it.
+  let wire: Transport | undefined;
+  env.connect = (handlers) => (wire = connect(env, handlers));
   const engine = await createEngine(env);
   const focus = createFocus(engine, {
     // getTimezoneOffset counts minutes west of UTC; the contract counts east.
@@ -40,6 +45,8 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   // A background tab's timers are throttled and a sleeping phone's do not run at all, so the
   // backoff may be far from done when the person is looking again.
   addEventListener('online', engine.wake);
+  // Without this a network that vanished is only found by a ping, most of a minute later.
+  addEventListener('offline', () => wire?.offline());
   document.addEventListener('visibilitychange', () => document.hidden || engine.wake());
   return { engine, focus };
 }

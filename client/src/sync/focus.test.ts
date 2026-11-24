@@ -60,6 +60,7 @@ function world() {
           send: (push) => void wire.sent.push(push),
           again: () => {},
           wake: () => {},
+          offline: () => {},
         };
         return transport;
       },

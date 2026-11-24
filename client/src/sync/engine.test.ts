@@ -9,6 +9,7 @@ import type { OpenStore, Write } from '../store/store.ts';
 import { createEngine } from './engine.ts';
 import type { Env } from './engine.ts';
 import { T0, fakeSockets, fakeTime, settle } from './fakes.ts';
+import { connect } from './transport.ts';
 import type { Fetch, Handlers, Push, Transport } from './transport.ts';
 
 const OTHER = 'b2c3d4e5f6071829';
@@ -34,6 +35,7 @@ function fakeWire(handlers: Handlers) {
     send: (push: Push) => void wire.sent.push(push),
     again: () => void wire.agains++,
     wake: () => void wire.wakes++,
+    offline: () => handlers.down(),
     // What the server does:
     welcome: (head = 0) => handlers.message({ type: 'welcome', server_time: 0, head }),
     cells: (from: number, to: number, cells: Cell[]) => handlers.message({ type: 'cells', from, to, cells }),
@@ -1089,6 +1091,41 @@ describe('the engine over the real transport', () => {
     sockets.last().accept();
     sockets.last().say({ type: 'welcome', server_time: time.now(), head: 0 });
     assert.equal(engine.sync.value, 'in-step');
+    await engine.stop();
+  });
+
+  it('the device says the network is gone: offline at once, not a ping later, and the edit made meanwhile goes out when it is back', async () => {
+    const time = fakeTime();
+    const sockets = fakeSockets();
+    // As browser.ts does it: the wire is made by the caller, so the offline event can reach it.
+    let wire: Transport | undefined;
+    const env: Env = {
+      url: 'https://heirloom.test',
+      now: time.now,
+      schedule: time.schedule,
+      random: () => 1,
+      WebSocket: sockets.FakeSocket,
+      fetch: tinyServer().fetch,
+      openStore: memoryStores(),
+      connect: (handlers) => (wire = connect(env, handlers)),
+    };
+    const engine = await createEngine(env);
+    await engine.register('invite-code', 'ravi', 'correct horse');
+    sockets.last().accept();
+    sockets.last().say({ type: 'welcome', server_time: time.now(), head: 0 });
+    assert.equal(engine.sync.value, 'in-step');
+
+    wire!.offline();
+    assert.equal(engine.sync.value, 'offline');
+    engine.write('task', 't1', { title: 'in the lift' });
+    await engine.saved();
+    assert.equal(sockets.all[0]!.sent.some((m) => m.type === 'push'), false);
+
+    engine.wake();
+    sockets.last().accept();
+    sockets.last().say({ type: 'welcome', server_time: time.now(), head: 0 });
+    assert.equal(engine.sync.value, 'syncing');
+    assert.deepEqual(sockets.last().sent.at(-1).cells.map((c: Cell) => c.value), ['in the lift']);
     await engine.stop();
   });
 

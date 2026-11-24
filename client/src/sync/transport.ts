@@ -73,11 +73,20 @@ export interface Transport {
   again(): void;
   /** Tries now instead of waiting out the backoff: the network came back, or the app came to the front. */
   wake(): void;
+  /** The device says the network is gone: whatever path was open is lost now, without waiting for a ping to find out. */
+  offline(): void;
 }
 
 export type Connect = (handlers: Handlers) => Transport;
 
 export const PING_MS = 25000;
+/**
+ * How long a pong may take. Ten seconds, not five: over a bad mobile link TCP sends a lost packet
+ * again after 1 s, then 2, then 4, so a pong that lost three in a row is still on its way at 7 s.
+ * Dropping the socket for that costs a new handshake on the very link that can least afford one,
+ * and an "offline" that was not true. A dead socket is found 10 s after the ping, 35 s at worst.
+ */
+export const PONG_MS = 10000;
 export const POLL_MS = 5000;
 /** How long a new socket has to say welcome. A proxy may accept the socket and then pass nothing on. */
 export const HELLO_MS = 10000;
@@ -107,7 +116,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
   let ws: Socket | null = null;
   let live = false; // this socket has said welcome
   let failures = 0; // socket attempts in a row that never did
-  let waitingPong = false;
+  let cancelPong = never;
   let cancelRetry = never;
   let cancelPing = never;
   let cancelHello = never;
@@ -155,7 +164,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
 
   function receive(msg: any, helloSent: number) {
     if (msg.type === 'pong') {
-      waitingPong = false;
+      cancelPong();
       return on.time(msg.server_time - (msg.t + wire.now()) / 2);
     }
     if (msg.type === 'ping') return ws?.send(JSON.stringify({ type: 'pong', t: msg.t }));
@@ -172,14 +181,14 @@ export function connect(wire: Wire, on: Handlers): Transport {
   }
 
   function ping() {
-    // No pong since the last ping: the socket is dead and nobody told us. Phones do this.
-    if (waitingPong) return lost();
-    waitingPong = true;
     try {
       ws?.send(JSON.stringify({ type: 'ping', t: wire.now() }));
     } catch {
       return lost();
     }
+    // No pong in time: the socket is dead and nobody told us. Phones do this, and so does Wi-Fi
+    // that is up but goes nowhere. Dropping the socket cancels this, so it never outlives its ping.
+    cancelPong = wire.schedule(lost, PONG_MS);
     cancelPing = wire.schedule(ping, PING_MS);
   }
 
@@ -187,7 +196,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
     const sock = ws;
     ws = null;
     live = false;
-    waitingPong = false;
+    cancelPong();
     cancelPing();
     cancelHello();
     if (!sock) return;
@@ -322,6 +331,12 @@ export function connect(wire: Wire, on: Handlers): Transport {
       failures = 0;
       open();
       if (polling) poll();
+    },
+    offline() {
+      if (live) return lost();
+      // On the POST path there is no socket to drop. The next poll that works says welcome again.
+      if (pollUp) on.down();
+      pollUp = false;
     },
   };
 }
