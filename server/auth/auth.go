@@ -55,10 +55,12 @@ const (
 	maxFailures = 5
 	window      = 15 * time.Minute
 	// ponytail: the failure counts live in memory, so a restart forgets them, and at most
-	// this many names are watched at once. Move them into SQLite if either ever matters.
+	// this many names are watched at once (about 1 MB). Move them into SQLite if either
+	// ever matters.
 	maxWatched = 10000
-	// Sign-ins waiting for their turn to hash. Past this the answer is slow_down, so a
-	// flood of them cannot pile up in memory.
+	// Sign-ins in line for the hash, the one running included. Past this the answer is
+	// slow_down, so a flood of them cannot pile up in memory. This line, not the list
+	// above, is what bounds how fast passwords can be guessed.
 	maxWaiting = 8
 )
 
@@ -81,16 +83,17 @@ type Service struct {
 	now     func() time.Time
 	revoked func(token string) // told when a token dies, so its open sockets can be cut
 
+	maxWatched int // a field so a test can fill the list without ten thousand hashes
+
 	hashing sync.Mutex // one argon2 at a time: two would be 38 MiB at once
 	waiting chan struct{}
-
-	mu     sync.Mutex
+	// Read and written only inside a hashing turn (see turn), which is its lock.
 	failed map[string]failures
 }
 
 // New takes the function to call with a dead token's key (as Check returns it).
 func New(db *sql.DB, now func() time.Time, revoked func(token string)) *Service {
-	return &Service{db: db, now: now, revoked: revoked,
+	return &Service{db: db, now: now, revoked: revoked, maxWatched: maxWatched,
 		waiting: make(chan struct{}, maxWaiting), failed: map[string]failures{}}
 }
 
@@ -125,10 +128,12 @@ func (s *Service) Register(ctx context.Context, invite, username, password, devi
 	}
 	salt := make([]byte, saltLen)
 	rand.Read(salt)
-	key, err := s.argon(ctx, password, salt, argonTime, argonMemory, argonThreads)
+	done, err := s.turn(ctx)
 	if err != nil {
 		return Session{}, err
 	}
+	key := argon(password, salt, argonTime, argonMemory, argonThreads)
+	done()
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -172,26 +177,10 @@ func (s *Service) Login(ctx context.Context, username, password, device string) 
 	if !ok || !validPassword(password) || !ValidDevice(device) {
 		return Session{}, ErrBadRequest
 	}
-	if err := s.attempt(username); err != nil {
+	account, public, err := s.checkPassword(ctx, username, password)
+	if err != nil {
 		return Session{}, err
 	}
-	var account int64
-	var public string
-	// A name nobody has gets the same argon2 work against a key that cannot match, so the
-	// time the answer takes does not say whether the account exists.
-	stored := nobody
-	err := s.db.QueryRow("select id, public_id, password from account where username = ?", username).Scan(&account, &public, &stored)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return Session{}, fmt.Errorf("read account: %w", err)
-	}
-	if match, err := s.verify(ctx, stored, password); err != nil {
-		return Session{}, err
-	} else if !match {
-		return Session{}, ErrCredentials
-	}
-	s.mu.Lock()
-	delete(s.failed, username)
-	s.mu.Unlock()
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -209,6 +198,33 @@ func (s *Service) Login(ctx context.Context, username, password, device string) 
 		s.revoked(string(replaced))
 	}
 	return Session{token, public, username}, nil
+}
+
+// checkPassword is the part of a sign-in that takes a hashing turn.
+func (s *Service) checkPassword(ctx context.Context, username, password string) (account int64, public string, err error) {
+	done, err := s.turn(ctx)
+	if err != nil {
+		// Turned away before the password was looked at, so nothing is counted against the name.
+		return 0, "", err
+	}
+	defer done()
+	// A name nobody has gets the same argon2 work against a key that cannot match, so the
+	// time the answer takes does not say whether the account exists.
+	stored := nobody
+	err = s.db.QueryRow("select id, public_id, password from account where username = ?", username).Scan(&account, &public, &stored)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, "", fmt.Errorf("read account: %w", err)
+	}
+	if err := s.attempt(username); err != nil {
+		return 0, "", err
+	}
+	if match, err := verify(stored, password); err != nil {
+		return 0, "", err
+	} else if !match {
+		return 0, "", ErrCredentials
+	}
+	delete(s.failed, username)
+	return account, public, nil
 }
 
 // Logout ends a token at once, on an open socket too.
@@ -256,58 +272,80 @@ func issue(tx *sql.Tx, account int64, device string, now int64) (token string, r
 	return token, replaced, nil
 }
 
-// attempt counts a sign-in against the name before its password is looked at, and
-// Login takes the count away when the password was right. Counting first means sign-ins
-// sent all at once cannot each slip past a limit none of them has reached yet.
+// attempt counts a sign-in against the name just before its password is hashed, and
+// checkPassword takes the count away when the password was right. Counting first, inside
+// the turn, means sign-ins sent all at once cannot each slip past a limit none of them
+// has reached yet, and one that never got a turn is never counted.
 func (s *Service) attempt(username string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	now := s.now()
 	f, watched := s.failed[username]
 	if watched && now.Sub(f.since) >= window {
+		delete(s.failed, username)
 		f, watched = failures{}, false
-	}
-	if !watched {
-		if len(s.failed) >= maxWatched {
-			for name, old := range s.failed {
-				if now.Sub(old.since) >= window {
-					delete(s.failed, name)
-				}
-			}
-		}
-		// Still full of live windows: somebody is spraying names. Refusing new ones for a
-		// minute is the safe side; forgetting counts would hand out fresh guesses.
-		if len(s.failed) >= maxWatched {
-			return slowDown(time.Minute)
-		}
-		f.since = now
 	}
 	if f.n >= maxFailures {
 		return slowDown(f.since.Add(window).Sub(now))
+	}
+	if !watched {
+		f.since = now
+		s.makeRoom(now)
 	}
 	f.n++
 	s.failed[username] = f
 	return nil
 }
 
-// argon runs one hash at a time and hands its memory back before the next may start.
-func (s *Service) argon(ctx context.Context, password string, salt []byte, passes, memory uint32, threads uint8) ([]byte, error) {
+// makeRoom keeps the list at its bound: it drops every window that has passed and, if
+// that was not enough, the one that began longest ago.
+//
+// A full list must not refuse a name it is not watching, or filling it with made-up
+// names would shut out everyone else. It must not stop counting new names either, or a
+// name not on it could be guessed without end. Forgetting the oldest window gives little
+// away: every name on the list cost a whole hashing turn to put there, so pushing one
+// name off a full list takes ten thousand hashes and buys five more guesses at it.
+func (s *Service) makeRoom(now time.Time) {
+	if len(s.failed) < s.maxWatched {
+		return
+	}
+	var oldest string
+	var began time.Time
+	for name, f := range s.failed {
+		if now.Sub(f.since) >= window {
+			delete(s.failed, name)
+		} else if oldest == "" || f.since.Before(began) {
+			oldest, began = name, f.since
+		}
+	}
+	if len(s.failed) >= s.maxWatched {
+		delete(s.failed, oldest)
+	}
+}
+
+// turn waits for the caller's turn to hash and returns the function that ends it. One
+// hash runs at a time; when the line is full the caller is told to slow down instead of
+// being added to it.
+func (s *Service) turn(ctx context.Context) (done func(), err error) {
 	select {
 	case s.waiting <- struct{}{}:
-		defer func() { <-s.waiting }()
 	default:
-		return nil, slowDown(1)
+		return nil, slowDown(time.Second)
 	}
 	s.hashing.Lock()
-	defer s.hashing.Unlock()
+	done = func() { s.hashing.Unlock(); <-s.waiting }
 	if err := ctx.Err(); err != nil {
+		done()
 		return nil, err // the caller went away while it waited
 	}
+	return done, nil
+}
+
+// argon hashes, and hands its memory back before it returns. Call it inside a turn.
+func argon(password string, salt []byte, passes, memory uint32, threads uint8) []byte {
 	key := argon2.IDKey([]byte(password), salt, passes, memory, threads, keyLen)
 	// The 19 MiB are garbage now, but Go would keep them until some later collection.
-	// Give them back while we still hold the lock, or the next sign-in doubles the peak.
+	// Give them back while we still hold the turn, or the next sign-in doubles the peak.
 	debug.FreeOSMemory()
-	return key, nil
+	return key
 }
 
 // The stored form is the usual one: $argon2id$v=19$m=19456,t=2,p=1$salt$key. The
@@ -320,7 +358,7 @@ func encode(salt, key []byte) string {
 // What Login checks a password against when the username is unknown.
 var nobody = encode(make([]byte, saltLen), make([]byte, keyLen))
 
-func (s *Service) verify(ctx context.Context, stored, password string) (bool, error) {
+func verify(stored, password string) (bool, error) {
 	var version int
 	var memory, passes uint32
 	var threads uint8
@@ -336,11 +374,7 @@ func (s *Service) verify(ctx context.Context, stored, password string) (bool, er
 	if err1 != nil || err2 != nil {
 		return false, errors.New("stored password is not base64")
 	}
-	got, err := s.argon(ctx, password, salt, passes, memory, threads)
-	if err != nil {
-		return false, err
-	}
-	return subtle.ConstantTimeCompare(got, want) == 1, nil
+	return subtle.ConstantTimeCompare(argon(password, salt, passes, memory, threads), want) == 1, nil
 }
 
 func hashOf(secret string) []byte {

@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -231,6 +233,104 @@ func TestLimitHoldsForSignInsAtOnce(t *testing.T) {
 	}
 	if guesses != maxFailures {
 		t.Errorf("%d of 7 simultaneous sign-ins had their password checked, want %d", guesses, maxFailures)
+	}
+}
+
+// A sign-in that was turned away before its password was looked at says nothing about
+// the password, so it must not use up one of the name's five tries.
+func TestSignInThatNeverReachedTheHashIsNotCounted(t *testing.T) {
+	w := newWorld(t)
+	w.register(t, "ravi", phone)
+	// Eight sign-ins are already in line for the hash.
+	for range maxWaiting {
+		w.waiting <- struct{}{}
+	}
+	for range maxFailures + 1 {
+		_, err := w.Login(ctx, "ravi", password, phone)
+		if e := want(t, "a sign-in with the line full", err, "slow_down"); e.RetryAfter != 1 {
+			t.Fatalf("retry after = %d s, want 1: the line is full, the name is not locked", e.RetryAfter)
+		}
+	}
+	for range maxWaiting {
+		<-w.waiting
+	}
+	// And six whose caller hung up while they waited.
+	gone, hangUp := context.WithCancel(ctx)
+	hangUp()
+	for range maxFailures + 1 {
+		if _, err := w.Login(gone, "ravi", "not the password", phone); !errors.Is(err, context.Canceled) {
+			t.Fatalf("a sign-in nobody waits for: %v, want it dropped", err)
+		}
+	}
+	if len(w.failed) != 0 {
+		t.Errorf("%d names are being counted, and no password was ever checked", len(w.failed))
+	}
+	if _, err := w.Login(ctx, "ravi", password, phone); err != nil {
+		t.Errorf("locked out by sign-ins that were never checked: %v", err)
+	}
+}
+
+// fail makes one failed sign-in for each name, a minute apart, oldest first.
+func (w *world) fail(t *testing.T, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		_, err := w.Login(ctx, name, "not the password", phone)
+		want(t, "a failed sign-in for "+name, err, "credentials")
+		w.now = w.now.Add(time.Minute)
+	}
+}
+
+func (w *world) watched() string {
+	names := slices.Sorted(maps.Keys(w.failed))
+	return strings.Join(names, " ")
+}
+
+// Filling the list with made-up names must not shut out the people who are not on it.
+func TestAFullListNeverRefusesAName(t *testing.T) {
+	w := newWorld(t)
+	w.maxWatched = 3
+	w.register(t, "ravi", phone)
+	w.fail(t, "aaa", "bbb", "ccc")
+	if w.watched() != "aaa bbb ccc" {
+		t.Fatalf("watching %q, want the list full", w.watched())
+	}
+	if _, err := w.Login(ctx, "ravi", password, phone); err != nil {
+		t.Fatalf("a real sign-in with the list full of other names: %v", err)
+	}
+	// More made-up names are checked and counted like any other, the list does not grow,
+	// and it is the oldest window that makes room each time.
+	w.fail(t, "ddd", "eee", "fff")
+	if w.watched() != "ddd eee fff" {
+		t.Errorf("watching %q, want only the three newest: memory must stay bounded", w.watched())
+	}
+	w.fail(t, "ddd")
+	if w.watched() != "ddd eee fff" {
+		t.Errorf("a name already on the list pushed another off: %q", w.watched())
+	}
+}
+
+// A name with five failures stays refused while newer names come and go around it, and
+// a window that has passed is dropped before any that is still running.
+func TestALockedNameStaysLockedOnAFullList(t *testing.T) {
+	w := newWorld(t)
+	w.maxWatched = 3
+	w.register(t, "ravi", phone)
+	w.fail(t, "old")                                  // 0 min
+	w.fail(t, "ravi", "ravi", "ravi", "ravi", "ravi") // 1 to 5 min: locked until 16 min
+	w.fail(t, "mid")                                  // 6 min
+	w.fail(t, "new")                                  // 7 min: "old" makes room
+	if w.watched() != "mid new ravi" {
+		t.Fatalf("watching %q, want the oldest window forgotten and ravi kept", w.watched())
+	}
+	_, err := w.Login(ctx, "ravi", password, phone)
+	if e := want(t, "the locked name at 8 minutes", err, "slow_down"); e.RetryAfter != 8*60 {
+		t.Errorf("retry after = %d s, want the 480 left of ravi's window", e.RetryAfter)
+	}
+	// At 16 minutes ravi's window has passed. The next new name drops it, not "mid".
+	w.now = w.now.Add(8 * time.Minute)
+	w.fail(t, "newer")
+	if w.watched() != "mid new newer" {
+		t.Errorf("watching %q, want the passed window gone before a live one", w.watched())
 	}
 }
 

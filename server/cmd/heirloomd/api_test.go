@@ -655,7 +655,9 @@ func TestBadHelloGetsBye(t *testing.T) {
 		"a hello with a bad device": {hello(ravi.Token, "my phone", 0), "protocol"},
 		"a hello with cursor -1":    {hello(ravi.Token, phone, -1), "protocol"},
 		"a frame that is not JSON":  {`hello`, "protocol"},
-		"a first frame over 1 MB":   {`{"type":"hello","token":"` + strings.Repeat("x", 1<<20) + `"}`, "protocol"},
+		// Nothing is known about the sender yet, so a hello gets 4 KB and no more.
+		"a hello of 5 KB":         {hello(strings.Repeat("x", 5000), phone, 0), "protocol"},
+		"a first frame over 1 MB": {`{"type":"hello","token":"` + strings.Repeat("x", 1<<20) + `"}`, "protocol"},
 	} {
 		d := w.dial()
 		d.say(c.first)

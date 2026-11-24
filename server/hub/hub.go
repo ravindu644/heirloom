@@ -22,7 +22,10 @@ import (
 )
 
 const (
-	maxFrame     = 1 << 20 // bytes of one frame from a device
+	maxFrame = 1 << 20 // bytes of one frame from a device
+	// A hello is about 150 bytes. Until it has been checked nothing is known about the
+	// sender, so it does not get a megabyte of our memory to say it in.
+	maxHello     = 4 << 10
 	helloTimeout = 10 * time.Second
 	// A device pings every 25 s. Two missed pings and it is gone; without this a phone that
 	// walked out of wifi would hold its connection, and its memory, forever.
@@ -306,7 +309,7 @@ func ours(err error) error {
 
 // serve runs one connection and returns why it ended.
 func (h *Hub) serve(ctx context.Context, c *conn) error {
-	hello, err := c.read(helloTimeout)
+	hello, err := c.read(helloTimeout, maxHello)
 	if err != nil {
 		return err
 	}
@@ -390,7 +393,7 @@ func (h *Hub) goLive(c *conn, cursor int64) error {
 // listen reads the device's frames until the socket ends.
 func (h *Hub) listen(c *conn) error {
 	for {
-		f, err := c.read(idleTimeout)
+		f, err := c.read(idleTimeout, maxFrame)
 		if err != nil {
 			return err
 		}
@@ -406,19 +409,19 @@ func (h *Hub) listen(c *conn) error {
 	}
 }
 
-func (c *conn) read(wait time.Duration) (frame, error) {
+func (c *conn) read(wait time.Duration, limit int64) (frame, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
 	_, r, err := c.ws.Reader(ctx)
 	if err != nil {
 		return frame{}, err
 	}
-	data, err := io.ReadAll(io.LimitReader(r, maxFrame+1))
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return frame{}, err
 	}
 	var f frame
-	if len(data) > maxFrame || json.Unmarshal(data, &f) != nil {
+	if int64(len(data)) > limit || json.Unmarshal(data, &f) != nil {
 		return frame{}, bye{"protocol"}
 	}
 	return f, nil
