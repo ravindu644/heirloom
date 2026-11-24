@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { build } from './tokens.mjs';
+import { androidColors, build } from './tokens.mjs';
 import { check } from './style-check.mjs';
 
 const design = fs.readFileSync('DESIGN.md', 'utf8');
@@ -63,4 +63,13 @@ test('style-check: token use passes', () => {
   assert.deepEqual(check('/* was #fff */\n.a { color: var(--ink); }', 'a.css'), []);
   // A comment must not hide the code beside it, and line numbers must survive a block comment.
   assert.equal(check('/* one\n two */\n.a { color: #fff; } /* why */', 'a.css')[0].split(' ')[0], 'a.css:3:');
+});
+
+test('tokens: the Android shell holds DESIGN.md\'s colours, not copies gone stale', () => {
+  for (const [name, xml] of Object.entries(androidColors(design))) {
+    assert.equal(fs.readFileSync(`android/app/src/main/res/${name}`, 'utf8'), xml, `${name}: run make tokens`);
+  }
+  // The notification icon's tint is the one colour Capacitor's own config holds.
+  const you = design.match(/^  you: "(#[0-9A-F]{6})"/m)[1];
+  assert.equal(JSON.parse(fs.readFileSync('capacitor.config.json', 'utf8')).plugins.LocalNotifications.iconColor, you);
 });

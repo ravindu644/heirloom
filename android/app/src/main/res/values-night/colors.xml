@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- generated from DESIGN.md by tools/tokens.mjs: edit that, not this -->
 <resources>
     <color name="ground">#0E100E</color>
     <color name="you">#FF6A4D</color>

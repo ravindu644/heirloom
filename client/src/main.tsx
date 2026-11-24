@@ -19,6 +19,9 @@ async function start() {
   effect(() => {
     const state = focus.state.value;
     const lengths = focus.lengths.value;
+    // Also when the connection comes or goes: a welcome is when the device learns how far its
+    // own clock is from the server's, and an alarm planned before that would ring that far off.
+    void engine.sync.value;
     const view = focus.view();
     if (state.phase === 'idle' || view.ends_at === null) return notifier.plan(null);
     const at = view.ends_at - (engine.now() - Date.now());

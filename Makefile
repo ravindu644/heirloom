@@ -81,10 +81,12 @@ dev-server:
 # The phone app carries its own copy of the web app, built to talk to SERVER (another origin
 # for it). `make apk SERVER=https://your.host`. The default is the laptop through `adb reverse`.
 SERVER ?= http://localhost:8787
+# Capacitor 8 needs Java 21. Where yours lives: `make apk JDK21=/path`, or JDK21 in the environment.
+JDK21 ?= $(HOME)/.jdks/jdk-21
 apk: tokens
 	VITE_SERVER_URL=$(SERVER) pnpm exec vite build --outDir dist-app
 	pnpm exec cap sync android
-	cd android && JAVA_HOME=$(HOME)/.jdks/jdk-21 ./gradlew assembleDebug
+	cd android && JAVA_HOME=$(JDK21) ./gradlew assembleDebug
 
 # Section 9 adds the systemd unit and its restart. Until then the binary only lands in the home folder.
 deploy: server

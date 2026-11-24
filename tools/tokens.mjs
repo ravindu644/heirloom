@@ -59,9 +59,26 @@ ${block(block(dark).split('\n'))}
 `;
 }
 
+// The Android shell draws the mark before any CSS exists (the icon, the splash, the status bar
+// icon's tint), so it needs the same three colours as resources. Light and dark, as two files.
+const ANDROID_ROLES = ['ground', 'you', 'ghost'];
+export function androidColors(designMd) {
+  const { colors } = parse(designMd.match(/^---\n([\s\S]*?)\n---/)[1]);
+  const file = (prefix) => `<?xml version="1.0" encoding="utf-8"?>
+<!-- generated from DESIGN.md by tools/tokens.mjs: edit that, not this -->
+<resources>
+${ANDROID_ROLES.map((role) => `    <color name="${role}">${colors[prefix + role]}</color>`).join('\n')}
+</resources>
+`;
+  return { 'values/colors.xml': file(''), 'values-night/colors.xml': file('dark-') };
+}
+
 if (import.meta.main) {
-  const css = build(fs.readFileSync('DESIGN.md', 'utf8'), (f) => fs.existsSync(`design/fonts/${f}`));
+  const design = fs.readFileSync('DESIGN.md', 'utf8');
+  const css = build(design, (f) => fs.existsSync(`design/fonts/${f}`));
   fs.mkdirSync('client/src/ui', { recursive: true });
   fs.writeFileSync('client/src/ui/tokens.css', css);
+  const res = 'android/app/src/main/res';
+  if (fs.existsSync(res)) for (const [name, xml] of Object.entries(androidColors(design))) fs.writeFileSync(`${res}/${name}`, xml);
   console.log(`tokens.css: ${css.match(/--/g).length} variables`);
 }
