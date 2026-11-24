@@ -1,0 +1,475 @@
+// Usage: node tools/design-audit.mjs [--state <name>] [--size phone|laptop]
+// Opens every state of client/demo.html in Chromium at 412x915 and 1440x900, reads what was drawn
+// and holds it to DESIGN.md: type, colour (light and dark), shape, space, one left edge, rhythm,
+// touch targets and the header. Prints each violation once with every state it shows in, exits 1
+// if there is any. Starts its own Vite and browser and ends both, also on failure or Ctrl-C.
+// The rules are pure functions over collected data, so tools/design-audit.test.mjs runs them with
+// no browser.
+import fs from 'node:fs';
+import { parse } from 'yaml';
+
+const SIZES = { phone: { width: 412, height: 915 }, laptop: { width: 1440, height: 900 } };
+const near = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
+const r2 = (n) => Math.round(n * 100) / 100;
+const pxs = (v) => String(v).split(/\s+/).filter((p) => /^-?[\d.]+px$|^0$/.test(p)).map(parseFloat);
+
+// Colours as [r, g, b, a] with channels 0 to 255: computed styles come back as rgb(), rgba() or,
+// for a color-mix, color(srgb 0..1 / a).
+export function rgba(v) {
+  if (/^#[0-9a-f]{6}$/i.test(v)) return [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16)).concat(1);
+  let m = v.match(/^rgba?\(([\d.]+),? ([\d.]+),? ([\d.]+)(?:,? \/? ?([\d.]+))?\)$/);
+  if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+  m = v.match(/^color\(srgb ([\d.e-]+) ([\d.e-]+) ([\d.e-]+)(?: \/ ([\d.]+))?\)$/);
+  if (m) return [m[1] * 255, m[2] * 255, m[3] * 255, m[4] === undefined ? 1 : +m[4]];
+  return null;
+}
+const hex = (c) => '#' + c.slice(0, 3).map((n) => Math.round(n).toString(16).padStart(2, '0')).join('').toUpperCase() + (c[3] < 1 ? ` at ${r2(c[3])}` : '');
+const mix = (a, b, p) => a.map((n, i) => (i < 3 ? n * (1 - p) + b[i] * p : 1));
+// A channel apart is rounding; anything more is another colour.
+const same = (a, b) => a.every((n, i) => (i < 3 ? Math.abs(n - b[i]) <= 1 : Math.abs(n - b[i]) <= 0.01));
+
+/** Everything the rules allow, worked out from DESIGN.md's front matter. */
+export function spec(designMd) {
+  const d = parse(designMd.match(/^---\n([\s\S]*?)\n---/)[1]);
+  const pct = (v) => parseFloat(v) / 100;
+  const roles = Object.entries(d.typography).map(([name, t]) => {
+    const size = parseFloat(t.fontSize);
+    return { name, family: t.fontFamily, size, weight: +t.fontWeight, lh: String(t.lineHeight).endsWith('px') ? parseFloat(t.lineHeight) : size * t.lineHeight };
+  });
+  const palettes = {};
+  for (const theme of ['light', 'dark']) {
+    const pre = theme === 'dark' ? 'dark-' : '';
+    const named = Object.keys(d.colors).filter((k) => !k.startsWith('dark-')).map((k) => ({ name: k, c: rgba(d.colors[pre + k]) }));
+    const ink = named.find((n) => n.name === 'ink').c;
+    const ground = named.find((n) => n.name === 'ground').c;
+    palettes[theme] = [
+      ...named,
+      ...named.flatMap(({ name, c }) => [
+        { name: `${name} with ink at state.hover`, c: mix(c, ink, pct(d.state.hover)) },
+        { name: `${name} with ink at state.press`, c: mix(c, ink, pct(d.state.press)) },
+      ]),
+      { name: 'ground at state.scrim', c: [...ground.slice(0, 3), pct(d.state.scrim)] },
+      ...Object.entries(d.shadow).map(([k, v]) => {
+        const m = v.match(/rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)/);
+        return { name: `shadow.${k}`, c: [+m[1], +m[2], +m[3], +m[4]] };
+      }),
+    ];
+  }
+  const px = (v) => (String(v).endsWith('px') ? [parseFloat(v)] : []);
+  const comp = Object.values(d.components).flatMap((c) => [c.padding, c.height, c.size].filter(Boolean).flatMap(pxs));
+  const bearing = Object.fromEntries(Object.entries(d.layout).filter(([k]) => k.startsWith('figure-bearing')).map(([k, v]) => [k.slice(15) || 'any', parseFloat(v)]));
+  return {
+    families: new Set(roles.map((r) => r.family)),
+    roles,
+    palettes,
+    radii: Object.values(d.rounded).flatMap(px),
+    borders: [0, 1, 2],
+    steps: Object.values(d.spacing).flatMap(px),
+    spaces: [...new Set([...Object.values(d.spacing), ...Object.values(d.layout)].flatMap(px).concat(comp))].sort((a, b) => a - b),
+    lg: parseFloat(d.spacing.lg),
+    touch: parseFloat(d.layout.touch),
+    bearing,
+    phone: SIZES.phone.width,
+  };
+}
+
+const v = (rule, el, what, allowed) => ({ rule, path: el.path, text: el.text, what, allowed });
+
+/** 1. The family is DESIGN.md's and size, weight and line height are one role's. */
+export function type(el, s, width) {
+  if (!el.hasText || !el.font) return [];
+  const f = el.font;
+  const family = f.family.split(',')[0].trim().replace(/^["']|["']$/g, '');
+  if (!s.families.has(family)) return [v('type', el, `font ${family}`, `DESIGN.md has ${[...s.families].join(', ')}`)];
+  const fits = (r) => r.family === family && near(f.size, r.size, 0.05) && f.weight === r.weight && f.lh !== null && near(f.lh, r.lh, 0.05);
+  if (s.roles.some(fits)) return [];
+  // Below 412px the phone timer scales with the screen; at 412 it is exact.
+  const xl = s.roles.find((r) => r.name === 'figure-xl');
+  if (width < s.phone && fits({ ...xl, size: (xl.size * width) / s.phone, lh: (xl.lh * width) / s.phone })) return [];
+  const nearest = s.roles.filter((r) => r.family === family).sort((a, b) => Math.abs(a.size - f.size) - Math.abs(b.size - f.size) || Math.abs(a.weight - f.weight) - Math.abs(b.weight - f.weight))[0];
+  const say = (x) => `${r2(x.size)}px ${x.weight} ${x.lh === null ? 'normal' : r2(x.lh) + 'px'}`;
+  return [v('type', el, `${family} ${say(f)} is no role`, nearest ? `nearest ${nearest.name} is ${say(nearest)}` : 'no role uses this family')];
+}
+
+/** 2. Every painted colour is the theme's palette, one of its defined mixes, or transparent. */
+export function colour(el, s, theme) {
+  const allowed = s.palettes[theme];
+  return el.colours.flatMap(([prop, value]) => {
+    const c = rgba(value);
+    if (!c) return [v('colour', el, `${prop} ${value}`, 'not an sRGB colour')];
+    if (c[3] === 0 || allowed.some((a) => same(a.c, c))) return [];
+    const dist = (a) => a.c.slice(0, 3).reduce((sum, n, i) => sum + (n - c[i]) ** 2, 0);
+    const best = allowed.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+    return [v('colour', el, `${theme} ${prop} ${hex(c)}`, `not a ${theme} colour; nearest ${best.name} ${hex(best.c)}`)];
+  });
+}
+
+/** 3. Radii from `rounded`, borders 0, 1 or 2px. */
+export function shape(el, s) {
+  const out = [];
+  for (const r of new Set(el.radius)) for (const n of pxs(r).length ? pxs(r) : [r]) {
+    if (!s.radii.some((a) => near(a, +n, 0.01))) out.push(v('shape', el, `border-radius ${r}`, `rounded is ${s.radii.join(' ')}px`));
+  }
+  for (const b of new Set(el.border)) if (!s.borders.some((a) => near(a, b, 0.01))) out.push(v('shape', el, `border ${b}px`, 'borders are 0, 1 or 2px'));
+  return out;
+}
+
+/** 4. Padding, margin and gap are values DESIGN.md holds. Auto margins never reach here. */
+export function space(el, s) {
+  return el.space.flatMap(([prop, n]) => {
+    const a = Math.abs(n);
+    if (a < 0.01 || s.spaces.some((x) => near(x, a, 0.01))) return [];
+    // A link in a line: a 48px target that takes no more height than the line, by a negative
+    // margin of half the difference. DESIGN.md asks for the target, not for this way of making it.
+    if (prop.startsWith('margin') && n < 0 && el.font?.lh && near(n, (el.font.lh - s.touch) / 2, 0.05)) return [];
+    if (prop.startsWith('margin') && n < 0 && el.figure && bearings(el, s).some((b) => near(n, b, 0.05))) return [];
+    return [v('space', el, `${prop} ${r2(n)}px`, `DESIGN.md holds ${s.spaces.join(' ')}px`)];
+  });
+}
+
+// How far a figure may sit left of the edge: nothing, the general bearing, or its leading digit's.
+function bearings(el, s) {
+  const digit = (el.text.match(/\d/) ?? [])[0];
+  return [0, s.bearing.any * el.font.size, digit !== undefined ? s.bearing[digit] * el.font.size : 0];
+}
+
+/**
+ * The columns of a screen: a container whose children in the flow stack one under the other with
+ * no two side by side. Rows (a button beside a button) are not columns, so their children never
+ * join a column. `main` and an open sheet are always columns, for the space above their content.
+ */
+export function columns(els) {
+  const kids = new Map();
+  for (const el of els) if (el.rect && el.parent !== null) (kids.get(el.parent) ?? kids.set(el.parent, []).get(el.parent)).push(el);
+  const out = [];
+  for (const box of els) {
+    if (!box.inScope || !box.rect) continue;
+    // A flex row that wraps stacks its lines too; it is still a row.
+    if (/flex/.test(box.display) && !box.flexDirection.startsWith('column')) continue;
+    // Inside a button the words are centred in a 48px target: that is the button's, not the screen's.
+    if (box.inPress) continue;
+    const flex = /flex|grid/.test(box.display);
+    const blocks = (kids.get(box.i) ?? [])
+      .filter((k) => !/absolute|fixed/.test(k.position) && k.float === 'none' && (flex || /^(block|flex|grid|table|list-item|flow-root)/.test(k.display)))
+      .sort((a, b) => a.rect.y - b.rect.y);
+    if (blocks.length < (box.root ? 1 : 2)) continue;
+    if (blocks.some((b, i) => i && b.rect.y < blocks[i - 1].rect.y + blocks[i - 1].rect.h - 0.5)) continue;
+    out.push({ box, blocks });
+  }
+  return out;
+}
+
+/** 5. Every block of a column starts at the column's edge; a figure may sit left by its bearing. */
+export function edge(col, s) {
+  if (col.blocks.length < 2) return [];
+  const x = col.box.content.left;
+  return col.blocks.flatMap((b) => {
+    const off = b.rect.x - x;
+    const ok = b.figure ? bearings(b, s) : [0];
+    if (ok.some((o) => near(off, o))) return [];
+    const said = b.figure ? `0 or the bearing ${ok.slice(1).map(r2).join(' or ')}px` : '0';
+    return [v('edge', b, `starts ${r2(off)}px ${off < 0 ? 'left' : 'right'} of its column's edge (${col.box.path})`, `one left edge: ${said}`)];
+  });
+}
+
+/**
+ * 6. The space above the first block and between neighbours is 0 or a step no larger than lg.
+ * The one space that may grow lies under the content: below a column's last block (not judged
+ * here: that is where it belongs), or, on a phone, right above the screen's action row.
+ */
+export function rhythm(col, s, size, isRoot) {
+  const { box, blocks } = col;
+  const out = [];
+  const spaces = [[blocks[0].rect.y - box.content.top, null, blocks[0]]];
+  for (let i = 1; i < blocks.length; i++) spaces.push([blocks[i].rect.y - (blocks[i - 1].rect.y + blocks[i - 1].rect.h), blocks[i - 1], blocks[i]]);
+  const last = blocks.at(-1);
+  for (const [gap, above, below] of spaces) {
+    if (near(gap, 0) || (gap <= s.lg + 0.5 && s.steps.some((st) => near(gap, st)))) continue;
+    // Above the first block only floating content counts: words centred in a 48px row are not a gap.
+    if (!above && gap <= s.lg) continue;
+    const where = above ? `between "${above.text || above.path}" and "${below.text || below.path}"` : `above "${below.text || below.path}", the first block of ${box.path}`;
+    if (gap > s.lg) {
+      if (size === 'phone' && isRoot && above && below === last && last.holdsPress) continue;
+      out.push(v('rhythm', below, `${r2(gap)}px ${where}`, `nothing related is further apart than lg (${s.lg}px); the one space that grows lies under the content${size === 'phone' ? ', above the action row' : ''}`));
+    } else out.push(v('rhythm', below, `${r2(gap)}px ${where}`, `spacing steps are ${s.steps.join(' ')}px`));
+  }
+  return out;
+}
+
+/** 7. At least touch by touch to a finger, and a button is a fill or underlined text. */
+export function press(el, s) {
+  if (!el.pressable || !el.hit) return [];
+  const out = [];
+  if (el.hit.w < s.touch || el.hit.h < s.touch) out.push(v('press', el, `${el.hit.w}x${el.hit.h}px to a finger`, `layout.touch is ${s.touch}x${s.touch}px`));
+  const b = el.button;
+  if (b && b.words && !b.underline && !(rgba(b.bg)?.[3] > 0) && !b.border && !b.row) out.push(v('press', el, 'a bare word that can be pressed', 'a button has a fill or is underlined text'));
+  return out;
+}
+
+/**
+ * 8. Every signed-in state has the same header at a size. Each state is compared with the header
+ * most states share, and the first difference is named.
+ */
+export function header(byState) {
+  const states = Object.entries(byState).filter(([, h]) => h?.length);
+  if (states.length < 2) return [];
+  const key = (h) => JSON.stringify(h);
+  const count = new Map();
+  for (const [, h] of states) count.set(key(h), (count.get(key(h)) ?? 0) + 1);
+  const [usualKey, n] = [...count].sort((a, b) => b[1] - a[1])[0];
+  const usual = JSON.parse(usualKey);
+  return states.filter(([, h]) => key(h) !== usualKey).map(([state, h]) => {
+    const diff = (a, b, at) => {
+      if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return a === b ? null : `${at}: ${JSON.stringify(a)} here, ${JSON.stringify(b)} in ${n} other states`;
+      for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        const d = diff(a[k], b[k], at + (Array.isArray(a) ? `[${k}]` : `.${k}`));
+        if (d) return d;
+      }
+      return null;
+    };
+    return { state, rule: 'header', path: 'header', text: h.map((p) => p.text).join(' | ').slice(0, 30), what: diff(h, usual, 'header'), allowed: 'every screen starts with the same header' };
+  });
+}
+
+/** Every rule over one state at one size; `dark` is the same page collected in the dark theme. */
+export function audit(light, dark, s, size) {
+  const width = SIZES[size].width;
+  const cols = columns(light);
+  const inCol = new Set(cols.flatMap((c) => c.blocks.map((b) => b.i)));
+  return [
+    ...light.flatMap((el) => [...type(el, s, width), ...colour(el, s, 'light'), ...shape(el, s), ...space(el, s), ...press(el, s)]),
+    ...dark.flatMap((el) => colour(el, s, 'dark')),
+    ...cols.flatMap((c) => [...edge(c, s), ...rhythm(c, s, size, !inCol.has(c.box.i) || c.box.root)]),
+  ];
+}
+
+// In the page. One pass over the DOM: what each element is, where it is and how it is drawn.
+export function collect() {
+  const PRESS = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=checkbox], [role=tab], [role=link], [role=switch]';
+  const px = (n) => parseFloat(n) || 0;
+  const local = (c) => c.replace(/^_(.+)_[a-z0-9]{5}_\d+$/, '$1');
+  const name = (el) => el.tagName.toLowerCase() + (el.classList[0] ? '.' + local(el.classList[0]) : '');
+  const clear = (c) => c === 'transparent' || /rgba\(.*, 0\)$|\/ 0\)$/.test(c);
+  const SIDES = ['top', 'right', 'bottom', 'left'];
+  const modal = document.querySelector('dialog:modal');
+  // A stuck block is drawn where the scroll put it, not where the flow did. Static holds the same
+  // room in the flow, so for the read nothing else moves and the block is where it belongs.
+  const stuck = [...document.querySelectorAll('*')].filter((e) => getComputedStyle(e).position === 'sticky');
+  for (const e of stuck) e.style.setProperty('position', 'static', 'important');
+  const out = [];
+  const drawn = (cs, el, own) => {
+    const colours = [];
+    if (own) colours.push(['color', cs.color]);
+    if (!clear(cs.backgroundColor)) colours.push(['background-color', cs.backgroundColor]);
+    for (const side of SIDES) if (px(cs[`border-${side}-width`]) > 0 && !/none|hidden/.test(cs[`border-${side}-style`])) colours.push([`border-${side}-color`, cs[`border-${side}-color`]]);
+    if (own && cs.textDecorationLine !== 'none') colours.push(['text-decoration-color', cs.textDecorationColor]);
+    if (el instanceof SVGElement) {
+      if (cs.fill !== 'none' && !cs.fill.startsWith('url')) colours.push(['fill', cs.fill]);
+      if (cs.stroke !== 'none' && px(cs.strokeWidth) > 0) colours.push(['stroke', cs.stroke]);
+    }
+    for (const c of cs.boxShadow.matchAll(/rgba?\([^)]*\)|color\([^)]*\)/g)) colours.push(['box-shadow', c[0]]);
+    return {
+      colours,
+      radius: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius],
+      border: SIDES.map((s) => (/none|hidden/.test(cs[`border-${s}-style`]) ? 0 : px(cs[`border-${s}-width`]))),
+    };
+  };
+  const visit = (el, parent, scoped) => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) return;
+    if (cs.display === 'contents') return [...el.children].forEach((c) => visit(c, parent, scoped));
+    const r = el.getBoundingClientRect();
+    // A screen reader's text: one pixel, clipped. Nothing of it is drawn.
+    if (r.width <= 1 && r.height <= 1) return;
+    const root = el.tagName === 'MAIN' || (el.tagName === 'DIALOG' && el.open);
+    const inScope = scoped || root;
+    if (r.width === 0 || r.height === 0) return [...el.children].forEach((c) => visit(c, parent, inScope));
+    const field = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+    const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join('').replace(/\s+/g, ' ').trim();
+    const i = out.length;
+    const tm = el.computedStyleMap();
+    const font = { family: cs.fontFamily, size: px(cs.fontSize), weight: +cs.fontWeight, lh: cs.lineHeight === 'normal' ? null : px(cs.lineHeight) };
+    const bl = px(cs.borderLeftWidth), bt = px(cs.borderTopWidth), bb = px(cs.borderBottomWidth);
+    const space = [];
+    for (const s of SIDES) {
+      space.push([`padding-${s}`, px(cs[`padding-${s}`])]);
+      if (tm.get(`margin-${s}`).toString() !== 'auto') space.push([`margin-${s}`, px(cs[`margin-${s}`])]);
+    }
+    for (const g of ['row-gap', 'column-gap']) if (cs[g] !== 'normal') space.push([g, px(cs[g])]);
+    const pressable = el.matches(PRESS) && !(modal && !modal.contains(el));
+    let button = null;
+    if (el.tagName === 'BUTTON') {
+      const under = (n) => getComputedStyle(n).textDecorationLine.includes('underline') || [...n.children].some(under);
+      button = {
+        words: !!el.textContent.trim(),
+        bg: cs.backgroundColor,
+        border: SIDES.some((s) => px(cs[`border-${s}-width`]) > 0 && !clear(cs[`border-${s}-color`])),
+        underline: under(el),
+        // A row: the words of a task row are a child of the painted row and fill its height, so
+        // what is pressed is the row. A bare word on a panel is neither.
+        row: (() => {
+          const p = el.parentElement, pc = getComputedStyle(p);
+          return !clear(pc.backgroundColor) && r.height >= p.getBoundingClientRect().height - px(pc.paddingTop) - px(pc.paddingBottom) - 1;
+        })(),
+      };
+    }
+    out.push({
+      i, parent, tag: el.tagName.toLowerCase(), role: el.getAttribute('role'),
+      path: [el.parentElement?.parentElement, el.parentElement, el].filter((e) => e && e !== document.body && e.id !== 'app').map(name).join(' > '),
+      text: (own || (field ? el.value || el.placeholder : '') || el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 30),
+      hasText: !!own || field,
+      font,
+      // Barlow Condensed is for figures and nothing else.
+      figure: /Condensed/.test(cs.fontFamily),
+      holdsPress: !!el.querySelector(PRESS),
+      rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+      content: { left: r.x + bl + px(cs.paddingLeft), top: r.y + bt + px(cs.paddingTop) - el.scrollTop, bottom: r.bottom - bb - px(cs.paddingBottom) },
+      display: cs.display, flexDirection: cs.flexDirection, position: cs.position, float: cs.float,
+      inPress: !!el.closest(PRESS),
+      inScope, root,
+      ...drawn(cs, el, !!own || field),
+      space, pressable, button, hit: null, el,
+    });
+    for (const p of ['::before', '::after']) {
+      const ps = getComputedStyle(el, p);
+      if (ps.content === 'none' || ps.display === 'none' || ps.width === '0px' || ps.height === '0px') continue;
+      out.push({ i: out.length, parent: i, path: out[i].path + p, text: '', hasText: false, rect: null, ...drawn(ps, el, false), space: SIDES.flatMap((s) => [[`padding-${s}`, px(ps[`padding-${s}`])], [`margin-${s}`, px(ps[`margin-${s}`])]]), pressable: false });
+    }
+    if (root && el.tagName === 'DIALOG') out.push({ i: out.length, parent: i, path: out[i].path + '::backdrop', text: '', rect: null, colours: [['background-color', getComputedStyle(el, '::backdrop').backgroundColor]], radius: [], border: [], space: [] });
+    if (field && el.placeholder && !el.value) out.push({ i: out.length, parent: i, path: out[i].path + '::placeholder', text: el.placeholder.slice(0, 30), rect: null, colours: [['color', getComputedStyle(el, '::placeholder').color]], radius: [], border: [], space: [] });
+    for (const c of el.children) visit(c, i, inScope);
+  };
+  for (const c of document.body.children) if (!/^(SCRIPT|STYLE|TEMPLATE)$/.test(c.tagName)) visit(c, null, false);
+
+  // What a finger hits, after the geometry above is written down: each target is scrolled to the
+  // middle and walked out from its centre, pixel by pixel, while elementFromPoint still finds it
+  // (or a label that hands the tap to it).
+  const hits = (el, x, y) => {
+    const h = document.elementFromPoint(x, y);
+    return !!h && (el.contains(h) || h.closest?.('label')?.control === el);
+  };
+  for (const e of out) {
+    if (!e.pressable) continue;
+    e.el.scrollIntoView({ block: 'center', inline: 'center' });
+    const r = e.el.getBoundingClientRect();
+    // Whole pixels: Chromium snaps a point to the pixel, so x.5 would be read as the next one.
+    const cx = Math.floor(r.x + r.width / 2), cy = Math.floor(r.y + r.height / 2);
+    if (!hits(e.el, cx, cy)) continue; // covered where it is: nothing to measure
+    const reach = (dx, dy) => {
+      let lo = 0, hi = 49; // ponytail: assumes the region is in one piece around the centre
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (hits(e.el, cx + dx * m, cy + dy * m)) lo = m; else hi = m; }
+      return lo;
+    };
+    e.hit = { w: reach(-1, 0) + reach(1, 0) + 1, h: reach(0, -1) + reach(0, 1) + 1 };
+  }
+
+  // The header: the parts of the shell around main, other than the navigation and the status line.
+  const shell = document.querySelector('main')?.parentElement;
+  const parts = shell?.querySelector(':scope > nav') ? [...shell.children].filter((c) => !/^(MAIN|NAV|DIALOG)$/.test(c.tagName) && c.getAttribute('role') !== 'status' && c.getBoundingClientRect().height) : [];
+  const half = (n) => Math.round(n * 2) / 2;
+  const head = parts.map((p) => {
+    const pr = p.getBoundingClientRect();
+    const box = (r) => [half(r.x - pr.x), half(r.y - pr.y), half(r.width), half(r.height)];
+    return {
+      tag: p.tagName.toLowerCase(),
+      text: p.textContent.trim().slice(0, 30),
+      at: [half(pr.x), half(pr.y), half(pr.width), half(pr.height)],
+      inside: [...p.querySelectorAll('*')].filter((d) => d.getBoundingClientRect().width > 1).map((d) => {
+        const cs = getComputedStyle(d);
+        return [d.tagName.toLowerCase(), ...box(d.getBoundingClientRect()), `${cs.fontSize} ${cs.fontWeight} ${cs.lineHeight}`];
+      }),
+    };
+  });
+  for (const e of stuck) e.style.removeProperty('position');
+  for (const e of out) delete e.el;
+  return { els: out, head };
+}
+
+let stopping = false;
+
+async function main() {
+  const args = process.argv.slice(2);
+  const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  const only = opt('--state');
+  const sizes = opt('--size') ? [opt('--size')] : Object.keys(SIZES);
+  if (sizes.some((z) => !SIZES[z])) throw new Error(`--size is phone or laptop`);
+  const s = spec(fs.readFileSync('DESIGN.md', 'utf8'));
+  const started = Date.now();
+
+  const { createServer } = await import('vite');
+  const { chromium } = await import('@playwright/test');
+  let server, browser;
+  const end = async () => {
+    await browser?.close().catch(() => {});
+    await server?.close().catch(() => {});
+  };
+  // Interrupted, the pages still open fail as the browser goes: that is not worth a stack trace.
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { stopping = true; end().then(() => process.exit(130)); });
+  try {
+    server = await createServer({ configFile: 'vite.config.ts', logLevel: 'error', server: { port: 0, strictPort: false } });
+    await server.listen();
+    const base = server.resolvedUrls.local[0].replace(/\/$/, '');
+    browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH, handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false });
+
+    // The states are whatever the demo's own index lists, so a new one is audited the day it is added.
+    const index = await browser.newPage();
+    await index.goto(`${base}/demo.html`);
+    let states = await index.$$eval('a[href*="state="]', (as) => as.map((a) => a.getAttribute('href')));
+    await index.close();
+    const nameOf = (href) => new URLSearchParams(href.split('#')[0].split('?')[1]).get('state');
+    if (only) states = states.filter((h) => nameOf(h) === only);
+    if (!states.length) throw new Error(only ? `no demo state named ${only}` : 'the demo lists no states');
+
+    const found = [];
+    const heads = Object.fromEntries(sizes.map((z) => [z, {}]));
+    const jobs = sizes.flatMap((size) => states.map((href) => ({ size, href })));
+    const worker = async () => {
+      const contexts = {};
+      for (let job; (job = jobs.shift()); ) {
+        const { size, href } = job;
+        const state = nameOf(href);
+        contexts[size] ??= await browser.newContext({ viewport: SIZES[size], reducedMotion: 'reduce', colorScheme: 'light' });
+        const page = await contexts[size].newPage();
+        try {
+          await page.goto(`${base}/demo.html${href}`);
+          // The demo taps for some states 100ms apart after the first paint; let them land.
+          await page.evaluate(() => document.fonts.ready);
+          await page.waitForTimeout(400);
+          const { els, head } = await page.evaluate(collect);
+          await page.emulateMedia({ colorScheme: 'dark' });
+          const dark = (await page.evaluate(collect)).els;
+          heads[size][state] = head;
+          for (const x of audit(els, dark, s, size)) found.push({ ...x, state, size });
+        } catch (err) {
+          found.push({ state, size, rule: 'read', path: '', text: '', what: `could not be read: ${err.message.split('\n')[0]}`, allowed: '' });
+        } finally {
+          await page.close();
+        }
+      }
+      for (const c of Object.values(contexts)) await c.close();
+    };
+    await Promise.all(Array.from({ length: 4 }, worker));
+    for (const size of sizes) for (const h of header(heads[size])) found.push({ ...h, size });
+
+    // One line per distinct violation, with every state it was found in.
+    const lines = new Map();
+    for (const f of found) {
+      const k = [f.rule, f.size, f.path, f.what, f.allowed].join('|');
+      const line = lines.get(k) ?? lines.set(k, { ...f, states: [] }).get(k);
+      if (!line.states.includes(f.state)) line.states.push(f.state);
+    }
+    const sorted = [...lines.values()].sort((a, b) => a.rule.localeCompare(b.rule) || a.size.localeCompare(b.size) || a.path.localeCompare(b.path));
+    for (const l of sorted) {
+      console.log(`${l.rule} ${l.size} ${l.path}${l.text ? ` "${l.text}"` : ''}: ${l.what}${l.allowed ? `; ${l.allowed}` : ''}`);
+      console.log(`  in ${l.states.length === states.length ? 'every state' : l.states.join(' ')}`);
+    }
+    const by = (key) => Object.entries(Object.groupBy(sorted, (l) => l[key])).map(([k, ls]) => `${k} ${ls.length}`).join(', ');
+    console.log(`\ndesign-audit: ${states.length} states, ${sizes.join(' and ')}, ${sorted.length} violations (${found.length} sightings) in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    if (sorted.length) console.log(`by rule: ${by('rule')}`);
+    process.exitCode = sorted.length ? 1 : 0;
+  } finally {
+    await end();
+  }
+}
+
+if (import.meta.main) main().catch((err) => { if (!stopping) console.error(err); process.exitCode = 1; });

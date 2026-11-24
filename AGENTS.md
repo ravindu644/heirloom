@@ -129,6 +129,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | `make deploy`, `make s10-rss` | Copy the arm64 binary to the S10 / run it there for 3 s and print its memory |
 | `tools/tokens.mjs` | DESIGN.md to `client/src/ui/tokens.css`, fonts included. Run by `make tokens` |
 | `tools/style-check.mjs` | Fails on a colour, font name or duration literal in `client/src/ui/` |
+| `tools/design-audit.mjs` | Every demo state in a browser against DESIGN.md: type, colour, shape, space, left edge, rhythm, touch, header |
 | `tools/budget.mjs` | Built JS, CSS, fonts and the server binary against ARCHITECTURE section 7 |
 | `tools/contracts-check.mjs` | Every cell, session and timer state in the fixtures against the schemas |
 
@@ -136,6 +137,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 - `npx @google/design.md lint DESIGN.md` must show 0 errors. Its warnings `orphaned-tokens` (UI reads
   tokens through tokens.css), `missing-primary` (roles are named for their job) and
   `token-like-ignored` on our own keys (`motion`, `layout`, `state`, `shadow`, read by tools/tokens.mjs) are expected.
+- Chromium's `elementFromPoint` snaps x.5 to the next pixel: sample whole pixels when measuring a target.
 - `node --test tools/` fails: Node 22 wants a quoted glob (`node --test "tools/*.test.mjs"`), not a directory.
 - `go.mod` says `go 1.26.0`, not `go 1.26`: the SQLite driver sets that floor and Go rewrites the line.
 - Never pass a cancellable context to a SQLite call in `server/`: a cancelled call makes the driver

@@ -333,11 +333,13 @@ Built once in `client/src/ui/kit/` and reused.
   `on-you` text, one per screen at most; secondary is `surface` with a 1px `line` border; quiet is
   `raised` with no border, for the lesser choice beside another button ("Skip break", "I have an
   invite", "Stop and log 6 min"). All 48px tall, `body-strong`, `rounded.sm`. A bare word is never
-  a button. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
+  a button. On an `ink` bar the bar is the fill, and its button is an outline in `ground`. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
-  "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target.
+  "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
+  and an equal negative margin, so the line it sits in keeps its height.
   These two, button and underlined link, are the only things that can be pressed besides rows,
-  boxes and the navigation.
+  boxes and the navigation. A row is a painted box whose whole surface is the target (a task, a
+  destination): its words need no fill of their own because the box is one.
 - **The person:** a `raised` circle with the first letter of the username in `body-strong`, and
   the username beside it in `label`. In the header and in a room.
 - **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.

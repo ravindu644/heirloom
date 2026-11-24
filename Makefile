@@ -10,7 +10,7 @@ S10_ADDR := $(shell sed -n 's/^- Address: *\([A-Za-z0-9.:-]*\).*/\1/p' .local/EN
 S10 := $(S10_USER)@$(S10_ADDR)
 need-s10 = @test -n "$(S10_USER)" -a -n "$(S10_ADDR)" || { echo "No S10 address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
-CHECKS := lint-design contracts test-tools style types pure test-core test-server test-sync sim budget e2e
+CHECKS := lint-design contracts test-tools style audit types pure test-core test-server test-sync sim budget e2e
 .PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk deploy s10-rss
 
 # -k: one failing check does not hide the others.
@@ -32,6 +32,10 @@ test-tools:
 
 style: tokens
 	node tools/style-check.mjs
+
+# What the browser drew, in every state of every screen, against DESIGN.md.
+audit: tokens
+	node tools/design-audit.mjs
 
 types: tokens
 	pnpm exec tsc --noEmit
