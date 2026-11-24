@@ -78,13 +78,13 @@ Times are ms since the epoch.
 
 | Dir | Message | Meaning |
 |---|---|---|
-| device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000}` | First frame. `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
+| device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000,"utc_offset_min":330}` | First frame. `utc_offset_min` is the device's offset from UTC, east positive; the server keeps the latest one per account to know that person's "today" for rooms (0 when a device does not send it). `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
 | server to device | `{"type":"welcome","server_time":1795494600150,"head":1049}` | `head` is the account's newest sequence number. |
 | server to device | `{"type":"cells","from":1042,"to":1049,"cells":[...]}` | Cells with sequence numbers after `from` up to `to`, oldest first, at most 500 a frame. After `welcome` the server sends these until the device has everything, then the same message carries other devices' pushes live. |
 | device to server | `{"type":"push","batch":"k3v9","cells":[...]}` | At most 500 cells. `batch` is any id the device picks. Sending a batch twice is harmless: a cell is its stamp. |
 | server to device | `{"type":"ack","batch":"k3v9","from":1049,"cursor":1054}` | Every cell is stored or was already beaten by a newer one. `from` is the newest sequence number before this batch and `cursor` the newest after it: the numbers between them are this batch's own cells. |
 | server to device | `{"type":"nack","batch":"k3v9","reason":"clock","server_time":1795494600150}` | Nothing was stored. See Drift. |
-| server to device | `{"type":"room","room":"...","members":[...]}` | Presence and totals. The member shape is pinned in roadmap section 7. |
+| server to device | `{"type":"room", ...}` | One room the account is in, whole: section 15. Sent for each room after `welcome`, and again whenever anything in it changes. |
 | server to device | `{"type":"bye","reason":"token"}` | Sent just before the server closes the socket for good. `token`: the token is unknown or signed out; the device stops reconnecting, keeps its data and its outbox, and asks the person to sign in. `protocol`: the first frame was not a valid `hello`, or a frame broke a limit. |
 | both ways | `{"type":"ping","t":1795494625000}` answered by `{"type":"pong","t":1795494625000,"server_time":1795494625140}` | Every 25 s from the device, so the tunnel keeps the socket open. `t` is echoed. The device's offset is `server_time - (sent + received) / 2`, smoothed. |
 
@@ -440,3 +440,75 @@ Worked out on the device from `habit` and `checkin` rows.
   record.
 
 These are checked by the core lane's own tests; `streak.json` holds the streak rule.
+
+## 15. Rooms
+
+A room is a few friends who see each other focusing. Rooms are not cells: they are tables the
+server owns, changed by requests that need a connection, because a room belongs to several
+accounts and has nothing to merge.
+
+**Requests.** `POST`, JSON, `token` and `device` in every body as for `/api/sync`, the same
+errors as section 10, and these of their own:
+
+| Request | Body (beside `token`, `device`) | 200 reply |
+|---|---|---|
+| `/api/rooms/create` | `name` (1 to 40 characters) | `{"room":"<id>"}` |
+| `/api/rooms/join` | `code` | `{"room":"<id>"}`. Joining a room one is in already is the same answer |
+| `/api/rooms/leave` | `room` | `{}`. The last member leaving ends the room |
+| `/api/rooms/update` | `room`, and any of `name`, `target_ms` (0 for none), `ranked` | `{}`. Any member may |
+| `/api/rooms/cheer` | `room`, `to` (a member's id), `run` (a session row id of theirs) | `{}`. Once per person per run; a second is the same answer |
+
+| Status | Code | When |
+|---|---|---|
+| 404 | `room` | No such room, or the account is not in it |
+| 404 | `code` | No room has this code |
+| 409 | `full` | The room has 8 members, or the account is in 5 rooms |
+| 404 | `run` | `to` is not a member, or has no such session that rang |
+
+A room's `code` is 8 characters of `A-Z 2-9` without the look-alikes (`I`, `O`, `0`, `1`), made
+by the server. Whoever has it can join; any member can read it.
+
+**The room message.** After `welcome`, and whenever anything below changes, the server sends each
+connected device one message per room its account is in. A device that has left a room, or been
+alone in one that ended, gets the message once more with `"gone": true` and nothing else.
+`POST /api/sync` replies carry the same objects under `rooms`.
+
+```json
+{ "type": "room", "room": "r_8f3a", "name": "Sachi and me", "code": "K7QW3RXM",
+  "target_ms": 36000000, "ranked": false, "server_time": 1795494600150,
+  "members": [
+    { "id": "a_19c2", "name": "sachi", "you": false, "away": false,
+      "phase": "work", "set_index": 1, "ends_at": 1795495265000, "paused": false,
+      "task": "Thinking in React, steps 1 to 3",
+      "today_ms": 4500000, "today_laps": 3, "week_ms": 21600000,
+      "last": { "run": "run-7f3a", "ended": 1795493100000, "cheers": ["a_02b7"] } } ] }
+```
+
+- `members` are in the order they joined. `id` is the account's opaque id, `name` its username,
+  `you` marks the account this message is for.
+- `phase`, `set_index`, `ends_at` and `paused` come from the member's timer cell, read at
+  `server_time`: a run whose bell has gone, or no timer, is `phase: "idle"` with `ends_at: null`.
+  A paused run has `paused: true` and `ends_at: null`. A member is focusing whether or not any
+  device of theirs is connected: a phone in a pocket still has its alarm set.
+- `task` is the title of the task the lap is for, and only when that member's
+  `settings.share_task` is true and the phase is `work`. Otherwise `null`: the server sends no
+  title it was not told to share, and "not sharing" and "no task" look the same from outside.
+- `away` is true when that member's `settings.rooms_hidden` is true. Then `phase` is `idle`,
+  `task` and `last` are `null`, and only the totals are real: someone who has hidden rooms is not
+  watched, but what they did still counts toward the room's week.
+- `today_ms`, `today_laps` and `week_ms` are section 7's counting over that member's session rows
+  (work, not `void`, overlapping minutes once), for their local day and their Monday to Sunday
+  week, by the latest `utc_offset_min` any device of theirs sent. The lap in progress is not in
+  them; a screen adds it from `ends_at` if it wants the figure to move.
+- `last` is the member's most recent work session that rang today: its run id, when it ended, and
+  the ids of the members who cheered it. `null` when there is none.
+- The room's own total for the week is the sum of its members' `week_ms`; `target_ms` is what
+  they are filling together, 0 when none is set. `ranked` says whether this room shows its
+  members by `week_ms`, most first; otherwise they stay in joining order, side by side.
+
+**What the server reads.** Only what this needs: an account's `timer` cell, its `session` rows,
+its `settings` fields `share_task` and `rooms_hidden`, and the `title` of the one task a shared
+lap is for. It reads nothing else of anyone's, and logs none of it.
+
+**Offline.** Every request above needs a connection and fails without one. A cheer made offline
+is the device's to keep and send when it is back; nothing else is queued.

@@ -33,7 +33,6 @@ when it is done.
 - [4] A project may be tomato (`you`), which is also the colour of every lap. The five project tones are the lead's bridge between PRODUCT ("projects with a colour") and DESIGN ("one hue"); the user may want real hues instead.
 - [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
 - [5] Stats use the viewer's current UTC offset for every day. A country with summer time shifts old laps by an hour across midnight.
-- [7] Room totals need each member's "today": the server does not know a member's UTC offset yet.
 - [9] SQLite creates `heirloom.db` as 0644, and the data directory is 0700 only when heirloomd makes it. Settle with the systemd unit.
 - [any] `tools/style-check.mjs` sees `200ms` in text but not `setTimeout(fn, 200)`.
 - [any] `tools/budget.mjs` counts every JS chunk as first load. Read Vite's manifest once a lazy chunk exists.
