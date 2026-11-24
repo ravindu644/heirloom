@@ -172,6 +172,12 @@ layout:
   gutter: 32px
   gap: 24px
   canvas: 1144px
+  lane: 8px
+  lane-set: 24px
+  lane-result: 40px
+state:
+  hover: 12%
+  press: 24%
 motion:
   press: 100ms
   fill: 160ms
@@ -207,7 +213,8 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **surface / raised:** lanes and the active nav pill, separated by tone, not by shadow.
 - **ink / muted:** text. Muted passes 4.5:1 on ground and surface in both themes. Text smaller than
   16px uses ink or muted only, never ghost.
-- **line:** dividers, the empty part of a lane.
+- **line:** dividers, and the empty part of a lane that sits on the ground. On a white surface the
+  empty part is `raised`: `raised` on `ground` is too faint to see, `line` on `surface` too harsh.
 - **you:** the one hue. Your marks, your line, your current lap, the one primary button per screen.
 - **you-tint:** the fill of a split chip and the selected row.
 - **on-you:** text on a you-filled button.
@@ -240,8 +247,12 @@ first, the rest after first paint.
   grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
 - Between the two, the sidebar collapses to the bottom bar under 720px.
 - Touch targets at least 48px. Nothing scrolls sideways.
-- These numbers are tokens under `layout:` (`touch`, `sidebar`, `margin`, `gutter`, `gap`, `canvas`).
-  The 720px breakpoint is the one size written in CSS, because a media query cannot read a variable.
+- These numbers are tokens under `layout:` (`touch`, `sidebar`, `margin`, `gutter`, `gap`, `canvas`,
+  and the lane heights `lane`, `lane-set`, `lane-result`).
+- Three sizes are written in CSS as numbers, because a media query cannot read a variable: 720px
+  (bottom bar below, sidebar from there), 1280px (from there the 300px timer and the rail sit side
+  by side), and 412px (below it the phone timer scales with the screen, `figure-xl` times the
+  width over 412, so the digits never leave a narrow phone).
 
 ## Elevation & Depth
 
@@ -256,17 +267,20 @@ Lanes and bars are square ended: a track has no rounded corners. Rows and button
 
 Built once in `client/src/ui/kit/` and reused.
 
-- **Lap bar:** four segments, 8px tall, 4px gaps. Done laps filled in you, the current lap filled to
-  its elapsed share, the long break after lap four named in words beside it.
+- **Lap bar:** four segments, 8px tall (`lane`), 4px gaps. Done laps filled in you, the current lap
+  filled to its elapsed share, the long break after lap four named in words beside it. In the
+  set-of-four moment it stands 24px tall (`lane-set`): that is what makes a set bigger than a lap.
 - **Race strip:** two lanes, you over ghost, on one scale; the split between them as a chip.
-- **Ghost lane:** the same lane as yours, hollow, with a dashed 1px ghost outline.
-- **Split chip:** "-19m" in ink on you-tint when behind, "+6m" in you when ahead, "level" in ink.
+- **Ghost lane:** the same lane as yours, hollow, with a dashed ghost outline: 1px on a strip, 2px
+  on the tall lanes of a result (`lane-result`, 40px), where 1px thins to a hairline.
+- **Split chip:** "-19m" in ink on you-tint when behind, "level" in ink on you-tint, "+6m" in
+  on-you on a you fill when ahead (you on you-tint is under 4.5:1 at this size).
 - **Task row:** title, project, laps as small squares (filled, in progress, empty), "2 of 4".
 - **Heat cell:** a 12px square, 2px gaps, zero to four steps; a rest day carries the rest mark.
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
   figure-md, the task only if shared, and a Cheer button.
 - **Buttons:** one primary (you) per screen at most; secondary on surface; text buttons for the
-  rest. 48px tall.
+  rest. 48px tall. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
 - **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
 
 ## Motion
