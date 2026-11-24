@@ -79,7 +79,7 @@ Times are ms since the epoch.
 | Dir | Message | Meaning |
 |---|---|---|
 | device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000,"utc_offset_min":330}` | First frame. `utc_offset_min` is the device's offset from UTC, east positive; the server keeps the latest one per account to know that person's "today" for rooms (0 when a device does not send it). `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
-| server to device | `{"type":"welcome","server_time":1795494600150,"head":1049}` | `head` is the account's newest sequence number. |
+| server to device | `{"type":"welcome","server_time":1795494600150,"head":1049,"rooms":["r_8f3a"]}` | `head` is the account's newest sequence number. `rooms` is the ids of every room the account is in, so a device that was away when its account left a room drops it now (section 15). |
 | server to device | `{"type":"cells","from":1042,"to":1049,"cells":[...]}` | Cells with sequence numbers after `from` up to `to`, oldest first, at most 500 a frame. After `welcome` the server sends these until the device has everything, then the same message carries other devices' pushes live. |
 | device to server | `{"type":"push","batch":"k3v9","cells":[...]}` | At most 500 cells. `batch` is any id the device picks. Sending a batch twice is harmless: a cell is its stamp. |
 | server to device | `{"type":"ack","batch":"k3v9","from":1049,"cursor":1054}` | Every cell is stored or was already beaten by a newer one. `from` is the newest sequence number before this batch and `cursor` the newest after it: the numbers between them are this batch's own cells. |
@@ -471,7 +471,9 @@ by the server. Whoever has it can join; any member can read it.
 **The room message.** After `welcome`, and whenever anything below changes, the server sends each
 connected device one message per room its account is in. A device that has left a room, or been
 alone in one that ended, gets the message once more with `"gone": true` and nothing else.
-`POST /api/sync` replies carry the same objects under `rooms`.
+`POST /api/sync` replies carry the same objects under `rooms`, and that array is the whole set.
+A device drops any room it holds that a `welcome`'s `rooms` or a POST reply's `rooms` does not
+name: it was not there to hear `gone`.
 
 ```json
 { "type": "room", "room": "r_8f3a", "name": "Sachi and me", "code": "K7QW3RXM",
@@ -511,4 +513,6 @@ its `settings` fields `share_task` and `rooms_hidden`, and the `title` of the on
 lap is for. It reads nothing else of anyone's, and logs none of it.
 
 **Offline.** Every request above needs a connection and fails without one. A cheer made offline
-is the device's to keep and send when it is back; nothing else is queued.
+is the device's to keep and send when it is back; nothing else is queued. A kept cheer that is
+answered `run` or `room` is dropped: the lap or the room is gone. Any other failure keeps it for
+the next connection.

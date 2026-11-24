@@ -16,7 +16,7 @@ function rig(random = 1) {
   const signals: (AbortSignal | undefined)[] = [];
   // What the engine would do when a message arrives, when a test needs it to do something.
   const react: { to?: (msg: ServerMessage) => void } = {};
-  const hello = { token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 0 };
+  const hello = { token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 0, utc_offset_min: 330 };
   // Each POST waits here until the test answers it.
   const replies: ((reply: { status: number; body: object } | 'unreachable') => void)[] = [];
   const fetch: Fetch = (url, init) => {
@@ -71,14 +71,14 @@ describe('backoff and offset arithmetic', () => {
 });
 
 describe('the socket', () => {
-  it('says hello first, with the token, the device, the cursor and its own time', () => {
+  it('says hello first, with the token, the device, the cursor, its own time and its offset from UTC', () => {
     const r = rig();
     r.hello.cursor = 1042;
     r.transport.start();
     assert.equal(r.sockets.last().url, 'wss://heirloom.test/api/ws');
     r.sockets.last().accept();
     assert.deepEqual(r.sockets.last().sent, [
-      { type: 'hello', token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 1042, client_time: T0 },
+      { type: 'hello', token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 1042, utc_offset_min: 330, client_time: T0 },
     ]);
   });
 
@@ -352,7 +352,7 @@ describe('without a socket', () => {
     r.time.advance(2000);
     r.sockets.last().fail();
     assert.deepEqual(r.posts, [
-      { url: 'https://heirloom.test/api/sync', token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 1042, client_time: T0 + 3000 },
+      { url: 'https://heirloom.test/api/sync', token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 1042, utc_offset_min: 330, client_time: T0 + 3000 },
     ]);
     r.time.jump(200);
     const cell = { stamp: '2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829', dataset: 'task', row: 't', field: 'title', value: 'x' };
@@ -391,6 +391,18 @@ describe('without a socket', () => {
     assert.equal(r.posts.length, 2);
     assert.deepEqual(r.posts[1].push, { batch: 'first', cells: [] });
     assert.equal(r.posts[1].cursor, 4);
+  });
+
+  it('the rooms of a POST reply are handed on as one room message each, after the cells', async () => {
+    const r = rig();
+    blocked(r);
+    const rooms = [{ room: 'r_1', name: 'Sachi and me', members: [] }, { room: 'r_2', gone: true }];
+    await r.answer({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [], rooms } });
+    assert.deepEqual(r.seen.slice(1), [
+      { type: 'cells', from: 0, to: 0, cells: [] },
+      { type: 'room', room: 'r_1', name: 'Sachi and me', members: [] },
+      { type: 'room', room: 'r_2', gone: true },
+    ]);
   });
 
   it('a nack comes through the same way', async () => {

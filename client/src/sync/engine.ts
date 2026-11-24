@@ -22,6 +22,11 @@ export interface Env extends Wire {
   openStore: OpenStore;
   /** Tests script the wire by replacing this. Left out, it is the real transport over `WebSocket` and `fetch`. */
   connect?: Connect;
+  /**
+   * The device's offset from UTC in minutes, east positive: 330 in Sri Lanka. The server is told,
+   * so it knows this person's "today" for rooms. Left out, it is told 0.
+   */
+  utcOffsetMin?: () => number;
 }
 
 /**
@@ -80,11 +85,27 @@ export interface Engine {
   wake(): void;
   /** Resolves when everything written so far is in the store. Rejects if the store refuses it. */
   saved(): Promise<void>;
+  /**
+   * Calls `listener` with each room message from the server (protocol section 15), over the
+   * socket or in a POST reply. Returns a function that stops it.
+   */
+  onRoom(listener: (msg: RoomMessage) => void): () => void;
+  /**
+   * One request to the server on behalf of whoever is signed in: the token and device are put
+   * in. The same time limit and codes as the account calls; `offline` when it cannot be asked.
+   */
+  request(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string }>;
+  /** A value kept on this device for the signed-in account, never sent: what `keep` last put under `name`. */
+  kept(name: string): unknown;
+  /** Saved with whatever else is being written. Gone with the account's database at sign out. */
+  keep(name: string, value: unknown): void;
   /** Every cell held, for tests and the simulator to compare devices. */
   cells(): Cell[];
   /** Saves what is pending, closes the wire and the stores. Rejects, after closing, if unsent edits could not be saved. */
   stop(): Promise<void>;
 }
+
+export type RoomMessage = Extract<ServerMessage, { type: 'room' }>;
 
 interface Session extends Account {
   token: string;
@@ -106,6 +127,10 @@ interface Replica {
   parked: Set<string>;
   oneByOne: boolean;
   // Saving:
+  // Values kept for the facades (`keep`), each under its own name in the store's meta.
+  local: Map<string, unknown>;
+  // The UTC offset the server was last told.
+  zone: number;
   pending: Write | null;
   saving: Promise<void> | null;
 }
@@ -122,6 +147,8 @@ const SIGN_OUT_WAIT_MS = 10000;
 const ASK_MS = 20000;
 const LOGOUT_MS = 5000;
 const INSTALL_DB = 'heirloom';
+// What `keep` stores sits in the meta beside the clock and the cursor, under this prefix.
+const LOCAL = 'local.';
 
 const bytes = (cell: Cell) => new TextEncoder().encode(JSON.stringify(cell)).length;
 const isCell = (c: any): c is Cell =>
@@ -160,6 +187,8 @@ export async function createEngine(env: Env): Promise<Engine> {
   const unsent = signal(0);
   const unsaved = signal(false);
   const sets = new Map<string, Signal<ReadonlyMap<string, Row>>>();
+  const roomListeners = new Set<(msg: RoomMessage) => void>();
+  const zone = () => env.utcOffsetMin?.() ?? 0;
 
   const sync = computed<SyncState>(() => {
     if (!account.value || refused.value) return 'signed-out';
@@ -206,7 +235,7 @@ export async function createEngine(env: Env): Promise<Engine> {
   // Writes made while one is being saved ride together in the next. That is the batching, and it
   // is also what makes two writes in one turn a single transaction.
   function save(r: Replica, write: Write) {
-    r.pending = join(r.pending, { ...write, meta: { clock: r.clock, cursor: r.cursor, offset } });
+    r.pending = join(r.pending, { ...write, meta: { ...write.meta, clock: r.clock, cursor: r.cursor, offset } });
     r.saving ??= Promise.resolve().then(() => flush(r));
   }
 
@@ -232,7 +261,7 @@ export async function createEngine(env: Env): Promise<Engine> {
               r.pending = {
                 cells: unsentCells,
                 outbox: [...r.outbox].map((key) => [key, true]),
-                meta: { clock: r.clock, cursor: 0, offset },
+                meta: { ...Object.fromEntries([...r.local].map(([name, value]) => [LOCAL + name, value])), clock: r.clock, cursor: 0, offset },
               };
               continue;
             } catch {
@@ -386,6 +415,9 @@ export async function createEngine(env: Env): Promise<Engine> {
         return pump();
       }
 
+      case 'room':
+        return roomListeners.forEach((listener) => listener(msg));
+
       case 'bye':
         if (msg.reason !== 'token') return;
         r.transport.stop();
@@ -402,7 +434,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     const cells: Cells = new Map();
     for (const cell of snap.cells) applyCell(cells, cell);
     const handlers: Handlers = {
-      hello: () => ({ token: session.token, device: me, cursor: r.cursor }),
+      hello: () => ({ token: session.token, device: me, cursor: r.cursor, utc_offset_min: (r.zone = zone()) }),
       message: (msg) => receive(r, msg),
       down: () => {
         if (db !== r) return;
@@ -413,6 +445,9 @@ export async function createEngine(env: Env): Promise<Engine> {
       },
       time: (sample) => {
         offset = smoothOffset(offset, sample);
+        // The person travelled, or summer time began: the server must hear the new offset, and
+        // a hello is what carries it. This runs at every pong, so within one ping of the change.
+        if (db === r && zone() !== r.zone) r.transport.again();
       },
     };
     const r: Replica = {
@@ -427,6 +462,8 @@ export async function createEngine(env: Env): Promise<Engine> {
       flight: null,
       parked: new Set(),
       oneByOne: false,
+      local: new Map(Object.entries(snap.meta).flatMap(([name, value]) => (name.startsWith(LOCAL) ? [[name.slice(LOCAL.length), value]] : []))),
+      zone: zone(),
       pending: null,
       saving: null,
     };
@@ -580,6 +617,27 @@ export async function createEngine(env: Env): Promise<Engine> {
       }),
 
     wake: () => db?.transport.wake(),
+
+    onRoom(listener) {
+      roomListeners.add(listener);
+      return () => void roomListeners.delete(listener);
+    },
+
+    async request(path, body) {
+      const r = db;
+      if (!r) return { ok: false, error: 'offline' };
+      const answer = await ask(path, { ...body, token: r.session.token, device: me });
+      return answer.ok ? answer : { ok: false, error: answer.error };
+    },
+
+    kept: (name) => db?.local.get(name),
+
+    keep(name, value) {
+      const r = db;
+      if (!r) return;
+      r.local.set(name, value);
+      save(r, { meta: { [LOCAL + name]: value } });
+    },
 
     async saved() {
       if (db && !(await settle(db))) throw new Error('the store refused the write: it is held in memory only');

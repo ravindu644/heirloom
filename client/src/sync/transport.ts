@@ -11,7 +11,8 @@ export type ServerMessage =
   | { type: 'ack'; batch: string; from: number; cursor: number }
   | { type: 'nack'; batch: string; reason: string; server_time: number }
   | { type: 'bye'; reason: string }
-  | { type: 'room'; room: string; members: unknown[] };
+  // One room as the server sees it now: protocol section 15. sync/rooms.ts reads the rest of it.
+  | ({ type: 'room'; room: string } & Record<string, unknown>);
 
 export interface Push {
   type: 'push';
@@ -55,7 +56,7 @@ export interface Wire {
 
 export interface Handlers {
   /** Asked at every hello and every POST, so the cursor sent is always the current one. */
-  hello(): { token: string; device: string; cursor: number };
+  hello(): { token: string; device: string; cursor: number; utc_offset_min: number };
   /** `welcome` means a path to the server is open; after `down` nothing arrives until the next one. */
   message(msg: ServerMessage): void;
   down(): void;
@@ -291,6 +292,8 @@ export function connect(wire: Wire, on: Handlers): Transport {
     const steps: ServerMessage[] = [{ type: 'cells', from: reply.from, to: reply.to, cells: reply.cells ?? [] }];
     // The engine pushes its outbox again on every welcome, so it gets one per stretch of working polls, not one per poll.
     if (!pollUp) steps.unshift({ type: 'welcome', server_time: reply.server_time, head: reply.head });
+    // The rooms ride in the reply as they would arrive on a socket: one message each.
+    for (const room of reply.rooms ?? []) steps.push({ ...room, type: 'room' });
     if (reply.ack) steps.push({ type: 'ack', ...reply.ack });
     if (reply.nack) steps.push({ type: 'nack', ...reply.nack });
     // Up before the welcome is handed over: the engine answers a welcome with a push, and it must be taken.

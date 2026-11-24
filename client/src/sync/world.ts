@@ -11,6 +11,7 @@ import { fakeSockets, fakeTime } from './fakes.ts';
 import { createFocus } from './focus.ts';
 import { createHabits } from './habits.ts';
 import { createProgress } from './progress.ts';
+import { createRooms } from './rooms.ts';
 import { createToday } from './today.ts';
 import type { Handlers, Push, Transport } from './transport.ts';
 
@@ -23,6 +24,15 @@ export function world() {
   const time = fakeTime();
   let runs = 0;
   let ids = 0;
+  // The device's offset from UTC. A test that travels changes it.
+  const zone = { min: OFFSET };
+  // The server's side of every request that is not an account call. A test sets `reply` to play it;
+  // left alone it answers 200 and an empty object.
+  type Answer = { status: number; body: object } | 'unreachable';
+  const server = {
+    requests: [] as { path: string; body: any; from: string }[],
+    reply: null as null | ((path: string, body: any) => Answer | Promise<Answer>),
+  };
   // Set to 1 and every look at the clock finds it a millisecond later, as a real one may.
   // Every wait Focus asked the scheduler for.
   const waits: number[] = [];
@@ -34,7 +44,7 @@ export function world() {
 
   async function device(name: string, options: { stores?: OpenStore; log?: Write[]; online?: boolean } = {}) {
     const stores = options.stores ?? memoryStores();
-    const wires: { handlers: Handlers; sent: Push[]; running: boolean }[] = [];
+    const wires: { handlers: Handlers; sent: Push[]; running: boolean; agains: number }[] = [];
     // Every write to the account's database, to see what shares a transaction.
     const logged: OpenStore = async (dbName) => {
       const store = await stores(dbName);
@@ -46,21 +56,28 @@ export function world() {
       schedule: time.schedule,
       random: () => (name.charCodeAt(0) % 16) / 16,
       WebSocket: fakeSockets().FakeSocket,
-      fetch: async (_url, init) => ({
-        ok: true,
-        status: 200,
-        headers: { get: () => null },
-        json: async () => ({ token: `token-${name}`, account: 'acct', username: JSON.parse(init.body).username }),
-      }),
+      fetch: async (url, init) => {
+        const path = new URL(url).pathname;
+        const body = JSON.parse(init.body);
+        let answer: Answer = { status: 200, body: { token: `token-${name}`, account: body.username === 'ravi' ? 'acct' : `acct-${body.username}`, username: body.username } };
+        if (!['/api/login', '/api/register', '/api/logout'].includes(path)) {
+          server.requests.push({ path, body, from: name });
+          answer = (await server.reply?.(path, body)) ?? { status: 200, body: {} };
+        }
+        if (answer === 'unreachable') throw new TypeError('fetch failed');
+        const { status, body: reply } = answer;
+        return { ok: status === 200, status, headers: { get: () => null }, json: async () => reply };
+      },
       openStore: logged,
+      utcOffsetMin: () => zone.min,
       connect: (handlers) => {
-        const wire = { handlers, sent: [] as Push[], running: false };
+        const wire = { handlers, sent: [] as Push[], running: false, agains: 0 };
         wires.push(wire);
         const transport: Transport = {
           start: () => void (wire.running = true),
           stop: () => void (wire.running = false),
           send: (push) => void wire.sent.push(push),
-          again: () => {},
+          again: () => void wire.agains++,
           wake: () => {},
           offline: () => {},
         };
@@ -80,6 +97,7 @@ export function world() {
     let today: ReturnType<typeof createToday> | undefined;
     let progress: ReturnType<typeof createProgress> | undefined;
     let habits: ReturnType<typeof createHabits> | undefined;
+    let rooms: ReturnType<typeof createRooms> | undefined;
 
     const d = {
       name,
@@ -94,11 +112,15 @@ export function world() {
       get habits() {
         return (habits ??= createHabits(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule }));
       },
+      get rooms() {
+        return (rooms ??= createRooms(engine, { schedule: time.schedule }));
+      },
       close() {
         focus.close();
         today?.close();
         progress?.close();
         habits?.close();
+        rooms?.close();
       },
       stores,
       wire,
@@ -149,5 +171,5 @@ export function world() {
 
   const sorted = (engine: Engine) => engine.cells().toSorted((x, y) => (`${x.dataset}/${x.row}/${x.field}` < `${y.dataset}/${y.row}/${y.field}` ? -1 : 1));
 
-  return { time, drift, waits, device, restart, exchange, sorted };
+  return { time, drift, waits, zone, server, device, restart, exchange, sorted };
 }

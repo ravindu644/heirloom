@@ -3,8 +3,9 @@
 // Rules: contracts/protocol.md section 15. Rooms are not cells: the server owns them, and every
 // change to one needs a connection.
 
+import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import type { Engine } from './engine.ts';
+import type { Engine, RoomMessage } from './engine.ts';
 
 export interface MemberView {
   id: string;
@@ -66,6 +67,208 @@ export interface Rooms {
   setShareTask(share: boolean): void;
 }
 
-export function createRooms(engine: Engine): Rooms & { close(): void } {
-  throw new Error('not built yet: createRooms, roadmap section 7');
+export interface RoomsEnv {
+  /** Runs `run` once after `ms`. Returns a function that cancels it. */
+  schedule(run: () => void, ms: number): () => void;
+}
+
+// A cheer still to be sent: which lap of whom, in which room.
+interface Cheer {
+  room: string;
+  to: string;
+  run: string;
+}
+
+const DAY_MS = 86400000;
+const PHASES = ['idle', 'work', 'short', 'long'] as const;
+const keyOf = (cheer: Cheer) => `${cheer.room}/${cheer.to}/${cheer.run}`;
+const text = (v: unknown, or = '') => (typeof v === 'string' ? v : or);
+const amount = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : 0);
+
+/**
+ * `env.schedule` is how a member turns idle when their bell goes with no new message.
+ * `close()` stops listening and cancels that wait.
+ */
+export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): void } {
+  // The last message for each room, as it came. Kept on the device, so the screen is not empty offline.
+  const rooms = signal<ReadonlyMap<string, RoomMessage>>(new Map());
+  // Cheers the server has not answered yet. Kept too: one made in a tunnel is sent after it, restart or not.
+  const waiting = signal<readonly Cheer[]>([]);
+  // Cheers this run of the app has sent and had accepted, so they stay shown until the server's message says so itself.
+  const accepted = signal<ReadonlySet<string>>(new Set());
+  const flying = new Set<string>();
+  const connected = computed(() => engine.sync.value === 'syncing' || engine.sync.value === 'in-step');
+
+  function remember(next: ReadonlyMap<string, RoomMessage>) {
+    rooms.value = next;
+    engine.keep('rooms', [...next.values()]);
+  }
+  function queue(next: readonly Cheer[]) {
+    waiting.value = next;
+    engine.keep('cheers', next);
+  }
+
+  // Each account has its own rooms and its own cheers waiting: read again whenever the account changes.
+  const stopAccount = effect(() => {
+    void engine.account.value;
+    untracked(() => {
+      const held = engine.kept('rooms');
+      const cheers = engine.kept('cheers');
+      batch(() => {
+        rooms.value = new Map((Array.isArray(held) ? (held as RoomMessage[]) : []).filter((msg) => typeof msg?.room === 'string').map((msg) => [msg.room, msg]));
+        waiting.value = Array.isArray(cheers) ? (cheers as Cheer[]).filter((c) => [c?.room, c?.to, c?.run].every((part) => typeof part === 'string')) : [];
+        accepted.value = new Set();
+      });
+    });
+  });
+
+  const stopRooms = engine.onRoom((msg) => {
+    const next = new Map(rooms.peek());
+    if (msg.gone === true) {
+      next.delete(msg.room);
+      // Its cheers have nowhere to go.
+      if (waiting.peek().some((cheer) => cheer.room === msg.room)) queue(waiting.peek().filter((cheer) => cheer.room !== msg.room));
+    } else next.set(msg.room, msg);
+    remember(next);
+  });
+
+  // A member's bell goes at `ends_at` whether or not the server says so in time. The list is
+  // worked out again at the next one due.
+  const bell = signal(0);
+  let cancelBell = () => {};
+
+  const list = computed(() => {
+    void bell.value;
+    const now = engine.now();
+    const mine = new Set([...waiting.value.map(keyOf), ...accepted.value]);
+    return [...rooms.value.values()].map((msg): RoomView => {
+      // Only what could be a member: anything else in the list is left out, not tripped over.
+      const raw = (Array.isArray(msg.members) ? (msg.members as Record<string, unknown>[]) : []).filter((member) => member !== null && typeof member === 'object');
+      const you = text(raw.find((member) => member?.you === true)?.id);
+      const members = raw.map((member): MemberView => {
+        const id = text(member.id);
+        const away = member.away === true;
+        const ends = typeof member.ends_at === 'number' ? member.ends_at : null;
+        // Their bell has gone since the server said this: idle, as its next message will say.
+        const over = ends !== null && ends <= now;
+        const phase = away || over ? 'idle' : (PHASES.find((p) => p === member.phase) ?? 'idle');
+        const last = away ? null : (member.last as { run?: unknown; ended?: unknown; cheers?: unknown } | null | undefined);
+        const run = text(last?.run);
+        const theirs = Array.isArray(last?.cheers) ? last.cheers.filter((c): c is string => typeof c === 'string') : [];
+        // A cheer made here shows at once, before the server has heard of it.
+        const cheers = you && mine.has(keyOf({ room: msg.room, to: id, run })) && !theirs.includes(you) ? [...theirs, you] : theirs;
+        return {
+          id,
+          name: text(member.name),
+          you: member.you === true,
+          away,
+          phase,
+          lap: (typeof member.set_index === 'number' ? member.set_index : 0) + 1,
+          ends_at: phase === 'idle' ? null : ends,
+          paused: phase !== 'idle' && member.paused === true,
+          task: phase === 'work' && typeof member.task === 'string' ? member.task : null,
+          today_ms: amount(member.today_ms),
+          today_laps: amount(member.today_laps),
+          week_ms: amount(member.week_ms),
+          last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you) } : null,
+        };
+      });
+      const ranked = msg.ranked === true;
+      return {
+        id: msg.room,
+        name: text(msg.name),
+        code: text(msg.code),
+        target_ms: amount(msg.target_ms),
+        week_ms: members.reduce((sum, member) => sum + member.week_ms, 0),
+        ranked,
+        // The sort is stable: members level on the week stay in the order they joined.
+        members: ranked ? members.toSorted((a, b) => b.week_ms - a.week_ms) : members,
+      };
+    });
+  });
+
+  const stopBell = effect(() => {
+    void bell.value;
+    const all = rooms.value;
+    untracked(() => {
+      cancelBell();
+      cancelBell = () => {};
+      const now = engine.now();
+      const ends = [...all.values()].flatMap((msg) => (Array.isArray(msg.members) ? (msg.members as { ends_at?: unknown }[]) : []).map((member) => member?.ends_at));
+      const next = Math.min(...ends.filter((at): at is number => typeof at === 'number' && at > now));
+      // A day at most: a browser runs a timer set further out than 2^31 ms at once.
+      if (Number.isFinite(next)) cancelBell = env.schedule(() => void bell.value++, Math.min(next - now, DAY_MS));
+    });
+  });
+
+  // One request per cheer, ever: `flying` while it is in the air, gone from `waiting` once answered.
+  async function send(cheer: Cheer) {
+    const key = keyOf(cheer);
+    if (flying.has(key)) return;
+    flying.add(key);
+    const answer = await engine.request('/api/rooms/cheer', cheer);
+    flying.delete(key);
+    // `run`: that lap is gone or was set aside, so there is nothing to cheer. Dropped quietly.
+    // Any other failure keeps it for the next connection.
+    if (!answer.ok && answer.error !== 'run') return;
+    batch(() => {
+      if (answer.ok) accepted.value = new Set([...accepted.peek(), key]);
+      queue(waiting.peek().filter((other) => keyOf(other) !== key));
+    });
+  }
+
+  // Whatever is waiting goes out when there is a connection, and again each time one returns.
+  const stopSending = effect(() => {
+    if (!connected.value) return;
+    const all = waiting.value;
+    untracked(() => all.forEach((cheer) => void send(cheer)));
+  });
+
+  const setting = (name: string) => computed(() => engine.rows('settings').value.get('current')?.[name] === true);
+
+  // Room requests need a connection and are not kept for later: only a cheer is.
+  async function ask(path: string, body: object): Promise<RoomResult> {
+    if (!connected.peek()) return { ok: false, error: 'offline' };
+    const answer = await engine.request(path, body);
+    if (!answer.ok) return answer;
+    return typeof answer.data?.room === 'string' ? { ok: true, room: answer.data.room } : { ok: true };
+  }
+
+  return {
+    list,
+    stale: computed(() => !connected.value),
+    hidden: setting('rooms_hidden'),
+    shareTask: setting('share_task'),
+
+    cheered: computed(() => {
+      // Your latest lap is the same lap in every room you are in. Where two rooms disagree for a
+      // moment, the later lap is the latest.
+      const yours = list.value.flatMap((room) => room.members.filter((member) => member.you && member.last).map((member) => ({ room, last: member.last! })));
+      const latest = yours.toSorted((a, b) => b.last.ended - a.last.ended)[0]?.last.run;
+      const names = yours.filter(({ last }) => last.run === latest).flatMap(({ room, last }) => last.cheers.map((id) => room.members.find((member) => member.id === id && !member.you)?.name));
+      return [...new Set(names.filter((name): name is string => !!name))];
+    }),
+
+    create: (name) => ask('/api/rooms/create', { name: name.trim() }),
+    join: (code) => ask('/api/rooms/join', { code: code.trim().toUpperCase() }),
+    leave: (room) => ask('/api/rooms/leave', { room }),
+    update: (room, fields) => ask('/api/rooms/update', { room, ...fields }),
+
+    cheer(room, member) {
+      const last = list.peek().find((r) => r.id === room)?.members.find((m) => m.id === member)?.last;
+      if (!last || last.cheered) return;
+      queue([...waiting.peek(), { room, to: member, run: last.run }]);
+    },
+
+    setHidden: (hidden) => engine.write('settings', 'current', { rooms_hidden: hidden }),
+    setShareTask: (share) => engine.write('settings', 'current', { share_task: share }),
+
+    close() {
+      stopAccount();
+      stopRooms();
+      stopBell();
+      stopSending();
+      cancelBell();
+    },
+  };
 }

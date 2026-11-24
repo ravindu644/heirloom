@@ -258,6 +258,37 @@ describe('a local edit', () => {
     assert.equal(log.length, writes + 1);
   });
 
+  it('keep and kept: a value for the account on this device, saved with the next write, never sent, and gone at sign out', async () => {
+    const log: Write[] = [];
+    const d = await signedIn({ wrap: watching(log) });
+    assert.equal(d.engine.kept('rooms'), undefined);
+    d.engine.keep('rooms', [{ room: 'r_1' }]);
+    assert.deepEqual(d.engine.kept('rooms'), [{ room: 'r_1' }]);
+    await d.engine.saved();
+    assert.deepEqual(log.at(-1)!.meta!['local.rooms'], [{ room: 'r_1' }]);
+    assert.equal(d.wire().sent.length, 0);
+    assert.equal(d.engine.unsent.value, 0);
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.deepEqual(again.engine.kept('rooms'), [{ room: 'r_1' }]);
+    again.wire().welcome();
+    await again.engine.signOut();
+    assert.equal(again.engine.kept('rooms'), undefined);
+  });
+
+  it('request: the token and device are put in, the server\'s code comes back, and signed out it answers offline without asking', async () => {
+    const d = await signedIn();
+    assert.equal((await d.engine.request('/api/rooms/leave', { room: 'r_1' })).ok, true);
+    assert.deepEqual(d.server.calls.at(-1)?.body, { room: 'r_1', token: 'token-of-ravi', device: d.engine.device });
+    d.server.fail = { status: 404, error: 'room' };
+    assert.deepEqual(await d.engine.request('/api/rooms/leave', { room: 'r_1' }), { ok: false, error: 'room' });
+    d.server.fail = null;
+    await d.engine.signOut();
+    const calls = d.server.calls.length;
+    assert.deepEqual(await d.engine.request('/api/rooms/leave', { room: 'r_1' }), { ok: false, error: 'offline' });
+    assert.equal(d.server.calls.length, calls);
+  });
+
   it('throws when nobody is signed in: there is no account to write to', async () => {
     const d = await device();
     assert.throws(() => d.engine.write('task', 't1', { title: 'x' }), /sign in/);
@@ -729,6 +760,7 @@ describe('a crash, then a restart', () => {
     // Offline, a lap ends here. Then the other tab signs out and deletes the database.
     d.wire().handlers.down();
     d.engine.write('session', 'run-1', { kind: 'work', outcome: 'rang' });
+    d.engine.keep('cheers', [{ room: 'r_1', to: 'a_sachi', run: 'run-7f3a' }]);
     await d.engine.saved();
     await (await d.stores('heirloom-acct-ravi')).destroy();
     d.engine.write('task', 't2', { title: 'typed in the tab that did not know' });
@@ -752,6 +784,7 @@ describe('a crash, then a restart', () => {
     await d.engine.stop();
     const again = await device({ stores: d.stores });
     assert.equal(again.engine.unsent.value, 4);
+    assert.deepEqual(again.engine.kept('cheers'), [{ room: 'r_1', to: 'a_sachi', run: 'run-7f3a' }], 'and a cheer that was waiting is kept with it');
     assert.equal(again.wire().handlers.hello().cursor, 0);
     again.wire().welcome();
     assert.deepEqual(again.wire().sent[0]!.cells.map((c) => c.row).toSorted(), ['run-1', 'run-1', 't2', 't3']);
