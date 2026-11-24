@@ -136,6 +136,35 @@ export function keyBetween(a: string | null, b: string | null): string {
   return midpoint(a, b);
 }
 
+const KEY_MAX = 64;
+
+/**
+ * The keys to write so that `id` sits just before `before` among its siblings, or at the end
+ * with null (or with a `before` that is not among them). Nearly always one key, for the moved row.
+ */
+export function moveKeys(siblings: readonly Pick<Task, 'id' | 'order'>[], id: string, before: string | null): [id: string, order: string][] {
+  const list = siblings.filter((other) => other.id !== id).sort(byOrder);
+  const found = before === null ? -1 : list.findIndex((other) => other.id === before);
+  const at = found < 0 ? list.length : found;
+  const low = list[at - 1]?.order || null;
+  const high = list[at]?.order ?? null;
+  if (high === null || (low ?? '') < high) {
+    const key = keyBetween(low, high);
+    if (key.length <= KEY_MAX) return [[id, key]];
+    // The gap has been halved until no key of 64 characters fits. Once in a few hundred moves
+    // into one gap: the whole list gets fresh keys, short and evenly stepped.
+    let last: string | null = null;
+    return [...list.slice(0, at), { id }, ...list.slice(at)].map((row) => [row.id, (last = keyBetween(last, null))]);
+  }
+  // The neighbours hold the same key: two devices each picked it. Nothing sorts between them, so
+  // the rows that share it from here on move up, into the room before the first larger key, and
+  // the moved row takes the room they leave. Usually that is one row.
+  const run = list.slice(at).filter((other) => other.order === high);
+  const ceiling = list[at + run.length]?.order ?? null;
+  let last = keyBetween(low, ceiling);
+  return [[id, last], ...run.map((row): [string, string] => [row.id, (last = keyBetween(last, ceiling))])];
+}
+
 /** Rows sort by `order`, then by row id, so two devices that picked the same key still agree. */
 export const byOrder = (a: Pick<Task, 'order' | 'id'>, b: Pick<Task, 'order' | 'id'>): number =>
   a.order !== b.order ? (a.order < b.order ? -1 : 1) : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;

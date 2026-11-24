@@ -24,6 +24,22 @@ const DAY_MS = 86400000;
 // 1970-01-01 was a Thursday: weekday 3 when Monday is 0.
 export const weekday = (ms: number) => (ms / DAY_MS + 3) % 7;
 
+/** How far back "41 of the last 45" looks, for the focus streak and for every habit. */
+export const WINDOW_DAYS = 45;
+
+/**
+ * The streak as the screens show it: over the 45 day window, and whether a miss lies inside
+ * those days. An empty day there that is not a rest day is a miss.
+ */
+export function streakWindow(today: string, kept: readonly string[], daysMask = 127): Streak & { missed: boolean } {
+  const s = streak({ today, kept, window: WINDOW_DAYS, daysMask });
+  // The same days the streak counted: back from today if today is kept, else from yesterday.
+  const now = Date.parse(today);
+  const keptToday = ((daysMask >> weekday(now)) & 1) === 1 && kept.includes(today);
+  const from = new Date((keptToday ? now : now - DAY_MS) - (WINDOW_DAYS - 1) * DAY_MS).toISOString().slice(0, 10);
+  return { ...s, missed: s.of - s.kept > s.rest.filter((day) => day >= from).length };
+}
+
 export function streak({ today, kept, window, daysMask = 127 }: StreakInput): Streak {
   const planned = (ms: number) => ((daysMask >> weekday(ms)) & 1) === 1;
   const keptDays = new Set(kept.map((day) => Date.parse(day)).filter(planned));

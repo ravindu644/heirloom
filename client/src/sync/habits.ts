@@ -2,20 +2,16 @@
 // lane could build to it at the same time; the core lane fills in createHabits.
 // Rules: contracts/protocol.md section 14, and section 8 for the streak.
 
+import { batch, computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { asCheckIn, asDays, asHabit, asRemind, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
+import type { CheckIn, Habit, HabitDay } from '../core/habits.ts';
+import { addDays } from '../core/progress.ts';
+import { byOrder, keyBetween, moveKeys } from '../core/today.ts';
+import { createDay } from './day.ts';
 import type { Engine } from './engine.ts';
 
-export interface HabitDay {
-  day: string;
-  /** The habit is planned for this weekday. */
-  planned: boolean;
-  /** Live check-ins on the day. */
-  count: number;
-  /** The count has reached the target. */
-  done: boolean;
-  /** A rest day of the streak (section 8). */
-  rest: boolean;
-}
+export type { HabitDay } from '../core/habits.ts';
 
 export interface HabitView {
   id: string;
@@ -83,6 +79,155 @@ export interface HabitsEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
-export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close(): void } {
-  throw new Error('not built yet: createHabits, roadmap section 6');
+const KEPT_MS = 30 * 86400000;
+
+/**
+ * `close()` stops the midnight timer. `recomputed()` says how many times every check-in has been
+ * gone through: it is there for the test that proves this is not every tick.
+ */
+export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close(): void; recomputed(): number } {
+  const clock = createDay(engine, env);
+  const habitRows = engine.rows('habit');
+  const checkinRows = engine.rows('checkin');
+
+  // The one pass over every check-in there is: how many are live on each day of each habit, and
+  // which they are, by day. Worked out again only when a check-in row has changed and someone
+  // asks. Habit rows, the day and the clock are not read here.
+  let passes = 0;
+  const checkins = computed(() => {
+    passes += 1;
+    const counts = new Map<string, Map<string, number>>();
+    const byDay = new Map<string, CheckIn[]>();
+    for (const [id, row] of checkinRows.value) {
+      const checkin = asCheckIn(id, row);
+      if (!checkin) continue;
+      let days = counts.get(checkin.habit);
+      if (!days) counts.set(checkin.habit, (days = new Map()));
+      days.set(checkin.day, (days.get(checkin.day) ?? 0) + 1);
+      const list = byDay.get(checkin.day);
+      if (list) list.push(checkin);
+      else byDay.set(checkin.day, [checkin]);
+    }
+    return { counts, byDay };
+  });
+
+  const habits = computed(() => {
+    const all = new Map<string, Habit>();
+    for (const [id, row] of habitRows.value) {
+      const habit = asHabit(id, row);
+      if (habit) all.set(id, habit);
+    }
+    return all;
+  });
+  const empty: ReadonlyMap<string, number> = new Map();
+
+  const model = computed(() => {
+    const today = clock.day.value;
+    const now = engine.now();
+    const show = (habit: Habit): HabitView => ({
+      id: habit.id,
+      title: habit.title,
+      days: habit.days,
+      target: habit.target,
+      remind: habit.remind,
+      ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today),
+    });
+    const all = [...habits.value.values()];
+    const alive = all.filter((habit) => habit.deleted === null).sort(byOrder);
+    const list = alive.filter((habit) => habit.archived === null).map(show);
+    const planned = list.filter((habit) => habit.today.planned);
+    return {
+      list,
+      archived: alive.filter((habit) => habit.archived !== null).map(show),
+      deleted: all
+        .filter((habit) => habit.deleted !== null && now - habit.deleted < KEPT_MS)
+        .sort((a, b) => b.deleted! - a.deleted! || byOrder(a, b))
+        .map(show),
+      today: { done: planned.filter((habit) => habit.today.done).length, planned: planned.length },
+    };
+  });
+
+  const habit = (id: string) => habits.peek().get(id);
+
+  return {
+    list: computed(() => model.value.list),
+    archived: computed(() => model.value.archived),
+    deleted: computed(() => model.value.deleted),
+    today: computed(() => model.value.today),
+
+    week() {
+      void clock.day.value;
+      const listed = new Set(model.value.list.map((view) => view.id));
+      const now = engine.now();
+      const today = clock.now();
+      // Fourteen days of check-ins at most are looked at here, whatever the year holds.
+      const mine = new Map<string, CheckIn[]>();
+      for (let back = 0; back < 14; back++) {
+        const day = addDays(today, -back);
+        const list = checkins.value.byDay.get(day);
+        if (list) mine.set(day, list.filter((checkin) => listed.has(checkin.habit)));
+      }
+      return weekAgainst(mine, today, now);
+    },
+
+    add(title, days, target) {
+      const name = title.trim();
+      if (!name) return null;
+      const id = env.id();
+      const last = [...habits.peek().values()].filter((other) => other.deleted === null).sort(byOrder).at(-1);
+      engine.write('habit', id, { title: name, days: asDays(days) ?? 127, target: asTarget(target) ?? 1, order: keyBetween(last?.order || null, null) });
+      return id;
+    },
+
+    edit(id, fields) {
+      const held = habit(id);
+      if (!held) return;
+      const write: Record<string, unknown> = {};
+      const title = fields.title?.trim();
+      if (title) write.title = title;
+      if (asDays(fields.days) !== null) write.days = fields.days;
+      if (asTarget(fields.target) !== null) write.target = fields.target;
+      if (fields.remind === null || asRemind(fields.remind) !== null) write.remind = fields.remind;
+      if (fields.archived !== undefined && fields.archived !== (held.archived !== null)) write.archived = fields.archived ? engine.now() : null;
+      if (Object.keys(write).length) engine.write('habit', id, write);
+    },
+
+    checkIn(id) {
+      const held = habit(id);
+      if (!held || held.deleted !== null) return null;
+      // Its own row, under an id of its own: two devices that tap at once make two, and both count.
+      const row = env.id();
+      engine.write('checkin', row, { habit: id, day: clock.now(), at: engine.now() });
+      return row;
+    },
+
+    undo(id) {
+      const today = (checkins.peek().byDay.get(clock.now()) ?? []).filter((checkin) => checkin.habit === id);
+      const latest = today.sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
+      if (latest) engine.write('checkin', latest.id, { deleted: engine.now() });
+    },
+
+    remove(id) {
+      if (habit(id)?.deleted === null) engine.write('habit', id, { deleted: engine.now() });
+    },
+
+    restore(id) {
+      const held = habit(id);
+      if (held && held.deleted !== null) engine.write('habit', id, { deleted: null });
+    },
+
+    move(id, before) {
+      if (!habit(id)) return;
+      // The list and the archive are both in key order, so one run of keys serves the two.
+      const siblings = [...habits.peek().values()].filter((other) => other.deleted === null);
+      // One turn, so one store transaction, also when a neighbour has to make room.
+      batch(() => {
+        for (const [row, order] of moveKeys(siblings, id, before)) engine.write('habit', row, { order });
+      });
+    },
+
+    wake: clock.wake,
+    close: clock.close,
+    recomputed: () => passes,
+  };
 }

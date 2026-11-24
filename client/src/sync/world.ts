@@ -9,6 +9,7 @@ import { createEngine } from './engine.ts';
 import type { Engine } from './engine.ts';
 import { fakeSockets, fakeTime } from './fakes.ts';
 import { createFocus } from './focus.ts';
+import { createHabits } from './habits.ts';
 import { createProgress } from './progress.ts';
 import { createToday } from './today.ts';
 import type { Handlers, Push, Transport } from './transport.ts';
@@ -78,6 +79,7 @@ export function world() {
     // Made when a test first asks for it, so tests of Focus alone see only Focus's timers.
     let today: ReturnType<typeof createToday> | undefined;
     let progress: ReturnType<typeof createProgress> | undefined;
+    let habits: ReturnType<typeof createHabits> | undefined;
 
     const d = {
       name,
@@ -89,10 +91,14 @@ export function world() {
       get progress() {
         return (progress ??= createProgress(engine, { utcOffsetMin: () => OFFSET, schedule: time.schedule }));
       },
+      get habits() {
+        return (habits ??= createHabits(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule }));
+      },
       close() {
         focus.close();
         today?.close();
         progress?.close();
+        habits?.close();
       },
       stores,
       wire,

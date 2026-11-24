@@ -6,7 +6,7 @@ import { batch, computed, effect, signal, untracked } from '@preact/signals-core
 import type { ReadonlySignal } from '@preact/signals-core';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
-import { asRepeat, asTask, byOrder, keyBetween, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
+import { asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
 import type { Repeat, Task } from '../core/today.ts';
 import { createCounts, lapLengths } from './counts.ts';
 import { createDay } from './day.ts';
@@ -128,7 +128,6 @@ const COLORS: readonly ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
 const PULSE_MS = 15000;
-const KEY_MAX = 64;
 
 /** The projects to show, in order: named, and neither deleted nor archived. A colour this build does not know reads as ink. */
 export const projectViews = (rows: ReadonlyMap<string, Row>): ProjectView[] =>
@@ -321,29 +320,9 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     move(id, before) {
       const t = task(id);
       if (!t) return;
-      const list = siblings(t).filter((other) => other.id !== id);
-      const found = before === null ? -1 : list.findIndex((other) => other.id === before);
-      const at = found < 0 ? list.length : found;
-      const low = list[at - 1]?.order || null;
-      const high = list[at]?.order ?? null;
+      // One turn, so one store transaction, also when a neighbour has to make room.
       batch(() => {
-        if (high === null || (low ?? '') < high) {
-          const key = keyBetween(low, high);
-          if (key.length <= KEY_MAX) return engine.write('task', id, { order: key });
-          // The gap has been halved until no key of 64 characters fits. Once in a few hundred
-          // moves into one gap: the whole list gets fresh keys, short and evenly stepped.
-          let last: string | null = null;
-          for (const row of [...list.slice(0, at), t, ...list.slice(at)]) engine.write('task', row.id, { order: (last = keyBetween(last, null)) });
-          return;
-        }
-        // The neighbours hold the same key: two devices each picked it. Nothing sorts between
-        // them, so the rows that share it from here on move up, into the room before the first
-        // larger key, and this one takes the room they leave. Usually that is one row.
-        const run = list.slice(at).filter((other) => other.order === high);
-        const ceiling = list[at + run.length]?.order ?? null;
-        let last = keyBetween(low, ceiling);
-        engine.write('task', id, { order: last });
-        for (const row of run) engine.write('task', row.id, { order: (last = keyBetween(last, ceiling)) });
+        for (const [row, order] of moveKeys(siblings(t), id, before)) engine.write('task', row, { order });
       });
     },
 

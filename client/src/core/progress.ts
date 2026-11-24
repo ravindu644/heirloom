@@ -4,7 +4,7 @@
 
 import { localDay, stats } from './stats.ts';
 import type { Session, Stats } from './stats.ts';
-import { streak, weekday } from './streak.ts';
+import { streak, streakWindow, weekday } from './streak.ts';
 import type { Task } from './today.ts';
 
 /** Focus and laps per local day, as `stats()` gives them. */
@@ -65,7 +65,6 @@ export interface Bests {
 }
 
 const DAY_MS = 86400000;
-const WINDOW_DAYS = 45;
 const RECENT_DAYS = 14;
 
 /** `day` moved by `n` days. */
@@ -100,18 +99,14 @@ export function weekRace(days: Days, today: string, youToday: number, ghostByNow
 /** The forgiving streak over the last 45 days, and the last 14 as dots. */
 export function streakView(days: Days, today: string): StreakView {
   const kept = new Set(keptDays(days));
-  const s = streak({ today, kept: [...kept], window: WINDOW_DAYS });
+  const s = streakWindow(today, [...kept]);
   const rest = new Set(s.rest);
-  // The same days the streak counted: to today if today is kept, else to yesterday.
-  const from = addDays(kept.has(today) ? today : addDays(today, -1), 1 - WINDOW_DAYS);
-  const rested = s.rest.filter((day) => day >= from).length;
   const recent = Array.from({ length: RECENT_DAYS }, (_, i) => {
     const day = addDays(today, i + 1 - RECENT_DAYS);
     const state = kept.has(day) ? ('kept' as const) : day === today ? ('open' as const) : rest.has(day) ? ('rest' as const) : ('empty' as const);
     return { day, state };
   });
-  // An empty day that is not a rest day is a miss.
-  return { streak: s.streak, kept: s.kept, of: s.of, missed: s.of - s.kept > rested, recent };
+  return { streak: s.streak, kept: s.kept, of: s.of, missed: s.missed, recent };
 }
 
 /** A year cell's level: from the laps that rang, and 1 for a day of minutes with no lap. */
