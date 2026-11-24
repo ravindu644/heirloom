@@ -14,8 +14,8 @@ What matters here:
   tests. Time comes from an injected clock so tests control it.
 - `core/merge.ts` is the only place a cell is compared or applied on the client.
 - The timer is computed from the timer cell, never stored as a ticking value.
-- Apply local changes first, queue them in the outbox, and ignore incoming values for fields with
-  unconfirmed local edits.
+- Apply local changes first and queue them in the outbox. An unsent edit is an ordinary cell: an
+  incoming cell replaces it only with a higher stamp (`contracts/protocol.md` section 3).
 - Nothing is ever lost: every path that could drop a session, a check-in or an offline edit has a
   test proving it does not.
 - Expose state to the UI through Preact signals with a small, named API. Write that API down in your

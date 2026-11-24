@@ -66,13 +66,13 @@ Pure-Go SQLite drivers carry their own SQLite build; section 0 of the roadmap ch
 
 ## 3. Data model
 
-Datasets are synced as cells. Field names here are the contract; `CONTRACTS.md` holds the exact
-wire types and the fixtures both sides test against.
+Datasets are synced as cells. Field names here are the contract; `contracts/protocol.md` and
+`contracts/schemas/` hold the exact wire types, and `contracts/fixtures/` what both sides test against.
 
 | Dataset | Rows | Fields | Kind |
 |---|---|---|---|
 | `timer` | one per account (`row = "current"`) | `state` (one JSON value, see below) | mutable, atomic |
-| `session` | one per pomodoro or break run | `kind` (work, short, long), `task`, `started`, `ended`, `planned_ms`, `paused_ms`, `outcome` (rang, void), `device`, `note` | created once; only `task`, `note` and `outcome` change later |
+| `session` | one per pomodoro or break run | `kind` (work, short, long), `task`, `started`, `ended`, `planned_ms`, `paused_ms`, `outcome` (rang, stopped, void), `device`, `note` | created once; only `task`, `note` and `outcome` change later |
 | `task` | one per task | `project`, `title`, `notes`, `estimate` (whole pomodoros), `parent`, `due`, `repeat`, `done`, `order`, `deleted` | mutable per field |
 | `project` | one per project | `name`, `color` (a DESIGN.md role name), `order`, `archived`, `deleted` | mutable per field |
 | `habit` | one per habit | `title`, `days` (weekday mask), `target`, `order`, `archived`, `deleted` | mutable per field |
@@ -94,7 +94,14 @@ offset`. Nothing ticks in storage.
 
 **One finished interval, one session, written by whoever sees it end.** The session id is the
 timer's `run` id, so when the phone and the laptop both see the same pomodoro ring, both write the
-same row and it collapses into one.
+same row and it collapses into one. Ringing does not write the timer cell: the phone rings from a
+native alarm with the app asleep, so a phase is over when its time left reaches 0, and what comes
+next is worked out from the cell. Only something the user does writes it.
+
+**Three outcomes.** `rang`: it reached the bell; the minutes count and it is a lap. `stopped`: ended
+early; the minutes count, it is not a lap, and the next start is a fresh lap in the same place of
+the set. `void`: set aside by the user; it stays in the timeline and counts nowhere. An interval
+with under 60 s of running time leaves no row at all.
 
 Rooms are not cells. They are server-owned tables (`room`, `member`, `cheer`) changed through
 online-only requests, because a room is shared between accounts and has nothing to merge.
@@ -111,7 +118,7 @@ device corrects its offset, restamps its unsent cells and sends again.
 | The same field edited on two devices | Newer stamp wins | The later edit. Rare (Ink & Switch found such clashes uncommon) |
 | A task deleted on one device, edited on the other | `deleted` is an ordinary field; the delete stands unless undone | It moves to Recently deleted for 30 days, with Restore |
 | The timer changed on two devices, both online | Newer stamp wins; both converge within a second | Every screen shows the same timer |
-| **Both devices offline, each runs the timer** | Each records its own sessions (different `run` ids). On reconnect the newer timer state wins the live slot. A device whose running interval is replaced closes it as `void` at that moment | Every completed pomodoro is kept. Two that overlap are shown side by side with a "ran on two devices" mark and can be voided with a tap. Focus time counts overlapping minutes once |
+| **Both devices offline, each runs the timer** | Each records its own sessions (different `run` ids). On reconnect the newer timer state wins the live slot. A device whose running interval is replaced closes it as `stopped` at that moment, so its minutes are kept | Every completed pomodoro is kept. Two that overlap are shown side by side with a "ran on two devices" mark and can be voided with a tap. Focus time counts overlapping minutes once |
 | A habit checked in on two devices | Two `checkin` rows; the day is done when live rows reach the target | Done, never lost. History shows both; undo removes the latest |
 | Two devices reorder a list | The order key is a fractional index in one field; newest wins; ties break by row id | The list settles on one order |
 | A device's clock is wrong while offline | Future stamps are refused and restamped. A clock behind loses ties it should have won | Nothing is corrupted; at worst an old edit loses |
@@ -127,7 +134,7 @@ case, so the rule above is ours. It follows the principle that what you really d
 device → server   hello  { token, device, cursor, client_time }
 server → device   welcome{ server_time, head }           then cells after cursor, in pages
 device → server   push   { batch, cells: [...] }          (idempotent: a cell is its stamp)
-server → device   ack    { batch, cursor }   or   nack { batch, reason: "clock", server_time }
+server → device   ack    { batch, from, cursor }   or   nack { batch, reason: "clock", server_time }
 server → others   cells  { from, to, cells }              (the account's other devices, live)
 server → device   room   { room, members: [...] }         (presence and today's totals, on change)
 both ways         ping / pong every 25 s                  (heartbeat for the tunnel; time offset)
@@ -138,8 +145,9 @@ both ways         ping / pong every 25 s                  (heartbeat for the tun
   history (Actual's growth problem avoided).
 - The server stores and forwards; it reads only the datasets it needs for rooms (`timer` for
   presence, `session` for totals).
-- The device applies its own change locally first and puts it in the outbox. It ignores incoming
-  values for fields it has unconfirmed edits on, so nothing flickers (Figma's rule).
+- The device applies its own change locally first and puts it in the outbox. An unsent edit is an
+  ordinary cell: an incoming cell replaces it only with a higher stamp. Nothing flickers, because
+  an edit made after seeing a value is always stamped later than that value.
 - Time offset: on each pong, `offset = server_time - (sent + received) / 2`, smoothed.
 
 ## 6. Notifications
@@ -158,7 +166,7 @@ both ways         ping / pong every 25 s                  (heartbeat for the tun
 |---|---|
 | Server memory | under 50 MB RSS with 20 connected devices; `GOMEMLIMIT=64MiB` |
 | Server binary | under 25 MB, web app embedded |
-| Web app, first load | under 90 KB of JS gzipped, under 20 KB of CSS, at most 2 font files |
+| Web app, first load | under 90 KB of JS gzipped, under 20 KB of CSS, at most 2 font files preloaded (the other three load after first paint) |
 | Tap to visible change | under 100 ms on the user's phone |
 | Motion | state changes under 250 ms; the reward moment under 1.2 s and skippable; all of it off under `prefers-reduced-motion` |
 | Live timer arrival | under 1 s from one device to the other on the home network |
@@ -201,3 +209,9 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-24 | Name: heirloom. Server binary: heirloomd | [design/names.md](../design/names.md) |
 | 2026-11-24 | Design language: route B, Pacer | [design/](../design/README.md); `DESIGN.md` |
 | 2026-11-24 | Exposure through a Cloudflare named Tunnel | User's choice; [stack.md](research/stack.md) §5 |
+| 2026-11-24 | Session outcomes are `rang`, `stopped`, `void`; a replaced offline interval closes as `stopped` | The user's call: minutes really worked are kept, a lap is only a lap when it rings |
+| 2026-11-24 | Ringing does not write the timer cell | The phone rings with the app asleep; nobody is there to write |
+| 2026-11-24 | An unsent edit loses to an incoming cell with a higher stamp (was: incoming values ignored) | Ignoring them left the device showing a value the server had already replaced |
+| 2026-11-24 | Server SQLite driver: `modernc.org/sqlite` | Pure Go, bundles its own SQLite, builds with `CGO_ENABLED=0`; a test asserts 3.51.3 or later |
+| 2026-11-24 | One root `package.json`; core tests on `node --test`, no test framework | Capacitor wants `android/` beside its config; Node 22 runs `.ts` itself |
+| 2026-11-24 | Dev-only packages: `@playwright/test`, `@google/design.md`, `yaml`, `ajv`, `@preact/preset-vite` | e2e, the DESIGN.md lint, reading its front matter, checking fixtures against schemas, JSX and hot reload |

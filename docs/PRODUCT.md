@@ -31,7 +31,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 |---|---|
 | Pomodoro of 25 / 5, a 15 to 30 minute long break after four, all adjustable, free | Cirillo's definition; locked custom lengths were Focus To-Do's top complaint |
 | A deliberate tap to start each pomodoro; auto-start is an option, off by default | Cirillo: starting is "a declaration of your determination" |
-| Pause, stop, and "void" for an interrupted pomodoro, which is kept in history but not counted, and never scolded | Cirillo: void, "as if it had never been set"; no punishment ([motivation.md](research/motivation.md) §6) |
+| Pause, stop, and set aside. A stopped pomodoro keeps its minutes but is not a lap, and the next start is a fresh one. One set aside ("void") stays in history and counts nowhere. Neither is scolded | Minutes really worked are kept; Cirillo's void, "as if it had never been set", is there when the user asks for it; no punishment ([motivation.md](research/motivation.md) §6) |
 | A pomodoro can be for a task or for nothing in particular | Starting must not need planning |
 | Time left identical on every device, live; any device can pause or stop it | The user's first requirement |
 | Rings on time on the phone with the screen off; a live countdown in the notification | Focus To-Do users complained of timers dying in the background |
@@ -42,7 +42,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 
 | Feature | Why |
 |---|---|
-| Tasks with an estimate in whole pomodoros, and done vs estimate shown on each | Cirillo's estimate loop; Focus To-Do's best planning feature |
+| Tasks with an estimate in whole pomodoros, and done vs estimate shown on each. Done may pass the estimate ("6 of 5"), with no warning colour | Cirillo's estimate loop; Focus To-Do's best planning feature; the overrun feeds estimate accuracy |
 | A gentle nudge when an estimate is over 7 ("break it down?") | Cirillo: "If It Takes More Than 5-7 Pomodoros, Break It Down" |
 | Projects with a colour, used to tag what the time went to (C, React, Next.js) | The record reads as a learning log ([motivation.md](research/motivation.md) §7) |
 | Subtasks, one level | Enough to break a task down; deeper trees are project management |
@@ -61,7 +61,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | Time per project, this week and all time | The most praised Focus To-Do report |
 | Estimate accuracy over time | Cirillo's record of over- and under-estimation |
 | A day timeline of sessions, with interrupted and "ran on two devices" marks | The honest record |
-| A forgiving streak: a day counts with one pomodoro; two rest days a week do not break it; after a miss it shows days kept ("41 of the last 45") | Streaks help while intact and people quit when they break (Silverman & Barasch); slack keeps them going (Sharif & Shu) |
+| A forgiving streak: a day counts with one pomodoro that rang; two rest days a week (Monday to Sunday) do not break it; after a miss it shows days kept ("41 of the last 45") | Streaks help while intact and people quit when they break (Silverman & Barasch); slack keeps them going (Sharif & Shu) |
 | Personal bests: best day, best week | Achievement, not activity |
 | A short end-of-day look back: what got done, one line to note | Cirillo's daily record, at most one pomodoro long |
 
@@ -127,3 +127,5 @@ noise, app blocking during focus, a companion character, widgets, a public read-
 |---|---|
 | 2026-11-24 | v1 scope as above; rooms in v1; no paid tier; no global social features |
 | 2026-11-24 | The look is route B, Pacer: you against your own past as a ghost; see DESIGN.md |
+| 2026-11-24 | A pomodoro ends one of three ways: rang (minutes and a lap), stopped (minutes, no lap), set aside (neither). A stop under 60 s is not recorded |
+| 2026-11-24 | Two rest days a week, counted Monday to Sunday; the streak's day needs one pomodoro that rang |

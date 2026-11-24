@@ -11,24 +11,24 @@ Lanes are named in brackets: **[lead]** the orchestrating session, **[server]**,
 
 Nothing user-visible. Ends with every check wired and failing for the right reason.
 
-- [ ] [lead] Pin toolchains in `TOOLCHAINS.md`: Go, Node, pnpm, Android SDK and JDK versions, read
+- [x] [lead] Pin toolchains in `TOOLCHAINS.md`: Go, Node, pnpm, Android SDK and JDK versions, read
       from the machine and the S10 container
-- [ ] [lead] `Makefile` with `make check` (runs everything below), `make dev`, `make server`,
+- [x] [lead] `Makefile` with `make check` (runs everything below), `make dev`, `make server`,
       `make web`, `make apk`, `make deploy`
-- [ ] [lead] `contracts/`: `protocol.md` (the messages in ARCHITECTURE §5, exact JSON), one JSON
+- [x] [lead] `contracts/`: `protocol.md` (the messages in ARCHITECTURE §5, exact JSON), one JSON
       schema per dataset, and fixtures: `merge.json` (cell pairs and the winner), `timer.json`
       (event sequences and the expected time left), `stats.json` (sessions and the expected
       totals, overlaps counted once), `streak.json` (day lists and the expected streak)
-- [ ] [lead] `tools/tokens.mjs`: `DESIGN.md` (colours with their `dark-` twins, type, spacing, radii,
+- [x] [lead] `tools/tokens.mjs`: `DESIGN.md` (colours with their `dark-` twins, type, spacing, radii,
       `motion`) to `client/src/ui/tokens.css`; fails on an unknown role or a missing dark twin
-- [ ] [lead] Fonts from `design/fonts/` into the client, timer weight preloaded
-- [ ] [lead] `tools/style-check.mjs`: fails on a colour, font name or duration literal anywhere in
+- [x] [lead] Fonts from `design/fonts/` into the client, timer weight preloaded
+- [x] [lead] `tools/style-check.mjs`: fails on a colour, font name or duration literal anywhere in
       `client/src/ui/` outside `tokens.css`
-- [ ] [lead] `tools/budget.mjs`: built JS and CSS sizes against ARCHITECTURE §7
-- [ ] [server] Skeleton Go module; `select sqlite_version()` test asserts 3.51.3 or later; the
+- [x] [lead] `tools/budget.mjs`: built JS and CSS sizes against ARCHITECTURE §7
+- [x] [server] Skeleton Go module; `select sqlite_version()` test asserts 3.51.3 or later; the
       binary cross-compiled for arm64 runs on the S10 container and its idle RSS is written down
-- [ ] [core] Skeleton TS package with the fixture runner; every fixture loads and fails
-- [ ] [qa] Playwright set up with a "two devices" helper (two browser contexts, `setOffline`)
+- [x] [core] Skeleton TS package with the fixture runner; every fixture loads and fails
+- [x] [qa] Playwright set up with a "two devices" helper (two browser contexts, `setOffline`)
 - [ ] Gate
 
 ## 1. The sync core
