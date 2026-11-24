@@ -26,7 +26,7 @@ when it is done.
 - [3] Nothing in section 3 has run on the phone: wireless adb dropped overnight. The commands are in the android lane's report, copied to `reviews/3/device-run.md`.
 - [any] An edit is durable a few milliseconds after the tap (one IndexedDB transaction with strict durability). A page killed inside that window loses that one edit; a browser offers no synchronous way to close it.
 - [3] `java` on the PATH is 17; `make apk` must set `JAVA_HOME=$HOME/.jdks/jdk-21` (Capacitor 8 needs 21).
-- [4] `task.when` ("after dinner") has no field in ARCHITECTURE section 3; `task.repeat` has no shape; DESIGN.md has no colour roles for projects.
+- [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
 - [5] The end-of-day look back's one-line note has nowhere to live.
 - [5] Stats use the viewer's current UTC offset for every day. A country with summer time shifts old laps by an hour across midnight.
 - [6] A habit's reminder time has no field.
