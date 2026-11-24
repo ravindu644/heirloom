@@ -61,12 +61,14 @@ ProtectControlGroups=yes
 ProtectClock=yes
 ProtectHostname=yes
 
-# TCP on the loopback and nothing else: no raw sockets, no netlink, no Bluetooth.
+# Internet sockets and nothing else: no raw sockets, no netlink, no Bluetooth. It listens
+# on the loopback only (see ExecStart), and it calls out for one thing: at a bell it sends
+# a Web Push to the browser's push service over HTTPS, after asking DNS where that is.
+# There is no IPAddressDeny here because those services (Google's, Mozilla's, Apple's,
+# Microsoft's) have no fixed addresses to allow, and systemd can filter by address but
+# not by name or port. The narrowing is in the server instead: an endpoint must be
+# https, redirects are not followed, and no private or loopback address is ever dialled.
 RestrictAddressFamilies=AF_INET AF_INET6
-# And at the packet level, where the kernel can: it talks to this machine only. The day
-# the server sends Web Push it will need to reach out, and these two lines must go.
-IPAddressDeny=any
-IPAddressAllow=localhost
 
 # It makes no containers, does not change how it is run, wants no real-time priority,
 # and never runs memory it wrote: there is no JIT in it, the SQLite is plain Go.

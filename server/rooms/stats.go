@@ -76,15 +76,35 @@ func Stats(sessions []Session, offsetMin int) (days map[string]Day, overlaps [][
 	return days, overlaps
 }
 
-// timer is the timer cell's state. A field a newer build adds is ignored.
-type timer struct {
+// Timer is the timer cell's state. A field a newer build adds is ignored.
+type Timer struct {
 	Phase     string  `json:"phase"`
+	Run       *string `json:"run"`
 	Task      *string `json:"task"`
 	Started   *int64  `json:"started"`
 	PausedAt  *int64  `json:"paused_at"`
 	PausedMs  int64   `json:"paused_ms"`
 	PlannedMs int64   `json:"planned_ms"`
 	SetIndex  int     `json:"set_index"`
+}
+
+// ReadTimer reads a timer cell. It says no for no cell, an idle timer, and a shape or a
+// phase this build does not know: in all of those nothing is running.
+func ReadTimer(state json.RawMessage) (t Timer, running bool) {
+	if json.Unmarshal(state, &t) != nil || t.Started == nil || (t.Phase != "work" && t.Phase != "short" && t.Phase != "long") {
+		return Timer{SetIndex: clampIndex(t.SetIndex)}, false
+	}
+	t.SetIndex = clampIndex(t.SetIndex)
+	return t, true
+}
+
+// Ends is the moment the run's bell goes, by protocol section 6. A paused run has none:
+// a paused lap never rings.
+func (t Timer) Ends() (at int64, set bool) {
+	if t.Started == nil || t.PausedAt != nil {
+		return 0, false
+	}
+	return *t.Started + t.PausedMs + t.PlannedMs, true
 }
 
 // presence is what a room sees of a timer at one moment.
@@ -96,19 +116,19 @@ type presence struct {
 	task     *string // the id of the task a lap is for, not its title
 }
 
-// watch reads a timer cell at now. No cell, a shape this build does not know, or a run
-// whose bell has gone are all idle: nobody is at it right now.
+// watch reads a timer cell at now. Nothing running, or a run whose bell has gone, is
+// idle: nobody is at it right now.
 func watch(state json.RawMessage, now int64) presence {
-	var t timer
-	if json.Unmarshal(state, &t) != nil || t.Started == nil || (t.Phase != "work" && t.Phase != "short" && t.Phase != "long") {
-		return presence{phase: "idle", setIndex: clampIndex(t.SetIndex)}
+	t, running := ReadTimer(state)
+	if !running {
+		return presence{phase: "idle", setIndex: t.SetIndex}
 	}
-	p := presence{phase: t.Phase, setIndex: clampIndex(t.SetIndex), task: t.Task}
-	if t.PausedAt != nil {
-		p.paused = true // a paused lap never rings
+	p := presence{phase: t.Phase, setIndex: t.SetIndex, task: t.Task}
+	end, set := t.Ends()
+	if !set {
+		p.paused = true
 		return p
 	}
-	end := *t.Started + t.PausedMs + t.PlannedMs
 	if now >= end {
 		return presence{phase: "idle", setIndex: p.setIndex}
 	}

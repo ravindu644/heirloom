@@ -126,6 +126,27 @@ alter table account add column utc_offset_min integer not null default 0;
 -- them without walking the years of sessions before.
 create index cell_session_started on cell (account, cast(value as integer))
 	where dataset = 'session' and field = 'started';
+`, `
+-- The server's own VAPID key, made at first start. One row.
+create table push_key (
+	id      integer primary key check (id = 1),
+	private blob not null
+) strict;
+
+-- A browser that asked to be rung, one per device. It goes with the device's token:
+-- signing out deletes that, and this with it.
+create table push_subscription (
+	account  integer not null,
+	device   text not null,
+	endpoint text not null, -- a capability: whoever has it can push to that browser
+	p256dh   blob not null,
+	auth     blob not null,
+	words    text not null, -- what the notification says, written by the app
+	rung_run text,          -- the last bell sent to this device, so none is sent twice,
+	rung_at  integer,       -- not even across a restart
+	primary key (account, device),
+	foreign key (account, device) references token (account, device) on delete cascade
+) strict, without rowid;
 `}
 
 func migrate(db *sql.DB) error {

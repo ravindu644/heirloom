@@ -13,11 +13,13 @@ import (
 
 	"heirloom/server/auth"
 	"heirloom/server/hub"
+	"heirloom/server/push"
 	"heirloom/server/rooms"
 	"heirloom/server/sync"
 )
 
 const (
+	maxPushBody    = 8 << 10 // a subscription and thirteen sentences of up to 80 characters
 	maxAccountBody = 4 << 10 // register, login, logout: a few short strings
 	maxSyncBody    = 1 << 20 // the same 1 MB as a frame on the socket
 )
@@ -25,12 +27,15 @@ const (
 // newAPI wires the routes of contracts/protocol.md, and the web app under everything
 // else. The hub comes back too, because its sockets outlive their HTTP requests and have
 // to be closed by hand at shutdown.
-func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Handler) (http.Handler, *hub.Hub) {
+func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Handler, bells *push.Service) (http.Handler, *hub.Hub) {
 	var h *hub.Hub
 	accounts := auth.New(db, now, func(token string) { h.Kick(token) })
 	cells := sync.New(db, now)
 	together := rooms.New(db, cells, now)
 	h = hub.New(accounts, cells, together, now)
+	if bells != nil {
+		h.OnTimer = bells.TimerChanged
+	}
 
 	// The e2e run polls /healthz and reads these three fields; the shape is fixed.
 	health, err := json.Marshal(struct {
@@ -68,6 +73,37 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	mux.HandleFunc("POST /api/logout", post(maxAccountBody, func(_ context.Context, c credentials) (struct{}, error) {
 		return struct{}{}, accounts.Logout(c.Token)
 	}))
+
+	// Web Push at the bell (protocol section 17). The key is public: a browser needs it
+	// before it has anything to sign in with. Signing out removes a device's subscription
+	// by itself: the row hangs on the token's.
+	type pushRequest struct {
+		Token        string            `json:"token"`
+		Device       string            `json:"device"`
+		Subscription push.Subscription `json:"subscription"`
+		Words        push.Words        `json:"words"`
+	}
+	mux.HandleFunc("GET /api/push/key", func(w http.ResponseWriter, _ *http.Request) {
+		reply(w, http.StatusOK, map[string]string{"key": bells.Key()})
+	})
+	ring := func(path string, do func(account int64, req pushRequest) error) {
+		mux.HandleFunc("POST /api/push/"+path, post(maxPushBody, func(_ context.Context, req pushRequest) (struct{}, error) {
+			if !auth.ValidDevice(req.Device) {
+				return struct{}{}, auth.ErrBadRequest
+			}
+			account, _, err := accounts.Check(req.Token, req.Device)
+			if err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, do(account, req)
+		}))
+	}
+	ring("subscribe", func(account int64, req pushRequest) error {
+		return bells.Subscribe(account, req.Device, req.Subscription, req.Words)
+	})
+	ring("unsubscribe", func(account int64, req pushRequest) error {
+		return bells.Unsubscribe(account, req.Device)
+	})
 
 	// Rooms (protocol section 15). Every request names its device as /api/sync does, and
 	// after each the hub has the members' devices look at the room again.

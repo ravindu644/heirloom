@@ -21,6 +21,7 @@ import (
 	"github.com/coder/websocket"
 
 	"heirloom/server/hub"
+	"heirloom/server/push"
 	"heirloom/server/rooms"
 	"heirloom/server/store"
 	"heirloom/server/sync"
@@ -50,6 +51,9 @@ type world struct {
 	ms  atomic.Int64
 	// Counts the cells the rooms tests write, so each gets a later stamp than the last.
 	stamps atomic.Int64
+	// Web Push: the server's bells, and the stand-in for the push services they call.
+	bells   *push.Service
+	gateway *gateway
 }
 
 func start(t *testing.T) *world {
@@ -64,18 +68,25 @@ func start(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api, h := newAPI(db, func() time.Time { return time.UnixMilli(w.ms.Load()) }, "test", app)
+	w.gateway = newGateway(t)
+	w.bells, err = push.New(db, sync.New(db, w.now), w.now, w.gateway.Client(), contact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api, h := newAPI(db, w.now, "test", app, w.bells)
 	// Behind the same bound on connections as the real listener, so every test here
 	// also says the bound is not in the way of ordinary use.
 	srv := httptest.NewUnstartedServer(api)
 	srv.Listener = limit(srv.Listener, maxConns)
 	srv.Start()
-	t.Cleanup(func() { h.Close(); srv.Close(); db.Close() })
+	t.Cleanup(func() { h.Close(); w.bells.Close(); srv.Close(); w.gateway.Close(); db.Close() })
 	w.url, w.db, w.hub = srv.URL, db, h
 	return w
 }
 
 func (w *world) pass(d time.Duration) { w.ms.Add(d.Milliseconds()) }
+
+func (w *world) now() time.Time { return time.UnixMilli(w.ms.Load()) }
 
 // asJSON writes what a device would send: a string goes as it is, anything else as JSON
 // with < > & left alone, the way JSON.stringify leaves them.

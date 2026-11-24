@@ -17,6 +17,18 @@ The server listens on `127.0.0.1:8787`; the Cloudflare tunnel is the only way in
 `systemctl status heirloomd` and `journalctl -u heirloomd` say how it is doing. The log holds a
 start line and errors, never anything a person wrote.
 
+## Ringing browsers
+
+At a bell the server sends a Web Push to each browser that asked for one. Push services want to
+know who is sending, in case something goes wrong. Until the unit's `ExecStart` is given
+`-contact mailto:you@example.org` (or an `https:` address), they are told
+`mailto:contact-not-set@heirloom.invalid`, which says what it is. Some push services refuse a
+sender they cannot write to, so set it before relying on the bell.
+
+The server's key for this is made at the first start and lives in the database. Restoring a
+backup from before that first start would make a new key, and every browser would have to
+subscribe again.
+
 ## An invite
 
 ```

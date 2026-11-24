@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"heirloom/server/auth"
+	"heirloom/server/push"
 	"heirloom/server/store"
+	"heirloom/server/sync"
 	"heirloom/server/web"
 )
 
@@ -38,6 +40,7 @@ func run() error {
 	data := flag.String("data", "./data", "directory for the database, created if missing")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	invite := flag.Bool("invite", false, "print one invite code for the database in -data and exit")
+	contact := flag.String("contact", push.DefaultContact, "who a push service may write to about this server: mailto:you@example.org or an https: address")
 	flag.Parse()
 
 	sqliteVersion, err := store.SQLiteVersion()
@@ -74,7 +77,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	api, sockets := newAPI(db, time.Now, sqliteVersion, app)
+	// Bells for browsers that are not looking. Made before the listener answers, so a
+	// lap that was running when the server went down has its bell set again first.
+	bells, err := push.New(db, sync.New(db, time.Now), time.Now, push.Client(), *contact)
+	if err != nil {
+		return err
+	}
+	api, sockets := newAPI(db, time.Now, sqliteVersion, app, bells)
 	// Without these one idle client can hold a connection, and a megabyte of body, forever.
 	// A socket is not cut by them: the deadlines are lifted when it takes the connection over.
 	srv := &http.Server{Handler: api, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
@@ -123,6 +132,8 @@ func run() error {
 	}
 	// Shutdown does not know about sockets. Close them and wait, so nothing is mid-write.
 	sockets.Close()
+	// No more bells, and the pushes in the air are cut short: the database is about to close.
+	bells.Close()
 	// A copy in the making has its own connection. Let it finish: ours must be the last
 	// to close, or the -wal file is left behind.
 	<-backedUp

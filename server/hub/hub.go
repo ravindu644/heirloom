@@ -186,6 +186,10 @@ type Hub struct {
 	conns   map[*conn]struct{}
 	closed  bool
 	serving gosync.WaitGroup
+
+	// OnTimer, when set, is told each time an account's timer cell changes. It is called
+	// with mu held, so it must not wait on anything: the bell for Web Push hangs here.
+	OnTimer func(account int64)
 }
 
 func New(a *auth.Service, cells *sync.Store, r *rooms.Service, now func() time.Time) *Hub {
@@ -257,6 +261,11 @@ func (h *Hub) push(account int64, from *conn, batch string, cells []json.RawMess
 	}
 	if h.rooms.Pushed(account, pushed.Won) {
 		h.announceOf(account)
+	}
+	if h.OnTimer != nil && slices.ContainsFunc(pushed.Won, func(c sync.Cell) bool {
+		return c.Dataset == "timer" && c.Row == "current" && c.Field == "state"
+	}) {
+		h.OnTimer(account)
 	}
 	ack := &Ack{Batch: batch, From: pushed.From, Cursor: pushed.Cursor}
 	if from != nil {

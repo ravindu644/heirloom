@@ -113,11 +113,11 @@ func TestSchemaIsMadeOnceAndANewerOneIsRefused(t *testing.T) {
 	if err := db.QueryRow("pragma user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow("select count(*) from sqlite_schema where type = 'table' and name in ('account', 'invite', 'token', 'cell', 'room', 'member', 'cheer')").Scan(&tables); err != nil {
+	if err := db.QueryRow("select count(*) from sqlite_schema where type = 'table' and name in ('account', 'invite', 'token', 'cell', 'room', 'member', 'cheer', 'push_key', 'push_subscription')").Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
-	if version != len(migrations) || tables != 7 {
-		t.Errorf("schema version %d with %d of our tables, want %d and 7", version, tables, len(migrations))
+	if version != len(migrations) || tables != 9 {
+		t.Errorf("schema version %d with %d of our tables, want %d and 9", version, tables, len(migrations))
 	}
 	// Opening again, as every restart and every "heirloomd -invite" does, must keep what is there.
 	if _, err := db.Exec("insert into account (public_id, username, password, created) values ('a', 'ravi', '', 0)"); err != nil {
