@@ -21,9 +21,10 @@ const (
 	maxSyncBody    = 1 << 20 // the same 1 MB as a frame on the socket
 )
 
-// newAPI wires the routes of contracts/protocol.md. The hub comes back too, because its
-// sockets outlive their HTTP requests and have to be closed by hand at shutdown.
-func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string) (http.Handler, *hub.Hub) {
+// newAPI wires the routes of contracts/protocol.md, and the web app under everything
+// else. The hub comes back too, because its sockets outlive their HTTP requests and have
+// to be closed by hand at shutdown.
+func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Handler) (http.Handler, *hub.Hub) {
 	var h *hub.Hub
 	accounts := auth.New(db, now, func(token string) { h.Kick(token) })
 	h = hub.New(accounts, sync.New(db, now), now)
@@ -46,6 +47,7 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string) (http.Handle
 		Token    string `json:"token"`
 	}
 	mux := http.NewServeMux()
+	mux.Handle("GET /", app) // GET and HEAD; the mux answers any other method with 405
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(health)

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/coder/websocket"
@@ -22,6 +23,7 @@ import (
 	"heirloom/server/hub"
 	"heirloom/server/store"
 	"heirloom/server/sync"
+	"heirloom/server/web"
 )
 
 // These tests talk to the whole server the way a device does: HTTP for accounts and
@@ -55,7 +57,11 @@ func start(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api, h := newAPI(db, func() time.Time { return time.UnixMilli(w.ms.Load()) }, "test")
+	app, err := web.Handler(fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>heirloom</title>")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api, h := newAPI(db, func() time.Time { return time.UnixMilli(w.ms.Load()) }, "test", app)
 	srv := httptest.NewServer(api)
 	t.Cleanup(func() { h.Close(); srv.Close(); db.Close() })
 	w.url, w.db, w.hub = srv.URL, db, h
@@ -899,5 +905,43 @@ func TestShutdownClosesSocketsAndLeavesOneFile(t *testing.T) {
 	}
 	if files, _ := filepath.Glob(filepath.Join(w.dir, "*")); len(files) != 1 {
 		t.Errorf("after shutdown the data directory holds %v, want only heirloom.db", files)
+	}
+}
+
+// The app is served under everything the API does not claim, and takes nothing from it.
+func TestAppAndAPIShareTheListener(t *testing.T) {
+	w := start(t)
+	get := func(path string) (*http.Response, string) {
+		t.Helper()
+		res, err := http.Get(w.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res, string(body)
+	}
+	if res, body := get("/"); res.StatusCode != 200 || !strings.Contains(body, "<title>heirloom</title>") || res.Header.Get("Content-Security-Policy") != web.CSP {
+		t.Errorf("/ = %d %q with CSP %q, want the app's index.html under its policy", res.StatusCode, body, res.Header.Get("Content-Security-Policy"))
+	}
+	// /healthz is still the health check, byte for byte, and not a page of the app.
+	if res, body := get("/healthz"); res.StatusCode != 200 || body != `{"ok":true,"version":"dev","sqlite":"test"}` || res.Header.Get("Content-Security-Policy") != "" {
+		t.Errorf("/healthz = %d %s", res.StatusCode, body)
+	}
+	// /api/login still reaches the accounts, and still answers any origin.
+	var e session
+	status, header := w.post("/api/login", creds{"username": "nobody", "password": password, "device": phone}, &e)
+	if status != 401 || e.Error != "credentials" || header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Errorf("/api/login = %d %q, Allow-Origin %q; want 401 credentials for any origin", status, e.Error, header.Get("Access-Control-Allow-Origin"))
+	}
+	// A path nobody has is a 404, not the app: an API typo must not come back as HTML with a 200.
+	for _, path := range []string{"/focus", "/api/nothing", "/healthz/x"} {
+		if res, body := get(path); res.StatusCode != 404 || strings.Contains(body, "<title>") {
+			t.Errorf("%s = %d %q, want 404 and not index.html", path, res.StatusCode, body)
+		}
+	}
+	// The app's own pages are for its own origin: no CORS header invites another site to read them.
+	if res, _ := get("/"); res.Header.Get("Access-Control-Allow-Origin") != "" {
+		t.Error("the app's page carries a CORS header")
 	}
 }

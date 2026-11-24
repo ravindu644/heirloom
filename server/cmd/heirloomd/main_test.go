@@ -8,7 +8,7 @@ import (
 )
 
 func TestHealthz(t *testing.T) {
-	h, _ := newAPI(nil, time.Now, "3.51.3")
+	h, _ := newAPI(nil, time.Now, "3.51.3", http.NotFoundHandler())
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))

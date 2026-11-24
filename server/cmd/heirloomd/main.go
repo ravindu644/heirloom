@@ -16,6 +16,7 @@ import (
 
 	"heirloom/server/auth"
 	"heirloom/server/store"
+	"heirloom/server/web"
 )
 
 // Set by the Makefile with -X main.version=...
@@ -64,7 +65,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("start: %w", err) // net's error already names the address
 	}
-	api, sockets := newAPI(db, time.Now, sqliteVersion)
+	app, err := web.App()
+	if err != nil {
+		return err
+	}
+	api, sockets := newAPI(db, time.Now, sqliteVersion, app)
 	// Without these one idle client can hold a connection, and a megabyte of body, forever.
 	// A socket is not cut by them: the deadlines are lifted when it takes the connection over.
 	srv := &http.Server{Handler: api, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
