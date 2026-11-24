@@ -40,6 +40,12 @@ async function start() {
   render(<App engine={engine} focus={asking} />, root);
 }
 
+// The built app in a browser keeps itself for a time with no connection (vite.config.ts writes
+// the worker). Not under `make dev`, and not in the phone app, which carries its own files.
+if (import.meta.env.PROD && !import.meta.env.VITE_SERVER_URL && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('/sw.js');
+}
+
 // One tab at a time. Two tabs of one browser share the device id and the database, and would
 // each stamp edits from their own copy of the clock. The first tab holds this lock for as long
 // as it lives; a second shows where heirloom is and takes over when the first closes.

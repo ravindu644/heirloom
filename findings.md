@@ -6,12 +6,12 @@ when it is done.
 ## From section 0
 - [any] The ack's `from` rule is exercised over POST only: over the socket this server always sends other devices' cells before the ack. A server test that orders them the other way would cover it.
 - [any] `core/hlc.ts` `stamp()` trusts its caller for a whole-millisecond `now`. A floor inside it would guard the one place stamps are made.
-- [2] Chromium's offline emulation may leave an open WebSocket alive. The first sync e2e asserts the socket drops; the fix, if needed, goes in `Device.setOffline` in `tests/e2e/devices.ts`.
-- [2] The browser path of the API (the CORS preflight) is only exercised once `main.tsx` starts the engine; cover it in the first timer e2e.
 - [9] Signing out offline with nothing unsent forgets the token locally but the server still holds it. Harmless (nobody has it), but it never expires.
 - [any] Five wrong sign-ins lock a username for 15 minutes for everyone, the owner included (protocol section 10). Anyone who knows a username can do it. Accepted on an invite-only server among friends.
 - [9] The server reads no frames during catch-up, so a pong can be late by the length of a catch-up. Over a slow link with years of cells the device may declare the socket dead and reconnect; it still makes progress each time. Measure on the S10 with a large account.
 - [9] argon2id's peak memory (19 MiB a hash) was measured on the laptop only (32 MB RSS during sign-ins). Measure on the S10.
+- [8] Lengths under a minute read as zero ("Start 0 min break", "0 minutes today."). The schema allows down to 1 s for tests; the settings screen should offer whole minutes only.
+- [9] The service worker makes the page open offline; a web manifest and icons (install as an app) and Web Push come with section 9. They need `manifest-src`, `img-src` in the server's CSP, whose test fails on any change so each gets a reason.
 - [9] After a restore every held cell is re-queued; if the server then refuses that push for the device's clock, the restamp gives all of them new stamps from this device, and a stale value could beat another device's newer one. Narrow the restamp to cells this device made (stamp ends in its id).
 - [9] Before the tunnel opens the server to the internet: a flood of sign-ins keeps the hashing line of 8 full (real sign-ins wait; signed-in devices are fine), `POST /api/sync` reads up to 1 MB before it can check the token with no cap on how many at once, and nothing caps open connections. A per-client limit behind the tunnel means trusting `CF-Connecting-IP`; decide the caps with the memory measured on the S10.
 - [9] `heirloomd -invite` with a wrong `-data` makes a new database and prints a code the running server does not know.
