@@ -5,11 +5,13 @@ import './tokens.css';
 import './base.css';
 import type { Engine } from '../sync/engine.ts';
 import type { Focus } from '../sync/focus.ts';
+import type { Today } from '../sync/today.ts';
 import css from './app.module.css';
 import { FocusScreen } from './focus/focus.tsx';
 import { Brand } from './kit/brand.tsx';
 import { Button } from './kit/button.tsx';
 import { SignIn } from './signin.tsx';
+import { TodayScreen } from './today/today.tsx';
 import * as s from './strings.ts';
 
 const SCREENS = ['focus', 'today', 'progress', 'habits', 'room'] as const;
@@ -40,7 +42,7 @@ export function Elsewhere() {
   );
 }
 
-export function App({ engine, focus }: { engine: Engine; focus: Focus }) {
+export function App({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
   const screen = useScreen();
   const account = engine.account.value;
   const sync = engine.sync.value;
@@ -79,7 +81,9 @@ export function App({ engine, focus }: { engine: Engine; focus: Focus }) {
       <main class={css.main}>
         <div class={css.canvas}>
           {screen === 'focus' ? (
-            <FocusScreen engine={engine} focus={focus} />
+            <FocusScreen engine={engine} focus={focus} today={today} />
+          ) : screen === 'today' ? (
+            <TodayScreen focus={focus} today={today} />
           ) : (
             <div class={css.later}>
               <h1>{s.nav[screen]}</h1>

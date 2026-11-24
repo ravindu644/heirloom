@@ -1,0 +1,82 @@
+/* One column that cannot be pushed wider than the screen by a long title. */
+.today { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); min-height: 100%; }
+
+.head { display: flex; align-items: baseline; gap: var(--space-md); }
+.head h1 { font: var(--type-title); }
+.head p { color: var(--muted); }
+
+/* The day target: a bar of as many segments as laps, and its words. */
+.target { display: grid; gap: var(--space-xs); }
+.target p { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); font: var(--type-label); color: var(--muted); }
+.targeting { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
+
+.moves { display: flex; gap: var(--space-xs); }
+.moves button:disabled { visibility: hidden; }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+.now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+.now > button, .then > button { justify-self: start; }
+
+.add input {
+  width: 100%;
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.add input::placeholder { color: var(--muted); opacity: 1; }
+.add input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+
+/* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--ground);
+}
+.bar > i { flex: none; width: var(--space-sm); height: var(--space-sm); border-radius: var(--radius-full); background: var(--you); }
+.bar > i.rest { background: var(--rest); }
+.bar a { display: flex; flex: 1; align-items: center; gap: var(--space-md); min-width: 0; min-height: var(--layout-touch); }
+.bar b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+.bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sect { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); font: var(--type-label); color: var(--muted); }
+.sect span { font-weight: inherit; }
+.rows { display: grid; gap: var(--space-sm); }
+
+.empty { max-width: 60ch; color: var(--muted); }
+
+/* What the last tap did, stuck to the bottom of the scroll so it is seen wherever the list is. */
+.said {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: calc(var(--layout-touch) + var(--space-md));
+  margin-top: auto;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--ground);
+}
+.said span { overflow-wrap: anywhere; }
+
+.binNote { color: var(--muted); }
+
+@media (min-width: 720px) {
+  .today { gap: var(--layout-gap); max-width: 80ch; }
+  .cols { gap: var(--layout-gap); }
+  .target p { justify-content: flex-start; }
+}
+
+/* Laptop: what is on now beside what is for later and what is done. */
+@media (min-width: 1280px) {
+  .today { max-width: none; }
+  .cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}

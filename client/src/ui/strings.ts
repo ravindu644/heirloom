@@ -5,7 +5,7 @@
 const MIN = 60000;
 const mins = (ms: number) => Math.round(ms / MIN);
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
-const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+export const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const two = (n: number) => String(n).padStart(2, '0');
 
 /** The timer's face: "18:42". Rounded up, so it reads 00:00 at the bell and not a second before. */
@@ -33,6 +33,19 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const ordinal = (n: number) => `${n}${n % 100 > 10 && n % 100 < 14 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 
 /** The ghost's day as people say it: "yesterday", "Monday", "last Tuesday", "Tuesday the 3rd". Days are `2026-11-24`. */
+/** A day to come, as people say it: "tomorrow", "on Thursday", "on Thursday the 3rd". */
+function comingDay(day: string, today: string): string {
+  const then = new Date(day);
+  const ahead = Math.round((then.getTime() - Date.parse(today)) / (24 * 60 * MIN));
+  const name = WEEKDAYS[then.getUTCDay()]!;
+  if (ahead === 1) return 'tomorrow';
+  return ahead < 7 ? `on ${name}` : `on ${name} the ${ordinal(then.getUTCDate())}`;
+}
+
+// Days are `2026-11-24`, which a Date reads as UTC midnight: said in UTC, the day never slips.
+const dated = (day: string, options: Intl.DateTimeFormatOptions) =>
+  new Date(day).toLocaleDateString('en-GB', { ...options, timeZone: 'UTC' }).replace(',', '');
+
 export function pastDay(day: string, today: string): string {
   const then = new Date(day);
   const ago = Math.round((Date.parse(today) - then.getTime()) / (24 * 60 * MIN));
@@ -55,7 +68,6 @@ export const nav = {
 
 // Screens that later sections build. Each says what will live there and that it does not yet.
 export const later = {
-  today: 'The tasks for the day, and how many laps each one gets. Not built yet. The timer runs without them.',
   progress: 'Your year of focus, and this week against last week. Not built yet. Every lap you run now is kept for it.',
   habits: 'The things you do every day, with one tap to check in. Not built yet.',
   room: 'The friends you study beside, and who is focusing now. Not built yet.',
@@ -97,6 +109,12 @@ export const focus = {
   setAsideDone: 'Set aside. It stays in your timeline and counts nowhere.',
   undo: 'Undo',
 
+  // The line over the digits when the lap is for a task. The lap in progress is counted.
+  onTask: (lap: number, estimate: number | null) => (estimate === null ? `lap ${lap} on this task` : `lap ${lap} of ${estimate} on this task`),
+  // Starting must not need planning: the quiet way past the task that is next.
+  startFree: 'Start without a task',
+  upNext: 'Up next',
+
   // What a screen reader hears, once a minute.
   left: (ms: number) => (ms > MIN ? `${Math.ceil(ms / MIN)} minutes left` : ms > 0 ? 'Under a minute left' : 'Time is up'),
   nextLength: (ms: number) => `${length(ms)}, not started`,
@@ -136,6 +154,9 @@ export const result = {
   set: 'Four laps. A full set!',
   laps: (n: number) => (n <= 1 ? 'First lap of the day.' : `${n} laps today.`),
   take: (ms: number) => (mins(ms) === 5 ? 'Take five.' : `Take ${length(ms)}.`),
+  // A short title is named; a long one would bury the count.
+  task: (title: string, run: number, estimate: number | null) =>
+    `${title.length > 28 ? 'This task' : title} is at ${estimate === null ? plural(run, 'lap', 'laps') : `${run} of ${estimate}`}.`,
 };
 
 /** People are told where their laps are: "this phone", not "this device". A finger means a phone. */
@@ -205,4 +226,116 @@ export const account = {
       // Storage is refusing writes and edits are unsent: another account now would lose them.
       unsaved: 'Not yet. Your last changes could not be saved here, and signing in now would lose them. Try again in a moment.',
     })[code] ?? 'The server tripped over that. Nothing was stored. Try again.',
+};
+
+const laps = (n: number) => plural(n, 'lap', 'laps');
+
+export const today = {
+  title: 'Today',
+  /** "Tuesday 24 November". */
+  date: (day: string) => dated(day, { weekday: 'long', day: 'numeric', month: 'long' }),
+
+  done: 'Done',
+  planned: 'Planned, left',
+  laps,
+
+  target: 'Day target',
+  targetNone: 'No target for today.',
+  targetSet: 'Set a target',
+  targetAt: (done: number, target: number) => `${done} of ${laps(target)} today`,
+  targetChange: 'Change',
+  targetKeep: 'Keep it',
+  targetClear: 'No target',
+  targetText: (n: number) => laps(n),
+  targetLess: 'One lap less',
+  targetMore: 'One lap more',
+
+  add: 'Add a task',
+  addHint: 'Add a task. End with ~3 for three laps.',
+  added: (title: string, estimate: number | null) => (estimate === null ? `Added: ${title}.` : `Added: ${title}, ${laps(estimate)}.`),
+
+  // The bar of the lap in progress.
+  free: 'A lap for nothing in particular',
+  lapDone: (n: number) => `Lap ${n} of 4, done`,
+  toFocus: 'Open Focus',
+
+  next: 'Next',
+  start: 'Start',
+  later: 'Later today',
+  laterCount: (tasks: number, left: number) => `${plural(tasks, 'task', 'tasks')}, ${laps(left)}`,
+  order: 'Change the order',
+  orderKeep: 'Keep this order',
+  up: 'Up',
+  down: 'Down',
+  upLabel: (title: string) => `Move up: ${title}`,
+  downLabel: (title: string) => `Move down: ${title}`,
+  upcoming: 'Upcoming',
+  doneToday: 'Done',
+
+  empty: 'Nothing on today yet. Add the first thing to work on, and guess its laps.',
+  allDone: 'Everything on today is done.',
+
+  of: (estimate: number | null) => (estimate === null ? '' : ` of ${estimate}`),
+  check: (title: string) => `Done: ${title}`,
+  /** A date beside a task: "yesterday", "tomorrow", "Mon 23 Nov". A past one is the plain date and no more. */
+  due: (day: string, today: string) => {
+    const days = Math.round((Date.parse(day) - Date.parse(today)) / (24 * 60 * MIN));
+    return days === 1 ? 'tomorrow' : days === -1 ? 'yesterday' : dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
+  },
+
+  markedDone: (title: string) => `Done: ${title}.`,
+  comesBack: (title: string, day: string, today: string) => `Done: ${title}. It comes back ${comingDay(day, today)}.`,
+  removed: (title: string) => `Deleted: ${title}. It keeps for 30 days.`,
+  undo: 'Undo',
+
+  bin: (n: number) => `Recently deleted, ${n}`,
+  binTitle: 'Recently deleted',
+  binNote: 'A deleted task keeps for 30 days, then it is gone for good.',
+  restore: 'Restore',
+};
+
+export const task = {
+  sheet: 'Task',
+  close: 'Close',
+  title: 'Title',
+  count: (run: number, estimate: number | null) => (estimate === null ? `${laps(run)} run` : `${run} of ${laps(estimate)} run`),
+
+  project: 'Project',
+  noProject: 'None',
+  newProject: 'New project',
+  projectName: 'Its name',
+  projectSquare: 'Its square',
+  addProject: 'Add project',
+  // The five squares, named for a screen reader.
+  colors: { you: 'Tomato', rest: 'Green', ink: 'Ink', ghost: 'Grey', 'heat-2': 'Rose' },
+
+  estimate: 'Estimate',
+  estimateText: (n: number) => (n === 0 ? 'None' : laps(n)),
+  less: 'One lap less',
+  more: 'One lap more',
+  // PRODUCT: a gentle nudge over 7. A fact, a reason, and one thing to do about it.
+  nudge: (n: number) => `${n} laps is a lot to hold in one task. Break it down and each piece is easier to start.`,
+  nudgeGo: 'Add a subtask',
+
+  due: 'Due',
+  repeat: 'Repeats',
+  once: 'No',
+  everyDay: 'Every day',
+  someDays: 'On chosen days',
+  // Monday first, as the rule counts them.
+  weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  when: 'When in the day',
+  whenHint: 'after dinner',
+  notes: 'Notes',
+
+  subtasks: 'Subtasks',
+  subtaskAdd: 'Add a subtask',
+  subtaskHint: 'A smaller piece of it',
+  subtaskTitle: 'Subtask',
+  subtaskCheck: (title: string) => `Done: ${title}`,
+  remove: 'Remove',
+
+  done: 'Mark done',
+  notDone: 'Not done after all',
+  delete: 'Delete',
 };

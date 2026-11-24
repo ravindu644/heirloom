@@ -1,0 +1,44 @@
+/* Phone: from the bottom, as wide as the screen. The one shadow, and a line so it has an edge in
+   the dark, where a shadow cannot be seen. */
+.sheet {
+  width: 100%;
+  max-width: 100%;
+  max-height: 90dvh;
+  margin: auto 0 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+  --track: var(--raised);
+  --row: var(--raised);
+  --row-track: var(--line);
+}
+.sheet[open] { animation: rise var(--motion-sheet) var(--motion-ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(var(--space-lg)); } }
+/* The page behind steps back into the ground: lighter in light, darker in dark. */
+.sheet::backdrop { background: color-mix(in srgb, var(--ground), transparent calc(var(--state-press) * 2)); }
+
+.inside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--layout-gap);
+  padding: var(--space-sm) var(--layout-margin) calc(var(--layout-gap) + env(safe-area-inset-bottom));
+}
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
+.head h2 { font: var(--type-label); color: var(--muted); outline: none; }
+
+@media (min-width: 720px) {
+  .sheet {
+    width: calc(100% - 2 * var(--layout-gutter));
+    max-width: 64ch;
+    max-height: 85dvh;
+    margin: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+  }
+  .inside { padding: var(--space-md) var(--layout-gap) var(--layout-gap); }
+}

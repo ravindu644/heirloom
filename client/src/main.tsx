@@ -10,7 +10,7 @@ const root = document.getElementById('app')!;
 
 async function start() {
   // The phone app is another origin, built knowing its server. In a browser the server is the page's own.
-  const { engine, focus } = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
+  const { engine, focus, today } = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
   // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
   const notifier = await startPlatform({ ring: ring.bellChannel, countdown: ring.countdownChannel });
 
@@ -38,7 +38,7 @@ async function start() {
     skipBreak: (task) => (void notifier.allow(), focus.skipBreak(task)),
   };
 
-  render(<App engine={engine} focus={asking} />, root);
+  render(<App engine={engine} focus={asking} today={today} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

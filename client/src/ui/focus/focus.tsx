@@ -4,44 +4,27 @@ import type { TimerState, TimerView } from '../../core/timer.ts';
 import type { Engine } from '../../sync/engine.ts';
 import { EXTEND_MS } from '../../sync/focus.ts';
 import type { Focus, Race as RaceNow } from '../../sync/focus.ts';
+import type { TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
 import { LapBar } from '../kit/lapbar.tsx';
 import { Panel } from '../kit/panel.tsx';
 import { Race, SplitChip } from '../kit/race.tsx';
 import * as s from '../strings.ts';
+import { useTick } from '../tick.ts';
 import css from './focus.module.css';
 
 // A bell this fresh was seen as it happened. Anything older is news from before the screen opened.
 const LIVE_MS = 2000;
 
-// Draws again exactly when the shown second changes, so two devices side by side turn over
-// together. With nothing counting down only the ghost moves, and half a minute is often enough.
-function useTick(focus: Focus) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const v = focus.view();
-    const counting = v.ends_at !== null && !v.over;
-    const timer = setTimeout(() => tick((n) => n + 1), counting ? v.left_ms % 1000 || 1000 : 30000);
-    return () => clearTimeout(timer);
-  });
-  useEffect(() => {
-    // A hidden tab's timers are throttled; be right the moment someone looks again.
-    const look = () => tick((n) => n + 1);
-    document.addEventListener('visibilitychange', look);
-    return () => document.removeEventListener('visibilitychange', look);
-  }, []);
-  return () => tick((n) => n + 1);
-}
-
-const today = (now: number) => localDay(now, -new Date(now).getTimezoneOffset());
+const dayOf = (now: number) => localDay(now, -new Date(now).getTimezoneOffset());
 
 /** The lane lengths and the split, said the same way in the panel and in the result. */
 function lanes(race: RaceNow, workMs: number, now: number) {
   // The lane is the ghost's whole day, so the empty part is what past you still went on to do.
   // With no ghost it is one set of four.
   const scale = Math.max(race.ghost?.total_ms ?? 4 * workMs, race.you_ms, 1);
-  const day = race.ghost && s.pastDay(race.ghost.day, today(now));
+  const day = race.ghost && s.pastDay(race.ghost.day, dayOf(now));
   const split = race.split_ms ?? 0;
   const text = s.race.split(split);
   return {
@@ -78,7 +61,7 @@ function RacePanel({ race, inLap, left, workMs, now }: { race: RaceNow; inLap: b
   );
 }
 
-export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus }) {
+export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
   const redraw = useTick(focus);
   const state: TimerState = focus.state.value;
   const lengths = focus.lengths.value;
@@ -95,6 +78,12 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
   const lap = state.set_index + 1;
   const nextLap = view.next.phase === 'work' ? view.next.set_index + 1 : (lap % 4) + 1;
   const set = result && lap === 4;
+
+  // The task this lap is for, and the one the next lap will be for. Starting needs no task: with
+  // none next, a lap is for nothing in particular.
+  const tasks = [today.running.value, today.next.value, ...today.later.value, ...today.done.value];
+  const lapTask = (state.task && tasks.find((task) => task?.id === state.task)) || null;
+  const nextTask = today.next.value;
 
   // The moment plays only for a bell that went while this screen was showing the run.
   const watched = useRef<string | null>(null);
@@ -185,7 +174,8 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
               </>
             )}
             <span class={css.words}>
-              {s.result.laps(focus.lapsToday())} {s.result.take(breakMs)}
+              {s.result.laps(focus.lapsToday())} {lapTask && `${s.result.task(lapTask.title, lapTask.laps, lapTask.estimate)} `}
+              {s.result.take(breakMs)}
             </span>
           </p>
         </div>
@@ -194,7 +184,7 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
             <Button kind="primary" onClick={() => focus.start()}>
               {s.focus.startBreak(breakMs)}
             </Button>
-            <Button kind="text" onClick={() => focus.skipBreak()}>
+            <Button kind="text" onClick={() => focus.skipBreak(nextTask?.id)}>
               {s.focus.skipBreak}
             </Button>
           </div>
@@ -203,8 +193,12 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
     );
   }
 
-  const taskRow = state.task ? engine.rows('task').value.get(state.task) : undefined;
-  const task = typeof taskRow?.title === 'string' ? taskRow.title : '';
+  // Ready, the line over the digits names the task a tap would start; in a lap, the task it is on.
+  // A lap on a task that is not on today's list still has its title, from the row itself.
+  const named = ready ? nextTask : state.phase === 'work' ? lapTask : null;
+  const row = !named && !ready && state.task ? engine.rows('task').value.get(state.task) : undefined;
+  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : '');
+  const upNext = [nextTask, ...today.later.value].filter((task): task is TaskView => !!task && !task.running && task !== named).slice(0, 3);
   const shown = ready ? lengths.work_ms : view.left_ms;
   // The digits are for eyes. A screen reader gets a sentence that changes once a minute.
   const heard = ready ? s.focus.nextLength(lengths.work_ms) : s.focus.left(view.left_ms);
@@ -218,10 +212,23 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
           <LapBar done={done} share={share} />
         </div>
         <div class={css.face}>
-          {task && !ready && (
-            <p class={css.task} title={task}>
-              {task}
-            </p>
+          {title && (
+            <div class={css.task}>
+              {named && (
+                <p>
+                  {named.project && (
+                    <span>
+                      <i style={`background:var(--${named.project.color})`} />
+                      {named.project.name}
+                    </span>
+                  )}
+                  {s.focus.onTask(named.laps + 1, named.estimate)}
+                </p>
+              )}
+              <p class={css.title} title={title}>
+                {title}
+              </p>
+            </div>
           )}
           <div class={cx(css.digits, !ready && (view.paused ? css.held : isBreak && css.resting))} aria-hidden="true">
             {s.clock(shown)}
@@ -247,11 +254,28 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
       </div>
       <div class={css.rail}>
         <RacePanel race={race} inLap={state.phase === 'work' && !ready} left={view.left_ms} workMs={lengths.work_ms} now={now} />
+        {upNext.length > 0 && (
+          <div class={css.upnext}>
+            <Panel title={s.focus.upNext}>
+              <ul>
+                {upNext.map((task) => (
+                  <li key={task.id}>
+                    <span>{task.title}</span>
+                    <b>
+                      {task.laps}
+                      {s.today.of(task.estimate)}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          </div>
+        )}
       </div>
       <div class={css.actions}>
         <div class={css.main}>
           {ready ? (
-            <Button kind="primary" onClick={() => focus.start()}>
+            <Button kind="primary" onClick={() => focus.start(nextTask?.id)}>
               {s.focus.startLap(nextLap)}
             </Button>
           ) : view.paused ? (
@@ -259,7 +283,7 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
               {s.focus.resume}
             </Button>
           ) : isBreak ? (
-            <Button onClick={() => focus.skipBreak()}>{s.focus.startLapNow(nextLap)}</Button>
+            <Button onClick={() => focus.skipBreak(nextTask?.id)}>{s.focus.startLapNow(nextLap)}</Button>
           ) : (
             <Button onClick={() => focus.pause()}>{s.focus.pause}</Button>
           )}
@@ -270,6 +294,11 @@ export function FocusScreen({ engine, focus }: { engine: Engine; focus: Focus })
           )}
         </div>
         <div class={css.quiet}>
+          {ready && nextTask && (
+            <Button kind="small" onClick={() => focus.start(null)}>
+              {s.focus.startFree}
+            </Button>
+          )}
           {!ready && !view.paused && state.phase === 'work' && (
             <Button kind="small" onClick={() => focus.extend()}>
               {s.focus.extend(EXTEND_MS)}

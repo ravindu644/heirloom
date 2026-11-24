@@ -22,15 +22,29 @@
 
 .clock { display: flex; flex: 1; flex-direction: column; }
 .face { display: flex; flex: 1; flex-direction: column; justify-content: center; padding-top: var(--layout-gap); }
-.task {
+/* The task the lap is for: its project and which lap of it this is, then its title. */
+.task { display: grid; gap: var(--space-xs); margin-bottom: var(--space-md); }
+.task p:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
+.task span { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); }
+.task i { width: var(--layout-lane); height: var(--layout-lane); }
+.title {
   display: -webkit-box;
-  margin-bottom: var(--space-md);
   overflow: hidden;
   font: var(--type-title);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+.rail { display: grid; align-content: start; gap: var(--layout-gap); }
+/* On the phone the next task is named over the digits and Today is one tap away; the room goes
+   to the digits. */
+.upnext { display: none; }
+.upnext ul { display: grid; padding: 0; list-style: none; }
+.upnext li { display: flex; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
+.upnext li + li { border-top: 1px solid var(--line); }
+.upnext li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upnext b { flex: none; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); line-height: inherit; color: var(--muted); }
 /* The timer never animates: the digits change. */
 .digits {
   margin-left: calc(var(--space-xs) * -1);
@@ -78,6 +92,7 @@
 @media (min-width: 720px) {
   .focus { min-height: 0; max-width: 80ch; }
   .actions { position: static; }
+  .upnext { display: block; }
   .clock, .face, .told { flex: none; }
   .face { padding-top: var(--space-xl); }
   .actions { flex-direction: column; }

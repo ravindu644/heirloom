@@ -1,0 +1,32 @@
+.check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--layout-touch);
+  height: var(--layout-touch);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.check i {
+  display: grid;
+  place-items: center;
+  width: calc(var(--space-md) + var(--space-xs));
+  height: calc(var(--space-md) + var(--space-xs));
+  border: 2px solid var(--muted);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--motion-press) var(--motion-ease), border-color var(--motion-press) var(--motion-ease);
+}
+.check:hover i { border-color: var(--ink); }
+.check[aria-checked="true"] i { border-color: var(--ink); background: var(--ink); }
+/* The tick: two sides of a small box, turned. */
+.check[aria-checked="true"] i::after {
+  content: "";
+  width: var(--space-xs);
+  height: var(--space-sm);
+  margin-top: calc(var(--space-xs) / -2);
+  border: solid var(--surface);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}

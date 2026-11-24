@@ -1,0 +1,63 @@
+.group { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); min-width: 0; padding: 0; border: 0; }
+.group legend { padding: 0; margin-bottom: var(--space-xs); font: var(--type-label); color: var(--muted); }
+
+/* One of several, or several of seven: a row of buttons, the chosen ones in ink. */
+.choices { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: none;
+  font: var(--type-body);
+  cursor: pointer;
+  transition: background-color var(--motion-press) var(--motion-ease), border-color var(--motion-press) var(--motion-ease);
+}
+.choice:hover { border-color: var(--ghost); }
+.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); font: var(--type-body-strong); line-height: inherit; }
+.choice i { width: var(--layout-lane); height: var(--layout-lane); }
+.weekday { min-width: var(--layout-touch); padding: 0; justify-content: center; }
+
+.making { display: grid; gap: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--raised); }
+.squares { display: flex; gap: var(--space-xs); }
+.squares button {
+  display: grid;
+  place-items: center;
+  width: var(--layout-touch);
+  height: var(--layout-touch);
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.squares button[aria-checked="true"] { border-color: var(--ink); }
+.squares i { width: var(--space-md); height: var(--space-md); }
+
+.line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); font: var(--type-label); color: var(--muted); }
+.nudge { color: var(--ink); text-wrap: pretty; }
+/* A full target for a thumb that takes no more room than the words beside it. */
+.nudge button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
+
+.pair { display: grid; gap: var(--space-md); }
+
+.sub { display: flex; align-items: center; gap: var(--space-sm); }
+.sub input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.sub input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+
+.ends { display: flex; gap: var(--space-sm); }
+
+@media (min-width: 720px) {
+  .pair { grid-template-columns: 1fr 1fr; }
+}

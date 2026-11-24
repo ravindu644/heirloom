@@ -1,0 +1,8 @@
+.stepper { display: inline-flex; align-items: center; gap: var(--space-sm); }
+.stepper button { min-width: var(--layout-touch); padding: 0; }
+.stepper output {
+  min-width: 9ch;
+  font: var(--type-figure-md);
+  font-feature-settings: var(--feature-figure-md);
+  text-align: center;
+}

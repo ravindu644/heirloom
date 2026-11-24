@@ -1,0 +1,10 @@
+.squares { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs); }
+.squares i { position: relative; width: var(--layout-lane); height: var(--layout-lane); overflow: hidden; background: var(--track, var(--line)); }
+.squares i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--you);
+  transform: scaleX(var(--share));
+  transform-origin: left;
+}

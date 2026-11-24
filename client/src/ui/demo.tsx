@@ -10,7 +10,10 @@ import type { Phase, TimerState } from '../core/timer.ts';
 import type { AccountResult, Engine, Row, SyncState } from '../sync/engine.ts';
 import { EXTEND_MS } from '../sync/focus.ts';
 import type { Focus } from '../sync/focus.ts';
+import type { Today } from '../sync/today.ts';
 import { App, Elsewhere } from './app.tsx';
+import { DAY, PROJECTS, demoToday } from './demo-today.ts';
+import type { DemoDay, DemoTask } from './demo-today.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -35,8 +38,12 @@ interface Scene {
   unsaved?: boolean;
   /** The timer was last touched on an earlier day. */
   newDay?: boolean;
-  /** The demo taps the button whose words start like this, once: for what only shows after a tap. */
-  tap?: string;
+  /** The demo taps the buttons whose words, or names, start like these, one after the other: for what only shows after a tap. */
+  tap?: string | string[];
+  /** The day's tasks. Left out, there are none. */
+  day?: DemoDay;
+  /** Opens on Today, not on Focus. */
+  today?: boolean;
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -45,7 +52,89 @@ interface Scene {
 const lap2 = { phase: 'work', lap: 1, left: 18 * MIN + 42000 } as const;
 const tuesday: [number, number] = [150 * MIN, 200 * MIN];
 
+// The day of the Today mockup: five laps done, ten planned and left, last Tuesday at 3h 20m.
+const TASKS: DemoTask[] = [
+  { id: 'kr', title: 'K&R 5.1 to 5.5: pointers and arrays', project: 'c', estimate: 4, squares: [1, 1], due: DAY },
+  { id: 'ex', title: 'Exercise 5-3: strcat with pointers', project: 'c', estimate: 2, due: DAY },
+  { id: 'react', title: 'Thinking in React, steps 1 to 3', project: 'react', estimate: 2, squares: [1], due: DAY },
+  { id: 'ttt', title: 'Tic-tac-toe tutorial: lift state up', project: 'react', estimate: 3, due: DAY },
+  { id: 'nextjs', title: 'Next.js: layouts and pages', project: 'next', estimate: 2, due: DAY },
+  { id: 'maths', title: 'Discrete maths, tutorial sheet 6', project: 'uni', estimate: 2, squares: [1, 1], done: true, due: DAY },
+];
+const day = (tasks: DemoTask[] = TASKS, more: Partial<DemoDay> = {}): DemoDay => ({ tasks, target: 8, done_ms: 125 * MIN, laps: 5, ghost: { total_ms: 200 * MIN, laps: 8 }, ...more });
+const onKr = { ...lap2, task: 'kr' };
+const idleAt2: Scene = { about: '', next: 1, you: 125 * MIN, laps: 5, ghost: tuesday };
+const swap = (id: string, fields: Partial<DemoTask>) => TASKS.map((task) => (task.id === id ? { ...task, ...fields } : task));
+const READING: DemoTask = { id: 'read', title: 'Read one chapter of OSTEP', estimate: 1, due: DAY, when: 'before bed', repeat: { every: 'day' } };
+
+const TODAY: Record<string, Scene> = {
+  'today-empty': { about: 'Today on a first day: nothing yet', next: 0, at: [9, 5], day: { tasks: [] } },
+  today: { ...idleAt2, about: 'Today, the day of the mockup, nothing running', day: day() },
+  'today-running': { about: 'Today with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-paused': { about: 'Today with that lap paused', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-lap-over': { about: 'Today just after the bell: the break is one tap away', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
+  'today-break': { about: 'Today during a short break', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
+  'today-done': { ...idleAt2, about: 'Everything on today done', day: day(TASKS.map((task) => ({ ...task, done: true })), { done_ms: 325 * MIN, laps: 13 }) },
+  'today-over': { about: 'A task past its estimate: 6 of 5, and running', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5, squares: [1, 1, 1, 0.4, 1, 1, 1] })) },
+  'today-long': {
+    ...idleAt2,
+    about: 'The longest title and the longest project name',
+    day: day(swap('kr', { title: LONG_TITLE, project: 'long', when: 'after the lecture, if the lab is free' }), {
+      projects: [...PROJECTS, { id: 'long', name: 'Operating systems: three easy pieces, the reading group', color: 'heat-2' }],
+    }),
+  },
+  'today-carried': {
+    ...idleAt2,
+    about: 'A task carried over from Saturday, and one with a when',
+    day: day([{ id: 'essay', title: 'Essay outline: why C has no strings', project: 'uni', estimate: 3, squares: [1], due: '2026-11-21' }, ...swap('ttt', { when: 'after dinner' })]),
+  },
+  'today-upcoming': {
+    ...idleAt2,
+    about: 'Upcoming tasks, one of them repeating',
+    day: day([
+      ...TASKS,
+      READING,
+      { id: 'quiz', title: 'Discrete maths quiz 4', project: 'uni', estimate: 2, due: '2026-11-25' },
+      { id: 'app', title: 'Next.js: data fetching', project: 'next', estimate: 3, due: '2026-11-27', repeat: { every: 'week', days: 0b0010100 } },
+    ]),
+  },
+  'today-ordering': { ...idleAt2, about: 'Changing the order', day: day(), tap: 'Change the order' },
+  'today-target': { ...idleAt2, about: 'Changing the day target', day: day(), tap: 'Change' },
+  'today-no-target': { ...idleAt2, about: 'No day target set', day: day(TASKS, { target: 0 }) },
+  'today-added': { ...idleAt2, about: 'Just after quick add', day: day(), tap: 'demo:add' },
+  'today-after-done': { ...idleAt2, about: 'Just after marking a task done: Undo', day: day(), tap: 'Done: Exercise 5-3' },
+  'today-after-repeat': { ...idleAt2, about: 'A repeating task done: it says when it comes back', day: day([...TASKS, READING]), tap: 'Done: Read one chapter' },
+  'today-after-delete': { ...idleAt2, about: 'Just after deleting a task: Undo', day: day(), tap: ['Exercise 5-3', 'Delete'] },
+  'today-deleted': {
+    ...idleAt2,
+    about: 'Recently deleted, with Restore',
+    day: day([...TASKS, { id: 'old1', title: 'Install a C compiler', project: 'c', estimate: 1, squares: [1], deleted: true }, { id: 'old2', title: 'Watch a talk about monads', estimate: 2, deleted: true }]),
+    tap: 'Recently deleted',
+  },
+  sheet: { ...idleAt2, about: 'A task open in the sheet', day: day(), tap: 'Exercise 5-3' },
+  'sheet-subtasks': {
+    ...idleAt2,
+    about: 'The sheet with subtasks and notes',
+    day: day([
+      ...swap('ex', { notes: 'The book wants strcat(s, t) to copy t to the end of s. Do it with pointers only, no indexes.' }),
+      { id: 's1', title: 'Write it with array indexes first', parent: 'ex', done: true },
+      { id: 's2', title: 'Rewrite with two pointers', parent: 'ex' },
+      { id: 's3', title: 'Test with an empty string', parent: 'ex' },
+    ]),
+    tap: 'Exercise 5-3',
+  },
+  'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 9 })), tap: 'Exercise 5-3' },
+  'sheet-project': { ...idleAt2, about: 'The sheet making a new project', day: day(), tap: ['Exercise 5-3', 'New project'] },
+  'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 }, when: 'after dinner' })), tap: 'Exercise 5-3' },
+  'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day() },
+  'focus-task': { about: 'Focus with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'focus-break-task': { about: 'Focus on a break, with tasks up next', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
+  'focus-result-task': { about: 'The result naming the task', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { title: 'K&R chapter 5', squares: [1, 1, 1] })) },
+};
+for (const [id, scene] of Object.entries(TODAY)) if (!id.startsWith('focus')) scene.today = true;
+
 const SCENES: Record<string, Scene> = {
+  ...TODAY,
   'signed-out': { about: 'Nobody is signed in', signedOut: true },
   idle: { about: 'The morning, before the first lap', at: [9, 5], next: 0, ghost: [5 * MIN, 200 * MIN] },
   'first-day': { about: 'No ghost yet: lap 1 of the first day', run: { phase: 'work', lap: 0, left: 21 * MIN + 7000 } },
@@ -73,7 +162,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -109,12 +198,17 @@ function stage(scene: Scene): { engine: Engine; focus: Focus } {
   // What the real one does when a run ends: a lap that rang counts, a stop keeps a minute or more.
   const close = (keep: boolean) => {
     if (!lapOpen() || !keep) return;
+    const task = state.value.task;
     if (over()) laps++;
-    if (over() || ran() >= MIN) you += ran();
+    if (over() || ran() >= MIN) {
+      you += ran();
+      if (task) today.credit(task, ran() / state.value.planned_ms);
+    }
   };
-  const begin = (phase: Phase) => {
-    state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: null, planned_ms: LENGTHS[`${phase}_ms`] }, now());
+  const begin = (phase: Phase, task: string | null = null) => {
+    state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: phase === 'work' ? task : null, planned_ms: LENGTHS[`${phase}_ms`] }, now());
   };
+  const today = demoToday(scene.day ?? { tasks: [] }, state, () => ran() / (state.value.planned_ms || 1));
 
   // Ten seconds to take a stop or a set aside back, as the real one gives.
   const undoable = signal(false);
@@ -143,14 +237,14 @@ function stage(scene: Scene): { engine: Engine; focus: Focus } {
       return { you_ms, ghost, split_ms: ghost ? you_ms - ghost.ms : null };
     },
     lapsToday: () => laps + (lapOpen() && over() ? 1 : 0),
-    start() {
+    start(task) {
       const next = view(state.value, now()).next.phase;
       close(true);
-      begin(next);
+      begin(next, task);
     },
-    skipBreak() {
+    skipBreak(task) {
       close(true);
-      begin('work');
+      begin('work', task);
     },
     pause: () => void (state.value = act(state.value, { do: 'pause' }, now())),
     resume: () => void (state.value = act(state.value, { do: 'resume' }, now())),
@@ -204,11 +298,12 @@ function stage(scene: Scene): { engine: Engine; focus: Focus } {
     cells: () => [],
     stop: async () => {},
   };
-  return { engine, focus };
+  return { engine, focus, today };
 }
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
+if (scene?.today && !location.hash) location.hash = '#/today';
 render(
   scene?.elsewhere ? (
     <Elsewhere />
@@ -218,7 +313,7 @@ render(
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>
       {Object.entries(SCENES).map(([id, { about }]) => (
-        <a key={id} href={`?state=${id}`} style="text-decoration: underline">
+        <a key={id} href={`?state=${id}${SCENES[id]?.today ? '#/today' : ''}`} style="text-decoration: underline">
           {id}: {about}
         </a>
       ))}
@@ -227,4 +322,13 @@ render(
   document.getElementById('app')!,
 );
 // After the first paint, as a person would: the screen has settled before anyone can tap.
-if (scene?.tap) setTimeout(() => [...document.querySelectorAll('button')].find((button) => button.textContent?.startsWith(scene.tap!))?.click(), 100);
+[scene?.tap ?? []].flat().forEach((words, i) =>
+  setTimeout(() => {
+    if (words === 'demo:add') {
+      // Typed and entered, as a person would.
+      const field = document.querySelector<HTMLInputElement>('input[name=task]')!;
+      field.value = 'pointers chapter 3 ~4';
+      field.form!.requestSubmit();
+    } else [...document.querySelectorAll('button')].find((button) => (button.textContent || button.ariaLabel)?.startsWith(words))?.click();
+  }, 100 * (i + 1)),
+);
