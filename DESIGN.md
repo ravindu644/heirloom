@@ -178,6 +178,7 @@ layout:
 state:
   hover: 12%
   press: 24%
+  scrim: 48%
 shadow:
   float: 0 12px 40px rgb(18 20 18 / 0.18)
 motion:
@@ -263,6 +264,7 @@ first, the rest after first paint.
 ## Elevation & Depth
 
 Flat. Surfaces step by tone. Only a menu or a sheet floats, with the one shadow (`shadow.float`).
+Behind a sheet the page fades toward the ground (`state.scrim` of ground over it), never to grey or black.
 The completion moment is flat and in the page.
 
 ## Shapes
@@ -305,6 +307,8 @@ Tokens under `motion:`. Short, and only when state changes.
 
 Under `prefers-reduced-motion` every moment shows its final state at once. No animation runs on a
 loop, ever.
+
+An Undo is offered for ten seconds, everywhere, and then goes without a word.
 
 ## The reward moment
 

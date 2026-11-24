@@ -346,7 +346,7 @@ by `order`, then by row id, so two devices that picked the same key still agree.
 
 | List | Rows |
 |---|---|
-| Today | not done, not deleted, no `parent`, and `due` is unset or today or earlier. By order. The first that is not running is "next" |
+| Today | not done, not deleted, no `parent`, and `due` is unset or today or earlier. By order. A task is "running" while the timer is on a lap for it that has not rung (counting or paused). The first that is not running is "next": so when a lap on the top task rings, that task is next again, and the plan's order decides what a new lap is for |
 | Upcoming | the same, with `due` after today. By `due`, then order |
 | Done | `done` falls on today. By when it was done |
 | Recently deleted | `deleted` in the last 30 days. Newest first |
@@ -356,7 +356,8 @@ A subtask shows inside its parent only.
 **Laps on a task.** From the work sessions of that task, oldest first: a `rang` session is one lap
 and one whole square; a `stopped` one is a part square, its running time over its planned length;
 a `void` one is nothing. The lap in progress on the task adds a part square that fills as it runs,
-unless its row is already there. "2 of 4" counts laps; the squares may pass the estimate.
+unless its row is already there; once its bell has gone it is a lap and a whole square, row or no
+row, so the count never trails the day's. "2 of 4" counts laps; the squares may pass the estimate.
 
 **Planned, left.** Over the Today list: the sum of each task's estimate minus its laps, never
 under 0 for a task. A task without an estimate adds nothing.

@@ -1105,6 +1105,41 @@
    }
   },
   {
+   "name": "a lap whose bell has gone is a lap and a whole square, before its row is written",
+   "task": "task-pointers",
+   "now": 1795494600000,
+   "state": {
+    "phase": "work",
+    "run": "run-now",
+    "task": "task-pointers",
+    "started": 1795492800000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1795491000000,
+     "ended": 1795492500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "laps": 2,
+    "squares": [
+     1,
+     1
+    ]
+   }
+  },
+  {
    "name": "a lap on another task, or a break, adds nothing here",
    "task": "task-pointers",
    "now": 1795494600000,
