@@ -258,7 +258,7 @@ WebView is a different origin from the server) and answers the browser's `OPTION
 | 403 | `invite` | The invite is unknown or used |
 | 409 | `taken` | The username exists |
 | 401 | `credentials` | Wrong username or password; the reply does not say which |
-| 429 | `slow_down` | After 5 failed sign-ins for a username inside 15 minutes, every sign-in for it until the 15 minutes pass, right password or not. `Retry-After` carries the seconds |
+| 429 | `slow_down` | After 5 failed sign-ins for a username inside 15 minutes, every sign-in for it until the 15 minutes pass, right password or not. Also when the server has a line of sign-ins waiting (it checks one password at a time): then nothing was wrong and the wait is a second. `Retry-After` carries the seconds, and tells the two apart |
 | 401 | `token` | `logout` or `/api/sync` with a token that is unknown or signed out |
 | 500 | `server` | The server's own fault. Nothing was stored; the device tries again |
 

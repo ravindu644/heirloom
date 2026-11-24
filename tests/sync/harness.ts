@@ -54,6 +54,7 @@ export function network() {
     WebSocket: Sock,
     async fetch(url: string, init: { method: string; headers: Record<string, string>; body: string }) {
       if (!httpUp) throw new TypeError('offline');
+      if (url.includes('/api/rooms/')) frames.push({ dir: 'out', msg: { type: 'request', path: new URL(url).pathname, ...JSON.parse(init.body) } });
       if (url.endsWith('/api/sync')) frames.push({ dir: 'out', msg: { type: 'post', ...JSON.parse(init.body) } });
       const res = await fetch(url, init);
       // The reply was lost on the way back. The server may well have stored the push.
@@ -99,7 +100,7 @@ export const stopAll = () => Promise.all([...running].map((e) => e.stop()));
 /** A device: give it the disk and network of one that stopped, and it is that device after a restart. */
 export async function device(
   server: Remote,
-  opts: { disk?: OpenStore; net?: Network; skew?: { ms: number }; random?: () => number } = {},
+  opts: { disk?: OpenStore; net?: Network; skew?: { ms: number }; random?: () => number; utcOffsetMin?: number } = {},
 ): Promise<Device> {
   const disk = opts.disk ?? memoryStores();
   const net = opts.net ?? network();
@@ -115,6 +116,7 @@ export async function device(
     WebSocket: net.WebSocket,
     fetch: net.fetch,
     openStore: disk,
+    utcOffsetMin: () => opts.utcOffsetMin ?? 0,
   });
   running.add(engine);
   const stop = engine.stop;
@@ -122,9 +124,9 @@ export async function device(
   return { engine, net, disk, skew };
 }
 
-export async function restart(server: Remote, d: Device): Promise<Device> {
+export async function restart(server: Remote, d: Device, opts: { utcOffsetMin?: number } = {}): Promise<Device> {
   await d.engine.stop();
-  return device(server, d);
+  return device(server, { ...d, ...opts });
 }
 
 export const PASSWORD = 'correct horse battery';

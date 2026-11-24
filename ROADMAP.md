@@ -102,8 +102,8 @@ The first thing the user can touch: one timer, live on two screens.
 
 - [ ] [ui] Habits with weekdays and a count; one-tap check-in; undo
 - [ ] [ui] Per-habit heatmap and streak
-- [ ] [android] Habit reminder notifications
-- [ ] [qa] Two devices check in offline; both kept; the day is done
+- [x] [android] Habit reminder notifications
+- [x] [qa] Two devices check in offline; both kept; the day is done
 - [ ] Gate
 
 ## 7. Rooms
@@ -132,7 +132,7 @@ The first thing the user can touch: one timer, live on two screens.
 - [ ] [lead] Exposure: Cloudflare named Tunnel on the user's domain (`cloudflared` on the S10
       container, its RSS measured); WebSocket and the 25 s heartbeat tested through it
 - [ ] [ui] Export and import as JSON
-- [ ] [qa] Measured on the S10: idle RSS, RSS with 20 simulated devices, both under budget
+- [x] [qa] Measured on the S10: idle RSS, RSS with 20 simulated devices, both under budget
 - [ ] Gate (the friend installs it from a link and joins a room)
 
 ## 10. Release 1.0
