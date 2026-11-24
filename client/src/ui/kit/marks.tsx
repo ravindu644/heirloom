@@ -20,8 +20,8 @@ export function Marks({ settings, say, last }: { settings: Settings; say: (mark:
   if (!any) return null;
   return (
     <ul class={css.marks} role="status">
-      {marks.map((mark, i) => (
-        <li key={i}>{say(mark)}</li>
+      {marks.map((mark) => (
+        <li key={mark.key}>{say(mark)}</li>
       ))}
     </ul>
   );

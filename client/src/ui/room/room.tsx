@@ -210,7 +210,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
     );
 
   const now = engine.now();
-  const name = (id: string) => room.members.find((m) => m.id === id);
+  const me = room.members.find((m) => m.you)?.id;
   const scale = Math.max(room.target_ms, room.week_ms, 1);
 
   return (
@@ -252,7 +252,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
 
       <section class={css.members} aria-label={s.room.members}>
         {room.members.map((m) => {
-          const who = m.last?.cheers.flatMap((id) => (name(id)?.you ? s.room.you : (name(id)?.name ?? []))) ?? [];
+          const who = m.last?.cheerers.map((cheerer) => (cheerer.id === me ? s.room.you : cheerer.name)) ?? [];
           return (
             <article key={m.id} class={cx(css.member, m.you && css.you)}>
               <div class={css.who}>

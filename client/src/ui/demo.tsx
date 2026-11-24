@@ -213,11 +213,11 @@ const ROOM_SCENES: Record<string, Scene> = {
 const lapOver = { phase: 'work', lap: 1, left: 0 } as const;
 const MORE: Record<string, Scene> = {
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
-  'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ kind: 'laps', tier: 1 }] },
-  'mark-hundred': { about: 'Lap 100, a best week, and a cheer', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier: 100 }, { kind: 'week', focus_ms: 1075 * MIN, before_ms: 1050 * MIN }], cheered: ['sachi', 'dilan'] },
-  'mark-off': { about: 'The same lap with celebrations off', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier: 100 }], prefs: { celebrate: false } },
-  'mark-estimate': { ...idleAt2, about: 'A task done inside its estimate: its mark on Today', today: true, day: day(), marks: [{ kind: 'estimate', task: 'react', title: 'Thinking in React, steps 1 to 3', estimate: 2, laps: 1 }], tap: 'Done: Thinking in React' },
-  ...Object.fromEntries([4, 25, 250, 500, 1000, 2500].map((tier) => [`mark-${tier}`, { about: `Lap ${tier}`, run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier }] } as Scene])),
+  'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
+  'mark-hundred': { about: 'Lap 100, a best week, and a cheer', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }, { key: 'week-2026-11-23', kind: 'week', focus_ms: 1075 * MIN, before_ms: 1050 * MIN }], cheered: ['sachi', 'dilan'] },
+  'mark-off': { about: 'The same lap with celebrations off', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }], prefs: { celebrate: false } },
+  'mark-estimate': { ...idleAt2, about: 'A task done inside its estimate: its mark on Today', today: true, day: day(), marks: [{ key: 'estimate-react', kind: 'estimate', task: 'react', title: 'Thinking in React, steps 1 to 3', estimate: 2, laps: 1 }], tap: 'Done: Thinking in React' },
+  ...Object.fromEntries([4, 25, 250, 500, 1000, 2500].map((tier) => [`mark-${tier}`, { about: `Lap ${tier}`, run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: `laps-${tier}`, kind: 'laps', tier }] } as Scene])),
 };
 
 const SCENES: Record<string, Scene> = {

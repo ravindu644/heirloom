@@ -13,6 +13,8 @@ import { DAY } from './demo-today.ts';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
+// When the demo's deleted habits went: two days back, so they are gone for good on 22 December.
+const DELETED_AT = Date.parse('2026-11-22T10:00:00');
 
 export interface DemoHabit {
   id: string;
@@ -59,7 +61,7 @@ export function demoHabits(seed: DemoHabit[], week: { now: number; before: numbe
   const view = (habit: DemoHabit): HabitView => {
     const days = habit.days ?? 127;
     const target = habit.target ?? 1;
-    return { id: habit.id, title: habit.title, days, target, remind: habit.remind ?? null, ...habitDays({ days, target }, new Map(Object.entries(habit.counts)), DAY) };
+    return { id: habit.id, title: habit.title, days, target, remind: habit.remind ?? null, deleted: habit.deleted ? DELETED_AT : null, ...habitDays({ days, target }, new Map(Object.entries(habit.counts)), DAY) };
   };
   const bump = (id: string, by: number) => {
     const habit = all.value.find((one) => one.id === id);
@@ -72,6 +74,7 @@ export function demoHabits(seed: DemoHabit[], week: { now: number; before: numbe
   const list = computed(() => all.value.filter((habit) => !habit.archived && !habit.deleted).map(view));
   return {
     list,
+    day: signal(DAY),
     archived: computed(() => all.value.filter((habit) => habit.archived && !habit.deleted).map(view)),
     deleted: computed(() => all.value.filter((habit) => habit.deleted).map(view)),
     today: computed(() => {
@@ -135,7 +138,8 @@ const member = (id: string, name: string, more: Partial<MemberView> = {}): Membe
 
 export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { value: SettingsView }; set(fields: Partial<SettingsView>): boolean }): Rooms {
   const at = now();
-  const lap = (n: number, ago: number, cheers: string[] = []) => ({ run: `run-${n}`, ended: at - ago * MIN, cheers, cheered: cheers.includes('me') });
+  const who = (id: string) => ({ id, name: id === 'me' ? 'ravi' : id });
+  const lap = (n: number, ago: number, cheers: string[] = []) => ({ run: `run-${n}`, ended: at - ago * MIN, cheers, cheered: cheers.includes('me'), cheerers: cheers.map(who) });
   const you = member('me', 'ravi', {
     you: true,
     phase: 'work',
@@ -222,7 +226,7 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
         return { ok: true };
       }),
     cheer: (id, to) =>
-      change(id, (one) => ({ ...one, members: one.members.map((m) => (m.id === to && m.last && !m.you ? { ...m, last: { ...m.last, cheers: [...m.last.cheers, 'me'], cheered: true } } : m)) })),
+      change(id, (one) => ({ ...one, members: one.members.map((m) => (m.id === to && m.last && !m.you ? { ...m, last: { ...m.last, cheers: [...m.last.cheers, 'me'], cheered: true, cheerers: [...m.last.cheerers, who('me')] } } : m)) })),
     setHidden: (rooms_hidden) => void prefs.set({ rooms_hidden }),
     setShareTask: (share_task) => void prefs.set({ share_task }),
   };

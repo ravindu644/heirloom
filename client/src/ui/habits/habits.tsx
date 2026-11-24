@@ -37,7 +37,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   const deleted = habits.deleted.value;
   const today = habits.today.value;
   const week = habits.week();
-  const day = list[0]?.today.day ?? archived[0]?.today.day ?? '';
+  const day = habits.day.value;
 
   const [open, setOpen] = useState<string | null>(null);
   const [ordering, setOrdering] = useState(false);
@@ -97,7 +97,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   return (
     <div class={css.habits}>
       <header class={css.head}>
-        <p>{day ? s.habits.label(day) : s.habits.list}</p>
+        <p>{s.habits.label(day)}</p>
         <h1 id="habits-title" tabIndex={-1}>
           {s.habits.finding(today.done, today.planned, list.length > 0)}
         </h1>
@@ -199,7 +199,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
               <div key={habit.id} class={cx(css.row, css.plain)}>
                 <div class={css.words}>
                   <span class={css.title}>{habit.title}</span>
-                  <span class={css.meta}>{s.habits.plan(habit.days)}</span>
+                  <span class={css.meta}>{[s.habits.plan(habit.days), habit.deleted === null ? '' : s.today.gone(habit.deleted)].filter(Boolean).join(', ')}</span>
                 </div>
                 <div class={css.end}>
                   <Button kind="link" onClick={() => (shelf === 'archived' ? habits.edit(habit.id, { archived: false }) : habits.restore(habit.id))}>
