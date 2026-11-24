@@ -6,6 +6,7 @@
 node_modules/
 dist/
 client/dist/
+client/dist-app/
 server/bin/
 # The app is copied here for go:embed. Only the placeholder is kept, so a fresh clone still builds.
 !server/web/dist/
