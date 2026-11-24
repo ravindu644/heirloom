@@ -1,6 +1,6 @@
 import { effect } from '@preact/signals-core';
 import { render } from 'preact';
-import { webNotifier } from './platform/web.ts';
+import { startPlatform } from './platform/index.ts';
 import { startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
@@ -11,7 +11,8 @@ const root = document.getElementById('app')!;
 async function start() {
   // The phone app is another origin, built knowing its server. In a browser the server is the page's own.
   const { engine, focus } = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
-  const notifier = webNotifier();
+  // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
+  const notifier = await startPlatform({ ring: ring.bellChannel, countdown: ring.countdownChannel });
 
   // The ring is planned whenever the timer changes, on any device. The timer counts in server
   // time and the notifier in this device's own, so the end is moved across by the difference.
@@ -24,8 +25,8 @@ async function start() {
     const lap = state.set_index + 1;
     notifier.plan(
       state.phase === 'work'
-        ? { at, title: ring.lapDone(lap), body: result.take(lap === 4 ? lengths.long_ms : lengths.short_ms) }
-        : { at, title: ring.breakOver, body: ring.lapNext(view.next.set_index + 1) },
+        ? { at, title: ring.lapDone(lap), body: result.take(lap === 4 ? lengths.long_ms : lengths.short_ms), during: ring.lapRunning(lap) }
+        : { at, title: ring.breakOver, body: ring.lapNext(view.next.set_index + 1), during: ring.breakRunning(state.phase === 'long') },
     );
   });
 

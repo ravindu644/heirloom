@@ -6,11 +6,9 @@
 // Chrome does not count it as a chain and throttle it harder, a fresh look whenever the tab comes
 // back into view, and a lateness cut-off. The server's Web Push (section 9) covers the closed tab.
 
+import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
 import { createBell } from './sound.ts';
-
-/** A plan closer than this to now is a phase already ending, such as a tap on finish: no bell. */
-export const MOMENT_MS = 1000;
 /** A ring this late is still worth hearing: past it, the person has moved on. Covers the throttle. */
 export const LATE_MS = 2 * 60_000;
 

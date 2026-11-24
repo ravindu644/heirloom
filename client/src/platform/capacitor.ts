@@ -1,0 +1,145 @@
+// The phone's Notifier: an exact alarm that rings and vibrates with the screen off, and a live
+// countdown in the shade while the phase runs. Both are Android's own work once handed over, so
+// nothing of ours needs to be running when the bell is due.
+//
+// What it cannot do: hear about a timer started on another device while heirloom is closed here.
+// There is no push service in v1; the phone rings for timers it has seen.
+
+import { registerPlugin } from '@capacitor/core';
+import { App } from '@capacitor/app';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
+import { MOMENT_MS } from './notifier.ts';
+import type { Notifier, Ring } from './notifier.ts';
+
+/** The one bell. Planning reuses the id, so a new plan always takes the old one's place. */
+export const RING_ID = 1;
+
+/** The names of the two channels in the phone's notification settings. The words come from the caller. */
+export interface Channels {
+  ring: string;
+  countdown: string;
+}
+
+/** The countdown plugin in android/app (CountdownPlugin.java). */
+export interface Countdown {
+  show(options: { title: string; end: number; channel: string }): Promise<void>;
+  clear(): Promise<void>;
+}
+
+export type Alarms = Pick<
+  LocalNotificationsPlugin,
+  'createChannel' | 'schedule' | 'cancel' | 'checkPermissions' | 'requestPermissions' | 'checkExactNotificationSetting'
+>;
+
+export interface PhoneEnv {
+  alarms: Alarms;
+  countdown: Countdown;
+  now(): number;
+  channels: Channels;
+  /** Where a failed bridge call is reported. Nothing is thrown into the timer's effect. */
+  warn(error: unknown): void;
+}
+
+export function createCapacitorNotifier({ alarms, countdown, now, channels, warn }: PhoneEnv): Notifier {
+  // Anything but a plan's JSON, so the first plan always runs: an alarm left from the app's last
+  // life must be cancelled when the timer it was for has since been stopped.
+  let applied: string | undefined;
+  let current: Ring | null = null;
+  // What Android actually holds, which is less than `applied` while permission is missing.
+  let live = 'null';
+
+  // Bridge calls are async and plans can come in a burst of sync messages. One at a time, in
+  // order, so the last plan is the one left standing.
+  let queue: Promise<unknown> = Promise.all([
+    // Settings fixed at creation: Android keeps a channel's sound and importance once it exists, so
+    // changing these means a new id. The bell is high importance so it shows on the lock screen and
+    // makes its sound; the countdown is low so it never makes one.
+    alarms.createChannel({ id: 'ring', name: channels.ring, importance: 4, visibility: 1, vibration: true }),
+    alarms.createChannel({ id: 'countdown', name: channels.countdown, importance: 2, visibility: 1, vibration: false }),
+  ]).catch(warn);
+  const run = (step: () => Promise<unknown>) => {
+    queue = queue.then(step).catch(warn);
+  };
+
+  // Without both, the plugin would ask for them itself: the notification prompt, or the exact
+  // alarm settings screen. A plan comes from a sync message as often as from a tap, so it never asks.
+  const can = async () =>
+    (await alarms.checkPermissions()).display === 'granted' &&
+    (await alarms.checkExactNotificationSetting()).exact_alarm === 'granted';
+
+  const apply = async (ring: Ring | null) => {
+    await alarms.cancel({ notifications: [{ id: RING_ID }] });
+    live = 'null';
+    if (!ring || !(await can())) return countdown.clear();
+    // Whole ms: the native side reads the end as a long, and a fraction would read as nothing.
+    const at = Math.round(ring.at);
+    await alarms.schedule({
+      notifications: [
+        {
+          id: RING_ID,
+          title: ring.title,
+          body: ring.body,
+          channelId: 'ring',
+          autoCancel: true,
+          // allowWhileIdle is what makes the plugin use setExactAndAllowWhileIdle with RTC_WAKEUP.
+          // Without it the alarm is a plain RTC one, which waits for the screen to come on.
+          schedule: { at: new Date(at), allowWhileIdle: true },
+        },
+      ],
+    });
+    live = JSON.stringify(ring);
+    await (ring.during ? countdown.show({ title: ring.during, end: at, channel: 'countdown' }) : countdown.clear());
+  };
+
+  return {
+    plan(ring) {
+      // A phase that has already ended, or is ending now, rings nowhere.
+      current = ring && ring.at - now() >= MOMENT_MS ? ring : null;
+      const key = JSON.stringify(current);
+      if (key === applied) return;
+      applied = key;
+      const planned = current;
+      run(() => apply(planned));
+    },
+    async allow() {
+      // main.tsx calls this as `void notifier.allow()`: a bridge failure is a no, not an unhandled rejection.
+      const ok = await (async () =>
+        (await alarms.requestPermissions()).display === 'granted' &&
+        (await alarms.checkExactNotificationSetting()).exact_alarm === 'granted')().catch((error) => (warn(error), false));
+      // The start that asked also planned its bell, likely while the prompt was up and nothing
+      // could be scheduled. Once the plans before this have run, set it if it is still missing.
+      if (ok) {
+        run(async () => {
+          const planned = current && current.at - now() >= MOMENT_MS ? current : null;
+          if (JSON.stringify(planned) !== live) await apply(planned);
+        });
+      }
+      return ok;
+    },
+  };
+}
+
+/** The phone's notifier, on the real plugins. */
+export function capacitorNotifier(channels: Channels): Notifier {
+  return createCapacitorNotifier({
+    alarms: LocalNotifications,
+    countdown: registerPlugin<Countdown>('Countdown'),
+    now: () => Date.now(),
+    channels,
+    warn: (error) => console.warn('heirloom: notifier', error),
+  });
+}
+
+/**
+ * The hardware back button. From Focus, the home screen, it leaves the app as Android does at the
+ * root of any app: to the background, still alive, so its socket keeps the timer current a while
+ * longer. Anywhere else it goes back through the hash history, and to Focus when there is none.
+ */
+export function backButton(): void {
+  void App.addListener('backButton', ({ canGoBack }) => {
+    if (['', '#', '#/', '#/focus'].includes(location.hash)) void App.minimizeApp();
+    else if (canGoBack) history.back();
+    else location.hash = '#/focus';
+  });
+}

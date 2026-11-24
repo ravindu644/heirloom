@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 7 has no adaptive icons: the mark on a ground disc, drawn whole. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="@color/ground" android:pathData="M10,54 a44,44 0 1,0 88,0 a44,44 0 1,0 -88,0" />
+    <path android:fillColor="@color/you" android:pathData="M27,54 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0" />
+    <path android:strokeColor="@color/ghost" android:strokeWidth="4" android:pathData="M66.857,44.232 A10,10 0 0,1 71.143,44.232 M74.391,45.578 A10,10 0 0,1 77.422,48.609 M78.768,51.857 A10,10 0 0,1 78.768,56.143 M77.422,59.391 A10,10 0 0,1 74.391,62.422 M71.143,63.768 A10,10 0 0,1 66.857,63.768 M63.609,62.422 A10,10 0 0,1 60.578,59.391 M59.232,56.143 A10,10 0 0,1 59.232,51.857 M60.578,48.609 A10,10 0 0,1 63.609,45.578" />
+</vector>

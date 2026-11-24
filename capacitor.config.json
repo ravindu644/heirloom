@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.ravindu644.heirloom",
+  "appName": "heirloom",
+  "webDir": "client/dist-app",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_heirloom",
+      "iconColor": "#C4321A"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ground">#0E100E</color>
+    <color name="you">#FF6A4D</color>
+    <color name="ghost">#7C827B</color>
+</resources>

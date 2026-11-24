@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From DESIGN.md: ground, you, ghost. values-night holds their dark-* twins. -->
+<resources>
+    <color name="ground">#EEF0EC</color>
+    <color name="you">#C4321A</color>
+    <color name="ghost">#8A9089</color>
+</resources>
