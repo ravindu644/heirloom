@@ -103,7 +103,7 @@ export interface Engine {
    * One request to the server on behalf of whoever is signed in: the token and device are put
    * in. The same time limit and codes as the account calls; `offline` when it cannot be asked.
    */
-  request(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string }>;
+  request(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }>;
   /**
    * A value kept on this device and never sent: what `keep` last put under `name`. By default
    * it belongs to the signed-in account. With `'device'` it belongs to the install, whoever is
@@ -663,7 +663,7 @@ export async function createEngine(env: Env): Promise<Engine> {
       const r = db;
       if (!r) return { ok: false, error: 'offline' };
       const answer = await ask(path, { ...body, token: r.session.token, device: me });
-      return answer.ok ? answer : { ok: false, error: answer.error };
+      return answer;
     },
 
     merge(cells) {

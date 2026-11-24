@@ -25,7 +25,14 @@ export interface MemberView {
   today_laps: number;
   week_ms: number;
   /** Their latest lap that rang today, who cheered it, and whether you have. */
-  last: { run: string; ended: number; cheers: string[]; cheered: boolean } | null;
+  last: {
+    run: string;
+    ended: number;
+    cheers: string[];
+    cheered: boolean;
+    /** Those of `cheers` who are in the room, with their names, in the same order: for saying who cheered. */
+    cheerers: { id: string; name: string }[];
+  } | null;
 }
 
 export interface RoomView {
@@ -42,8 +49,8 @@ export interface RoomView {
   members: MemberView[];
 }
 
-/** `error` is a code from protocol sections 10 and 15, or `offline`. */
-export type RoomResult = { ok: true; room?: string } | { ok: false; error: string };
+/** `error` is a code from protocol sections 10 and 15, or `offline`. With `slow_down`, `retry_after` is the seconds to wait when the server said. */
+export type RoomResult = { ok: true; room?: string } | { ok: false; error: string; retry_after?: number };
 
 export interface Rooms {
   /** The rooms this account is in, as the server last said. Kept while offline, marked by `stale`. */
@@ -150,6 +157,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
       // Only what could be a member: anything else in the list is left out, not tripped over.
       const raw = (Array.isArray(msg.members) ? (msg.members as Record<string, unknown>[]) : []).filter((member) => member !== null && typeof member === 'object');
       const you = text(raw.find((member) => member?.you === true)?.id);
+      const names = new Map(raw.map((member) => [text(member.id), text(member.name)]));
       const members = raw.map((member): MemberView => {
         const id = text(member.id);
         const away = member.away === true;
@@ -175,7 +183,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           today_ms: amount(member.today_ms),
           today_laps: amount(member.today_laps),
           week_ms: amount(member.week_ms),
-          last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you) } : null,
+          last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you), cheerers: cheers.flatMap((cheerer) => (names.has(cheerer) ? [{ id: cheerer, name: names.get(cheerer)! }] : [])) } : null,
         };
       });
       const ranked = msg.ranked === true;

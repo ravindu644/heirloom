@@ -125,8 +125,9 @@ describe('marks', () => {
     assert.deepEqual(s.marks.value, []);
     d.focus.start();
     w.time.advance(LAP);
-    assert.deepEqual(s.marks.value, [{ kind: 'laps', tier: 1 }]);
-    assert.deepEqual(Object.keys(shown(d) ?? {}), ['laps-1']);
+    assert.deepEqual(s.marks.value, [{ key: 'laps-1', kind: 'laps', tier: 1 }]);
+    // The mark carries the very key that is written, so a list of marks can be keyed by it.
+    assert.deepEqual(Object.keys(shown(d) ?? {}), d.settings.marks.peek().map((mark) => mark.key));
     s.seen();
     assert.deepEqual(s.marks.value, []);
     for (const n of [2, 3]) {
@@ -136,7 +137,7 @@ describe('marks', () => {
     }
     d.focus.skipBreak();
     w.time.advance(LAP);
-    assert.deepEqual(s.marks.value, [{ kind: 'laps', tier: 4 }]);
+    assert.deepEqual(s.marks.value, [{ key: 'laps-4', kind: 'laps', tier: 4 }]);
     // Shown and not yet looked at: it stays until seen, and is not added a second time.
     d.today.add('something else changes');
     assert.equal(s.marks.value.length, 1);
@@ -150,7 +151,7 @@ describe('marks', () => {
       for (let n = 0; n < count; n++) theirLap(d, T0 - 3 * DAY + made * HOUR, { task });
     }
     for (const task of [over, none, under!]) d.today.setDone(task!, true);
-    assert.deepEqual(s.marks.value, [{ kind: 'estimate', task: under, title: 'under', estimate: 3, laps: 1 }]);
+    assert.deepEqual(s.marks.value, [{ key: `estimate-${under}`, kind: 'estimate', task: under, title: 'under', estimate: 3, laps: 1 }]);
     d.today.setDone(level!, true);
     assert.deepEqual(s.marks.value.map((mark) => mark.kind === 'estimate' && mark.title), ['under', 'level']);
     assert.deepEqual(Object.keys(shown(d)!).toSorted(), [`estimate-${level}`, `estimate-${under}`].toSorted());
@@ -169,7 +170,7 @@ describe('marks', () => {
     assert.deepEqual(s.marks.value, []);
     d.focus.skipBreak();
     w.time.advance(LAP);
-    assert.deepEqual(s.marks.value, [{ kind: 'week', focus_ms: 75 * MIN, before_ms: 50 * MIN }]);
+    assert.deepEqual(s.marks.value, [{ key: 'week-2026-11-23', kind: 'week', focus_ms: 75 * MIN, before_ms: 50 * MIN }]);
     assert.ok('week-2026-11-23' in shown(d)!);
     s.seen();
     d.focus.skipBreak();
@@ -192,7 +193,7 @@ describe('marks', () => {
     void b.settings.marks.value;
     a.focus.start();
     w.time.advance(LAP);
-    assert.deepEqual(a.settings.marks.value, [{ kind: 'laps', tier: 1 }]);
+    assert.deepEqual(a.settings.marks.value, [{ key: 'laps-1', kind: 'laps', tier: 1 }]);
     await a.settle();
     w.exchange(a, b);
     assert.deepEqual(b.settings.marks.value, [], 'catching up is not an achievement');
@@ -257,7 +258,7 @@ describe('marks', () => {
     w.time.advance(MIN);
     assert.deepEqual(s.marks.value, []);
     s.set({ celebrate: true });
-    assert.deepEqual(s.marks.value, [{ kind: 'estimate', task: fresh, title: 'fresh', estimate: 2, laps: 1 }]);
+    assert.deepEqual(s.marks.value, [{ key: `estimate-${fresh}`, kind: 'estimate', task: fresh, title: 'fresh', estimate: 2, laps: 1 }]);
     assert.deepEqual(Object.keys(shown(d)!), [`estimate-${fresh}`]);
   });
 
@@ -267,7 +268,7 @@ describe('marks', () => {
     for (let n = 0; n < 3; n++) theirLap(d, T0 - 5 * DAY + n * HOUR);
     d.focus.start();
     w.time.advance(LAP);
-    assert.deepEqual(s.marks.value, [{ kind: 'laps', tier: 4 }]);
+    assert.deepEqual(s.marks.value, [{ key: 'laps-4', kind: 'laps', tier: 4 }]);
     assert.deepEqual(Object.keys(shown(d)!).toSorted(), ['laps-4', 'week-2026-11-23']);
   });
 });

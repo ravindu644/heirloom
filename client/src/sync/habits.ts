@@ -34,6 +34,8 @@ export interface HabitView {
   of: number;
   /** True when a miss lies inside those days: then the screen shows kept of, not the run. */
   missed: boolean;
+  /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after. */
+  deleted: number | null;
 }
 
 export interface HabitEdit {
@@ -53,6 +55,8 @@ export interface Habits {
   readonly deleted: ReadonlySignal<HabitView[]>;
   /** Of the habits planned for today: how many are done. */
   readonly today: ReadonlySignal<{ done: number; planned: number }>;
+  /** The local day, `2026-11-24`. It changes at midnight and on `wake()`. */
+  readonly day: ReadonlySignal<string>;
   /** Check-ins this week so far and last week up to the same weekday and time. Call it on a tick. */
   week(): { now: number; before: number };
 
@@ -130,6 +134,7 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       days: habit.days,
       target: habit.target,
       remind: habit.remind,
+      deleted: habit.deleted,
       ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today),
     });
     const all = [...habits.value.values()];
@@ -226,6 +231,7 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       });
     },
 
+    day: clock.day,
     wake: clock.wake,
     close: clock.close,
     recomputed: () => passes,

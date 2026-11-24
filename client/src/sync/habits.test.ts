@@ -238,6 +238,7 @@ describe('a habit\'s days', () => {
 
   it('at local midnight today rolls over with nobody tapping: the count starts again and yesterday is in the record', async () => {
     const { w, d, h } = await one();
+    assert.equal(h.day.value, TODAY);
     const id = h.add('Read', EVERY_DAY, 1)!;
     h.checkIn(id);
     let changes = 0;
@@ -247,6 +248,8 @@ describe('a habit\'s days', () => {
     assert.deepEqual(h.today.value, { done: 0, planned: 1 });
     assert.equal(changes, 2);
     stop();
+    assert.equal(h.day.value, '2026-11-25');
+    assert.equal(view(d, id).deleted, null);
     assert.equal(view(d, id).today.day, '2026-11-25');
     assert.deepEqual(view(d, id).record.map((day) => [day.day, day.done]), [[TODAY, true], ['2026-11-25', false]]);
     assert.equal(view(d, id).streak, 1, 'today is not over, so it is not an empty day');
@@ -371,6 +374,8 @@ describe('the list', () => {
     w.exchange(a, b);
     assert.deepEqual(a.habits.list.value, []);
     assert.deepEqual(titles(a.habits.deleted.value), ['Read 20 pages']);
+    // It says when it was deleted, so the screen can say when it goes for good. A live habit says null.
+    assert.equal(a.habits.deleted.value[0]!.deleted, T0);
     assert.equal(a.habits.deleted.value[0]!.streak, 2);
     w.time.advance(MIN);
     a.habits.restore(id);

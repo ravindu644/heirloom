@@ -9,13 +9,14 @@ import type { Session } from './stats.ts';
 import type { Task } from './today.ts';
 
 /** A mark for something that was achieved, never for showing up. */
-export type Mark =
-  /** The total of laps that rang has reached a tier: 1, 4, 25, 100, 250, 500, 1000, 2500. */
-  | { kind: 'laps'; tier: number }
-  /** A task was done with its laps at or under its estimate. */
-  | { kind: 'estimate'; task: string; title: string; estimate: number; laps: number }
-  /** This week has passed the best week before it. */
-  | { kind: 'week'; focus_ms: number; before_ms: number };
+export type Mark = {
+  /** Its key in `settings.marks`: `laps-25`, `estimate-<task id>`, `week-<monday>`. One mark, one key, so a list of them can be keyed by it. */
+  key: string;
+} & (
+  | /** The total of laps that rang has reached a tier: 1, 4, 25, 100, 250, 500, 1000, 2500. */ { kind: 'laps'; tier: number }
+  | /** A task was done with its laps at or under its estimate. */ { kind: 'estimate'; task: string; title: string; estimate: number; laps: number }
+  | /** This week has passed the best week before it. */ { kind: 'week'; focus_ms: number; before_ms: number }
+);
 
 export const TIERS = [1, 4, 25, 100, 250, 500, 1000, 2500];
 
@@ -35,7 +36,8 @@ export function lapMarks(sessions: readonly Session[], days: Days, today: string
   const out: Earned[] = TIERS.filter((tier) => rang.length >= tier).map((tier) => {
     // The lap that made the total reach the tier.
     const lap = rang[tier - 1]!;
-    return { key: `laps-${tier}`, at: lap.ended, mark: { kind: 'laps', tier }, cell: ['session', lap.id, 'outcome'] };
+    const key = `laps-${tier}`;
+    return { key, at: lap.ended, mark: { key, kind: 'laps', tier }, cell: ['session', lap.id, 'outcome'] };
   });
 
   const monday = mondayOf(today);
@@ -45,7 +47,8 @@ export function lapMarks(sessions: readonly Session[], days: Days, today: string
   // Only once there is a week before it: a first week has nothing to pass.
   if (before.length && focus_ms > Math.max(...before)) {
     const latest = sessions.filter((s) => counted(s) && localDay(s.started, utcOffsetMin) >= monday).sort((a, b) => b.ended - a.ended)[0];
-    if (latest) out.push({ key: `week-${monday}`, at: latest.ended, mark: { kind: 'week', focus_ms, before_ms: Math.max(...before) }, cell: ['session', latest.id, 'ended'] });
+    const key = `week-${monday}`;
+    if (latest) out.push({ key, at: latest.ended, mark: { key, kind: 'week', focus_ms, before_ms: Math.max(...before) }, cell: ['session', latest.id, 'ended'] });
   }
   return out;
 }
@@ -55,6 +58,7 @@ export function taskMarks(tasks: readonly Task[], lapsOf: (task: string) => numb
   return tasks.flatMap((task): Earned[] => {
     const laps = lapsOf(task.id);
     if (task.done === null || task.estimate === null || task.deleted !== null || laps < 1 || laps > task.estimate) return [];
-    return [{ key: `estimate-${task.id}`, at: task.done, mark: { kind: 'estimate', task: task.id, title: task.title, estimate: task.estimate, laps }, cell: ['task', task.id, 'done'] }];
+    const key = `estimate-${task.id}`;
+    return [{ key, at: task.done, mark: { key, kind: 'estimate', task: task.id, title: task.title, estimate: task.estimate, laps }, cell: ['task', task.id, 'done'] }];
   });
 }

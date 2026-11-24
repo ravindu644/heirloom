@@ -44,7 +44,8 @@ describe('the list', () => {
       members: [
         { id: ME, name: 'ravi', you: true, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, last: null },
         { id: SACHI, name: 'sachi', you: false, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN,
-          last: { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [NIMAL], cheered: false } },
+          // Nimal cheered and is not in this room: counted in `cheers`, and not among the names.
+          last: { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [NIMAL], cheered: false, cheerers: [] } },
       ],
     }]);
     // She pauses; the room is renamed.
@@ -204,6 +205,9 @@ describe('room requests', () => {
     const fail = (status: number, error: string) => (w.server.reply = () => ({ status, body: { error } }));
     fail(404, 'code');
     assert.deepEqual(await r.join('NOSUCHRM'), { ok: false, error: 'code' });
+    // The server's hashing line is full: the code, and the seconds it asked for.
+    w.server.reply = () => ({ status: 429, body: { error: 'slow_down' }, retryAfter: '1' });
+    assert.deepEqual(await r.join('K7QW3RXM'), { ok: false, error: 'slow_down', retry_after: 1 });
     fail(409, 'full');
     assert.deepEqual(await r.join('K7QW3RXM'), { ok: false, error: 'full' });
     assert.deepEqual(await r.create('One too many'), { ok: false, error: 'full' });
@@ -248,7 +252,7 @@ describe('cheering', () => {
     const { w, d, r } = await one();
     withSachi(d);
     r.cheer('r_1', SACHI);
-    assert.deepEqual(sachi(d).last, { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [ME], cheered: true });
+    assert.deepEqual(sachi(d).last, { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [ME], cheered: true, cheerers: [{ id: ME, name: 'ravi' }] });
     await settle();
     assert.deepEqual(cheers(w).map((c) => c.body), [{ room: 'r_1', to: SACHI, run: 'run-7f3a', token: 'token-a', device: d.engine.device }]);
     assert.equal(sachi(d).last?.cheered, true, 'answered, and the message has not come yet');
@@ -386,6 +390,18 @@ describe('cheering', () => {
     await d.connect();
     await settle();
     assert.deepEqual(cheers(w), []);
+  });
+});
+
+describe('who cheered', () => {
+  it('each lap says who cheered it by name, in the order they cheered, for every screen to say it the same way', async () => {
+    const { d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { last: lastLap([NIMAL, 'a_left_the_room']) }), member(NIMAL, 'nimal')]));
+    const last = () => r.list.value[0]!.members[1]!.last!;
+    assert.deepEqual(last().cheerers, [{ id: NIMAL, name: 'nimal' }]);
+    assert.deepEqual(last().cheers, [NIMAL, 'a_left_the_room'], 'the ids are all still there');
+    r.cheer('r_1', SACHI);
+    assert.deepEqual(last().cheerers, [{ id: NIMAL, name: 'nimal' }, { id: ME, name: 'ravi' }]);
   });
 });
 

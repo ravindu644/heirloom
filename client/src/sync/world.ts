@@ -29,7 +29,7 @@ export function world() {
   const zone = { min: OFFSET };
   // The server's side of every request that is not an account call. A test sets `reply` to play it;
   // left alone it answers 200 and an empty object.
-  type Answer = { status: number; body: object } | 'unreachable';
+  type Answer = { status: number; body: object; retryAfter?: string } | 'unreachable';
   const server = {
     requests: [] as { path: string; body: any; from: string }[],
     reply: null as null | ((path: string, body: any) => Answer | Promise<Answer>),
@@ -66,8 +66,8 @@ export function world() {
           answer = (await server.reply?.(path, body)) ?? { status: 200, body: {} };
         }
         if (answer === 'unreachable') throw new TypeError('fetch failed');
-        const { status, body: reply } = answer;
-        return { ok: status === 200, status, headers: { get: () => null }, json: async () => reply };
+        const { status, body: reply, retryAfter } = answer;
+        return { ok: status === 200, status, headers: { get: () => retryAfter ?? null }, json: async () => reply };
       },
       openStore: logged,
       utcOffsetMin: () => zone.min,
