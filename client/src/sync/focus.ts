@@ -67,7 +67,8 @@ export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'ro
 
 /** What `extend()` adds. */
 export const EXTEND_MS = 300000;
-const UNDO_MS = 10000;
+/** How long a stop can be taken back. */
+export const UNDO_MS = 10000;
 // The longest the watch waits before looking again: a browser runs a timer set further out than 2^31 ms at once.
 const DAY_MS = 86400000;
 

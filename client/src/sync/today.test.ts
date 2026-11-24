@@ -250,25 +250,61 @@ describe('laps and squares', () => {
     assert.deepEqual(d.engine.cells(), cells, 'the square moved and nothing was written');
     // At the bell the square is whole and the lap counts.
     w.time.advance(15 * MIN);
-    assert.deepEqual(d.today.running.value?.squares, [1, 0.6, 1]);
-    assert.equal(d.today.running.value?.laps, 2);
+    assert.deepEqual(next(d)?.squares, [1, 0.6, 1]);
+    assert.equal(next(d)?.laps, 2);
   });
 
-  it('the square is whole at the bell even where no row can be written yet: offline with another device\'s timer', async () => {
+  it('a lap on the top task rings with no row yet: the task shows the lap and the whole square, and is next again; its row then changes nothing', async () => {
     const w = world();
     const a = await w.device('a');
     const b = await w.device('b');
-    const id = a.today.add('pointers')!;
+    const id = a.today.add('pointers ~4')!;
+    a.today.add('arrays');
     a.focus.start(id);
     await a.settle();
     w.exchange(a, b);
+    // b is offline with a's timer: it may not write the bell.
     b.disconnect();
     w.time.advance(LAP - 1000);
+    // Still counting: the task is running, and next is the one below.
+    assert.equal(b.today.running.value?.title, 'pointers');
+    assert.equal(b.today.running.value?.running, true);
+    assert.equal(b.today.running.value?.laps, 0);
     assert.ok(b.today.running.value!.squares[0]! < 1);
+    assert.equal(next(b)?.title, 'arrays');
+    assert.deepEqual(titles(b.today.later.value), []);
+
     w.time.advance(1000);
     assert.deepEqual(b.sessions(), []);
-    assert.deepEqual(b.today.running.value?.squares, [1]);
+    const rung = { ...next(b)! };
+    assert.equal(b.today.running.value, null);
+    assert.equal(rung.title, 'pointers');
+    assert.equal(rung.running, false);
+    assert.equal(rung.laps, 1, 'never a full square beside "0 of 4"');
+    assert.deepEqual(rung.squares, [1]);
+    assert.deepEqual(titles(b.today.later.value), ['arrays']);
     assert.equal(b.today.figures().laps, 1);
+    assert.equal(b.today.figures().left_laps, 3);
+
+    // The row arrives. Nothing on the screen moves.
+    w.exchange(a, b);
+    assert.equal(b.session('run-1')?.outcome, 'rang');
+    assert.deepEqual(next(b), rung);
+    assert.equal(b.today.running.value, null);
+    assert.equal(b.today.figures().laps, 1);
+  });
+
+  it('a paused lap is still running: the task stays out of the queue until its bell', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('pointers')!;
+    d.today.add('arrays');
+    d.focus.start(id);
+    w.time.advance(5 * MIN);
+    d.focus.pause();
+    w.time.advance(2 * 60 * MIN);
+    assert.equal(d.today.running.value?.title, 'pointers');
+    assert.equal(next(d)?.title, 'arrays');
   });
 
   it('a paused lap stops filling, and a break is on no task', async () => {

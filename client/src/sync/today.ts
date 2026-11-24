@@ -188,6 +188,9 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       if (task) tasks.set(id, task);
     }
     const lists = plan([...tasks.values()], today, now, env.utcOffsetMin());
+    // The timer is on a lap for a task only until that lap rings. After the bell the task is
+    // like any other in the list, so the top of the plan decides what the next lap is for.
+    const lapOn = state.phase === 'work' && !view(state, now).over ? state.task : null;
     const sessions = counts.live(state, now);
 
     const show = (t: Task): TaskView => ({
@@ -198,7 +201,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       project: (t.project !== null && project.get(t.project)) || null,
       estimate: t.estimate,
       ...squares(sessions, state, now, t.id),
-      running: state.phase === 'work' && state.task === t.id,
+      running: t.id === lapOn,
       due: t.due,
       when: t.when,
       repeat: t.repeat,
@@ -210,7 +213,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       tasks,
       lists,
       projects,
-      ...upNext(todays, state.phase === 'work' ? state.task : null),
+      ...upNext(todays, lapOn),
       left: plannedLeft(todays),
       upcoming: lists.upcoming.map(show),
       done: lists.done.map(show),

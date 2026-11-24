@@ -182,14 +182,18 @@ export const plannedLeft = (tasks: readonly { estimate: number | null; laps: num
 /**
  * The laps and squares of one task, oldest first: a lap that rang is 1, a stopped one the share
  * of its plan it ran, one set aside nothing. The lap in progress on the task is a share that
- * grows, until its row is there.
+ * grows, until its row is there; once its bell has gone it is a lap and a whole square, row or
+ * no row, so a task never shows a full square beside a count that has not moved.
  */
 export function squares(sessions: readonly Session[], state: TimerState, now: number, task: string): { laps: number; squares: number[] } {
   const share = (ran: number, planned: number) => (planned > 0 ? Math.min(1, Math.max(0, ran / planned)) : 0);
   const mine = sessions.filter((s) => s.kind === 'work' && s.task === task && s.outcome !== 'void').toSorted((a, b) => a.started - b.started);
   const out = mine.map((s) => (s.outcome === 'rang' ? 1 : share(s.ended - s.started - s.paused_ms, s.planned_ms)));
+  let laps = mine.filter((s) => s.outcome === 'rang').length;
   if (state.phase === 'work' && state.task === task && !sessions.some((s) => s.id === state.run)) {
-    out.push(share(state.planned_ms - view(state, now).left_ms, state.planned_ms));
+    const { over, left_ms } = view(state, now);
+    if (over) laps += 1;
+    out.push(over ? 1 : share(state.planned_ms - left_ms, state.planned_ms));
   }
-  return { laps: mine.filter((s) => s.outcome === 'rang').length, squares: out };
+  return { laps, squares: out };
 }
