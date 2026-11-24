@@ -11,7 +11,11 @@ Load the `taste-gate` skill and the global `design-taste-frontend` and `antialgo
 Read `DESIGN.md` in full and the screen's section of `docs/PRODUCT.md`.
 
 For each screen the lead names: capture or open its screenshots at 412x915 and 1440x900, light and
-dark. Open every picture. Then write:
+dark. Open every picture. Run `node tools/design-audit.mjs` and read its output: a value the
+browser drew that DESIGN.md does not define is a FAIL without further argument. Put each new
+screen beside the screens already built and check that the same job looks the same: header,
+headings, buttons, gaps. Measure left edges and gaps from the page, do not judge them by eye.
+Then write:
 1. A verdict: PASS, or FAIL with the reasons.
 2. Each problem, one line: what, where, which DESIGN.md rule or taste-gate row it breaks, and the fix.
 3. The words: every string on screen read against the voice. Generic, scolding or padded copy is a FAIL.

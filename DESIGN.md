@@ -175,6 +175,7 @@ layout:
   lane: 8px
   lane-set: 24px
   lane-result: 40px
+  figure-bearing: -0.04em
 state:
   hover: 12%
   press: 24%
@@ -251,6 +252,22 @@ first, the rest after first paint.
 - **Phone, 412 wide:** 20px margins, one column, a bottom bar of five labelled destinations
   (Focus, Today, Progress, Habits, Room). The primary action sits in the lower half, in reach of a
   thumb.
+- **The header.** Every screen starts with the same line: the mark and the name at the left, and
+  at the right the person: their initial in a circle and their username. That is one 48px target
+  and it opens Settings. On the laptop the same chip sits at the foot of the sidebar. Sign out is
+  in Settings and nowhere else. Settings is reached from the person, not from the five
+  destinations.
+- **One left edge.** In a column every block starts at the same x: headings, figures, sentences,
+  panels, buttons. The big figures are set so their ink sits on that edge, not their box: the
+  digits of Barlow Condensed carry space at their left, and `layout.figure-bearing` (in em of the
+  figure's own size) pulls them back. A sentence under the digits starts exactly under the digits.
+- **Rhythm.** Every vertical space is a step of the spacing scale. Things that belong together
+  sit `xs` or `sm` apart (the line under the digits belongs to the digits); parts of one block
+  `md`; one block from the next `lg`. Nothing related is ever further apart than `lg`.
+- **Free space goes to one place.** A screen may have one stretch of space that grows with the
+  screen, and it lies under the content: above the action row on a phone, at the bottom of the
+  canvas on a laptop. Content never floats in the middle of the screen with space above and
+  below it, and two related things are never pushed apart to fill a tall screen.
 - **Laptop, 1440:** a 232px labelled sidebar on the ground, the canvas at 32px gutters, a 12-column
   grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
 - Between the two, the sidebar collapses to the bottom bar under 720px.
@@ -299,8 +316,17 @@ Built once in `client/src/ui/kit/` and reused.
 - **Heat cell:** a 12px square, 2px gaps, zero to four steps; a rest day carries the rest mark.
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
   figure-md, the task only if shared, and a Cheer button.
-- **Buttons:** one primary (you) per screen at most; secondary on surface; text buttons for the
-  rest. 48px tall. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
+- **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
+  `on-you` text, one per screen at most; secondary is `surface` with a 1px `line` border; quiet is
+  `raised` with no border, for the lesser choice beside another button ("Skip break", "I have an
+  invite", "Stop and log 6 min"). All 48px tall, `body-strong`, `rounded.sm`. A bare word is never
+  a button. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
+- **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
+  "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target.
+  These two, button and underlined link, are the only things that can be pressed besides rows,
+  boxes and the navigation.
+- **The person:** a `raised` circle with the first letter of the username in `body-strong`, and
+  the username beside it in `label`. In the header and in a room.
 - **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
 
 ## Motion
@@ -359,6 +385,18 @@ Sample strings, the register to match:
 - Never colour alone: ahead and behind carry a sign and a word, rest days a mark, the ghost a dash.
 - Every control has a label a screen reader can say; the timer announces once a minute, not every
   second.
+
+## Consistency
+
+One rule decides every case: if two things do the same job they look the same, on every screen,
+at every size, in both themes. A screen never has its own button, its own heading size, its own
+gap or its own grey. When a screen needs something this file does not have, the file gets it
+first and the screen uses it second.
+
+`tools/design-audit.mjs` holds the app to this. It opens every state of every screen in a
+browser and reads what was drawn: every font, size, weight, colour, radius, border and space
+must be a value this file defines, every block in a column must share its left edge, and
+everything that can be pressed must be 48px to touch. It runs in `make check`.
 
 ## Do's and Don'ts
 

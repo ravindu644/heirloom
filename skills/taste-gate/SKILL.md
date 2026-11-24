@@ -13,9 +13,14 @@ slop-gate for app screens.
 
 ```
 node tools/style-check.mjs         # no colour, font or duration literal outside tokens.css
+node tools/design-audit.mjs        # what the browser drew, against DESIGN.md: every size, colour, gap, left edge
 node tools/budget.mjs              # JS, CSS, fonts against ARCHITECTURE section 7
 npx @google/design.md lint DESIGN.md   # 0 errors
 ```
+
+Measure positions, never judge them by eye: read `getBoundingClientRect()` for the blocks of a
+column and compare their left edges and the gaps between them with the spacing scale. A picture
+at 30% hides a 4px misalignment that the person holding the phone sees at once.
 
 Fix every failure. Do not hide things from the checks.
 
@@ -34,6 +39,12 @@ and the longest string it can hold. Open every picture.
 | Empty state | it shows an illustration and "Nothing here yet!" instead of the first thing to do |
 | Thumb | the main action on the phone is out of reach in the top third |
 | Dark | anything is navy, glowing, or lower contrast than DESIGN.md allows |
+| One left edge | two blocks of one column start at different x, or a line under the big digits does not start under their ink |
+| Rhythm | a gap is not a step of the spacing scale, or the largest gap on the screen lies between two things that belong together |
+| Free space | content floats in the middle with space above and below, or related things were pushed apart to fill a tall screen |
+| Pressable | something that can be pressed is a bare word with no fill and no underline, or two buttons that do the same kind of job look different |
+| Same job, same look | the same control, heading, figure or gap is drawn two ways on two screens, sizes or themes |
+| Where things live | an account action (sign out, settings) sits loose on a content screen instead of behind the person in the header |
 
 ## 3. The tells of generic app UI
 
@@ -73,3 +84,23 @@ Read every string on the screen aloud against the Voice section of DESIGN.md.
 The design reviewer writes PASS or FAIL per screen, one line per finding (what, where, which rule,
 the fix), and one thing that is good and must survive later changes. Any tell from section 3 or 4
 is a FAIL until fixed or defended in one sentence that names the user's need it serves.
+
+## 6. Lessons from reviews that passed what the user then failed
+
+Written 2026-11-25, after the user looked at Focus and Today and found three things two design
+reviews had let through. Each is now a row above; this is why.
+
+- **A rule that solves one problem can break a person's eye.** The reviewer upheld "digits centred
+  in the free space, actions at the bottom" because it met the thumb rule. The user saw a hole
+  between the timer and its race panel. Space between related things is a FAIL even when another
+  rule asked for it; find the layout that keeps both.
+- **Optical edges are edges.** "of 25:00, paused since 16:38" sat a few pixels off the big
+  digits, because the digits' box and their ink are not the same. Nobody measured. Measure.
+- **A bare word does not look pressable.** "I have an invite" and "Skip break" were text with no
+  fill. They passed because DESIGN.md said "text buttons for the rest". When a rule in DESIGN.md
+  produces something a person does not read as a button, the rule is wrong: say so in the review,
+  under "DESIGN.md's to fix", and fail the screen until it is.
+- **Where a thing lives is design too.** "Sign out" loose in the corner of every screen was never
+  questioned. Account actions belong behind the person.
+- **Consistency is checked across screens, not inside one.** Review each new screen side by side
+  with the ones already built: same header, same headings, same buttons, same gaps.

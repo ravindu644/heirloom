@@ -14,6 +14,10 @@ What matters here:
 - Every colour, font, size, space, radius and duration comes from `tokens.css` (generated from
   DESIGN.md). A literal fails `tools/style-check.mjs`.
 - Use `ui/kit/`. A component you need that is not there goes into the kit once, not into your screen.
+- The same job looks the same everywhere. Before a screen gets its own heading size, gap, button or
+  grey, check how the screens already built do it; if DESIGN.md lacks the thing, ask the lead to add
+  it there first. `tools/design-audit.mjs` reads what the browser drew and fails on anything
+  DESIGN.md does not define, on a block off its column's left edge, and on a target under 48px.
 - Every string goes into `ui/strings.ts`, in the voice DESIGN.md describes. Read each one aloud.
 - Instant: no spinner for local data, no layout shift, motion only as DESIGN.md allows, everything
   still under `prefers-reduced-motion`. Tap to visible change under 100 ms.

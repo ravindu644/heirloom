@@ -44,7 +44,7 @@ export function build(designMd, fontExists) {
   }
 
   if (errors.length) throw new Error(errors.join('\n'));
-  const vars = (prefix, map) => Object.entries(map).map(([k, v]) => `--${prefix}${k}: ${v};`);
+  const vars = (prefix, map) => Object.entries(map ?? {}).map(([k, v]) => `--${prefix}${k}: ${v};`);
   return `/* generated from DESIGN.md by tools/tokens.mjs: edit that, not this */
 ${[...faces.values()].join('\n')}
 :root {
