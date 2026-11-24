@@ -1,7 +1,32 @@
 # Section 3: the run on the phone
 
-Not done yet: wireless adb dropped while the user slept. Run these with the phone connected.
-The screen-off step is last, because the phone locks.
+Done on 2026-11-25, about 03:00, on the user's phone (Samsung SM-A166P, Android 15), in silence
+(ringer silent, media volume set to 0 for the run and restored). Every check passed:
+
+| Check | Result |
+|---|---|
+| Join, the notification prompt, a one minute lap | pass |
+| The alarm Android holds | exact (`window=0`), `RTC_WAKEUP`, allow-while-idle, `exactAllowReason=policy_permission` |
+| The countdown notification | ongoing, counting down, on its quiet channel, gone at the end and on pause |
+| Pause and resume | the alarm goes and comes back at the new end (64 ms off the sum) |
+| The bell, app in front | 17 ms after the planned end |
+| The bell, app in the background | 19 ms |
+| The bell, screen off | 14 ms |
+| The bell, screen off and locked, lap started on the laptop | 21 ms; the phone had the lap 0.58 s after the laptop's click |
+| Hardware back | from Today to Focus; from Focus out of the app, the process kept |
+
+Two things it could not show:
+- **Doze.** The phone was charging, so Android never entered its idle mode. The alarm is the kind
+  Android fires in Doze, but that is not yet seen on this phone. To see it: with a lap scheduled
+  and the screen off, `adb shell dumpsys battery unplug; adb shell dumpsys deviceidle force-idle`,
+  read when the bell was posted, then `adb shell dumpsys deviceidle unforce; adb shell dumpsys
+  battery reset`. It needs the phone unlocked to start the lap.
+- **A sleeping phone and another device.** After about two minutes with the screen off the open
+  app stops hearing the server. A lap started on the laptop then did not ring on the phone; when
+  the screen came on, still locked, it caught up in 3.4 s. This is the limit in ARCHITECTURE's
+  log (no push service in v1), measured.
+
+The commands, for running it again. The screen-off step is last, because the phone locks.
 
 ```sh
 adb devices                                  # stop unless a line ends in "device"
