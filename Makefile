@@ -10,7 +10,7 @@ S10_ADDR := $(shell sed -n 's/^- Address: *\([A-Za-z0-9.:-]*\).*/\1/p' .local/EN
 S10 := $(S10_USER)@$(S10_ADDR)
 need-s10 = @test -n "$(S10_USER)" -a -n "$(S10_ADDR)" || { echo "No S10 address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
-CHECKS := lint-design contracts test-tools style types test-core test-server budget e2e
+CHECKS := lint-design contracts test-tools style types pure test-core test-server test-sync sim budget e2e
 .PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk deploy s10-rss
 
 # -k: one failing check does not hide the others.
@@ -36,8 +36,22 @@ style: tokens
 types: tokens
 	pnpm exec tsc --noEmit
 
+# core/ is pure: time and storage are handed in, so the same code runs in tests, the simulator
+# and the phone. A global here would work in the browser and lie everywhere else.
+pure:
+	@! grep -rnE '\b(document|window|navigator|localStorage)\.|\bindexedDB\b|new WebSocket|\bfetch\(|\bset(Timeout|Interval)\(|Date\.now|new Date\(\)|Math\.random' client/src/core --include='*.ts' --exclude='*.test.ts' || { echo "client/src/core must stay pure: pass these in"; exit 1; }
+	@echo "pure: client/src/core uses no globals"
+
 test-core:
 	node --test "client/src/**/*.test.ts"
+
+# Real devices' code against the real server, in Node: the scenarios of ARCHITECTURE section 4,
+# then many devices editing at random with the network coming and going.
+test-sync: server
+	node --test "tests/sync/*.test.ts"
+
+sim: server
+	node tools/sim/sim.ts --seed 20261124
 
 test-server:
 	cd server && go vet ./... && go test ./...
