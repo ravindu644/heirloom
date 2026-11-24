@@ -6,10 +6,10 @@ import type { Cell } from '../../client/src/core/merge.ts';
 import { memoryStores } from '../../client/src/store/memory.ts';
 import type { OpenStore } from '../../client/src/store/store.ts';
 import { sleep } from '../server.ts';
-import type { Server } from '../server.ts';
+import type { Remote } from '../server.ts';
 
 export { sleep, startServer } from '../server.ts';
-export type { Server } from '../server.ts';
+export type { Remote, Server } from '../server.ts';
 
 /** Polls until `ok()` holds. On timeout it throws `what`, or what `what()` says then. */
 export async function until(ok: () => boolean, ms: number, what: string | (() => string)): Promise<number> {
@@ -40,7 +40,8 @@ export function network() {
       this.addEventListener('message', (e) => frames.push({ dir: 'in', msg: JSON.parse(String(e.data)) }));
     }
     override send(data: string) {
-      frames.push({ dir: 'out', msg: JSON.parse(data) });
+      // A socket that is closing drops what it is given, so that never went anywhere.
+      if (this.readyState === WebSocket.OPEN) frames.push({ dir: 'out', msg: JSON.parse(data) });
       super.send(data);
     }
   }
@@ -97,7 +98,7 @@ export const stopAll = () => Promise.all([...running].map((e) => e.stop()));
 
 /** A device: give it the disk and network of one that stopped, and it is that device after a restart. */
 export async function device(
-  server: Server,
+  server: Remote,
   opts: { disk?: OpenStore; net?: Network; skew?: { ms: number }; random?: () => number } = {},
 ): Promise<Device> {
   const disk = opts.disk ?? memoryStores();
@@ -121,7 +122,7 @@ export async function device(
   return { engine, net, disk, skew };
 }
 
-export async function restart(server: Server, d: Device): Promise<Device> {
+export async function restart(server: Remote, d: Device): Promise<Device> {
   await d.engine.stop();
   return device(server, d);
 }
@@ -129,7 +130,7 @@ export async function restart(server: Server, d: Device): Promise<Device> {
 export const PASSWORD = 'correct horse battery';
 
 /** A new account on its own first device. */
-export async function account(server: Server, username: string, opts: Parameters<typeof device>[1] = {}) {
+export async function account(server: Remote, username: string, opts: Parameters<typeof device>[1] = {}) {
   const d = await device(server, opts);
   const res = await d.engine.register(server.invite(), username, PASSWORD);
   if (!res.ok) throw new Error(`register ${username}: ${res.error}`);
@@ -137,7 +138,7 @@ export async function account(server: Server, username: string, opts: Parameters
 }
 
 /** Another device of an account. */
-export async function signedIn(server: Server, username: string, opts: Parameters<typeof device>[1] = {}) {
+export async function signedIn(server: Remote, username: string, opts: Parameters<typeof device>[1] = {}) {
   const d = await device(server, opts);
   const res = await d.engine.signIn(username, PASSWORD);
   if (!res.ok) throw new Error(`sign in ${username}: ${res.error}`);
@@ -153,14 +154,25 @@ export const table = (cells: Cell[]) =>
     .sort();
 
 /** What the server holds for an account: what a brand new device gets after catching up from 0. */
-export async function serverHolds(server: Server, username: string): Promise<string[]> {
+export async function serverCells(server: Remote, username: string): Promise<Cell[]> {
   const fresh = await signedIn(server, username);
   try {
     await until(() => inStep(fresh.engine), 10000, `a fresh device of ${username} did not catch up`);
-    return table(fresh.engine.cells());
+    return fresh.engine.cells();
   } finally {
     await fresh.engine.stop();
   }
+}
+
+export const serverHolds = async (server: Remote, username: string) => table(await serverCells(server, username));
+
+/** The server's rows of one dataset, by id, each with its fields' newest values. */
+export async function serverRows(server: Remote, username: string, dataset: string): Promise<Map<string, Record<string, unknown>>> {
+  const rows = new Map<string, Record<string, unknown>>();
+  for (const c of await serverCells(server, username)) {
+    if (c.dataset === dataset) rows.set(c.row, { ...rows.get(c.row), id: c.row, [c.field]: c.value });
+  }
+  return rows;
 }
 
 /** The rows a screen would show, as `dataset/row/field value` lines, for the datasets the device holds. */

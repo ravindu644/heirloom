@@ -1,0 +1,59 @@
+// Driving the app as a person does, by role and by the words in client/src/ui/strings.ts, and
+// reading what the server holds through a Node device of the same account.
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { account, PASSWORD, serverRows, until } from '../sync/harness.ts';
+import type { Device } from '../sync/harness.ts';
+import { e2eServer } from './server.ts';
+
+export const server = e2eServer();
+
+/** A username of its own for each test, so tests share the server and nothing else. */
+export const username = (tag: string) => `${tag}_${Math.random().toString(36).slice(2, 10)}`;
+
+export async function signIn(page: Page, name: string, password = PASSWORD) {
+  if (!page.url().startsWith('http')) await page.goto('/');
+  await page.getByLabel('Username').fill(name);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+}
+
+export async function join(page: Page, invite: string, name: string) {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'I have an invite' }).click();
+  await page.getByLabel('Invite code').fill(invite);
+  await page.getByLabel('Username').fill(name);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Join', exact: true }).click();
+}
+
+/** What a ready Focus screen shows: the button for the lap a tap starts. */
+export const ready = (page: Page, lap = 1) => expect(page.getByRole('button', { name: `Start lap ${lap}`, exact: true })).toBeVisible();
+
+/**
+ * A new account made from Node, with these lap lengths in its settings: the Node device is the
+ * account's first, so the browsers that sign in after get the settings with everything else.
+ */
+export async function accountWith(name: string, lengths: { work_ms?: number; short_ms?: number; long_ms?: number } = {}): Promise<Device> {
+  const node = await account(server, name);
+  if (Object.keys(lengths).length) node.engine.write('settings', 'current', lengths);
+  await until(() => node.engine.unsent.value === 0 && node.engine.sync.value === 'in-step', 5000, 'settings were not sent');
+  return node;
+}
+
+/** Session rows the server holds for an account. */
+export const sessions = async (name: string) => [...(await serverRows(server, name, 'session')).values()];
+
+/** Polls the server until `ok` holds for its session rows, and returns them. */
+export async function sessionsWhen(name: string, ok: (rows: Record<string, unknown>[]) => boolean, ms = 10000) {
+  const start = Date.now();
+  for (;;) {
+    const rows = await sessions(name);
+    if (ok(rows)) return rows;
+    if (Date.now() - start > ms) throw new Error(`the server's session rows never matched: ${JSON.stringify(rows)}`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
+/** The big digits: "24:59". */
+export const digits = (page: Page) => page.getByText(/^\d\d:\d\d$/);

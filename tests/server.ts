@@ -9,12 +9,24 @@ export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 
 const BIN = join(import.meta.dirname, '../server/bin/heirloomd');
 
-export interface Server {
+/** What a test needs of a running server: where it is, and invites to it. */
+export interface Remote {
   url: string;
+  /** One new invite code. heirloomd makes it from the data directory, which works while it runs. */
   invite(): string;
+}
+
+export interface Server extends Remote {
+  /** The data directory, so a Playwright worker can reach a server it did not start. */
+  data: string;
   /** SIGTERM, then throws unless heirloomd exited 0: a server killed mid-shutdown is a failure. */
   stop(): Promise<void>;
 }
+
+export const remote = (url: string, data: string): Remote => ({
+  url,
+  invite: () => execFileSync(BIN, ['-data', data, '-invite'], { encoding: 'utf8' }).trim(),
+});
 
 const freePort = () =>
   new Promise<number>((resolve, reject) => {
@@ -51,8 +63,8 @@ export async function startServer(addr?: string): Promise<Server> {
     await sleep(50);
   }
   return {
-    url,
-    invite: () => execFileSync(BIN, ['-data', data, '-invite'], { encoding: 'utf8' }).trim(),
+    ...remote(url, data),
+    data,
     async stop() {
       proc.kill('SIGTERM');
       const late = setTimeout(() => proc.kill('SIGKILL'), 5000);

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import type { TimerState } from '../../client/src/core/timer.ts';
+import { createFocus } from '../../client/src/sync/focus.ts';
 import { account, converge, offline, online, serverHolds, signedIn, sleep, startServer, stopAll, table, until } from './harness.ts';
 import type { Device, Server } from './harness.ts';
 
@@ -148,7 +149,44 @@ test('4. both devices offline, each runs the timer: both sessions kept everywher
   await stop(a, b);
 });
 
-test.todo('4. the device whose running lap is replaced closes it as stopped at that moment (section 2)');
+test('4. a lap still running when another device\'s newer start arrives is closed as stopped, with its minutes', async () => {
+  const [a, b] = await pair('row4r');
+  let runs = 0;
+  const focus = (d: Device) =>
+    createFocus(d.engine, {
+      utcOffsetMin: () => 0,
+      runId: () => `run-${++runs}`,
+      schedule: (run, ms) => {
+        const t = setTimeout(run, ms);
+        return () => clearTimeout(t);
+      },
+    });
+  const [fa, fb] = [focus(a), focus(b)];
+  offline(b);
+  fa.start();
+  const replaced = a.engine.timer.value;
+  // Ninety seconds pass on both laptops. The skew stands in for the wait, and stays under the
+  // server's five minutes, so nothing is refused for its clock.
+  a.skew.ms = b.skew.ms = 90000;
+  fb.start();
+  const newer = b.engine.timer.value;
+  online(b);
+  await settled('row4r', [a, b]);
+
+  // A's lap ran for ninety seconds and nobody stopped it: its minutes are kept, as stopped.
+  const rows = [...a.engine.rows('session').value.values()];
+  assert.equal(rows.length, 1);
+  const row = rows[0]!;
+  assert.equal(row.id, replaced.run);
+  assert.equal(row.outcome, 'stopped');
+  assert.equal(row.device, a.engine.device);
+  const ran = (row.ended as number) - (row.started as number);
+  assert.ok(ran >= 90000 && ran < 95000, `the replaced lap kept ${ran} ms`);
+  for (const d of [a, b]) assert.deepEqual(d.engine.timer.value, newer);
+  fa.close();
+  fb.close();
+  await stop(a, b);
+});
 
 test('5. a habit checked in on two devices offline: two checkin rows, both everywhere', async () => {
   const [a, b] = await pair('row5');
