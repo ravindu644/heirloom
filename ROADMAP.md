@@ -121,7 +121,7 @@ The first thing the user can touch: one timer, live on two screens.
 - [ ] [ui] Milestones with our own named tiers; within-estimate and best-week marks; all switchable
 - [ ] [ui] Sounds: a small set, licensed, under 200 KB in total
 - [ ] [ui] Settings screen complete: durations, auto-start, sounds, celebrations, ring here
-- [ ] [lead] Copy pass over every string against the voice rules in DESIGN.md
+- [x] [lead] Copy pass over every string against the voice rules in DESIGN.md
 - [ ] [design-review] Every screen, empty states included, at both sizes, light and dark
 - [ ] Gate
 

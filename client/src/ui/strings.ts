@@ -35,7 +35,6 @@ export function wall(ms: number): string {
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ordinal = (n: number) => `${n}${n % 100 > 10 && n % 100 < 14 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 
-/** The ghost's day as people say it: "yesterday", "Monday", "last Tuesday", "Tuesday the 3rd". Days are `2026-11-24`. */
 /** A day to come, as people say it: "tomorrow", "on Thursday", "on Thursday the 3rd". */
 function comingDay(day: string, today: string): string {
   const then = new Date(day);
@@ -49,6 +48,7 @@ function comingDay(day: string, today: string): string {
 const dated = (day: string, options: Intl.DateTimeFormatOptions) =>
   new Date(day).toLocaleDateString('en-GB', { ...options, timeZone: 'UTC' }).replace(',', '');
 
+/** The ghost's day as people say it: "yesterday", "Monday", "last Tuesday", "Tuesday the 3rd". Days are `2026-11-24`. */
 export function pastDay(day: string, today: string): string {
   const then = new Date(day);
   const ago = Math.round((Date.parse(today) - then.getTime()) / (24 * 60 * MIN));
@@ -183,7 +183,6 @@ export const status = {
   signOutFailed: 'That did not go through. You are still signed in.',
 };
 
-// A second tab of the same browser: it shares the first one's laps and must not run beside it.
 // The notification when a phase ends, for a tab out of sight or a phone in a pocket. What
 // happened in the title, what is next in the body.
 export const ring = {
@@ -201,6 +200,7 @@ export const ring = {
   remindBody: 'Planned for today.',
 };
 
+// A second tab of the same browser: it shares the first one's laps and must not run beside it.
 export const elsewhere = 'heirloom is open in another tab of this browser. Close that one and this one takes over by itself.';
 
 export const settings = {
@@ -224,7 +224,7 @@ export const settings = {
   autoBreak: 'Start the break when a lap rings',
   autoWork: 'Start the next lap when a break rings',
   autoNote:
-    'Off, every start is yours to tap. On, a device that wakes within two hours of a bell writes the laps and breaks that would have run meanwhile. After the long break nothing starts by itself.',
+    'Off, every start is yours to tap. On, a device that wakes within two hours of a bell counts the laps and breaks that would have run meanwhile, watched or not. After the long break nothing starts by itself.',
 
   target: 'Day target',
   targetText: (laps: number) => (laps === 0 ? 'No target' : plural(laps, 'lap a day', 'laps a day')),
@@ -236,8 +236,8 @@ export const settings = {
   ringHere: (device: string) => `Ring on this ${device}`,
   ringHereNote: (device: string) => `For this ${device} only. Your other devices keep their own.`,
   finish: 'A finished lap',
-  celebrate: 'Show the moment, and a milestone when one is reached',
-  celebrateNote: 'Off, a finished lap is its numbers and nothing more.',
+  celebrate: 'Mark a finished lap',
+  celebrateNote: 'A short motion when a lap rings, and one line at the laps worth it: the first, the 25th, a best week. Off, a finished lap is its numbers and nothing more.',
 
   rooms: 'Rooms',
   shareTask: 'Show the room what I am on',
@@ -603,7 +603,7 @@ export const room = {
   errors: {
     offline: 'Needs a connection. Nothing was sent.',
     code: 'No room has that code.',
-    full: 'A room holds 8 people and a person 5 rooms. One of the two is full.',
+    full: 'That room has its 8 people, or you are in 5 rooms already. Both are the most there can be.',
     slow_down: 'Too many wrong codes. Joining opens again within the hour.',
     room: 'That room is no longer there.',
     bad_request: 'A room needs a name of 1 to 40 characters.',
