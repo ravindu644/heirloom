@@ -78,7 +78,7 @@ Times are ms since the epoch.
 
 | Dir | Message | Meaning |
 |---|---|---|
-| device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000,"utc_offset_min":330}` | First frame. `utc_offset_min` is the device's offset from UTC, east positive; the server keeps the latest one per account to know that person's "today" for rooms (0 when a device does not send it). `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
+| device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000,"utc_offset_min":330}` | First frame. `utc_offset_min` is the device's offset from UTC, east positive; the server keeps the latest one per account to know that person's "today" for rooms. A device that does not send it changes nothing: the last one known stands, and before any is known it is 0. `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
 | server to device | `{"type":"welcome","server_time":1795494600150,"head":1049,"rooms":["r_8f3a"]}` | `head` is the account's newest sequence number. `rooms` is the ids of every room the account is in, so a device that was away when its account left a room drops it now (section 15). |
 | server to device | `{"type":"cells","from":1042,"to":1049,"cells":[...]}` | Cells with sequence numbers after `from` up to `to`, oldest first, at most 500 a frame. After `welcome` the server sends these until the device has everything, then the same message carries other devices' pushes live. |
 | device to server | `{"type":"push","batch":"k3v9","cells":[...]}` | At most 500 cells. `batch` is any id the device picks. Sending a batch twice is harmless: a cell is its stamp. |
@@ -503,7 +503,10 @@ name: it was not there to hear `gone`.
   week, by the latest `utc_offset_min` any device of theirs sent. The lap in progress is not in
   them; a screen adds it from `ends_at` if it wants the figure to move.
 - `last` is the member's most recent work session that rang today: its run id, when it ended, and
-  the ids of the members who cheered it. `null` when there is none.
+  the ids of the members who cheered it. `null` when there is none. A cheer belongs to two people
+  and a lap, not to a room: it shows in every room the two share. Only a lap that rang can be
+  cheered, never a break, never one's own, and never a member who is away.
+- A member's local midnight changes their `today_ms`, so it sends the message like any other change.
 - The room's own total for the week is the sum of its members' `week_ms`; `target_ms` is what
   they are filling together, 0 when none is set. `ranked` says whether this room shows its
   members by `week_ms`, most first; otherwise they stay in joining order, side by side.

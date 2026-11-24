@@ -10,7 +10,10 @@ import (
 	"errors"
 	"io"
 	"log"
+	"maps"
 	"net/http"
+	"reflect"
+	"slices"
 	gosync "sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +21,7 @@ import (
 	"github.com/coder/websocket"
 
 	"heirloom/server/auth"
+	"heirloom/server/rooms"
 	"heirloom/server/sync"
 )
 
@@ -56,12 +60,19 @@ type frame struct {
 	Batch  string            `json:"batch"`
 	Cells  []json.RawMessage `json:"cells"`
 	T      json.RawMessage   `json:"t"`
+	// Minutes east of UTC, in a hello. A device that does not say is taken to be on UTC.
+	UTCOffsetMin int `json:"utc_offset_min"`
 }
+
+// The offsets the world uses run from UTC-12 to UTC+14.
+func validOffset(min int) bool { return min >= -720 && min <= 840 }
 
 type welcomeMsg struct {
 	Type       string `json:"type"`
 	ServerTime int64  `json:"server_time"`
 	Head       int64  `json:"head"`
+	// Every room the account is in right now. A device drops any room not named here.
+	Rooms []string `json:"rooms"`
 }
 
 type cellsMsg struct {
@@ -103,7 +114,9 @@ type SyncRequest struct {
 	Token  string `json:"token"`
 	Device string `json:"device"`
 	Cursor *int64 `json:"cursor"`
-	Push   *struct {
+	// As in a hello: minutes east of UTC, 0 when left out.
+	UTCOffsetMin int `json:"utc_offset_min"`
+	Push         *struct {
 		Batch string            `json:"batch"`
 		Cells []json.RawMessage `json:"cells"`
 	} `json:"push"`
@@ -117,6 +130,8 @@ type SyncReply struct {
 	Cells      []sync.Cell `json:"cells"`
 	Ack        *Ack        `json:"ack,omitempty"`
 	Nack       *Nack       `json:"nack,omitempty"`
+	// Every room the account is in, as a socket would be told it.
+	Rooms []*rooms.Message `json:"rooms"`
 }
 
 type conn struct {
@@ -128,11 +143,39 @@ type conn struct {
 	out     chan []byte
 	queued  atomic.Int64
 	reader  gosync.WaitGroup
+
+	// Rooms that may read differently now. A room message is not queued: the connection's
+	// own goroutine builds it when it gets there. So a burst of changes is one message, a
+	// slow device is never owed more than one per room, and what is sent was true when it
+	// was written, not when something changed.
+	staleMu gosync.Mutex
+	stale   map[int64]struct{}
+	wake    chan struct{}
+	// What this device was last told of each room, and when that room next changes by time
+	// alone. Only the connection's own goroutine touches it.
+	shown map[int64]shown
+}
+
+type shown struct {
+	msg  *rooms.Message
+	next int64
+}
+
+// mark says a room may have changed. It never blocks: it is called with Hub.mu held.
+func (c *conn) mark(room int64) {
+	c.staleMu.Lock()
+	c.stale[room] = struct{}{}
+	c.staleMu.Unlock()
+	select {
+	case c.wake <- struct{}{}:
+	default: // already woken
+	}
 }
 
 type Hub struct {
 	auth  *auth.Service
 	cells *sync.Store
+	rooms *rooms.Service
 	now   func() time.Time
 
 	// mu makes "commit, then tell the others, then ack" one step. Two batches that commit
@@ -144,8 +187,8 @@ type Hub struct {
 	serving gosync.WaitGroup
 }
 
-func New(a *auth.Service, cells *sync.Store, now func() time.Time) *Hub {
-	return &Hub{auth: a, cells: cells, now: now, conns: map[*conn]struct{}{}}
+func New(a *auth.Service, cells *sync.Store, r *rooms.Service, now func() time.Time) *Hub {
+	return &Hub{auth: a, cells: cells, rooms: r, now: now, conns: map[*conn]struct{}{}}
 }
 
 // encode writes JSON without escaping < > &, so a value leaves as the device wrote it.
@@ -211,6 +254,9 @@ func (h *Hub) push(account int64, from *conn, batch string, cells []json.RawMess
 			}
 		}
 	}
+	if h.rooms.Pushed(account, pushed.Won) {
+		h.announceOf(account)
+	}
 	ack := &Ack{Batch: batch, From: pushed.From, Cursor: pushed.Cursor}
 	if from != nil {
 		ack.Type = "ack"
@@ -222,14 +268,17 @@ func (h *Hub) push(account int64, from *conn, batch string, cells []json.RawMess
 // Sync is POST /api/sync: the socket's exchange in one request. An *auth.Error says the
 // token or the body was bad.
 func (h *Hub) Sync(req SyncRequest) (SyncReply, error) {
-	if req.Cursor == nil || *req.Cursor < 0 || !auth.ValidDevice(req.Device) {
+	if req.Cursor == nil || *req.Cursor < 0 || !auth.ValidDevice(req.Device) || !validOffset(req.UTCOffsetMin) {
 		return SyncReply{}, auth.ErrBadRequest
 	}
 	account, _, err := h.auth.Check(req.Token, req.Device)
 	if err != nil {
 		return SyncReply{}, err
 	}
-	var reply SyncReply
+	if err := h.offset(account, req.UTCOffsetMin); err != nil {
+		return SyncReply{}, err
+	}
+	reply := SyncReply{Rooms: []*rooms.Message{}}
 	if req.Push != nil {
 		answer, err := h.push(account, nil, req.Push.Batch, req.Push.Cells)
 		if err != nil {
@@ -249,7 +298,107 @@ func (h *Hub) Sync(req SyncRequest) (SyncReply, error) {
 	}
 	// A push may have landed between the two reads; the head is never behind the page.
 	reply.ServerTime, reply.Head, reply.To, reply.Cells = h.now().UnixMilli(), max(head, page.To), page.To, page.Cells
+	in, err := h.rooms.Of(account)
+	if err != nil {
+		return SyncReply{}, err
+	}
+	for _, room := range in {
+		msg, _, err := h.rooms.Message(room, account)
+		if err != nil {
+			return SyncReply{}, err
+		}
+		if msg != nil {
+			reply.Rooms = append(reply.Rooms, msg)
+		}
+	}
 	return reply, nil
+}
+
+// offset keeps the account's latest offset from UTC. A new one moves its "today", which
+// every room it is in shows.
+func (h *Hub) offset(account int64, min int) error {
+	changed, err := h.rooms.SetOffset(account, min)
+	if err == nil && changed {
+		h.mu.Lock()
+		h.announceOf(account)
+		h.mu.Unlock()
+	}
+	return err
+}
+
+// Announce says a room may read differently now: every connected device of its members
+// looks again. A device is sent the room only if what it would be told has changed.
+func (h *Hub) Announce(room int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.announce(room)
+}
+
+// announce and announceOf want Hub.mu held. Failing to read who is in a room is logged
+// and no more: what called this, a push or a join, has already happened.
+func (h *Hub) announce(room int64) {
+	members, err := h.rooms.Members(room)
+	if ours(err) != nil {
+		return
+	}
+	for c := range h.conns {
+		// Membership is the wall: a device hears of a room only through its account being in it.
+		if slices.Contains(members, c.account) {
+			c.mark(room)
+		}
+	}
+}
+
+func (h *Hub) announceOf(account int64) {
+	in, err := h.rooms.Of(account)
+	if ours(err) != nil {
+		return
+	}
+	for _, room := range in {
+		h.announce(room)
+	}
+}
+
+// Left tells the account's devices, once, that a room is gone for them. The mark makes
+// each drop what it remembered of the room; it finds the account is out and sends nothing.
+func (h *Hub) Left(account, room int64, public string) {
+	gone := encode(rooms.Gone{Type: "room", Room: public, Gone: true})
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.conns {
+		if c.account == account {
+			c.send(gone)
+			c.mark(room)
+		}
+	}
+}
+
+// tell sends this device each of these rooms as it is now, unless that is what the
+// device was last told. server_time moves with every reading and is not a change.
+func (h *Hub) tell(c *conn, in []int64) error {
+	for _, room := range in {
+		msg, next, err := h.rooms.Message(room, c.account)
+		if err != nil {
+			return ours(err)
+		}
+		if msg == nil {
+			delete(c.shown, room) // left, or the room ended: Left has said so
+			continue
+		}
+		before := c.shown[room].msg
+		c.shown[room] = shown{msg, next}
+		if before != nil {
+			was, is := *before, *msg
+			was.ServerTime, is.ServerTime = 0, 0
+			if reflect.DeepEqual(was, is) {
+				continue
+			}
+		}
+		if err := c.write(encode(msg)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // A cursor past the head comes from a server whose data was restored from an older copy.
@@ -274,7 +423,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	ws.SetReadLimit(-1)
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
-	c := &conn{ws: ws, cancel: cancel, out: make(chan []byte, queueFrames)}
+	c := &conn{ws: ws, cancel: cancel, out: make(chan []byte, queueFrames),
+		stale: map[int64]struct{}{}, wake: make(chan struct{}, 1), shown: map[int64]shown{}}
 
 	h.mu.Lock()
 	if h.closed {
@@ -313,7 +463,7 @@ func (h *Hub) serve(ctx context.Context, c *conn) error {
 	if err != nil {
 		return err
 	}
-	if hello.Type != "hello" || hello.Cursor == nil || *hello.Cursor < 0 || !auth.ValidDevice(hello.Device) {
+	if hello.Type != "hello" || hello.Cursor == nil || *hello.Cursor < 0 || !auth.ValidDevice(hello.Device) || !validOffset(hello.UTCOffsetMin) {
 		return bye{"protocol"}
 	}
 	if err := h.admit(c, hello.Token, hello.Device); err != nil {
@@ -323,7 +473,23 @@ func (h *Hub) serve(ctx context.Context, c *conn) error {
 	if err != nil {
 		return ours(err)
 	}
-	if err := c.write(encode(welcomeMsg{"welcome", h.now().UnixMilli(), head})); err != nil {
+	names, err := h.rooms.IDs(c.account)
+	if err != nil {
+		return ours(err)
+	}
+	if err := c.write(encode(welcomeMsg{"welcome", h.now().UnixMilli(), head, names})); err != nil {
+		return err
+	}
+	// Each of those rooms, straight after the welcome. The offset goes in first: it
+	// decides which day "today" is in what is about to be sent.
+	if err := h.offset(c.account, hello.UTCOffsetMin); err != nil {
+		return ours(err)
+	}
+	in, err := h.rooms.Of(c.account)
+	if err != nil {
+		return ours(err)
+	}
+	if err := h.tell(c, in); err != nil {
 		return err
 	}
 
@@ -352,11 +518,45 @@ func (h *Hub) serve(ctx context.Context, c *conn) error {
 	// socket while it catches up, so it is never sent its own push back, and every ack it
 	// gets starts at the number it has reached.
 	c.reader.Go(func() { c.cancel(h.listen(c)) })
+	// One timer for the connection, set to the next bell or midnight in any room it has
+	// been shown. Nobody pushes anything when a lap ends by time alone, and the room
+	// must still say idle. It lives and dies with the connection.
+	// It starts by firing at once, which sets it from what the welcome showed.
+	bell := time.NewTimer(0)
+	defer bell.Stop()
 	for {
+		var msg []byte
+		var in []int64
 		select {
 		case <-ctx.Done():
 			return context.Cause(ctx)
-		case msg := <-c.out:
+		case msg = <-c.out:
+		case <-c.wake:
+		case <-bell.C:
+			in = slices.Collect(maps.Keys(c.shown))
+		}
+		// Whatever woke us, the rooms go first: a frame queued after a room changed is never
+		// written ahead of the room's news.
+		c.staleMu.Lock()
+		in = slices.AppendSeq(in, maps.Keys(c.stale))
+		clear(c.stale)
+		c.staleMu.Unlock()
+		if len(in) > 0 {
+			if err := h.tell(c, in); err != nil {
+				return err
+			}
+			bell.Stop()
+			var next int64
+			for _, s := range c.shown {
+				if next == 0 || s.next < next {
+					next = s.next
+				}
+			}
+			if next != 0 {
+				bell.Reset(time.UnixMilli(next).Sub(h.now()))
+			}
+		}
+		if msg != nil {
 			c.queued.Add(-int64(len(msg)))
 			if err := c.write(msg); err != nil {
 				return err

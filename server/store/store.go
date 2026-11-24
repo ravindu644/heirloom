@@ -86,6 +86,42 @@ create table cell (
 
 -- Pull by cursor walks this, and the account's head is its last entry.
 create unique index cell_seq on cell (account, seq);
+`, `
+-- Rooms are the server's own: several accounts share one, so there is nothing to merge.
+create table room (
+	id        integer primary key,
+	public_id text not null unique,
+	name      text not null,
+	code      text not null unique, -- whoever has it can join
+	target_ms integer not null default 0,
+	ranked    integer not null default 0
+) strict;
+
+-- id grows as people join, which is the order the room shows them in.
+create table member (
+	id      integer primary key,
+	room    integer not null references room (id) on delete cascade,
+	account integer not null references account (id),
+	unique (room, account)
+) strict;
+create index member_account on member (account);
+
+-- One row per person per run, in no room: a cheer is between two people.
+create table cheer (
+	to_account   integer not null references account (id),
+	run          text not null,
+	from_account integer not null references account (id),
+	created      integer not null,
+	primary key (to_account, run, from_account)
+) strict, without rowid;
+
+-- The latest offset from UTC a device of this account sent: where its "today" begins.
+alter table account add column utc_offset_min integer not null default 0;
+
+-- A room shows a member's day and week. This finds the sessions that started inside
+-- them without walking the years of sessions before.
+create index cell_session_started on cell (account, cast(value as integer))
+	where dataset = 'session' and field = 'started';
 `}
 
 func migrate(db *sql.DB) error {

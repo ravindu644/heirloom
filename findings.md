@@ -13,6 +13,8 @@ when it is done.
 - [8] Lengths under a minute read as zero ("Start 0 min break", "0 minutes today."). The schema allows down to 1 s for tests; the settings screen should offer whole minutes only.
 - [9] The service worker makes the page open offline; a web manifest and icons (install as an app) and Web Push come with section 9. They need `manifest-src`, `img-src` in the server's CSP, whose test fails on any change so each gets a reason.
 - [9] After a restore every held cell is re-queued; if the server then refuses that push for the device's clock, the restamp gives all of them new stamps from this device, and a stale value could beat another device's newer one. Narrow the restamp to cells this device made (stamp ends in its id).
+- [9] A room's join code is 40 bits and `/api/rooms/join` does not limit wrong tries by a signed-in account. Fine among invited friends; add a limit with the other caps.
+- [9] Room totals were measured on the laptop only (130 µs a message warm, 507 µs when a week is recounted). Measure on the S10.
 - [9] Before the tunnel opens the server to the internet: a flood of sign-ins keeps the hashing line of 8 full (real sign-ins wait; signed-in devices are fine), `POST /api/sync` reads up to 1 MB before it can check the token with no cap on how many at once, and nothing caps open connections. A per-client limit behind the tunnel means trusting `CF-Connecting-IP`; decide the caps with the memory measured on the S10.
 - [9] `heirloomd -invite` with a wrong `-data` makes a new database and prints a code the running server does not know.
 - [2] The session-writing rules need their own fixture (`session.json`). Design worked out by the lead on 2026-11-25:

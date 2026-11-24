@@ -21,6 +21,7 @@ import (
 	"github.com/coder/websocket"
 
 	"heirloom/server/hub"
+	"heirloom/server/rooms"
 	"heirloom/server/store"
 	"heirloom/server/sync"
 	"heirloom/server/web"
@@ -47,6 +48,8 @@ type world struct {
 	db  *sql.DB
 	hub *hub.Hub
 	ms  atomic.Int64
+	// Counts the cells the rooms tests write, so each gets a later stamp than the last.
+	stamps atomic.Int64
 }
 
 func start(t *testing.T) *world {
@@ -134,6 +137,7 @@ type syncBody struct {
 	Device string    `json:"device"`
 	Cursor int64     `json:"cursor"`
 	Push   *pushBody `json:"push,omitempty"`
+	Offset int       `json:"utc_offset_min,omitempty"`
 }
 
 type pushBody struct {
@@ -144,7 +148,7 @@ type pushBody struct {
 func (w *world) sync(token, device string, cursor int64, push *pushBody) hub.SyncReply {
 	w.t.Helper()
 	var reply hub.SyncReply
-	if status, _ := w.post("/api/sync", syncBody{token, device, cursor, push}, &reply); status != 200 {
+	if status, _ := w.post("/api/sync", syncBody{token, device, cursor, push, 0}, &reply); status != 200 {
 		w.t.Fatalf("sync = %d", status)
 	}
 	return reply
@@ -162,6 +166,16 @@ type msg struct {
 	ServerTime int64 `json:"server_time"`
 	T          json.RawMessage
 	Cells      []sync.Cell
+	// A room message.
+	Room     string
+	Name     string
+	Code     string
+	TargetMs int64 `json:"target_ms"`
+	Ranked   bool
+	Gone     bool
+	Members  []rooms.Member
+	Rooms    []string // in a welcome
+	raw      string
 }
 
 type device struct {
@@ -210,7 +224,7 @@ func (d *device) read() (msg, error) {
 	if err != nil {
 		return msg{}, err
 	}
-	var m msg
+	m := msg{raw: string(data)}
 	return m, json.Unmarshal(data, &m)
 }
 
@@ -456,8 +470,8 @@ func TestPostSyncPagesAndRefusesBadRequests(t *testing.T) {
 
 	var e session
 	for what, body := range map[string]any{
-		"a signed out token": syncBody{"NOSUCHTOKEN", phone, 0, nil},
-		"another device":     syncBody{ravi.Token, laptop, 0, nil},
+		"a signed out token": syncBody{"NOSUCHTOKEN", phone, 0, nil, 0},
+		"another device":     syncBody{ravi.Token, laptop, 0, nil, 0},
 	} {
 		if status, _ := w.post("/api/sync", body, &e); status != 401 || e.Error != "token" {
 			t.Errorf("%s: %d %s, want 401 token", what, status, e.Error)
@@ -465,8 +479,8 @@ func TestPostSyncPagesAndRefusesBadRequests(t *testing.T) {
 	}
 	for what, body := range map[string]any{
 		"no cursor":           creds{"token": ravi.Token, "device": phone},
-		"a cursor below zero": syncBody{ravi.Token, phone, -1, nil},
-		"no device":           syncBody{ravi.Token, "", 0, nil},
+		"a cursor below zero": syncBody{ravi.Token, phone, -1, nil, 0},
+		"no device":           syncBody{ravi.Token, "", 0, nil, 0},
 		"not JSON":            `{"token":`,
 		"a body over 1 MB":    `{"token":"` + strings.Repeat("x", 1<<20) + `"}`,
 	} {
@@ -515,7 +529,7 @@ func TestTwoAccountsNeverSeeEachOther(t *testing.T) {
 	}
 	// One account's token is nothing with the other's device id.
 	var e session
-	if status, _ := w.post("/api/sync", syncBody{ravi.Token, laptop, 0, nil}, &e); status != 401 {
+	if status, _ := w.post("/api/sync", syncBody{ravi.Token, laptop, 0, nil, 0}, &e); status != 401 {
 		t.Errorf("Ravi's token from Sam's device = %d, want 401", status)
 	}
 }
@@ -612,7 +626,7 @@ func TestLogoutEndsTheTokenOnHTTPAndOnAnOpenSocket(t *testing.T) {
 	b.quiet() // the laptop's own token is untouched
 
 	var e session
-	if status, _ := w.post("/api/sync", syncBody{ravi.Token, phone, 0, nil}, &e); status != 401 || e.Error != "token" {
+	if status, _ := w.post("/api/sync", syncBody{ravi.Token, phone, 0, nil, 0}, &e); status != 401 || e.Error != "token" {
 		t.Errorf("sync with the signed out token = %d %q, want 401 token", status, e.Error)
 	}
 	if status, _ := w.post("/api/logout", creds{"token": ravi.Token}, &e); status != 401 || e.Error != "token" {

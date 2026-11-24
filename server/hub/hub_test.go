@@ -56,3 +56,21 @@ func TestStartFrom(t *testing.T) {
 		}
 	}
 }
+
+// A room message is not queued, only owed. However often a room changes while a device is
+// not reading, the device is owed that room once, and nothing piles up behind it.
+func TestAStalledDeviceIsOwedEachRoomOnce(t *testing.T) {
+	c, ctx := stalled()
+	c.stale, c.wake = map[int64]struct{}{}, make(chan struct{}, 1)
+	for range 10000 {
+		c.mark(7)
+		c.mark(9)
+	}
+	if len(c.stale) != 2 || len(c.wake) != 1 || len(c.out) != 0 || c.queued.Load() != 0 {
+		t.Errorf("after 20000 changes: %d rooms owed, %d wake-ups, %d frames and %d bytes queued; want 2, 1, 0, 0",
+			len(c.stale), len(c.wake), len(c.out), c.queued.Load())
+	}
+	if ctx.Err() != nil {
+		t.Errorf("the device was cut for being slow: %v", context.Cause(ctx))
+	}
+}

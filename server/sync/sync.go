@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"unicode/utf8"
@@ -216,6 +217,64 @@ func (s *Store) Pull(account, after int64) (Page, error) {
 // Head is the account's newest sequence number, 0 before its first cell.
 func (s *Store) Head(account int64) (int64, error) {
 	return headOf(s.db, account)
+}
+
+// readable is everything the server itself ever reads out of a cell, all of it for rooms
+// (protocol.md section 15), beside the five session fields Sessions counts with.
+// Anything else is stored and passed on unopened.
+var readable = map[[2]string]bool{
+	{"timer", "state"}:           true,
+	{"session", "kind"}:          true, // these two say whether a run is a lap that rang,
+	{"session", "outcome"}:       true, // which is what a cheer is for
+	{"settings", "share_task"}:   true,
+	{"settings", "rooms_hidden"}: true,
+	{"task", "title"}:            true,
+}
+
+// Value reads one field of an account, nil when nobody has written it. It refuses any
+// field not in readable, so a new reader of people's data has to be added there, in sight.
+func (s *Store) Value(account int64, dataset, row, field string) (json.RawMessage, error) {
+	if !readable[[2]string{dataset, field}] {
+		return nil, fmt.Errorf("%s.%s is not a field the server reads", dataset, field)
+	}
+	var value []byte
+	err := s.db.QueryRow("select value from cell where account = ? and dataset = ? and row_id = ? and field = ?",
+		account, dataset, row, field).Scan(&value)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("read %s.%s: %w", dataset, field, err)
+	}
+	return value, nil
+}
+
+// Sessions returns the session rows that started in [from, to), each as its fields. Only
+// the five fields the counting needs are read: not the task, not the note.
+//
+// "indexed by" is a promise, not a hint: if this could not use the index on started it
+// would fail, instead of quietly walking every session the account ever had.
+func (s *Store) Sessions(account, from, to int64) (map[string]map[string]json.RawMessage, error) {
+	rows, err := s.db.Query(`select f.row_id, f.field, f.value
+		from cell s indexed by cell_session_started
+		join cell f on f.account = s.account and f.dataset = 'session' and f.row_id = s.row_id
+			and f.field in ('kind', 'started', 'ended', 'paused_ms', 'outcome')
+		where s.account = ? and s.dataset = 'session' and s.field = 'started'
+			and cast(s.value as integer) >= ? and cast(s.value as integer) < ?`, account, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("read sessions: %w", err)
+	}
+	defer rows.Close()
+	sessions := map[string]map[string]json.RawMessage{}
+	for rows.Next() {
+		var row, field string
+		var value []byte
+		if err := rows.Scan(&row, &field, &value); err != nil {
+			return nil, fmt.Errorf("read sessions: %w", err)
+		}
+		if sessions[row] == nil {
+			sessions[row] = map[string]json.RawMessage{}
+		}
+		sessions[row][field] = value
+	}
+	return sessions, rows.Err()
 }
 
 // The newest number is always still in the table: a cell is only ever replaced by one

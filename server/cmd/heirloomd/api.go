@@ -13,6 +13,7 @@ import (
 
 	"heirloom/server/auth"
 	"heirloom/server/hub"
+	"heirloom/server/rooms"
 	"heirloom/server/sync"
 )
 
@@ -27,7 +28,9 @@ const (
 func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Handler) (http.Handler, *hub.Hub) {
 	var h *hub.Hub
 	accounts := auth.New(db, now, func(token string) { h.Kick(token) })
-	h = hub.New(accounts, sync.New(db, now), now)
+	cells := sync.New(db, now)
+	together := rooms.New(db, cells, now)
+	h = hub.New(accounts, cells, together, now)
 
 	// The e2e run polls /healthz and reads these three fields; the shape is fixed.
 	health, err := json.Marshal(struct {
@@ -65,6 +68,64 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	mux.HandleFunc("POST /api/logout", post(maxAccountBody, func(_ context.Context, c credentials) (struct{}, error) {
 		return struct{}{}, accounts.Logout(c.Token)
 	}))
+
+	// Rooms (protocol section 15). Every request names its device as /api/sync does, and
+	// after each the hub has the members' devices look at the room again.
+	type roomRequest struct {
+		Token    string  `json:"token"`
+		Device   string  `json:"device"`
+		Room     string  `json:"room"`
+		Code     string  `json:"code"`
+		Name     *string `json:"name"`
+		TargetMs *int64  `json:"target_ms"`
+		Ranked   *bool   `json:"ranked"`
+		To       string  `json:"to"`
+		Run      string  `json:"run"`
+	}
+	type roomReply struct {
+		Room string `json:"room,omitempty"`
+	}
+	room := func(path string, do func(account int64, req roomRequest) (public string, room int64, err error)) {
+		mux.HandleFunc("POST /api/rooms/"+path, post(maxAccountBody, func(_ context.Context, req roomRequest) (roomReply, error) {
+			if !auth.ValidDevice(req.Device) {
+				return roomReply{}, auth.ErrBadRequest
+			}
+			account, _, err := accounts.Check(req.Token, req.Device)
+			if err != nil {
+				return roomReply{}, err
+			}
+			public, id, err := do(account, req)
+			if err != nil {
+				return roomReply{}, err
+			}
+			h.Announce(id)
+			return roomReply{public}, nil
+		}))
+	}
+	room("create", func(account int64, req roomRequest) (string, int64, error) {
+		if req.Name == nil {
+			return "", 0, auth.ErrBadRequest
+		}
+		return together.Create(account, *req.Name)
+	})
+	room("join", func(account int64, req roomRequest) (string, int64, error) {
+		return together.Join(account, req.Code)
+	})
+	room("leave", func(account int64, req roomRequest) (string, int64, error) {
+		id, err := together.Leave(account, req.Room)
+		if err == nil {
+			h.Left(account, id, req.Room)
+		}
+		return "", id, err
+	})
+	room("update", func(account int64, req roomRequest) (string, int64, error) {
+		id, err := together.Update(account, req.Room, req.Name, req.TargetMs, req.Ranked)
+		return "", id, err
+	})
+	room("cheer", func(account int64, req roomRequest) (string, int64, error) {
+		id, err := together.Cheer(account, req.Room, req.To, req.Run)
+		return "", id, err
+	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
