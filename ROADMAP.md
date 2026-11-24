@@ -140,6 +140,6 @@ The first thing the user can touch: one timer, live on two screens.
 - [ ] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [ ] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
 - [ ] [qa] Budgets: bundle, tap latency on the phone, live timer arrival
-- [ ] [lead] README for friends: install the APK, open the web app, join a room
+- [x] [lead] README for friends: install the APK, open the web app, join a room
 - [ ] [lead] Signed release APK; tag `v1.0.0`
 - [ ] Gate
