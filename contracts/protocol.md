@@ -366,3 +366,51 @@ Fixture: `today.json`. `quick_add`: text in, title and estimate out, or `null`. 
 rule and a day in, the next day out. `next`: a done task's id, `due`, today and rule in, the next
 row's id and `due` out. `order`: property checks, described in the file. `squares`: sessions, the
 timer state, `now` and a task in, `laps` and `squares` out.
+
+## 13. Progress
+
+The rules behind the Progress screen. All of it is worked out on the device from `session`, `task`,
+`project` and `day` rows, with the same counting as section 7: a session counts when it is work
+and not `void`, on the local day it started, and minutes two devices ran at once count once.
+
+**This week against last week.** Weeks run Monday to Sunday. For each day of this week up to
+today, the running total of focus; today's includes the lap in progress, as the race does. For
+each day of last week, the same. The ghost's figure "by now" is last week's total up to the same
+weekday and time of day. The split is this week's total less that.
+
+**The year.** One cell per local day from the first day with a counted session to today. A cell's
+level comes from the laps that rang that day: 0 none, 1 for 1 to 3, 2 for 4 to 6, 3 for 7 or 8, 4
+for 9 or more. A day with counted minutes and no lap is level 1. A rest day (section 8) carries
+the rest mark.
+
+**Since the first lap.** Total focus and laps; the days kept (at least one lap that rang) of the
+days so far, counted as the streak counts them: to today if today is kept, else to yesterday.
+The steadiest weekday is the one with the highest share of kept days among those it has had, if
+it has had at least three; ties go to the one kept more often, then to the earlier weekday.
+
+**Bests.** The day with the most focus, and the Monday to Sunday week with the most; the earlier
+one wins a tie. Today and this week may be the best.
+
+**By project.** Over today and the six days before: for each project, the focus of the counted
+sessions whose task is in it, and their laps; and the same sum over the seven days before those,
+for comparison. A session with no task, or a task with no project, is under no project. Projects
+with nothing in either window are left out. Most time first.
+
+**Estimates.** Over tasks done in the last 28 days that have an estimate and are not deleted: the
+laps run over the laps guessed, as one ratio (1.3 means a task takes 1.3 laps for each one
+guessed), and the eight done most recently with their two numbers. No such task, no ratio.
+
+**A day's timeline.** Every session that started on the day, breaks and set-aside laps included,
+oldest first, each with its kind, times, outcome, task, and whether it is one of a pair that ran
+on two devices at once (the `overlaps` of section 7).
+
+**Setting a lap aside from the timeline** writes `outcome: void` on its row. Counting it again
+writes back what it was, which the row itself says: `rang` if it ran its whole plan
+(`ended - started - paused_ms >= planned_ms`), `stopped` if not.
+
+**The look back.** For today: the focus and laps, the tasks done today, and the day's note. The
+note is the `note` field of the `day` row whose id is the local day. Writing an empty note writes
+an empty string.
+
+These are checked by the core lane's own tests; `stats.json` and `streak.json` hold the parts the
+server will share for rooms.

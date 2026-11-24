@@ -77,6 +77,7 @@ Datasets are synced as cells. Field names here are the contract; `contracts/prot
 | `project` | one per project | `name`, `color` (a DESIGN.md role name), `order`, `archived`, `deleted` | mutable per field |
 | `habit` | one per habit | `title`, `days` (weekday mask), `target`, `order`, `archived`, `deleted` | mutable per field |
 | `checkin` | one per check-in | `habit`, `day` (local `YYYY-MM-DD`), `at`, `deleted` | created once; undo sets `deleted` |
+| `day` | one per local day with a note (`row` = the day) | `note` | mutable per field |
 | `settings` | one per account | durations, auto-start flags, sounds, celebrations on or off, what rooms may see | mutable per field |
 
 The timer `state` is a single JSON value so it can never be half-updated:
@@ -226,4 +227,5 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-25 | One tab per browser profile runs the engine (Web Locks); a second tab waits and takes over | Two tabs share a device id and a database but not a clock |
 | 2026-11-25 | `task.when` and the shape of `task.repeat` added; a project's `color` is one of five existing DESIGN.md roles | PRODUCT asks for projects with a colour; DESIGN.md allows one hue. Five tones of the palette, shown as a small square beside the name, keep both. The user may overrule with real hues |
 | 2026-11-25 | A repeating task done makes the next task as its own row, with an id made from the series and the day | Each day's laps stay with that day's task, and two devices marking it done offline make the same row |
+| 2026-11-25 | A `day` dataset holds the look back's one line, one row per local day | The note belongs to a day, not to a session or a task; a row per day cannot collide across devices except on the same line, where the later edit wins |
 | 2026-11-24 | Dev-only packages: `@playwright/test`, `@google/design.md`, `yaml`, `ajv`, `@preact/preset-vite` | e2e, the DESIGN.md lint, reading its front matter, checking fixtures against schemas, JSX and hot reload |

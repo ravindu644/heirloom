@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "day",
+  "description": "One row per local day that has something said about it. The row id is the day, 2026-11-24. Today it holds the one line of the end-of-day look back.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "note": { "type": "string", "maxLength": 280, "description": "One line the person wrote about the day. Empty is no note." }
+  }
+}

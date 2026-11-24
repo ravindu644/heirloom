@@ -30,7 +30,6 @@ when it is done.
 - [4] At 360x640 the race panel is cut by the stuck buttons (it fits whole from about 740px tall). If a real phone lands in that band, short screens need their own rule and a fourth size in DESIGN.md.
 - [8] "This phone" is chosen by pointer, so a tablet used with a finger is called a phone.
 - [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
-- [5] The end-of-day look back's one-line note has nowhere to live.
 - [5] Stats use the viewer's current UTC offset for every day. A country with summer time shifts old laps by an hour across midnight.
 - [6] A habit's reminder time has no field.
 - [7] Room totals need each member's "today": the server does not know a member's UTC offset yet.
