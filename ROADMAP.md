@@ -35,16 +35,16 @@ Nothing user-visible. Ends with every check wired and failing for the right reas
 
 The part that has to be right. No screens yet.
 
-- [ ] [core] Stamps (HLC) with the drift rule, merge of cells, outbox, cursor; `merge.json` passes
-- [ ] [core] Timer math from the timer cell (time left, phase end, set index); `timer.json` passes
-- [ ] [core] IndexedDB store with batched writes and `persist()`
-- [ ] [core] Transport: WebSocket with ping, offset estimate, reconnect with backoff, HTTP fallback
-- [ ] [server] Store (cells, newest per field, sequence numbers), push/ack/nack, pull by cursor,
+- [x] [core] Stamps (HLC) with the drift rule, merge of cells, outbox, cursor; `merge.json` passes
+- [x] [core] Timer math from the timer cell (time left, phase end, set index); `timer.json` passes
+- [x] [core] IndexedDB store with batched writes and `persist()`
+- [x] [core] Transport: WebSocket with ping, offset estimate, reconnect with backoff, HTTP fallback
+- [x] [server] Store (cells, newest per field, sequence numbers), push/ack/nack, pull by cursor,
       fan-out to an account's devices; `merge.json` passes in Go
-- [ ] [server] Accounts: invite links, argon2id passwords, per-device tokens, login rate limit
-- [ ] [qa] Simulator: N devices, random edits, random offline windows; all copies end equal to the
+- [x] [server] Accounts: invite links, argon2id passwords, per-device tokens, login rate limit
+- [x] [qa] Simulator: N devices, random edits, random offline windows; all copies end equal to the
       server; runs in `make check` with a fixed seed
-- [ ] [qa] Scenarios from ARCHITECTURE §4 as tests, one per table row
+- [x] [qa] Scenarios from ARCHITECTURE §4 as tests, one per table row
 - [ ] Gate
 
 ## 2. Timer, end to end
