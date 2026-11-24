@@ -274,6 +274,41 @@
    ]
   },
   {
+   "name": "extend long after the bell does nothing: the lap would still be over",
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001860000,
+     "do": "extend",
+     "ms": 300000
+    },
+    {
+     "at": 1800001860000,
+     "expect": {
+      "over": true,
+      "left_ms": 0,
+      "state": {
+       "phase": "work",
+       "run": "run-1",
+       "task": null,
+       "started": 1800000000000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 0
+      }
+     }
+    }
+   ]
+  },
+  {
    "name": "a set of four, then the long break, then lap one again",
    "steps": [
     {

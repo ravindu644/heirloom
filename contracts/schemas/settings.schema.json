@@ -5,9 +5,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "work_ms": { "type": "integer", "minimum": 1000, "default": 1500000 },
-    "short_ms": { "type": "integer", "minimum": 1000, "default": 300000 },
-    "long_ms": { "type": "integer", "minimum": 1000, "default": 900000 },
+    "work_ms": { "type": "integer", "minimum": 1000, "maximum": 86400000, "default": 1500000 },
+    "short_ms": { "type": "integer", "minimum": 1000, "maximum": 86400000, "default": 300000 },
+    "long_ms": { "type": "integer", "minimum": 1000, "maximum": 86400000, "default": 900000 },
     "auto_break": { "type": "boolean", "default": false, "description": "Start the break when a lap rings." },
     "auto_work": { "type": "boolean", "default": false, "description": "Start the next lap when a break rings." },
     "sound": { "type": "string", "description": "Id of the bell. The set is pinned in roadmap section 8." },

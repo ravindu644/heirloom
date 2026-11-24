@@ -111,7 +111,9 @@ Rules:
   earlier waits in the socket, so a device never gets its own push back and every ack starts at
   the number the device has reached. A device does not push before it has caught up either.
 - A `hello` or a POST with a cursor past the server's head (the server was restored from an older
-  copy) is answered from 0: the device is sent everything.
+  copy) is answered from 0: the device is sent everything. A device that sees a `head` below its
+  own cursor sets its cursor to 0 and puts every cell it holds back in its outbox, because the
+  server may have lost any of them. Pushing a cell the server already has changes nothing.
 - A page of `cells` also stops near 1 MB, whatever the count.
 
 ## 5. Without a socket
@@ -155,7 +157,7 @@ Actions, each a pure function of the state, the action and `now`:
 | `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
 | `pause` | `paused_at = now`. Nothing when idle, paused or over |
 | `resume` | `paused_ms += now - paused_at`, `paused_at = null`. Nothing unless paused |
-| `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap |
+| `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap if the new end is still ahead of `now`; if not, nothing: minutes nobody worked are not added |
 | `stop` | Idle, every other field as the schema's idle state, `set_index` the next lap's index by the same rule as `start` |
 
 Setting a lap aside (void) changes the timer exactly as `stop` does; the difference is the
@@ -299,7 +301,8 @@ back as rung. An extension rewrites the timer cell, so the second bell's row is 
 first.
 
 **Who writes the bell.** A device that sees a run over writes the rang row only when it holds no
-row for that run that ends at or after this bell, and either it is in step with the server (caught up, connected) or it was the
+row for that run that ends at or after this bell and was written no earlier than the timer
+cell that shows the run (a row from before an undo or an extension tells an older story), and either it is in step with the server (caught up, connected) or it was the
 last to write the timer cell (the cell's stamp ends in its own device id). A device that is
 offline with another device's timer waits: that lap may have been stopped where it was running.
 
