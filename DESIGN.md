@@ -289,8 +289,12 @@ first, the rest after first paint.
   and the lane heights `lane`, `lane-set`, `lane-result`).
 - Three sizes are written in CSS as numbers, because a media query cannot read a variable: 720px
   (bottom bar below, sidebar from there), 1280px (from there the 300px timer and the rail sit side
-  by side), and 412px (below it the phone timer scales with the screen, `figure-xl` times the
-  width over 412, so the digits never leave a narrow phone).
+  by side), and 412px, the width the phone is drawn for.
+- **A phone is not always 412 wide.** The first real one measured 471. Under 720px the layout is
+  fluid: every column runs from margin to margin (fields, panels and button rows fill it; a
+  measure in `ch` caps a line of text only from 720px up), and the timer keeps its share of the
+  width, `figure-xl` times the width over 412, smaller on a narrow phone and larger on a wide
+  one, never past `figure-xxl`. Pictures and the audit are taken at 412 and at 471.
 
 ## Elevation & Depth
 
