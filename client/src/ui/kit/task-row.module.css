@@ -36,8 +36,6 @@ div.words { cursor: auto; }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); overflow-wrap: anywhere; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
-.end { display: flex; flex: none; align-items: center; gap: var(--space-xs); }
-/* Where a button takes the laps' place at the row's end, they sit at the far side of this line. */
-.far { display: flex; margin-left: auto; }
+.end { display: flex; flex: none; align-items: center; gap: var(--space-md); }
 
 .done .title { color: var(--muted); text-decoration: line-through; }

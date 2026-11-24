@@ -10,6 +10,7 @@ import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { useTyped } from '../kit/typed.ts';
 import * as s from '../strings.ts';
+import form from '../kit/form.module.css';
 import css from './task-sheet.module.css';
 
 const COLORS: ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
@@ -81,14 +82,14 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
     <Sheet title={s.task.sheet} close={s.task.close} onClose={onClose}>
       <Field label={s.task.title} {...title} />
 
-      <fieldset class={css.group}>
+      <fieldset class={form.group}>
         <legend>{s.task.project}</legend>
-        <div class={css.choices}>
-          <button type="button" class={css.choice} aria-pressed={!task.project} onClick={() => edit({ project: null })}>
+        <div class={form.choices}>
+          <button type="button" class={form.choice} aria-pressed={!task.project} onClick={() => edit({ project: null })}>
             {s.task.noProject}
           </button>
           {today.projects.value.map((project) => (
-            <button key={project.id} type="button" class={css.choice} aria-pressed={task.project?.id === project.id} onClick={() => edit({ project: project.id })}>
+            <button key={project.id} type="button" class={form.choice} aria-pressed={task.project?.id === project.id} onClick={() => edit({ project: project.id })}>
               <i style={`background:var(--${project.color})`} />
               {project.name}
             </button>
@@ -114,9 +115,9 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         )}
       </fieldset>
 
-      <fieldset class={css.group}>
+      <fieldset class={form.group}>
         <legend>{s.task.estimate}</legend>
-        <div class={css.line}>
+        <div class={form.line}>
           <Stepper
             text={s.task.estimateText(estimate)}
             less={s.task.less}
@@ -141,12 +142,12 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         <Field label={s.task.when} placeholder={s.task.whenHint} {...when} />
       </div>
 
-      <fieldset class={css.group}>
+      <fieldset class={form.group}>
         <legend>{s.task.repeat}</legend>
-        <div class={css.choices}>
+        <div class={form.choices}>
           <button
             type="button"
-            class={css.choice}
+            class={form.choice}
             aria-pressed={!task.repeat && !chosen}
             onClick={() => {
               setChosen(false);
@@ -157,7 +158,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
           </button>
           <button
             type="button"
-            class={css.choice}
+            class={form.choice}
             aria-pressed={task.repeat?.every === 'day'}
             onClick={() => {
               setChosen(false);
@@ -167,17 +168,17 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
             {s.task.everyDay}
           </button>
           {/* Choosing days is not a rule until a day is chosen, so nothing is saved by this tap alone. */}
-          <button type="button" class={css.choice} aria-pressed={chosen && task.repeat?.every !== 'day'} onClick={() => setChosen(true)}>
+          <button type="button" class={form.choice} aria-pressed={chosen && task.repeat?.every !== 'day'} onClick={() => setChosen(true)}>
             {s.task.someDays}
           </button>
         </div>
         {chosen && task.repeat?.every !== 'day' && (
-          <div class={cx(css.choices, css.days)}>
+          <div class={cx(form.choices, form.days)}>
             {s.task.weekdays.map((name, bit) => (
               <button
                 key={name}
                 type="button"
-                class={cx(css.choice, css.weekday)}
+                class={cx(form.choice, form.weekday)}
                 aria-pressed={(days & (1 << bit)) !== 0}
                 onClick={() => {
                   const mask = days ^ (1 << bit);
@@ -191,7 +192,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         )}
       </fieldset>
 
-      <fieldset class={css.group}>
+      <fieldset class={form.group}>
         <legend>{s.task.subtasks}</legend>
         {task.subtasks.map((sub) => (
           <Subtask
@@ -224,7 +225,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         </form>
       </fieldset>
 
-      <div class={css.ends}>
+      <div class={form.ends}>
         <Button onClick={leave(onDone)}>{task.done ? s.task.notDone : s.task.done}</Button>
         <Button kind="quiet" onClick={leave(onRemove)}>
           {s.task.delete}

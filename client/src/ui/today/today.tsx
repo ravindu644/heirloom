@@ -1,13 +1,16 @@
-import type { ComponentChildren, TargetedSubmitEvent } from 'preact';
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { UNDO_MS } from '../../sync/focus.ts';
-import type { Engine } from '../../sync/engine.ts';
 import type { Focus } from '../../sync/focus.ts';
+import type { Settings } from '../../sync/settings.ts';
 import type { TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
 import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
+import { Marks } from '../kit/marks.tsx';
+import { QuickAdd } from '../kit/quick-add.tsx';
+import { Said, useSaid } from '../kit/said.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { cx } from '../kit/cx.ts';
@@ -24,17 +27,7 @@ const TARGET_MAX = 24;
 
 type List = 'next' | 'later' | 'upcoming' | 'done';
 
-/** What the last tap did, in parts, so a long title can be cut short and the rest still read. */
-interface Said {
-  lead: string;
-  title: string;
-  tail?: string;
-  /** The task it speaks of, when that task has a row to keep clear of the bar. */
-  row?: string;
-  undo?: () => void;
-}
-
-export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
+export function TodayScreen({ focus, today, settings }: { focus: Focus; today: Today; settings: Settings }) {
   useTick(focus);
   const day = today.day.value;
   const next = today.next.value;
@@ -52,12 +45,7 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
   const [bin, setBin] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [targeting, setTargeting] = useState(false);
-  const [said, setSaid] = useState<Said | null>(null);
-  useEffect(() => {
-    if (!said) return;
-    const timer = setTimeout(() => setSaid(null), UNDO_MS);
-    return () => clearTimeout(timer);
-  }, [said]);
+  const [said, setSaid] = useSaid();
 
   // Every task the screen shows. The running one is in `later`, in its place.
   const all = [next, ...later, ...upcoming, ...done].filter((task): task is TaskView => task !== null);
@@ -74,15 +62,12 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
     if (open && !opened) setOpen(null);
   }, [open, opened]);
 
-  const add = (event: TargetedSubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const field = event.currentTarget.elements.namedItem('task') as HTMLInputElement;
-    const id = today.add(field.value);
-    if (!id) return;
-    // Emptied and still focused: ready for the next line.
-    field.value = '';
+  const add = (text: string) => {
+    const id = today.add(text);
+    if (!id) return false;
     const made = [today.next.value, ...today.later.value].find((task) => task?.id === id);
-    if (made) setSaid({ lead: s.today.saidAdded, title: made.title, tail: made.estimate === null ? undefined : s.today.addedLaps(made.estimate), row: id });
+    if (made) setSaid({ lead: s.today.saidAdded, title: made.title, tail: made.estimate === null ? undefined : s.today.addedLaps(made.estimate), comma: made.estimate !== null, row: () => document.querySelector(`[data-task="${CSS.escape(id)}"]`)?.parentElement });
+    return true;
   };
 
   const setDone = (task: TaskView, isDone: boolean) => {
@@ -135,15 +120,6 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
     to?.focus();
   }, [open]);
 
-  // The bar never covers the row it speaks of: a new task that lands under it is nudged clear.
-  const bar = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    const row = said?.row && document.querySelector(`[data-task="${CSS.escape(said.row)}"]`)?.parentElement;
-    if (!row || !bar.current) return;
-    const under = row.getBoundingClientRect().bottom - bar.current.getBoundingClientRect().top;
-    if (under > 0 && row.getBoundingClientRect().top < bar.current.getBoundingClientRect().bottom) bar.current.closest('main')?.scrollBy(0, under + bar.current.offsetHeight / 4);
-  }, [said]);
-
   const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => (
     <TaskRow
       key={task.id}
@@ -174,7 +150,6 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
   const isBreak = state.phase === 'short' || state.phase === 'long';
   // The bell has gone on a lap and its break has not been started.
   const rung = state.phase === 'work' && view.over;
-  const deletedAt = (id: string) => engine.rows('task').value.get(id)?.deleted;
   const running = today.running.value;
   const leftInLater = later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
@@ -247,16 +222,14 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
 
       <div class={css.cols}>
         <div class={css.now}>
-          <form class={css.add} onSubmit={add}>
-            <input name="task" aria-label={s.today.add} placeholder={s.today.addHint} autocomplete="off" enterkeyhint="done" />
-          </form>
+          <QuickAdd name="task" label={s.today.add} hint={s.today.addHint} onAdd={add} />
 
           {state.phase !== 'idle' && !(isBreak && view.over) && (
             <div class={css.bar}>
               <i class={isBreak ? css.rest : undefined} />
               <a href="#/focus" aria-label={s.today.toFocus}>
                 {rung ? (
-                  <span>{s.today.lapDone(state.set_index + 1)}</span>
+                  <span class={css.rung}>{s.today.lapDone(state.set_index + 1)}</span>
                 ) : (
                   <>
                     <b>{s.clock(view.left_ms)}</b>
@@ -330,25 +303,11 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
 
           {!next && later.length === 0 && <p class={css.empty}>{done.length ? s.today.allDone : s.today.empty}</p>}
 
-          {said && (
-            <p class={css.said} role="status" ref={bar}>
-              <span>
-                {said.lead} <span class={css.saidTitle}>{said.title}{said.tail && said.lead === s.today.saidAdded ? ',' : '.'}</span>
-                {said.tail && <span class={css.saidTail}>{said.tail}</span>}
-              </span>
-              {said.undo && (
-                <Button
-                  kind="link"
-                  onClick={() => {
-                    said.undo!();
-                    setSaid(null);
-                  }}
-                >
-                  {s.today.undo}
-                </Button>
-              )}
-            </p>
-          )}
+          {/* A task done inside its guess, a milestone reached from here: said once, for as long as an Undo lasts. */}
+          <div class={css.foot}>
+            <Marks settings={settings} say={s.mark} last={UNDO_MS} />
+            {said && <Said said={said} undo={s.today.undo} onDone={() => setSaid(null)} />}
+          </div>
         </div>
 
         <div class={css.then}>
@@ -394,7 +353,7 @@ export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: F
                 key={task.id}
                 task={task}
                 of={s.today.of(task.estimate)}
-                note={typeof deletedAt(task.id) === 'number' ? s.today.gone(deletedAt(task.id) as number) : undefined}
+                note={task.deleted === null ? undefined : s.today.gone(task.deleted)}
                 end={
                   <Button kind="link" onClick={() => today.restore(task.id)}>
                     {s.today.restore}

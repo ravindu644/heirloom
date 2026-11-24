@@ -5,31 +5,25 @@
 .head p { font: var(--type-label); color: var(--muted); }
 .head h1 { font: var(--type-title); text-wrap: balance; }
 
-/* Phone: one column, in the order the screen is read. The two groups a laptop sets side by side
-   dissolve, and each panel takes its place by number. */
+/* One column, in the order it is read. */
 .grid { display: flex; flex-direction: column; gap: var(--space-lg); }
-.wide, .side { display: contents; }
-.week { order: 1; }
-.streak { order: 2; }
-.year { order: 3; }
-.day { order: 4; }
-.projects { order: 5; }
-.estimates { order: 6; }
 
 .quiet { color: var(--muted); text-wrap: pretty; }
 
-/* The days as squares, with the totals beside them where there is room. */
-/* The grid gives way when the record is longer than its place; the totals keep their width. */
-.since { display: flex; flex-direction: column; gap: var(--space-lg); }
-.heat { display: grid; gap: var(--space-md); min-width: 0; }
+/* The days as squares, the chosen day in words, the key, and the totals: under one another on a
+   phone. This is the box the squares are sized against: large while every week fits it, small
+   after. */
+.since { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); container-type: inline-size; }
+.heat { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); min-width: 0; }
 .said { font: var(--type-label); color: var(--muted); }
-.totals { display: grid; gap: var(--space-md); }
+.totals { display: grid; align-content: start; gap: var(--space-md); padding-top: var(--space-sm); }
 .totals dt { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 .totals dd { margin: 0; font: var(--type-label); color: var(--muted); }
 
 /* The streak: the number, then what it counts. */
 .count { display: flex; align-items: baseline; gap: var(--space-sm); color: var(--muted); }
-.count b { font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); color: var(--ink); }
+/* Its ink on the panel's edge, over the dots: pulled back by the bearing of the digit that leads. */
+.count b { margin-left: var(--bearing, var(--layout-figure-bearing)); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); color: var(--ink); }
 .bests dl { margin: 0; }
 .bests h3 { margin-bottom: var(--space-sm); font: var(--type-body-strong); }
 .bests div { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; border-top: 1px solid var(--line); }
@@ -39,13 +33,14 @@
 /* A project: its square and name, the figure, the bar with the week before marked, and the line of words. */
 .shares { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); padding: 0; list-style: none; }
 .shares li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-xs) var(--space-md); }
-/* The square stays level with the first line of a name that takes two. */
-.name { display: inline-flex; align-items: flex-start; gap: var(--space-xs); min-width: 0; overflow-wrap: anywhere; }
-.name i { position: relative; top: calc((1lh - var(--layout-lane)) / 2); flex: none; width: var(--layout-lane); height: var(--layout-lane); }
+/* The square is a letter in the name's first line, so the name's own text is what the figure
+   beside it lines up with. It stands in the middle of the capitals. */
+.name { min-width: 0; overflow-wrap: anywhere; }
+.name i { position: relative; bottom: calc((1cap - var(--layout-lane)) / 2); display: inline-block; width: var(--layout-lane); height: var(--layout-lane); margin-right: var(--space-xs); }
 .shares b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 .bar { position: relative; grid-column: 1 / -1; height: var(--layout-lane); background: var(--track, var(--line)); }
 .bar i { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
-.bar u, .mark u { border-left: 2px dashed var(--ghost); }
+.bar u, .mark u { border-left: var(--layout-stroke) dashed var(--ghost); }
 .bar u { position: absolute; top: calc(var(--space-xs) * -1); bottom: calc(var(--space-xs) * -1); }
 .line { grid-column: 1 / -1; font: var(--type-label); color: var(--muted); }
 .mark { display: flex; align-items: center; gap: var(--space-sm); font: var(--type-label); color: var(--muted); }
@@ -58,14 +53,21 @@
 
 @media (min-width: 720px) {
   .progress { max-width: 80ch; }
-  .since { flex-direction: row; align-items: flex-start; }
-  .heat { flex: 0 1 auto; }
-  .totals { flex: none; }
+  /* With room, the totals stand right beside the squares, however few weeks there are. They keep
+     a width of their own; the squares know it and take what is left. The two lines under the
+     squares are as wide as the squares and no wider, so they do not push the totals away; in
+     the first weeks, when the squares are a narrow column, they keep the width of the totals. */
+  .since { grid-template-columns: minmax(0, max-content) var(--layout-sidebar); justify-content: start; column-gap: var(--space-lg); --beside: calc(var(--layout-sidebar) + var(--space-lg)); }
+  .heat { min-width: var(--layout-sidebar); }
+  .heat > p { contain: inline-size; }
+  .totals { padding-top: 0; }
 }
 
-/* Laptop: the reference's two columns. What is drawn wide on the left, what is read on the right. */
+/* Laptop: the reference's two columns. What is drawn wide on the left, what is read on the right.
+   A year too long for its column has a row of its own, the canvas wide. */
 @media (min-width: 1280px) {
   .progress { max-width: none; }
-  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
-  .wide, .side { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .col { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
+  .full { grid-column: 1 / -1; }
 }

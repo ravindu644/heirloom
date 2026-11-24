@@ -17,6 +17,11 @@ import type { DemoDay, DemoTask } from './demo-today.ts';
 import { demoProgress } from './demo-progress.ts';
 import type { DemoRecord } from './demo-progress.ts';
 import type { Progress } from '../sync/progress.ts';
+import type { Habits } from '../sync/habits.ts';
+import type { Rooms } from '../sync/rooms.ts';
+import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
+import { HABITS, MANY_HABITS, demoHabits, demoRooms, demoSettings } from './demo-more.ts';
+import type { DemoHabit, DemoRoom } from './demo-more.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -50,6 +55,15 @@ interface Scene {
   settings?: boolean;
   /** The record behind Progress. Given, the scene opens there. */
   record?: DemoRecord;
+  /** The habits. Given, the scene opens on Habits. Left out, the mockup's are there all the same. */
+  habits?: DemoHabit[];
+  /** The rooms. Given, the scene opens on Room. Left out, there is the one of the mockup. */
+  room?: DemoRoom;
+  /** Settings other than the defaults, and marks waiting to be shown. */
+  prefs?: Partial<SettingsView>;
+  marks?: Mark[];
+  /** Who cheered the lap just finished. */
+  cheered?: string[];
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -162,9 +176,56 @@ const PROGRESS: Record<string, Scene> = {
   'progress-no-projects': { ...week, about: 'No projects and no estimates yet', record: { projects: 'none', estimates: false } },
 };
 
+// Habits: the empty screen first, then the mockup's five and one counted through the day.
+const HABIT_SCENES: Record<string, Scene> = {
+  'habits-none': { ...week, about: 'Habits before the first one', habits: [] },
+  'habits-one': { ...week, about: 'One habit, never checked in', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }] },
+  habits: { ...week, about: 'Habits: six, three done, one counted through the day', habits: HABITS },
+  'habits-checked': { ...week, about: 'Just after a check-in on a counted habit: Undo', habits: HABITS, tap: 'Check in: A glass of water' },
+  'habits-all': { ...week, about: 'Every habit of today done', habits: HABITS.map((habit) => ({ ...habit, counts: { ...habit.counts, '2026-11-24': habit.target ?? 1 } })) },
+  'habits-ordering': { ...week, about: 'Changing the order of habits', habits: HABITS, tap: 'Change the order' },
+  'habits-sheet': { ...week, about: 'A habit open: days, count, reminder, its record', habits: HABITS, tap: 'Push one commit' },
+  'habits-sheet-new': { ...week, about: 'A habit open that has no check-in yet', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }], tap: 'Read 10 pages' },
+  'habits-archived': { ...week, about: 'Archived habits, behind their link', habits: HABITS, tap: 'Archived' },
+  'habits-deleted': { ...week, about: 'Recently deleted habits', habits: HABITS, tap: 'Recently deleted' },
+  'habits-after-delete': { ...week, about: 'Just after deleting a habit: Undo', habits: HABITS, tap: ['Lights out', 'Delete'] },
+  'habits-many': { ...week, about: 'Ten habits, one with a very long title', habits: MANY_HABITS },
+};
+
+// Room: no room first, then a room of one, the mockup's four, and eight.
+const ROOM_SCENES: Record<string, Scene> = {
+  'room-none': { ...week, about: 'Room: not in one yet', room: { rooms: 'none' } },
+  'room-none-offline': { ...week, about: 'Not in a room, and no connection', sync: 'offline', room: { rooms: 'none', stale: true } },
+  'room-alone': { ...week, about: 'A room of one', run: onKr, room: { members: 'alone' } },
+  room: { ...week, about: 'Room: four friends, one cheer given, one away', run: onKr, room: {} },
+  'room-cheered': { ...week, about: 'Just after a cheer', run: onKr, room: {}, tap: 'Cheer sachi' },
+  'room-ranked': { ...week, about: 'A room that has switched its order on', run: onKr, room: { ranked: true } },
+  'room-eight': { ...week, about: 'Eight members, a long name, a long task title', run: onKr, room: { members: 'eight', name: 'Second years, block C, the ones who stay up' } },
+  'room-stale': { ...week, about: 'No connection: the room as it was last heard from', run: onKr, sync: 'offline', room: { stale: true } },
+  'room-two': { ...week, about: 'In two rooms', run: onKr, room: { rooms: 'two' } },
+  'room-sheet': { ...week, about: 'The room: its code, name, target, order and the way out', run: onKr, room: {}, tap: 'Code and settings' },
+  'room-leaving': { ...week, about: 'Leaving, the second tap', run: onKr, room: {}, tap: ['Code and settings', 'Leave the room'] },
+  'room-another': { ...week, about: 'Making or joining another room', run: onKr, room: {}, tap: 'Make or join' },
+  'room-hidden': { ...week, about: 'Rooms hidden: Room leaves the navigation', room: {}, prefs: { rooms_hidden: true } },
+};
+
+// Settings in full, and the marks in their moments.
+const lapOver = { phase: 'work', lap: 1, left: 0 } as const;
+const MORE: Record<string, Scene> = {
+  'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
+  'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ kind: 'laps', tier: 1 }] },
+  'mark-hundred': { about: 'Lap 100, a best week, and a cheer', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier: 100 }, { kind: 'week', focus_ms: 1075 * MIN, before_ms: 1050 * MIN }], cheered: ['sachi', 'dilan'] },
+  'mark-off': { about: 'The same lap with celebrations off', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier: 100 }], prefs: { celebrate: false } },
+  'mark-estimate': { ...idleAt2, about: 'A task done inside its estimate: its mark on Today', today: true, day: day(), marks: [{ kind: 'estimate', task: 'react', title: 'Thinking in React, steps 1 to 3', estimate: 2, laps: 1 }], tap: 'Done: Thinking in React' },
+  ...Object.fromEntries([4, 25, 250, 500, 1000, 2500].map((tier) => [`mark-${tier}`, { about: `Lap ${tier}`, run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ kind: 'laps', tier }] } as Scene])),
+};
+
 const SCENES: Record<string, Scene> = {
   ...TODAY,
   ...PROGRESS,
+  ...HABIT_SCENES,
+  ...ROOM_SCENES,
+  ...MORE,
   'signed-out': { about: 'Nobody is signed in', signedOut: true },
   idle: { about: 'The morning, before the first lap', at: [9, 5], next: 0, ghost: [5 * MIN, 200 * MIN] },
   'first-day': { about: 'No ghost yet: lap 1 of the first day', run: { phase: 'work', lap: 0, left: 21 * MIN + 7000 } },
@@ -195,7 +256,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -308,6 +369,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     return { ok: true };
   };
   const engine: Engine = {
+    server: location.origin,
     sync,
     account,
     unsent,
@@ -338,17 +400,20 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     stop: async () => {},
   };
   const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
-  return { engine, focus, today, progress };
+  const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
+  const habits = demoHabits(scene.habits ?? HABITS, { now: 7, before: 8 });
+  const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
+  return { engine, focus, today, progress, habits, rooms, settings };
 }
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
-if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : '';
+if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
 render(
   scene?.elsewhere ? (
     <Elsewhere />
   ) : scene ? (
-    <App {...stage(scene)} />
+    <App {...stage(scene)} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>

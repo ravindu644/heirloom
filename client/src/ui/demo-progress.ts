@@ -62,6 +62,7 @@ function history(from = '2026-09-07', first = '2026-09-14'): Record<string, numb
   return minutes;
 }
 
+const NO_GUESSES: Estimates = { ratio: null, tasks: [], weeks: Array.from({ length: 8 }, (_, i) => ({ monday: addDays('2026-11-23', (i - 7) * 7), ratio: null })) };
 const at = (day: string, hour: number, minute: number) => new Date(`${day}T00:00:00`).getTime() + (hour * 60 + minute) * MIN;
 const project = (id: string) => PROJECTS.find((p) => p.id === id)!;
 
@@ -90,6 +91,7 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     task: { id: 'kr', title: 'K&R 5.1 to 5.5: pointers and arrays' },
     project: project('c'),
     overlap: false,
+    row: 0,
     ...more,
   });
   const rest = (id: string, h: number, m: number, long = false): TimelineEntry => ({
@@ -102,6 +104,7 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     task: null,
     project: null,
     overlap: false,
+    row: 0,
   });
   const maths = { task: { id: 'maths', title: 'Discrete maths, tutorial sheet 6' }, project: project('uni') };
   const scripted = signal<TimelineEntry[]>([
@@ -114,7 +117,7 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     rest('g', 12, 15, true),
     lap('h', 14, 0, { outcome: 'stopped', ended: at(DAY, 14, 12), ran_ms: 12 * MIN, task: { id: 'react', title: 'Thinking in React, steps 1 to 3' }, project: project('react') }),
     lap('i', 15, 30, { overlap: true }),
-    lap('j', 15, 40, { overlap: true, task: { id: 'react', title: 'Thinking in React, steps 1 to 3' }, project: project('react') }),
+    lap('j', 15, 40, { overlap: true, row: 1, task: { id: 'react', title: 'Thinking in React, steps 1 to 3' }, project: project('react') }),
     lap('k', 16, 10),
   ]);
   // Any other day: its laps from nine, a short break after each.
@@ -124,7 +127,8 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
       { ...rest(`${day}-${i}r`, 9, 0), started: at(day, 9, i * 30 + 25), ended: at(day, 9, i * 30 + 30) },
     ]).flat();
 
-  const share = (p: ProjectView | null, now: number, n: number, before: number): ProjectShare => ({ project: p, focus_ms: now * MIN, laps: n, before_ms: before * MIN });
+  // All time is made up from the week: about nine weeks of the same.
+  const share = (p: ProjectView | null, now: number, n: number, before: number): ProjectShare => ({ project: p, focus_ms: now * MIN, laps: n, before_ms: before * MIN, all_ms: (now * 9 + before) * MIN });
   const shares: Record<string, ProjectShare[]> = {
     usual: [share(project('c'), 375, 15, 300), share(project('react'), 275, 11, 250), share(project('uni'), 175, 7, 225), share(project('next'), 100, 4, 100)],
     long: [share({ id: 'long', name: 'Operating systems: three easy pieces, the reading group', color: 'heat-2' }, 375, 15, 300), share(project('react'), 275, 11, 0), share(null, 50, 2, 75)],
@@ -138,9 +142,11 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     week: [share(project('c'), 200, 8, 0), share(project('uni'), 125, 5, 0)],
   };
   const guesses: Estimates = record.estimates === false
-    ? { ratio: null, tasks: [] }
+    ? NO_GUESSES
     : {
         ratio: 1.3,
+        // Eight weeks, getting closer; one with no task done that had a guess.
+        weeks: [1.9, 1.7, 1.8, null, 1.5, 1.6, 1.4, 1.3].map((ratio, i) => ({ monday: addDays('2026-11-23', (i - 7) * 7), ratio })),
         tasks: [
           { id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 },
           { id: 'e1', title: 'K&R chapter 4: functions and program structure', estimate: 4, laps: 6 },
@@ -161,10 +167,12 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
       done: todayMin >= 50 ? [{ id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 }] : [],
       note: note.value,
     }),
+    today: signal(DAY),
+    note: (day) => (day === DAY ? note.value : day === '2026-11-17' ? 'Arrays decay to pointers. Wrote that on my hand.' : ''),
     streak: signal(streakView(days(), DAY)),
     since: signal(since(days(), DAY)),
     bests: signal(bests(days())),
-    estimates: signal(kind === 'weeks' || kind === 'year' ? guesses : { ratio: null, tasks: [] }),
+    estimates: signal(kind === 'weeks' || kind === 'year' ? guesses : NO_GUESSES),
     timeline: (day) => (day === DAY && record.scripted !== false ? scripted.value : plain(day)),
     setAside: (id) => void (scripted.value = scripted.value.map((entry) => (entry.id === id ? { ...entry, outcome: 'void' } : entry))),
     countAgain: (id) => void (scripted.value = scripted.value.map((entry) => (entry.id === id ? { ...entry, outcome: entry.ran_ms >= LAP ? 'rang' : 'stopped' } : entry))),

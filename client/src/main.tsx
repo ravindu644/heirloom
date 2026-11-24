@@ -82,7 +82,8 @@ async function start() {
     skipBreak: (task) => (void notifier.allow(), focus.skipBreak(task)),
   };
 
-  render(<App {...app} focus={asking} />, root);
+  // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
+  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

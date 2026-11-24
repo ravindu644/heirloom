@@ -1,6 +1,6 @@
 .dots { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
-.dots i { box-sizing: border-box; width: calc(var(--space-sm) + var(--space-xs)); height: calc(var(--space-sm) + var(--space-xs)); border-radius: var(--radius-full); }
+.dots i { box-sizing: border-box; width: var(--layout-dot); height: var(--layout-dot); border-radius: var(--radius-full); }
 .kept { background: var(--you); }
-.rest { border: 2px solid var(--rest); }
+.rest { border: var(--layout-stroke) solid var(--rest); }
 .empty { background: var(--track, var(--line)); }
-.open { border: 2px solid var(--ink); }
+.open { border: var(--layout-stroke) solid var(--ink); }

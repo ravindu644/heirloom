@@ -1,0 +1,4 @@
+.switch { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); cursor: pointer; }
+.switch > span { display: grid; gap: var(--space-xs); min-width: 0; }
+.switch b { font: var(--type-body); }
+.switch small { font: var(--type-label); color: var(--muted); text-wrap: pretty; }

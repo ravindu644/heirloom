@@ -1,0 +1,9 @@
+.add input {
+  width: 100%;
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.add input:focus-visible { border-color: var(--ink); outline-offset: 0; }

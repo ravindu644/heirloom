@@ -1,0 +1,21 @@
+/* What the last tap did: as wide as the list, one line, stuck to the bottom of the scroll so it
+   is seen wherever the list is. It sits after the last row, so that row scrolls clear of it. */
+.said {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--ground);
+}
+.said > span { display: flex; flex: 1; gap: var(--space-xs); min-width: 0; white-space: nowrap; }
+/* The bar's job is to say which task: what comes after the name gives way first, and all of it
+   before the name loses a letter. */
+.title { flex: 0 1 auto; min-width: 6ch; overflow: hidden; text-overflow: ellipsis; }
+.tail { flex: 0 10000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.said button { color: var(--ground); text-decoration-color: var(--ground); }
+.said button:hover { color: var(--ground); }

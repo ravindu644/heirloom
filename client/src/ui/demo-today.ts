@@ -90,6 +90,7 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       due: task.due ?? null,
       when: task.when ?? null,
       repeat: task.repeat ?? null,
+      deleted: task.deleted ?? null,
       done: !!task.done,
       subtasks: tasks.value.filter((sub) => sub.parent === task.id && !sub.deleted).map((sub) => ({ id: sub.id, title: sub.title, done: !!sub.done })),
     };

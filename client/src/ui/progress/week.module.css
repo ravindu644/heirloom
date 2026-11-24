@@ -1,23 +1,35 @@
 /* Room at the left for the hours, at the right for half of Sunday's name, and on top for last
    week's total, which stands over the end of its line. */
 .chart { padding: var(--space-lg) var(--space-md) 0 calc(var(--space-lg) + var(--space-sm)); }
-.plot { position: relative; height: calc(var(--layout-touch) * 4); }
+.plot { position: relative; height: var(--layout-chart); }
+/* The guesses, week by week: the same drawing, a quarter as tall. */
+.small .plot { height: calc(var(--layout-chart) / 4); }
+.small { padding-top: var(--space-lg); }
 .plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; }
-.plot polyline { stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.plot polyline { stroke-width: var(--layout-stroke); vector-effect: non-scaling-stroke; }
 .you { stroke: var(--you); }
 /* Past you: dashed, no hue. */
 .ghost { stroke: var(--ghost); stroke-dasharray: var(--space-xs) var(--space-xs); }
 
 /* Light lines at each step of the scale, with the hours beside them. */
-.grid { position: absolute; right: 0; left: 0; height: 1px; background: var(--line); }
+.grid { position: absolute; right: 0; left: 0; height: var(--layout-hair); background: var(--line); }
 .grid span { position: absolute; right: calc(100% + var(--space-sm)); transform: translateY(-50%); font: var(--type-label); color: var(--muted); }
 
-.dot { position: absolute; width: var(--space-sm); height: var(--space-sm); border-radius: var(--radius-full); background: var(--you); transform: translate(-50%, -50%); }
+.dot { position: absolute; width: var(--layout-dot); height: var(--layout-dot); border-radius: var(--radius-full); background: var(--you); transform: translate(-50%, -50%); }
 .yourTotal, .ghostTotal { position: absolute; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); white-space: nowrap; }
+/* Under its dot and to the right, when yours is the lower line. */
 .yourTotal { margin: var(--space-sm) 0 0 var(--space-sm); color: var(--you); }
-.before { margin-left: calc(var(--space-sm) * -1); transform: translateX(-100%); }
+.yourTotal.last { margin-left: calc(var(--space-sm) * -1); transform: translateX(-100%); }
+/* Over its dot, when yours is the upper line or runs near the floor: centred, or pulled in at either end of the week. */
+.yourTotal.over { margin: calc(var(--space-sm) * -1) 0 0; transform: translate(-50%, -100%); }
+.yourTotal.over.first { transform: translate(0, -100%); }
+.yourTotal.over.last { transform: translate(-100%, -100%); }
+/* A week that stands alone, with no line to either side. */
+.lone { width: var(--space-sm); height: var(--space-sm); }
 .ghostTotal { right: 0; margin-top: calc(var(--space-xs) * -1); color: var(--muted); transform: translateY(-100%); }
 
 .days { position: relative; height: calc(1lh + var(--space-sm)); font: var(--type-label); color: var(--muted); }
 .days span { position: absolute; top: var(--space-sm); transform: translateX(-50%); }
 .days .today { color: var(--ink); }
+.days .start { transform: none; }
+.days .end { right: 0; transform: none; }

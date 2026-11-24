@@ -15,6 +15,8 @@ import { Settings } from './settings.tsx';
 import { DESTINATIONS, Shell } from './shell.tsx';
 import type { Destination } from './shell.tsx';
 import { FocusScreen } from './focus/focus.tsx';
+import { HabitsScreen } from './habits/habits.tsx';
+import { RoomScreen } from './room/room.tsx';
 import { ProgressScreen } from './progress/progress.tsx';
 import { SignIn } from './signin.tsx';
 import { TodayScreen } from './today/today.tsx';
@@ -48,18 +50,20 @@ export function Elsewhere() {
   return <Notice text={s.elsewhere} />;
 }
 
-/** Everything `startApp` returns. The last three are for screens not built yet: taken, so the wiring is done once. */
+/** Everything `startApp` returns, and the one moment the screens hand back. */
 interface Props {
   engine: Engine;
   focus: Focus;
   today: Today;
   progress: Progress;
-  habits?: Habits;
-  rooms?: Rooms;
-  settings?: SettingsData;
+  habits: Habits;
+  rooms: Rooms;
+  settings: SettingsData;
+  /** A habit was given a reminder time where it had none: the moment to ask for leave to notify. */
+  onReminderSet?: () => void;
 }
 
-export function App({ engine, focus, today, progress }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, onReminderSet }: Props) {
   const screen = useScreen();
   const account = engine.account.value;
   const sync = engine.sync.value;
@@ -80,20 +84,25 @@ export function App({ engine, focus, today, progress }: Props) {
 
   return (
     // The status line keeps its space only where buttons sit at the bottom of a phone screen: Focus.
-    <Shell person={account.username} at={screen === 'settings' ? undefined : screen} status={said} keepStatus={screen === 'focus'}>
+    <Shell
+      person={account.username}
+      at={screen === 'settings' ? undefined : screen}
+      without={rooms.hidden.value ? 'room' : undefined}
+      status={said}
+      keepStatus={screen === 'focus'}
+    >
       {screen === 'focus' ? (
-        <FocusScreen engine={engine} focus={focus} today={today} />
+        <FocusScreen engine={engine} focus={focus} today={today} rooms={rooms} settings={settings} />
       ) : screen === 'today' ? (
-        <TodayScreen engine={engine} focus={focus} today={today} />
+        <TodayScreen focus={focus} today={today} settings={settings} />
       ) : screen === 'progress' ? (
         <ProgressScreen focus={focus} progress={progress} />
-      ) : screen === 'settings' ? (
-        <Settings engine={engine} onSignIn={() => setAgain(true)} />
+      ) : screen === 'habits' ? (
+        <HabitsScreen focus={focus} habits={habits} onReminderSet={onReminderSet} />
+      ) : screen === 'room' ? (
+        <RoomScreen engine={engine} rooms={rooms} />
       ) : (
-        <div class={css.later}>
-          <h1>{s.nav[screen]}</h1>
-          <p>{s.later[screen]}</p>
-        </div>
+        <Settings engine={engine} settings={settings} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

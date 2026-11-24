@@ -1,5 +1,5 @@
 import type { TargetedKeyboardEvent, TargetedMouseEvent } from 'preact';
-import { useRef } from 'preact/hooks';
+import { useLayoutEffect, useRef } from 'preact/hooks';
 import { cx } from './cx.ts';
 import css from './heat.module.css';
 
@@ -13,16 +13,18 @@ export interface HeatDay {
 interface Props {
   /** One per day, oldest first, with no gaps. */
   days: HeatDay[];
-  /** The day chosen, outlined. */
-  chosen: string;
-  onChoose: (day: string) => void;
+  /** The day chosen, outlined, and what choosing one does. Left out, the grid is a picture and nothing in it is pressed. */
+  chosen?: string;
+  onChoose?: (day: string) => void;
   /** What the grid is, for a screen reader. */
   label: string;
   /** A day in words: "Tuesday 17 November: 3h 20m, 8 laps". Read as the chosen day changes. */
-  say: (day: HeatDay) => string;
+  say?: (day: HeatDay) => string;
   /** Names for the rows shown (Monday, Wednesday, Friday, Sunday) and for a month, by its number from 0. */
   weekdays: string[];
   month: (month: number) => string;
+  /** Called when the weeks do not fit their place even at the small size. */
+  onOver?: () => void;
 }
 
 const weekdayOf = (day: string) => (new Date(day).getUTCDay() + 6) % 7;
@@ -31,18 +33,25 @@ const weekdayOf = (day: string) => (new Date(day).getUTCDay() + 6) % 7;
  * Days as squares: weeks are columns, Monday on top, one hue getting darker over four steps, a
  * rest day carrying the rest mark. The squares are too small to press one by one, so the grid
  * is one control: a tap chooses the day under the finger, the arrow keys move a day or a week,
- * and a screen reader hears it as a slider over the days. When it is wider than its place it
- * opens on the newest weeks and scrolls sideways to the older ones.
+ * and a screen reader hears it as a slider over the days. The squares come in two sizes, chosen
+ * by fit and by the style sheet alone: large while every week fits the place the grid stands in,
+ * small once they do not. For that the grid must stand inside a box that is a size container
+ * (`container-type: inline-size`); whatever shares its row says how wide it is in `--beside`.
+ * Wider than its place even when small, it opens on the newest weeks and scrolls sideways.
  */
-export function Heat({ days, chosen, onChoose, label, say, weekdays, month }: Props) {
+export function Heat({ days, chosen, onChoose, label, say, weekdays, month, onOver }: Props) {
   const grid = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  // Looked at after every layout and before the paint, so whoever can give the grid more room does so unseen.
+  useLayoutEffect(() => {
+    if (onOver && scroller.current && scroller.current.scrollWidth > scroller.current.clientWidth + 1) onOver();
+  });
   if (!days.length) return null;
   const lead = weekdayOf(days[0]!.day);
-  const at = Math.max(0, days.findIndex((d) => d.day === chosen));
+  const at = onChoose ? Math.max(0, days.findIndex((d) => d.day === chosen)) : -1;
   const choose = (i: number) => {
     i = Math.min(days.length - 1, Math.max(0, i));
-    onChoose(days[i]!.day);
+    onChoose!(days[i]!.day);
     // A day chosen by the keys may be one scrolled out of sight. Only the grid moves, never the page.
     const cell = grid.current!.children[i]!.getBoundingClientRect();
     const seen = scroller.current!.getBoundingClientRect();
@@ -68,16 +77,12 @@ export function Heat({ days, chosen, onChoose, label, say, weekdays, month }: Pr
 
   return (
     <div
-      class={css.heat}
-      role="slider"
-      tabIndex={0}
+      class={cx(css.heat, onChoose && css.pressed)}
+      style={`--weeks:${Math.ceil((lead + days.length) / 7)}`}
       aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={days.length - 1}
-      aria-valuenow={at}
-      aria-valuetext={say(days[at]!)}
-      onKeyDown={key}
-      onClick={point}
+      {...(onChoose
+        ? { role: 'slider', tabIndex: 0, 'aria-valuemin': 0, 'aria-valuemax': days.length - 1, 'aria-valuenow': at, 'aria-valuetext': say?.(days[at]!), onKeyDown: key, onClick: point }
+        : { role: 'img' })}
     >
       <div class={css.rows} aria-hidden="true">
         {[0, 2, 4, 6].map((row) => (
@@ -90,8 +95,9 @@ export function Heat({ days, chosen, onChoose, label, say, weekdays, month }: Pr
         <div class={css.weeks}>
           <div class={css.months} aria-hidden="true">
             {days.map((d, i) =>
-              // A month is named over the column its first day falls in.
-              d.day.endsWith('-01') || i === 0 ? (
+              // A month is named over the column its first day falls in. The month the record
+              // starts in is named too, unless the next one begins so close that the two would touch.
+              d.day.endsWith('-01') || (i === 0 && !days.slice(1, 21 - lead).some((next) => next.day.endsWith('-01'))) ? (
                 <span key={d.day} style={`grid-column:${Math.floor((lead + i) / 7) + 1}`}>
                   {month(Number(d.day.slice(5, 7)) - 1)}
                 </span>

@@ -19,7 +19,8 @@ export function clock(ms: number): string {
 /** A total on a lane: "2h 11m", "45m". */
 export function total(ms: number): string {
   const m = mins(ms);
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+  // A whole number of hours is said as a person says it: "5h", not "5h 0m".
+  return m < 60 ? `${m}m` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 /** A length in a sentence: "6 minutes", "1h 5m". */
@@ -69,11 +70,6 @@ export const nav = {
   room: 'Room',
 };
 
-// Screens that later sections build. Each says what will live there and that it does not yet.
-export const later = {
-  habits: 'The things you do every day, with one tap to check in. Not built yet.',
-  room: 'The friends you study beside, and who is focusing now. Not built yet.',
-};
 
 export const focus = {
   title: 'Focus',
@@ -159,6 +155,7 @@ export const result = {
   set: 'Four laps. A full set!',
   laps: (n: number) => (n <= 1 ? 'First lap of the day.' : `${n} laps today.`),
   take: (ms: number) => (mins(ms) === 5 ? 'Take five.' : `Take ${length(ms)}.`),
+  cheered: (who: string[]) => `${names(who)} cheered.`,
   // A short title is named; a long one would bury the count.
   task: (title: string, run: number, estimate: number | null) =>
     `${title.length > 28 ? 'This task' : title} is at ${estimate === null ? plural(run, 'lap', 'laps') : `${run} of ${estimate}`}.`,
@@ -214,6 +211,53 @@ export const settings = {
   account: 'Account',
   where: (device: string, server: string) => `This ${device} keeps step with the server at ${server}.`,
   refused: (device: string, server: string) => `The server at ${server} signed this ${device} out. Your laps are safe on it.`,
+
+  lengths: 'Laps and breaks',
+  lap: 'A lap',
+  short: 'A short break',
+  long: 'The long break, after four laps',
+  minutes: (ms: number) => length(ms),
+  less: 'One minute less',
+  more: 'One minute more',
+
+  auto: 'Starting by itself',
+  autoBreak: 'Start the break when a lap rings',
+  autoWork: 'Start the next lap when a break rings',
+  autoNote:
+    'Off, every start is yours to tap. On, a device that wakes within two hours of a bell writes the laps and breaks that would have run meanwhile. After the long break nothing starts by itself.',
+
+  target: 'Day target',
+  targetText: (laps: number) => (laps === 0 ? 'No target' : plural(laps, 'lap a day', 'laps a day')),
+  targetLess: 'One lap less',
+  targetMore: 'One lap more',
+
+  bell: 'The bell',
+  oneBell: 'One bell for now.',
+  ringHere: (device: string) => `Ring on this ${device}`,
+  ringHereNote: (device: string) => `For this ${device} only. Your other devices keep their own.`,
+  finish: 'A finished lap',
+  celebrate: 'Show the moment, and a milestone when one is reached',
+  celebrateNote: 'Off, a finished lap is its numbers and nothing more.',
+
+  rooms: 'Rooms',
+  shareTask: 'Show the room what I am on',
+  shareTaskNote: 'The title of the task a lap is for, while the lap runs. Off, friends see the phase and the time left.',
+  hideRooms: 'Hide rooms',
+  hideRoomsNote: 'Room leaves the screens on your devices and friends see you as away. Your laps still count toward a room\u2019s week.',
+
+  copy: 'Your copy',
+  copyNote: 'Everything this account holds, as one file that is yours to keep.',
+  export: 'Save a copy',
+  file: (day: string) => `heirloom-${day}.json`,
+  exported: (name: string) => `Saved as ${name}.`,
+  import: 'Bring a copy back',
+  importNote: 'A copy merges with what is here: the newer edit wins, so bringing one back twice loses nothing.',
+  imported: (cells: number) => (cells === 0 ? 'Everything in that copy was here already.' : `${plural(cells, 'change', 'changes')} brought in.`),
+  importErrors: {
+    not_json: 'That file could not be read as a copy.',
+    not_heirloom: 'That file was not saved by heirloom.',
+    empty: 'That copy is empty. Nothing was changed.',
+  },
 };
 
 export const account = {
@@ -394,11 +438,12 @@ export const progress = {
   ahead: (ms: number) => `${cap(length(ms))} ahead of last week.`,
   behind: (laps: number) => `${lapsWord(laps)} behind last week.`,
   closeNow: 'The lap you are in now draws you level.',
-  close: (laps: number) => (laps === 1 ? 'One lap draws you level.' : `${laps} laps draw you level.`),
+  closeWith: (more: number) => `This lap and ${more === 1 ? 'one more' : `${more} more`} draw you level.`,
   ghostEnded: (ms: number) => `Last week ended on ${total(ms)}.`,
   pastAll: 'That is more than all of last week.',
 
   week: 'This week against last week',
+  weekAlone: 'This week',
   weekdays: WEEKDAYS_SHORT,
   hours: (h: number) => `${h}h`,
   byNow: (ms: number, day: string) => `Last week had ${total(ms)} by this time on ${weekdayName(day)}.`,
@@ -440,16 +485,20 @@ export const progress = {
 
   projects: 'Last 7 days by project',
   noProject: 'No project',
-  shareLine: (n: number, now: number, before: number) => {
+  shareLine: (n: number, now: number, before: number, all: number) => {
     const diff = mins(now) - mins(before);
     const change = before < MIN ? 'none the week before' : diff === 0 ? 'same as the week before' : `${diff > 0 ? 'up' : 'down'} ${total(Math.abs(diff) * MIN)} on the week before`;
-    return `${plural(n, 'lap', 'laps')}, ${change}`;
+    return `${plural(n, 'lap', 'laps')}, ${change}, ${total(all)} in all`;
   },
   before: 'the 7 days before',
   noProjects: 'No lap in these 7 days was on a task with a project. Give a task a project on Today and its time shows here.',
 
   estimates: 'Estimates',
   ratio: (ratio: number) => `A task takes about ${ratio.toFixed(1)} laps for each one you guess.`,
+  ratioFigure: (ratio: number) => ratio.toFixed(1),
+  guessed: '1.0',
+  thisWeek: 'this week',
+  guesses: (weeks: { ratio: number | null }[]) => `The last ${weeks.length} weeks, oldest first: ${weeks.map((week) => (week.ratio === null ? 'nothing to go by' : week.ratio.toFixed(1))).join(', ')}.`,
   noEstimates: 'No guess to check yet. Give a task an estimate, finish it, and this says how close the guess was.',
 
   dayTitle: (day: string, today: string) => (day === today ? 'Today, hour by hour' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, hour by hour`),
@@ -472,7 +521,166 @@ export const progress = {
   lookBack: 'Looking back on today',
   lookTotals: (ms: number, n: number) => (n === 0 && ms < MIN ? 'No lap has rung today yet.' : `${cap(length(ms))} of focus in ${plural(n, 'lap', 'laps')}.`),
   lookDone: 'Done today',
-  note: 'One line about today',
+  note: 'A line or two about today',
+  noteThen: 'The line you wrote that day',
   noteHint: 'what went well, or what got in the way',
   noteLeft: (n: number) => plural(n, 'character left', 'characters left'),
 };
+
+const COUNT_WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
+/** "Sachi", "Sachi and Dilan", "Sachi, Dilan and Amaya". */
+const names = (list: string[]) => (list.length < 3 ? list.join(' and ') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
+
+export const habits = {
+  label: (day: string) => `Habits, ${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}`,
+  // The finding. What is left is a number, never a reproach, and yesterday is not spoken of.
+  finding: (done: number, planned: number, any: boolean) =>
+    !any ? 'No habits yet.' : planned === 0 ? 'Nothing planned for today.' : `${done} of ${planned} today. ${countWord(planned - done)} left.`,
+  add: 'Add a habit',
+  addHint: 'Add a habit. It starts as every day, once.',
+  empty: 'Add the first thing you want to do most days. One tap a day checks it in.',
+  list: 'Habits',
+  plan: (days: number) => (days === 127 ? 'Every day' : days === 31 ? 'Weekdays' : days === 96 ? 'Weekends' : WEEKDAYS_SHORT.filter((_, bit) => days & (1 << bit)).join(', ')),
+  running: (n: number) => (n === 1 ? '1 day running' : `${n} days running`),
+  keptOf: (kept: number, of: number) => `${kept} of ${of} planned days`,
+  check: (title: string) => `Check in: ${title}`,
+  of: (target: number) => ` of ${target}`,
+  days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+  weekLabel: (done: number, planned: number) => `This week: ${done} of ${planned} planned days done.`,
+  saidIn: 'Checked in:',
+  saidCount: (count: number, target: number) => `${count} of ${target}.`,
+  saidArchived: 'Archived:',
+  ordering: 'Habits, in order',
+  archived: (n: number) => `Archived, ${n}`,
+  archivedTitle: 'Archived habits',
+  archivedNote: 'An archived habit keeps its record and asks for nothing.',
+  bringBack: 'Bring back',
+  binNote: 'A deleted habit keeps for 30 days, then it is gone for good.',
+
+  week: 'This week against last',
+  thisWeek: 'This week',
+  lastWeek: 'Last week',
+  weekLine: (now: number, before: number, day: string) =>
+    now === 0 && before === 0
+      ? 'No check-ins yet this week.'
+      : before === 0
+        ? `${plural(now, 'check-in', 'check-ins')} this week. Last week had none by now.`
+        : now < before
+          ? `Last week had ${before} by this time on ${weekdayName(day)}. ${countWord(before - now)} more ${before - now === 1 ? 'draws' : 'draw'} you level.`
+          : now === before
+            ? 'Level with last week at this time.'
+            : `${countWord(now - before)} ahead of last week at this time.`,
+
+  sheet: 'Habit',
+  title: 'Habit',
+  daysOf: 'Days',
+  weekdays: WEEKDAYS_SHORT,
+  perDay: 'How often in a day',
+  times: (n: number) => (n === 1 ? 'Once a day' : `${n} times a day`),
+  less: 'One time less',
+  more: 'One time more',
+  remind: 'Reminder',
+  remindNote: 'On the days it is planned, until it is checked in.',
+  noRemind: 'No reminder',
+  record: 'Since the first check-in',
+  recordLabel: (title: string, done: number, of: number) => `${title}: ${done} of ${of} days done since the first check-in.`,
+  recordNote: 'A filled square is a day done. A ring is a rest day.',
+  noRecord: 'The first check-in starts its record.',
+  archive: 'Archive',
+};
+
+export const room = {
+  label: (name: string) => `Room: ${name}`,
+  noRoom: 'You are not in a room yet.',
+  about: 'A room is a few friends who see each other focusing: who is on a lap, the phase and the time left. Task titles stay hidden unless you share yours in Settings.',
+  make: 'Make a room',
+  name: 'Its name',
+  makeGo: 'Make the room',
+  join: 'Join a room',
+  code: 'The code a friend gave you',
+  joinGo: 'Join',
+  errors: {
+    offline: 'Needs a connection. Nothing was sent.',
+    code: 'No room has that code.',
+    full: 'A room holds 8 people and a person 5 rooms. One of the two is full.',
+    slow_down: 'Too many wrong codes. Joining opens again within the hour.',
+    room: 'That room is no longer there.',
+    bad_request: 'A room needs a name of 1 to 40 characters.',
+  } as Record<string, string>,
+  failed: 'That did not go through. Nothing was changed.',
+  needsConnection: 'Making or joining a room needs a connection.',
+
+  finding: (members: number, focusing: number) =>
+    members === 1 ? 'Only you here so far. The code brings a friend in.' : focusing === 0 ? 'Nobody is on a lap right now.' : `${focusing} of ${members} focusing now.`,
+  stale: 'This is the room as it was last heard from.',
+  week: 'Together this week',
+  weekAt: (ms: number, target: number) => (target > 0 ? `${total(ms)} of ${total(target)} together this week.` : `${total(ms)} together this week.`),
+  share: (name: string, ms: number) => `${name} ${total(ms)}`,
+  you: 'You',
+  members: 'Who is focusing now',
+  focusing: (lap: number) => `Focusing, lap ${lap} of 4`,
+  paused: (lap: number) => `Paused, lap ${lap} of 4`,
+  shortBreak: 'Short break',
+  longBreak: 'Long break',
+  breakPaused: 'Break paused',
+  idle: 'Not on a lap',
+  away: 'Away',
+  left: (ms: number) => `${clock(ms)} left`,
+  notSharing: 'Not sharing what they are on.',
+  yoursHidden: 'Your task is not shown to the room.',
+  totals: (today: number, laps: number, week: number) =>
+    laps === 0 && today < MIN ? `Nothing today yet, ${total(week)} this week.` : `${total(today)} today in ${plural(laps, 'lap', 'laps')}, ${total(week)} this week.`,
+  cheer: 'Cheer',
+  cheerLabel: (name: string, ended: number) => `Cheer ${name} for the lap that rang at ${wall(ended)}`,
+  cheered: 'Cheered',
+  cheeredBy: (who: string[], yours: boolean) => `${names(who)} cheered ${yours ? 'your last lap' : 'this lap'}.`,
+
+  open: 'Code and settings',
+  sheet: 'This room',
+  renameGo: 'Rename',
+  target: 'Together in a week',
+  targetText: (hours: number) => (hours === 0 ? 'No target' : plural(hours, 'hour', 'hours')),
+  targetLess: 'One hour less',
+  targetMore: 'One hour more',
+  ranked: 'Order by this week',
+  rankedNote: 'Most focus first, for everyone in this room. Off, people stay in the order they joined.',
+  codeTitle: 'The code to share',
+  codeNote: 'Whoever has it can join. Read it out, or copy it.',
+  copy: 'Copy the code',
+  copied: 'Copied.',
+  copyFailed: 'This browser would not copy it. The code is above.',
+  leave: 'Leave the room',
+  leaveNote: (last: boolean) => (last ? 'You are the last one here. Leaving ends the room.' : 'Your laps leave the room’s week with you. The code brings you back.'),
+  leaveGo: 'Leave',
+  stay: 'Stay',
+  rooms: 'Your rooms',
+  another: 'Make or join another room',
+  anotherTitle: 'Another room',
+  hidden: 'Rooms are hidden on your devices.',
+  unhide: 'Settings brings them back',
+};
+
+/** Every lap tier has a line of its own. The numbers are a track's: one lap is 400 metres. */
+const TIERS: Record<number, string> = {
+  1: 'Lap 1. The bell works.',
+  4: '4 laps. On a track that is a mile, give or take nine metres.',
+  25: '25 laps. On a track that is the ten thousand metres.',
+  100: '100 laps. Nearly a marathon: on a track, two kilometres short.',
+  250: '250 laps. A hundred kilometres, seated.',
+  500: '500 laps. 200 kilometres. The ghost is asking how.',
+  1000: '1000 laps. Four figures, one bell at a time.',
+  2500: '2500 laps. 1000 kilometres. No medal exists for that, so this sentence will have to do.',
+};
+
+/** What was just achieved, one line each: the number first, no exclamation mark. */
+export const marks = {
+  laps: (tier: number) => TIERS[tier] ?? `${tier} laps.`,
+  estimate: (title: string, laps: number, estimate: number) =>
+    `${title.length > 28 ? 'That task' : title}: done in ${plural(laps, 'lap', 'laps')}${laps === estimate ? ', as you guessed.' : `. You guessed ${estimate}.`}`,
+  week: (ms: number, before: number) => `${total(ms)} this week. Your best before was ${total(before)}.`,
+};
+
+/** A mark as its one line, whichever kind it is. */
+export const mark = (m: { kind: 'laps'; tier: number } | { kind: 'estimate'; title: string; estimate: number; laps: number } | { kind: 'week'; focus_ms: number; before_ms: number }) =>
+  m.kind === 'laps' ? marks.laps(m.tier) : m.kind === 'estimate' ? marks.estimate(m.title, m.laps, m.estimate) : marks.week(m.focus_ms, m.before_ms);

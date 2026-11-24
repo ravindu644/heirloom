@@ -19,16 +19,6 @@
 .now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
 .now > button, .then > button { justify-self: start; }
 
-.add input {
-  width: 100%;
-  min-height: var(--layout-touch);
-  padding: 0 var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-}
-.add input:focus-visible { border-color: var(--ink); outline-offset: 0; }
-
 /* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
 .bar {
   display: flex;
@@ -44,6 +34,8 @@
 .bar a { display: flex; flex: 1; align-items: center; gap: var(--space-md); min-width: 0; min-height: var(--layout-touch); }
 .bar b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* "Lap 2 of 4, done" is the whole message: on a narrow phone it takes two lines rather than lose a word. */
+.bar .rung { white-space: normal; text-wrap: balance; }
 /* A button on the bar is an outline in the ground. */
 .bar .onBar { border-color: var(--ground); background: none; color: var(--ground); }
 .bar .onBar:hover { background: color-mix(in srgb, var(--ground) var(--state-hover), transparent); }
@@ -54,26 +46,9 @@
 
 .empty { color: var(--muted); }
 
-/* What the last tap did: as wide as the list, one line, stuck to the bottom of the scroll so it
-   is seen wherever the list is. It sits after the last row, so that row scrolls clear of it. */
-.said {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  min-height: var(--layout-touch);
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-md);
-  background: var(--ink);
-  color: var(--ground);
-}
-.said > span { display: flex; flex: 1; gap: var(--space-xs); min-width: 0; white-space: nowrap; }
-/* The title gives way first, down to a few letters; on the narrowest phone what comes next is cut short too. */
-.saidTitle { flex: 0 10000 auto; min-width: 6ch; overflow: hidden; text-overflow: ellipsis; }
-.saidTail { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.said button { color: var(--ground); text-decoration-color: var(--ground); }
-.said button:hover { color: var(--ground); }
+/* What was just achieved and what the last tap did stay in sight together, at the foot of the list. */
+.foot { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding-top: var(--space-sm); background: var(--ground); }
+.foot:empty { display: none; }
 
 .binNote { color: var(--muted); }
 

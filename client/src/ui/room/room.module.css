@@ -1,0 +1,51 @@
+.room { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); padding-bottom: var(--space-md); }
+
+/* The heading is a finding. The line over it says which room. */
+.head { display: grid; gap: var(--space-xs); }
+.head p { font: var(--type-label); color: var(--muted); }
+.head h1 { font: var(--type-title); text-wrap: balance; }
+.quiet { color: var(--muted); text-wrap: pretty; }
+.link { justify-self: start; }
+a.link { display: flex; align-items: center; min-height: var(--layout-touch); font: var(--type-label); color: var(--muted); text-decoration: underline; text-underline-offset: var(--space-xs); }
+/* A room's name can be forty characters: its choice cuts it short, not the row. */
+.pick { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The two ways in. */
+.doors { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+.door { display: grid; gap: var(--space-md); }
+
+/* The week the room fills together: one lane, a share for each person. */
+.week { display: grid; gap: var(--space-sm); }
+.bar { display: flex; gap: var(--layout-heat-gap); height: var(--layout-lane-set); background: var(--line); }
+.bar i { min-width: var(--layout-stroke); background: var(--ink); }
+.bar .mine { background: var(--you); }
+
+/* Side by side, each in a lane of their own, and all the same height in a row. */
+.members { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+.member { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+/* Your own lane has your colour down its edge. */
+.you { box-shadow: inset var(--layout-stroke) 0 0 var(--you); }
+.who { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
+.who > span { min-width: 0; overflow-wrap: anywhere; }
+.who b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+/* A break is the green of the calyx, here as everywhere. */
+.who .rest { color: var(--rest); }
+.phase { font: var(--type-body-strong); }
+/* Three lines hold any title a person would share, as on a task's own row. */
+.task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.totals { font: var(--type-label); color: var(--muted); }
+/* The button follows the words it is about; a lane with fewer words is not stretched to line them up. */
+.foot { display: grid; padding-top: var(--space-xs); }
+
+/* In the room's sheet. */
+.legend { font: var(--type-label); color: var(--muted); }
+/* Its ink on the sheet's edge, as every large figure's is. */
+.code { margin-left: var(--layout-figure-bearing); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); user-select: all; }
+.rename { display: grid; gap: var(--space-md); }
+
+@media (min-width: 720px) {
+  .quiet { max-width: 60ch; }
+  .doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .door button, .rename button, .foot button { justify-self: start; }
+  .members { grid-template-columns: repeat(auto-fill, minmax(calc(var(--layout-sidebar) + var(--space-md)), 1fr)); gap: var(--layout-gap); }
+}

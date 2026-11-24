@@ -1,0 +1,91 @@
+.habits { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; padding-bottom: var(--space-md); }
+
+/* The heading is a finding. The line over it says which day. */
+.head { display: grid; gap: var(--space-xs); }
+.head p { font: var(--type-label); color: var(--muted); }
+.head h1 { font: var(--type-title); text-wrap: balance; }
+/* The focus is sent here when a habit's sheet closes on a habit that has gone: a place to read on from, not a control. */
+.head h1:focus { outline: none; }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
+.now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+.now > button, .then > button { justify-self: start; }
+.quiet { color: var(--muted); text-wrap: pretty; }
+.rows { display: grid; gap: var(--space-sm); }
+
+/* A habit is a row as a task is: the box, the words, and what is counted at the end. Its week
+   lies under the words on a phone and beside them where there is room. */
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: calc(var(--layout-touch) + var(--space-md));
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xs);
+  border-radius: var(--radius-md);
+  background: var(--row, var(--surface));
+  --track: var(--row-track, var(--raised));
+}
+.plain { padding-left: var(--space-md); }
+/* The words and the week are one target, the height of the row. */
+.open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  min-width: 0;
+  min-height: var(--layout-touch);
+  align-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.words { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-xs) var(--space-md); min-width: 0; align-content: center; align-items: center; }
+.words > * { grid-column: 1; }
+.title { display: -webkit-box; overflow: hidden; font: var(--type-body); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; text-wrap: pretty; }
+.meta { font: var(--type-label); color: var(--muted); }
+.end { display: flex; align-items: center; justify-content: flex-end; }
+.words .count { grid-row: 1 / span 2; grid-column: 2; }
+.count { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
+.count b { font: inherit; color: var(--ink); }
+.moves { display: flex; gap: var(--space-xs); }
+.moves button:disabled { visibility: hidden; }
+
+/* Seven days, Monday first: the letter, and under it the day as a short lane. */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-xs); }
+.week span { display: grid; gap: var(--space-xs); font: var(--type-label); color: var(--muted); text-align: center; }
+.week .today { color: var(--ink); }
+.week i { position: relative; display: grid; place-items: center; height: var(--layout-lane-set); background: var(--track); }
+.week .done { background: var(--you); }
+/* A count on its way: filled as far as it has got, as a lap in progress is. */
+.week .part::before { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--share) * 100%); background: var(--you); }
+/* A rest day carries the ring, as it does in the row of days. */
+.week .rest::after { content: ""; box-sizing: border-box; width: var(--layout-dot); height: var(--layout-dot); border: var(--layout-stroke) solid var(--rest); border-radius: var(--radius-full); }
+/* Not planned: no lane, only the line it would stand on. Nothing to do is not a miss. */
+.week .off { background: none; box-shadow: inset 0 calc(var(--layout-stroke) * -1) 0 var(--line); }
+/* Today has a line round it, as in the year. */
+.week .today i { outline: var(--layout-hair) solid var(--ink); }
+
+/* In the sheet. */
+.remind { display: grid; gap: var(--space-xs); justify-items: start; }
+.remind > label { width: 100%; }
+.legend { font: var(--type-label); color: var(--muted); }
+/* The box the record's squares are sized against: large while every week fits it. */
+.record { container-type: inline-size; }
+
+/* On a phone, changing the order is about the names: the weeks step aside for Up and Down. */
+.ordering .week { display: none; }
+
+@media (min-width: 720px) {
+  .ordering .week { display: grid; }
+  .habits { max-width: 80ch; }
+  .quiet { max-width: 60ch; }
+  .open { grid-template-columns: minmax(0, 1fr) calc(var(--layout-touch) * 5); gap: var(--space-md); align-items: center; }
+}
+
+/* Laptop: the list beside this week against the last. */
+@media (min-width: 1280px) {
+  .habits { max-width: none; }
+  .cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}

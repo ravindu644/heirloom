@@ -15,7 +15,7 @@ interface Props {
   next?: boolean;
   /** It was added while the screen was open: it comes in with the `fill` motion, once. */
   arriving?: boolean;
-  /** At the row's end, where the laps otherwise are: a button, the move controls. The laps move under the title. */
+  /** At the row's end: a button, the move controls. The squares and the count sit to its left. */
   end?: ComponentChildren;
   /** What the box marks, for a screen reader. Left out with `onDone`, there is no box. */
   checkLabel?: string;
@@ -31,7 +31,7 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
   const words = (
     <>
       <span class={css.title}>{task.title}</span>
-      {(task.project || note || (end && laps)) && (
+      {(task.project || note) && (
         <span class={css.meta}>
           {task.project && (
             <span class={css.project}>
@@ -41,8 +41,6 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
             </span>
           )}
           {note && <span>{note}</span>}
-          {/* A button at the row's end takes the laps' place; they move here, to the far side of the line. */}
-          {end && laps && <span class={css.far}>{laps}</span>}
         </span>
       )}
     </>
@@ -57,7 +55,11 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
       ) : (
         <div class={css.words}>{words}</div>
       )}
-      <div class={css.end}>{end ?? laps}</div>
+      {/* A control at the row's end has the squares and the count to its left, centred on it. */}
+      <div class={css.end}>
+        {laps}
+        {end}
+      </div>
     </div>
   );
 }

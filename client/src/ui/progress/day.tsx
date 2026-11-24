@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'preact/hooks';
-import { UNDO_MS } from '../../sync/focus.ts';
 import type { Progress, TimelineEntry } from '../../sync/progress.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
@@ -28,13 +27,8 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const entries = progress.timeline(day);
   const isToday = day === today;
 
-  // A lap set aside here can be counted again for as long as any Undo lasts.
+  // The lap last set aside here, for the one sentence a screen reader is told.
   const [aside, setAside] = useState<string | null>(null);
-  useEffect(() => {
-    if (!aside) return;
-    const timer = setTimeout(() => setAside(null), UNDO_MS);
-    return () => clearTimeout(timer);
-  }, [aside]);
   useEffect(() => setAside(null), [day]);
 
   // The day's stretch: whole hours around what ran, never fewer than four.
@@ -46,17 +40,10 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const hours = (until - from) / HOUR;
   const every = [1, 2, 3, 4, 6].find((n) => hours / n <= 6) ?? 6;
   const x = (ms: number) => ((ms - from) / (until - from)) * 100;
-  // The second of a pair that overlaps the one before it goes on the row below.
-  let busyUntil = 0;
-  const rows = entries.map((entry) => {
-    const below = entry.overlap && entry.started < busyUntil;
-    if (!below) busyUntil = entry.ended;
-    return below ? 1 : 0;
-  });
-  const two = rows.includes(1);
+  const two = entries.some((entry) => entry.row === 1);
 
   const said = entries.find((entry) => entry.id === aside && entry.outcome === 'void');
-  const act = (entry: TimelineEntry) => (entry.outcome !== 'void' ? s.progress.setAside : entry === said ? s.today.undo : s.progress.countAgain);
+  const act = (entry: TimelineEntry) => (entry.outcome === 'void' ? s.progress.countAgain : s.progress.setAside);
 
   const look = isToday ? progress.lookBack() : null;
   // One line: a new line typed or pasted is a space.
@@ -75,17 +62,18 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
         <>
           <div class={css.axis} aria-hidden="true">
             <div class={cx(css.track, two && css.two)}>
-              {entries.map((entry, i) => (
+              {entries.map((entry) => (
                 <i
                   key={entry.id}
-                  class={cx(entry.kind !== 'work' ? css.rest : entry.outcome === 'void' ? css.void : css.lap, rows[i] === 1 && css.below)}
+                  class={cx(entry.kind !== 'work' ? css.rest : entry.outcome === 'void' ? css.void : css.lap, entry.row === 1 && css.below)}
                   style={`left:${x(entry.started)}%;width:${x(entry.ended) - x(entry.started)}%`}
                 />
               ))}
             </div>
             <div class={css.hours}>
+              {/* Each hour's name is centred on its hour; only one at either end of the lane is pulled in. */}
               {Array.from({ length: Math.floor(hours / every) + 1 }, (_, k) => (
-                <span key={k} style={`left:${((k * every) / hours) * 100}%`}>
+                <span key={k} class={k === 0 ? css.start : k * every === hours ? css.end : undefined} style={`left:${((k * every) / hours) * 100}%`}>
                   {s.wall(from + k * every * HOUR)}
                 </span>
               ))}
@@ -101,7 +89,7 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
                   {entry.overlap && <em>{s.progress.twoDevices}</em>}
                 </span>
                 <span class={css.length}>{entry.outcome === 'void' ? s.progress.ranAside(entry.ran_ms) : s.progress.ran(entry.ran_ms)}</span>
-                {/* The way back is where the finger already is: for as long as an Undo lasts the link says Undo, then Count again. */}
+                {/* The way back is where the finger already is, under the one name it has on every row: Count again. */}
                 {entry.kind === 'work' && (
                   <Button
                     kind="link"
@@ -146,6 +134,12 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
             hint={NOTE_MAX - note.value.length <= NOTE_NEAR ? s.progress.noteLeft(NOTE_MAX - note.value.length) : undefined}
             {...note}
           />
+        </section>
+      )}
+      {!isToday && progress.note(day) && (
+        <section class={css.look} aria-label={s.progress.noteThen}>
+          <h3>{s.progress.noteThen}</h3>
+          <p>{progress.note(day)}</p>
         </section>
       )}
     </Panel>

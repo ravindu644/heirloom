@@ -25,7 +25,9 @@
 
 /* No padding below: the status line is the space under the screen, and a screen's own buttons
    may stick to the very bottom of the scroll. */
-.main { grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
+/* Positioned, so a line kept for screen readers (out of the flow) lies inside the scroller and
+   can never make the page itself taller than the screen. */
+.main { position: relative; grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
 .canvas { max-width: var(--layout-canvas); height: 100%; }
 
 /* What the connection has to say. It takes room when it speaks and none when it is silent. */
@@ -46,7 +48,9 @@
 .nav {
   grid-area: nav;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* Five destinations, or four for someone who has hidden rooms: each an equal share. */
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   padding: 0 var(--space-sm) env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
 }

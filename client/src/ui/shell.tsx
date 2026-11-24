@@ -12,6 +12,8 @@ interface Props {
   person?: string;
   /** The destination being shown, if it is one of the five. */
   at?: Destination;
+  /** A destination this person has taken out of their navigation: Room, when rooms are hidden. */
+  without?: Destination;
   /** What the connection has to say, or nothing. */
   status?: string;
   /** Keep the status line's space even when it is silent: for a screen with buttons at the bottom of a phone. */
@@ -24,7 +26,7 @@ interface Props {
  * and the name in one place, the person at the right of the header (at the foot of the sidebar
  * on a laptop), the screen, what the connection has to say, and the five destinations.
  */
-export function Shell({ person, at, status = '', keepStatus, children }: Props) {
+export function Shell({ person, at, without, status = '', keepStatus, children }: Props) {
   return (
     <div class={css.shell}>
       <a class={css.brand} href="#/focus">
@@ -32,7 +34,7 @@ export function Shell({ person, at, status = '', keepStatus, children }: Props) 
       </a>
       {person && (
         <nav class={css.nav} aria-label={s.nav.label}>
-          {DESTINATIONS.map((id) => (
+          {DESTINATIONS.filter((id) => id !== without).map((id) => (
             <a key={id} href={`#/${id}`} aria-current={id === at ? 'page' : undefined}>
               {id === at ? <b>{s.nav[id]}</b> : s.nav[id]}
             </a>

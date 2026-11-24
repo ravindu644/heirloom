@@ -5,9 +5,12 @@ import type { Engine } from '../../sync/engine.ts';
 import { EXTEND_MS } from '../../sync/focus.ts';
 import type { Focus, Race as RaceNow } from '../../sync/focus.ts';
 import type { TaskView, Today } from '../../sync/today.ts';
+import type { Rooms } from '../../sync/rooms.ts';
+import type { Settings } from '../../sync/settings.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
 import { LapBar } from '../kit/lapbar.tsx';
+import { Marks } from '../kit/marks.tsx';
 import { Panel } from '../kit/panel.tsx';
 import { Race, SplitChip } from '../kit/race.tsx';
 import * as s from '../strings.ts';
@@ -66,7 +69,7 @@ function RacePanel({ race, inLap, left, workMs, now }: { race: RaceNow; inLap: b
   );
 }
 
-export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
+export function FocusScreen({ engine, focus, today, rooms, settings }: { engine: Engine; focus: Focus; today: Today; rooms: Rooms; settings: Settings }) {
   const redraw = useTick(focus);
   const state: TimerState = focus.state.value;
   const lengths = focus.lengths.value;
@@ -95,7 +98,8 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
   const moment = useRef<string | null>(null);
   if (result && watched.current === state.run && view.ends_at !== null && now - view.ends_at < LIVE_MS) moment.current = state.run;
   watched.current = view.over ? null : state.run;
-  const live = result && moment.current === state.run;
+  // With celebrations off a finished lap is its numbers at once: nothing runs, nothing lights.
+  const live = result && moment.current === state.run && settings.all.value.celebrate;
   useEffect(() => {
     if (!live) return;
     // Tap anywhere, or any key: straight to the final state.
@@ -172,6 +176,10 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
           <div class={css.lanes}>
             <Race big you={l.you} ghost={l.ghost} from={live && !set ? Math.max(0, race.you_ms - state.planned_ms) / (race.you_ms || 1) * l.you.share : undefined} />
           </div>
+          <Marks settings={settings} say={s.mark} />
+        </div>
+        {/* What to do next, and the line that explains it, travel together: on a phone they are the screen's lower group. */}
+        <div class={css.next}>
           <p class={css.facts}>
             {l.day && (
               <>
@@ -180,11 +188,10 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
             )}
             <span class={css.words}>
               {s.result.laps(focus.lapsToday())} {lapTask && `${s.result.task(lapTask.title, lapTask.laps, lapTask.estimate)} `}
+              {rooms.cheered.value.length > 0 && `${s.result.cheered(rooms.cheered.value)} `}
               {s.result.take(breakMs)}
             </span>
           </p>
-        </div>
-        <div class={css.actions}>
           <div class={css.main}>
             <Button kind="primary" onClick={() => focus.start()}>
               {s.focus.startBreak(breakMs)}
@@ -210,6 +217,19 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
   const shown = ready ? lengths.work_ms : view.left_ms;
   // The digits are for eyes. A screen reader gets a sentence that changes once a minute.
   const heard = ready ? s.focus.nextLength(lengths.work_ms) : s.focus.left(view.left_ms);
+
+  // What a start would do, or what the last tap did with the way to take it back.
+  const why =
+    note && focus.undoable.value ? (
+      <>
+        {note}
+        <Button kind="link" class={css.undo} onClick={() => focus.undo()}>
+          {s.focus.undo}
+        </Button>
+      </>
+    ) : (
+      note || s.focus.endsIfStarted(now + lengths.work_ms)
+    );
 
   return (
     <div class={css.focus}>
@@ -252,19 +272,11 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
             <p class="sr" role="timer" aria-live="polite">
               {heard}
             </p>
-            <p class={css.sub}>
-              {ready && note && focus.undoable.value ? (
-                <>
-                  {note}
-                  <Button kind="link" class={css.undo} onClick={() => focus.undo()}>
-                    {s.focus.undo}
-                  </Button>
-                </>
-              ) : ready
-                ? note || s.focus.endsIfStarted(now + lengths.work_ms)
-                : view.ends_at !== null
-                  ? s.focus.endsAt(state.planned_ms, view.ends_at)
-                  : s.focus.pausedSince(state.planned_ms, state.paused_at ?? now)}
+            {/* While the clock runs this line is about the digits and stays with them. Before a
+                start it explains the button: with the digits where there is a sidebar, with the
+                button on a phone. */}
+            <p class={cx(css.sub, ready && css.wide)}>
+              {ready ? why : view.ends_at !== null ? s.focus.endsAt(state.planned_ms, view.ends_at) : s.focus.pausedSince(state.planned_ms, state.paused_at ?? now)}
             </p>
           </div>
         </div>
@@ -317,6 +329,7 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
           )}
         </div>
         <div class={css.quiet}>
+          {ready && <p class={css.why}>{why}</p>}
           {!ready && !view.paused && state.phase === 'work' && (
             <Button kind="link" onClick={() => focus.extend()}>
               {s.focus.extend(EXTEND_MS)}
