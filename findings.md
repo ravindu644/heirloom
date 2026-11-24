@@ -22,6 +22,9 @@ when it is done.
   - Starting while a run is open closes it first: `rang` if over, else `stopped`. A running interval replaced by a newer incoming timer state closes as `stopped` at that moment.
 - [any] A run stopped under 60 s on another device (no row) and replaced there before this device heard of the stop is closed here as `stopped` or `rang`: this device cannot tell it from a run the other device never saw. It shows with the "ran on two devices" mark and can be set aside.
 - [2] Auto-start: both devices must write the same next state (same run id, `started` at the previous end), or one of them makes a stray `stopped` row.
+- [3] On the phone the bell uses the notification sound, so silent mode and Do Not Disturb silence it (it still vibrates in vibrate mode). The Clock app's timers ring through silent on the alarm stream. The user's call; a channel's sound is frozen once made, so changing it later means a new channel id.
+- [3] Nothing in section 3 has run on the phone: wireless adb dropped overnight. The commands are in the android lane's report, copied to `reviews/3/device-run.md`.
+- [any] An edit is durable a few milliseconds after the tap (one IndexedDB transaction with strict durability). A page killed inside that window loses that one edit; a browser offers no synchronous way to close it.
 - [3] `java` on the PATH is 17; `make apk` must set `JAVA_HOME=$HOME/.jdks/jdk-21` (Capacitor 8 needs 21).
 - [4] `task.when` ("after dinner") has no field in ARCHITECTURE section 3; `task.repeat` has no shape; DESIGN.md has no colour roles for projects.
 - [5] The end-of-day look back's one-line note has nowhere to live.
