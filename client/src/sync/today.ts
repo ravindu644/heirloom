@@ -75,11 +75,11 @@ export interface TaskEdit {
 export interface Today {
   /** The local day, `2026-11-24`. It changes at midnight, and the lists with it. */
   readonly day: ReadonlySignal<string>;
-  /** The first task to start: the top of today's list that is not the one running. */
+  /** The first task to start: the first of today's open tasks, in order, that is not running. Null when there is none. It is not in `later`. */
   readonly next: ReadonlySignal<TaskView | null>;
-  /** The task the timer is on, if it is one of today's. */
+  /** The task a lap is running on (counting or paused, bell not yet gone), if it is one of today's open tasks. The same task is also in `later`, in its place: this is the handle for the bar, not a third list. */
   readonly running: ReadonlySignal<TaskView | null>;
-  /** The rest of today's open tasks, in order. */
+  /** Today's open tasks other than `next`, in order, the running one included, in its place. With `next` this is the whole list. */
   readonly later: ReadonlySignal<TaskView[]>;
   /** Open tasks due after today, by day. */
   readonly upcoming: ReadonlySignal<TaskView[]>;
@@ -90,6 +90,8 @@ export interface Today {
   readonly projects: ReadonlySignal<ProjectView[]>;
   /** Worked out at the engine's now, the lap in progress included. Call it on every tick. */
   figures(): DayFigures;
+  /** Looks at the clock now: after the device slept, `day` and the lists are right as soon as this returns. */
+  wake(): void;
 
   /** Quick add: "pointers chapter 3 ~4". Due today, at the end of the list. Returns the new id, or null for an empty title. */
   add(text: string): string | null;
@@ -140,17 +142,15 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   // comes: a clock that was corrected meanwhile may say it is not midnight yet.
   const day = signal(dayNow());
   let cancelMidnight = () => {};
-  function armMidnight() {
+  // A sleeping laptop runs no timers, so this is also what waking calls: the day as it is now,
+  // and a fresh wait for the midnight after it.
+  function turn() {
+    cancelMidnight();
+    day.value = dayNow();
     const midnight = Date.parse(day.peek()) + DAY_MS - env.utcOffsetMin() * 60000;
-    cancelMidnight = env.schedule(
-      () => {
-        day.value = dayNow();
-        armMidnight();
-      },
-      Math.min(Math.max(midnight - engine.now(), 1000), DAY_MS),
-    );
+    cancelMidnight = env.schedule(turn, Math.min(Math.max(midnight - engine.now(), 1000), DAY_MS));
   }
-  armMidnight();
+  turn();
 
   // While a lap runs on a task its square fills, so the lists are worked out again every few
   // seconds, and once more at the bell. Nothing else here moves with the clock.
@@ -265,9 +265,13 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       };
     },
 
+    wake: turn,
+
     add(line) {
       const parsed = quickAdd(line);
       if (!parsed) return null;
+      // The new task is due the day it really is. If the list is still showing yesterday, it must not land in Upcoming.
+      if (day.peek() !== dayNow()) turn();
       const id = env.id();
       engine.write('task', id, { ...parsed, due: dayNow(), order: atEnd(model.peek().lists.today) });
       return id;

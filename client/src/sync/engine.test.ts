@@ -48,7 +48,7 @@ function fakeWire(handlers: Handlers) {
 function fakeAccounts() {
   const server = {
     reachable: true,
-    calls: [] as { path: string; body: any }[],
+    calls: [] as { path: string; body: any; signal?: AbortSignal }[],
     fail: null as null | { status: number; error: string; retryAfter?: string },
     /** Set, and the next logout waits for it: the request is on its way and has not come back. */
     logoutWaits: null as null | Promise<void>,
@@ -57,7 +57,7 @@ function fakeAccounts() {
     if (!server.reachable) throw new TypeError('fetch failed');
     const path = new URL(url).pathname;
     const body = JSON.parse(init.body);
-    server.calls.push({ path, body });
+    server.calls.push({ path, body, signal: init.signal });
     if (path === '/api/logout') await server.logoutWaits;
     const fail = server.fail;
     if (fail) {
@@ -699,7 +699,7 @@ describe('a crash, then a restart', () => {
     assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 1);
   });
 
-  it('the account database deleted from another tab: this engine is signed out too, and does not go on writing into nothing', async () => {
+  it('the account database deleted from another tab, with nothing unsent here: this engine is signed out too, and does not go on writing into nothing', async () => {
     const d = await signedIn();
     d.engine.write('task', 't1', { title: 'before' });
     await d.engine.saved();
@@ -707,7 +707,8 @@ describe('a crash, then a restart', () => {
     await d.engine.saved();
     const wire = d.wire();
     await (await d.stores('heirloom-acct-ravi')).destroy();
-    d.engine.write('task', 't2', { title: 'typed in the tab that did not know' });
+    // The next thing to save is a cell from the server: nothing of ours is at stake.
+    d.wire().cells(1, 2, [theirs(60, 't2', 'title', 'from another device')]);
     await d.engine.saved();
     assert.equal(d.engine.account.value, null);
     assert.equal(d.engine.sync.value, 'signed-out');
@@ -717,6 +718,43 @@ describe('a crash, then a restart', () => {
     assert.throws(() => d.engine.write('task', 't3', { title: 'x' }), /sign in/);
     // No retry is left ticking.
     assert.equal(d.time.waiting(), 0);
+  });
+
+  it('the account database deleted from another tab while this one holds an unsent lap: the lap is written back, kept, and sent at the next sign in', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'sent long ago' });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    // Offline, a lap ends here. Then the other tab signs out and deletes the database.
+    d.wire().handlers.down();
+    d.engine.write('session', 'run-1', { kind: 'work', outcome: 'rang' });
+    await d.engine.saved();
+    await (await d.stores('heirloom-acct-ravi')).destroy();
+    d.engine.write('task', 't2', { title: 'typed in the tab that did not know' });
+    await d.engine.saved();
+
+    assert.equal(d.engine.account.value?.username, 'ravi');
+    assert.equal(d.engine.unsent.value, 3);
+    assert.equal(d.engine.unsaved.value, false);
+    assert.equal(d.engine.rows('session').value.get('run-1')?.outcome, 'rang');
+    // On the disk again: what the server never got, and nothing else of the account.
+    const disk = await (await d.stores('heirloom-acct-ravi')).load();
+    assert.deepEqual(disk.cells.map((c) => `${c.row}/${c.field}`).toSorted(), ['run-1/kind', 'run-1/outcome', 't2/title']);
+    assert.equal(disk.outbox.length, 3);
+    assert.equal(disk.meta.cursor, 0, 'so the rest is asked for again');
+    // Later writes land in the new database like any other.
+    d.engine.write('task', 't3', { title: 'and one more' });
+    await d.engine.saved();
+    assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 4);
+
+    // The app is opened again and the person signs in: the lap goes to the server.
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.engine.unsent.value, 4);
+    assert.equal(again.wire().handlers.hello().cursor, 0);
+    again.wire().welcome();
+    assert.deepEqual(again.wire().sent[0]!.cells.map((c) => c.row).toSorted(), ['run-1', 'run-1', 't2', 't3']);
   });
 });
 
@@ -863,10 +901,8 @@ describe('accounts', () => {
     assert.equal(d.engine.account.value, null);
     assert.match(d.engine.device, /^[0-9a-f]{16}$/);
     assert.deepEqual(await d.engine.register('invite-code', 'ravi', 'correct horse'), { ok: true });
-    assert.deepEqual(d.server.calls[0], {
-      path: '/api/register',
-      body: { invite: 'invite-code', username: 'ravi', password: 'correct horse', device: d.engine.device },
-    });
+    assert.equal(d.server.calls[0]?.path, '/api/register');
+    assert.deepEqual(d.server.calls[0]?.body, { invite: 'invite-code', username: 'ravi', password: 'correct horse', device: d.engine.device });
     assert.deepEqual(d.engine.account.value, { account: 'acct-ravi', username: 'ravi' });
     assert.equal(d.wire().running, true);
     assert.equal(d.wire().handlers.hello().token, 'token-of-ravi');
@@ -910,7 +946,8 @@ describe('accounts', () => {
     const wire = d.wire();
     wire.ack(0, 2);
     assert.deepEqual(await leaving, { ok: true });
-    assert.deepEqual(d.server.calls.at(-1), { path: '/api/logout', body: { token: 'token-of-ravi' } });
+    assert.equal(d.server.calls.at(-1)?.path, '/api/logout');
+    assert.deepEqual(d.server.calls.at(-1)?.body, { token: 'token-of-ravi' });
     assert.equal(d.engine.account.value, null);
     assert.equal(d.engine.sync.value, 'signed-out');
     assert.equal(wire.running, false);
@@ -937,9 +974,60 @@ describe('accounts', () => {
     // and saying so is the honest answer: the timer is on the server, untouched.
     assert.throws(() => d.engine.write('session', 'run-1', { outcome: 'rang' }), /sign in/);
     assert.deepEqual([...d.engine.rows('task').value], []);
+    // And the screen is not left with a name over an empty account while the request is out.
+    assert.equal(d.engine.account.value, null);
+    assert.equal(d.engine.sync.value, 'signed-out');
     release();
     assert.deepEqual(await leaving, { ok: true });
     assert.equal(d.engine.account.value, null);
+  });
+
+  it('a logout the server never answers is given five seconds and then cancelled: the sign out finishes without it', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'sent' });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    d.server.logoutWaits = new Promise(() => {});
+    let finished: unknown;
+    void d.engine.signOut().then((result) => (finished = result));
+    await settle();
+    const logout = d.server.calls.at(-1)!;
+    assert.equal(logout.path, '/api/logout');
+    assert.equal(d.engine.account.value, null);
+    d.time.advance(4999);
+    await settle();
+    assert.equal(finished, undefined);
+    assert.equal(logout.signal?.aborted, false);
+    d.time.advance(1);
+    await settle();
+    assert.deepEqual(finished, { ok: true });
+    assert.equal(logout.signal?.aborted, true);
+    assert.deepEqual(await (await d.stores('heirloom-acct-ravi')).load(), { cells: [], outbox: [], meta: {} });
+    // The next sign in is not kept waiting behind it.
+    assert.deepEqual(await d.engine.signIn('ravi', 'correct horse'), { ok: true });
+  });
+
+  it('a sign in the server never answers is given twenty seconds, cancelled, and reported as offline', async () => {
+    const d = await device();
+    const hung: Fetch = (_url, init) => {
+      d.server.calls.push({ path: '/api/login', body: {}, signal: init.signal });
+      return new Promise(() => {});
+    };
+    const engine = await createEngine({
+      url: 'https://heirloom.test',
+      now: d.time.now,
+      schedule: d.time.schedule,
+      random: () => 0.5,
+      WebSocket: fakeSockets().FakeSocket,
+      fetch: hung,
+      openStore: memoryStores(),
+    });
+    const answer = engine.signIn('ravi', 'correct horse');
+    await settle();
+    d.time.advance(20000);
+    assert.deepEqual(await answer, { ok: false, error: 'offline' });
+    assert.equal(d.server.calls.at(-1)?.signal?.aborted, true);
   });
 
   it('an edit that lands just as the outbox empties stops the sign out: still signed in, the server not told, the edit kept', async () => {

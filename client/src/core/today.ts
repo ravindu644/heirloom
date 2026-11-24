@@ -168,11 +168,15 @@ export function plan(
   };
 }
 
-/** Today's list split three ways: the task the timer is on, the first of the others, and the rest. */
+/**
+ * Today's list as the screen shows it. `next` is the first task that is not running, lifted out
+ * of the list. `later` is every other task in order, the running one included, in its place: its
+ * row stays where it was while its square fills. `running` is that same task again, for the bar.
+ */
 export function upNext<T extends { id: string }>(today: readonly T[], timerTask: string | null): { running: T | null; next: T | null; later: T[] } {
   const running = today.find((t) => t.id === timerTask) ?? null;
-  const [next = null, ...later] = today.filter((t) => t !== running);
-  return { running, next, later };
+  const next = today.find((t) => t !== running) ?? null;
+  return { running, next, later: today.filter((t) => t !== next) };
 }
 
 /** Laps still planned: each task's estimate less the laps it has, never under 0. No estimate adds nothing. */

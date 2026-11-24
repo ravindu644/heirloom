@@ -45,9 +45,17 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   const today = createToday(engine, { utcOffsetMin, id, schedule: env.schedule });
   // A background tab's timers are throttled and a sleeping phone's do not run at all, so the
   // backoff may be far from done when the person is looking again.
-  addEventListener('online', engine.wake);
+  addEventListener('online', () => {
+    engine.wake();
+    today.wake();
+  });
   // Without this a network that vanished is only found by a ping, most of a minute later.
   addEventListener('offline', () => wire?.offline());
-  document.addEventListener('visibilitychange', () => document.hidden || engine.wake());
+  // And a laptop that slept over midnight must not go on showing yesterday until a late timer fires.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    engine.wake();
+    today.wake();
+  });
   return { engine, focus, today };
 }

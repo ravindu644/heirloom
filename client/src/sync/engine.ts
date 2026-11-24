@@ -15,7 +15,7 @@ import { IDLE, act } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
 import { StoreGone } from '../store/store.ts';
 import type { OpenStore, Store, Write } from '../store/store.ts';
-import { connect, smoothOffset } from './transport.ts';
+import { connect, postJson, smoothOffset } from './transport.ts';
 import type { Connect, Handlers, Push, ServerMessage, Transport, Wire } from './transport.ts';
 
 export interface Env extends Wire {
@@ -117,6 +117,10 @@ const PUSH_CELLS = 500;
 const PUSH_BYTES = 900 * 1024;
 const SAVE_RETRY_MS = 5000;
 const SIGN_OUT_WAIT_MS = 10000;
+// How long the server has to answer an account call. Signing out does not need its answer at
+// all, so it waits less: the next sign in queues behind it.
+const ASK_MS = 20000;
+const LOGOUT_MS = 5000;
 const INSTALL_DB = 'heirloom';
 
 const bytes = (cell: Cell) => new TextEncoder().encode(JSON.stringify(cell)).length;
@@ -215,14 +219,34 @@ export async function createEngine(env: Env): Promise<Engine> {
         if (db === r) unsaved.value = false;
       } catch (err) {
         if (err instanceof StoreGone) {
-          // Signed out in another tab, and the database deleted with it. There is nothing to
-          // write into and nobody to write for: this engine is signed out too.
-          r.pending = null;
-          if (db === r) {
-            detach(r);
-            account.value = null;
+          // Signed out in another tab, and the database deleted with it.
+          if (r.outbox.size) {
+            // But this tab holds edits the server never got, a lap perhaps. They are written
+            // back into a database of the same name, they and nothing else, with the cursor at 0
+            // so the rest is asked for again. The token is dead by now, so this ends as a
+            // `bye` does: signed out with the unsent work kept, sent when the person signs in.
+            try {
+              r.store = await env.openStore(`${INSTALL_DB}-${r.session.account}`);
+              r.cursor = 0;
+              const unsentCells = [...r.outbox].map((key) => r.cells.get(key)!);
+              r.pending = {
+                cells: unsentCells,
+                outbox: [...r.outbox].map((key) => [key, true]),
+                meta: { clock: r.clock, cursor: 0, offset },
+              };
+              continue;
+            } catch {
+              // No store to be had. The edits stay in memory and the ordinary retry below goes on asking.
+            }
+          } else {
+            // Nothing to write and nobody to write for: this engine is signed out too.
+            r.pending = null;
+            if (db === r) {
+              detach(r);
+              account.value = null;
+            }
+            break;
           }
-          break;
         }
         if (db === r) unsaved.value = true;
         // Not saved, so not forgotten: it goes back in front of whatever came since and is tried
@@ -428,18 +452,12 @@ export async function createEngine(env: Env): Promise<Engine> {
     r.store.close();
   }
 
-  async function ask(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }> {
-    const post = env.fetch;
+  async function ask(path: string, body: object, ms = ASK_MS): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }> {
     try {
-      const res = await post(env.url + path, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) return { ok: true, data };
+      const res = await postJson(env, env.url + path, body, ms);
+      if (res.ok) return { ok: true, data: res.data ?? {} };
       const wait = Number(res.headers.get('retry-after'));
-      return { ok: false, error: data?.error ?? `http_${res.status}`, ...(wait > 0 && { retry_after: wait }) };
+      return { ok: false, error: res.data?.error ?? `http_${res.status}`, ...(wait > 0 && { retry_after: wait }) };
     } catch {
       return { ok: false, error: 'offline' };
     }
@@ -548,11 +566,14 @@ export async function createEngine(env: Env): Promise<Engine> {
         // No await between that check and here: from this line no write can be made, so none can
         // be deleted with the database. The token is still good until the server is told, so a
         // refusal above leaves the person properly signed in.
-        detach(r);
+        // The account goes in the same turn as its rows: the screen never shows a name over nothing.
+        batch(() => {
+          detach(r);
+          account.value = null;
+        });
         // Best effort: offline with nothing to send, the device still signs out. The token is forgotten here either way.
-        await ask('/api/logout', { token: r.session.token });
+        await ask('/api/logout', { token: r.session.token }, LOGOUT_MS);
         await install.write({ meta: { session: null } });
-        account.value = null;
         // Everything here is on the server. Left on a shared laptop it would be the next person's to read.
         await r.store.destroy();
         return { ok: true };

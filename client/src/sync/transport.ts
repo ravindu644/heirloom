@@ -32,7 +32,7 @@ export interface Socket {
 /** The part of `fetch` this uses. */
 export type Fetch = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string },
+  init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal },
 ) => Promise<{
   ok: boolean;
   status: number;
@@ -109,9 +109,36 @@ export const smoothOffset = (held: number | null, sample: number): number =>
 const JSON_POST = { method: 'POST', headers: { 'content-type': 'application/json' } };
 const never = () => {};
 
-export function connect(wire: Wire, on: Handlers): Transport {
+/**
+ * One POST of JSON that may take `ms` and no longer. When the limit wins the request is aborted,
+ * not just forgotten: a browser keeps six connections to a host, and six requests left hanging
+ * would hold every later one in a queue behind them. Rejects when there is no answer.
+ */
+export async function postJson(wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, body: object, ms: number) {
   // A browser's fetch must not be called as a method of another object.
   const post = wire.fetch;
+  const abort = new AbortController();
+  let cancel = never;
+  const answered = (async () => {
+    const res = await post(url, { ...JSON_POST, body: JSON.stringify(body), signal: abort.signal });
+    return { ok: res.ok, status: res.status, headers: res.headers, data: await res.json().catch(() => null) };
+  })();
+  // If the limit wins, whatever this request does later is nobody's business.
+  answered.catch(() => {});
+  const limit = new Promise<never>((_, reject) => {
+    cancel = wire.schedule(() => {
+      abort.abort();
+      reject(new Error('no answer in time'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([answered, limit]);
+  } finally {
+    cancel();
+  }
+}
+
+export function connect(wire: Wire, on: Handlers): Transport {
   let running = false;
   let ws: Socket | null = null;
   let live = false; // this socket has said welcome
@@ -239,29 +266,17 @@ export function connect(wire: Wire, on: Handlers): Transport {
     queued = null;
     const sent = wire.now();
     let reply;
-    let cancelLimit = never;
     try {
       const body = { ...on.hello(), client_time: sent, ...(push && { push: { batch: push.batch, cells: push.cells } }) };
-      const answered = (async () => {
-        const res = await post(wire.url + '/api/sync', { ...JSON_POST, body: JSON.stringify(body) });
-        return { status: res.status, ok: res.ok, reply: res.ok ? await res.json() : null };
-      })();
-      // If the limit wins, whatever this request does later is nobody's business.
-      answered.catch(() => {});
-      const limit = new Promise<never>((_, reject) => {
-        cancelLimit = wire.schedule(() => reject(new Error('sync did not answer')), POST_MS);
-      });
-      const res = await Promise.race([answered, limit]);
-      cancelLimit();
+      const res = await postJson(wire, wire.url + '/api/sync', body, POST_MS);
       if (mine !== polls) return;
       if (res.status === 401) {
         stop();
         return on.message({ type: 'bye', reason: 'token' });
       }
-      if (!res.ok) throw new Error(`sync answered ${res.status}`);
-      reply = res.reply;
+      if (!res.ok || !res.data) throw new Error(`sync answered ${res.status}`);
+      reply = res.data;
     } catch {
-      cancelLimit();
       if (mine !== polls) return;
       posting = false;
       pollFailures += 1;

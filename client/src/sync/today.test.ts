@@ -14,8 +14,12 @@ const TOMORROW = '2026-11-25';
 
 type Device = Awaited<ReturnType<ReturnType<typeof world>['device']>>;
 const titles = (list: { title: string }[]) => list.map((t) => t.title);
-// Today's open tasks as the screen lists them: running, next, then the rest.
-const open = (d: Device) => titles([d.today.running.value, d.today.next.value, ...d.today.later.value].filter((t) => t !== null));
+// Today's open tasks in list order: `next` and `later` are all of them, put back by their keys.
+const open = (d: Device) => {
+  const key = (t: { id: string }) => `${d.engine.rows('task').value.get(t.id)?.order ?? ''} ${t.id}`;
+  const all = [d.today.next.value, ...d.today.later.value].filter((t) => t !== null);
+  return titles(all.toSorted((a, b) => (key(a) < key(b) ? -1 : 1)));
+};
 const next = (d: Device) => d.today.next.value;
 const row = (d: Device, id: string) => d.engine.rows('task').value.get(id);
 // One lap that rang on a task, as a row.
@@ -105,7 +109,10 @@ describe('the lists', () => {
     assert.equal(d.today.running.value?.title, 'two');
     assert.equal(d.today.running.value?.running, true);
     assert.equal(d.today.next.value?.title, 'one');
-    assert.deepEqual(titles(d.today.later.value), ['three']);
+    // The running task keeps its row, in its place, between the others.
+    assert.deepEqual(titles(d.today.later.value), ['two', 'three']);
+    assert.equal(d.today.later.value[0], d.today.running.value, 'the same view, not a copy with other numbers');
+    assert.deepEqual(open(d), ['one', 'two', 'three']);
     w.time.advance(5 * MIN);
     d.focus.pause();
     assert.equal(d.today.running.value?.title, 'two', 'paused is still on it');
@@ -208,6 +215,50 @@ describe('midnight', () => {
     assert.equal(d.today.day.value, TOMORROW);
   });
 
+  it('wake() after a sleep over midnight: the day is right at once, and a task added then is on today\'s list, not "tomorrow"', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('for tomorrow')!;
+    d.today.edit(id, { due: TOMORROW });
+    // The lid is shut for twenty hours. No timer runs.
+    w.time.jump(20 * HOUR);
+    assert.equal(d.today.day.value, TODAY, 'still showing yesterday');
+    d.today.wake();
+    assert.equal(d.today.day.value, TOMORROW);
+    assert.equal(next(d)?.title, 'for tomorrow');
+    d.today.add('added on waking');
+    assert.deepEqual(open(d), ['for tomorrow', 'added on waking']);
+    assert.deepEqual(d.today.upcoming.value, []);
+    // One wait, for the midnight after: the old one is gone, not left to fire late.
+    assert.equal(w.time.waiting(), 1);
+    w.time.advance(18 * HOUR);
+    assert.equal(d.today.day.value, '2026-11-26');
+  });
+
+  it('a task added before anything woke Today still lands on the real day\'s list', async () => {
+    const w = world();
+    const d = await w.device('a');
+    void d.today;
+    w.time.jump(20 * HOUR);
+    const id = d.today.add('typed straight after opening the lid')!;
+    assert.equal(d.engine.rows('task').value.get(id)?.due, TOMORROW);
+    assert.equal(d.today.day.value, TOMORROW);
+    assert.equal(next(d)?.id, id);
+    assert.deepEqual(d.today.upcoming.value, []);
+  });
+
+  it('wake() on the same day changes nothing', async () => {
+    const w = world();
+    const d = await w.device('a');
+    let changes = 0;
+    const stop = d.today.day.subscribe(() => changes++);
+    w.time.advance(HOUR);
+    d.today.wake();
+    stop();
+    assert.equal(changes, 1);
+    assert.equal(w.time.waiting(), 1);
+  });
+
   it('close() leaves no timer waiting', async () => {
     const w = world();
     const d = await w.device('a');
@@ -272,7 +323,8 @@ describe('laps and squares', () => {
     assert.equal(b.today.running.value?.laps, 0);
     assert.ok(b.today.running.value!.squares[0]! < 1);
     assert.equal(next(b)?.title, 'arrays');
-    assert.deepEqual(titles(b.today.later.value), []);
+    assert.deepEqual(titles(b.today.later.value), ['pointers'], 'its row stays in the list while its square fills');
+    assert.deepEqual(open(b), ['pointers', 'arrays']);
 
     w.time.advance(1000);
     assert.deepEqual(b.sessions(), []);

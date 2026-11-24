@@ -12,6 +12,8 @@ function rig(random = 1) {
   const seen: (ServerMessage | 'down')[] = [];
   const samples: number[] = [];
   const posts: any[] = [];
+  // The abort signal each POST was given, in the same order.
+  const signals: (AbortSignal | undefined)[] = [];
   // What the engine would do when a message arrives, when a test needs it to do something.
   const react: { to?: (msg: ServerMessage) => void } = {};
   const hello = { token: 'tok', device: 'a1b2c3d4e5f60718', cursor: 0 };
@@ -19,6 +21,7 @@ function rig(random = 1) {
   const replies: ((reply: { status: number; body: object } | 'unreachable') => void)[] = [];
   const fetch: Fetch = (url, init) => {
     posts.push({ url, ...JSON.parse(init.body) });
+    signals.push(init.signal);
     return new Promise((resolve, reject) => {
       replies.push((reply) =>
         reply === 'unreachable'
@@ -40,7 +43,7 @@ function rig(random = 1) {
     { url: 'https://heirloom.test', now: time.now, schedule: time.schedule, random: () => random, WebSocket: sockets.FakeSocket, fetch },
     { hello: () => ({ ...hello }), message: (msg) => (seen.push(msg), react.to?.(msg)), down: () => seen.push('down'), time: (s) => samples.push(s) },
   );
-  return { time, sockets, seen, samples, posts, hello, answer, transport, react };
+  return { time, sockets, seen, samples, posts, signals, hello, answer, transport, react };
 }
 
 // Opens the socket and gets it welcomed.
@@ -442,9 +445,13 @@ describe('without a socket', () => {
     await settle();
     assert.equal(r.posts.length, 2);
     assert.equal(r.seen.includes('down'), false);
+    assert.equal(r.signals[1]?.aborted, false);
     r.time.advance(1);
     await settle();
     assert.equal(r.seen.at(-1), 'down');
+    // Cancelled, not left hanging: a browser has six connections to a host, and six of these would block every later request.
+    assert.equal(r.signals[1]?.aborted, true);
+    assert.equal(r.signals[0]?.aborted, false, 'a POST that was answered is not aborted afterwards');
     r.time.advance(1000);
     assert.equal(r.posts.length, 3);
     // The hung request answers at last. Nobody is listening for it any more.
