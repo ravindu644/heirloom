@@ -178,6 +178,8 @@ layout:
 state:
   hover: 12%
   press: 24%
+shadow:
+  float: 0 12px 40px rgb(18 20 18 / 0.18)
 motion:
   press: 100ms
   fill: 160ms
@@ -220,6 +222,10 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **on-you:** text on a you-filled button.
 - **ghost:** past you. Hollow blocks, dashed lines, grey labels. Never filled, never in a hue.
 - **rest:** breaks and rest days only, the calyx green of the tomato.
+- **A project's colour** is one of five roles this palette already has: `you`, `rest`, `ink`,
+  `ghost`, `heat-2`. It shows as a small square before the project's name, never alone and never
+  as a fill behind text. A second hue family would break the one rule the look stands on: red
+  means you. Five tones tell five projects apart; beyond that the name does the work.
 - **heat-1 to heat-3, then you:** the four steps of the heatmap, you mixed into the surface at 22,
   45 and 72 percent, so the scale is one hue getting darker. Zero is `raised`.
 
@@ -256,7 +262,8 @@ first, the rest after first paint.
 
 ## Elevation & Depth
 
-Flat. Surfaces step by tone. Only a menu, a sheet or the completion moment floats, with one shadow.
+Flat. Surfaces step by tone. Only a menu or a sheet floats, with the one shadow (`shadow.float`).
+The completion moment is flat and in the page.
 
 ## Shapes
 

@@ -135,7 +135,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 ## Gotchas
 - `npx @google/design.md lint DESIGN.md` must show 0 errors. Its warnings `orphaned-tokens` (UI reads
   tokens through tokens.css), `missing-primary` (roles are named for their job) and
-  `token-like-ignored` on `motion`, `layout` and `state` (our keys, read by tools/tokens.mjs) are expected.
+  `token-like-ignored` on our own keys (`motion`, `layout`, `state`, `shadow`, read by tools/tokens.mjs) are expected.
 - `node --test tools/` fails: Node 22 wants a quoted glob (`node --test "tools/*.test.mjs"`), not a directory.
 - `go.mod` says `go 1.26.0`, not `go 1.26`: the SQLite driver sets that floor and Go rewrites the line.
 - Never pass a cancellable context to a SQLite call in `server/`: a cancelled call makes the driver

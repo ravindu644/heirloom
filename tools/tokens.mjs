@@ -49,7 +49,7 @@ export function build(designMd, fontExists) {
 ${[...faces.values()].join('\n')}
 :root {
   color-scheme: light dark;
-${block([...light, ...type, ...vars('space-', d.spacing), ...vars('radius-', d.rounded), ...vars('layout-', d.layout), ...vars('state-', d.state), ...vars('motion-', d.motion)])}
+${block([...light, ...type, ...vars('space-', d.spacing), ...vars('radius-', d.rounded), ...vars('layout-', d.layout), ...vars('state-', d.state), ...vars('shadow-', d.shadow), ...vars('motion-', d.motion)])}
 }
 @media (prefers-color-scheme: dark) {
   :root {
