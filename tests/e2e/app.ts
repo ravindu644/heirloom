@@ -57,3 +57,36 @@ export async function sessionsWhen(name: string, ok: (rows: Record<string, unkno
 
 /** The big digits: "24:59". */
 export const digits = (page: Page) => page.getByText(/^\d\d:\d\d$/);
+
+/** The app's own status line. The result view has a status of its own above it; this one comes last. */
+export const statusLine = (page: Page) => page.getByRole('status').last();
+
+/**
+ * Call before the tap that starts a lap. Resolves with the ms from that tap until the running
+ * timer cell is committed to this account's IndexedDB database, read from the page itself.
+ */
+export function timerOnDisk(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const name = (await indexedDB.databases()).map((d) => d.name).find((n) => n?.startsWith('heirloom-'));
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(name!);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const tapped = await new Promise<number>((resolve) =>
+      document.addEventListener('click', () => resolve(performance.now()), { capture: true, once: true }),
+    );
+    for (;;) {
+      // A read transaction sees only what is committed.
+      const cell = await new Promise<any>((resolve) => {
+        const get = db.transaction('cells').objectStore('cells').get('timer/current/state');
+        get.onsuccess = () => resolve(get.result);
+      });
+      if (cell?.value?.phase === 'work') {
+        db.close();
+        return performance.now() - tapped;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+}

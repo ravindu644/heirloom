@@ -78,6 +78,8 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   await button(b.page, 'Start 1 min break').click();
   await expect(a.page.getByText('Short break, after lap 1 of 4')).toBeVisible({ timeout: 1000 });
   await expect(button(a.page, 'Start lap 2 now')).toBeVisible();
+  // A break is not stretched: the offer is for laps.
+  for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);
 });
 
 test('stop under a minute leaves no row and says so', async ({ deviceA: a, deviceB: b }) => {

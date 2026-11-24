@@ -1,7 +1,7 @@
 // Accounts through the screens (protocol section 10), and the API from another origin, which is
 // what the phone app is.
 import { PASSWORD } from '../sync/harness.ts';
-import { accountWith, join, ready, server, signIn, username } from './app.ts';
+import { accountWith, join, ready, server, signIn, statusLine, username } from './app.ts';
 import { ADDR } from './server.ts';
 import { expect, test } from './devices.ts';
 
@@ -33,7 +33,7 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
   }
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect(a.page.getByRole('status')).toHaveText('');
+  await expect(statusLine(a.page)).toHaveText('');
 
   await a.page.getByRole('button', { name: 'Sign out' }).click();
   await expect(a.page.getByRole('heading', { name: 'Sign in' })).toBeVisible();

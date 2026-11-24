@@ -14,6 +14,8 @@ export type Device = {
   page: Page;
   /** The Wi-Fi switch: requests fail, the open socket closes and new ones are refused. */
   setOffline(offline: boolean): Promise<void>;
+  /** A network that is up and goes nowhere: sockets stay open, no event fires, and no frame gets through either way. */
+  silence(silent: boolean): void;
   /** Console errors, page errors and CSP violations so far, from every page of the device. */
   errors: string[];
 };
@@ -44,11 +46,19 @@ async function device({ browser }: { browser: Browser }, use: (d: Device) => Pro
   // A laptop whose Wi-Fi goes off loses the socket at once, so every socket goes through here,
   // where going offline can close it and refuse the next.
   let offline = false;
+  let silent = false;
   const open = new Map<WebSocketRoute, WebSocketRoute>();
   await context.routeWebSocket(/\/api\/ws$/, (ws) => {
     if (offline) return ws.close();
     const server = ws.connectToServer();
     open.set(ws, server);
+    // Passed on by hand, so that silence can swallow them.
+    ws.onMessage((frame) => {
+      if (!silent) server.send(frame);
+    });
+    server.onMessage((frame) => {
+      if (!silent) ws.send(frame);
+    });
     // With a handler here Playwright no longer passes the page's close on, so it is passed by hand.
     ws.onClose(() => {
       open.delete(ws);
@@ -61,6 +71,7 @@ async function device({ browser }: { browser: Browser }, use: (d: Device) => Pro
     context,
     page,
     errors,
+    silence: (value) => void (silent = value),
     async setOffline(value) {
       offline = value;
       await context.setOffline(value);

@@ -24,7 +24,7 @@ when it is done.
 - [2] Auto-start: both devices must write the same next state (same run id, `started` at the previous end), or one of them makes a stray `stopped` row.
 - [3] On the phone the bell uses the notification sound, so silent mode and Do Not Disturb silence it (it still vibrates in vibrate mode). The Clock app's timers ring through silent on the alarm stream. The user's call; a channel's sound is frozen once made, so changing it later means a new channel id.
 - [3] Nothing in section 3 has run on the phone: wireless adb dropped overnight. The commands are in the android lane's report, copied to `reviews/3/device-run.md`.
-- [any] An edit is durable a few milliseconds after the tap (one IndexedDB transaction with strict durability). A page killed inside that window loses that one edit; a browser offers no synchronous way to close it.
+- [any] An edit is durable 8 to 19 ms after the tap on this laptop, median 14 (one IndexedDB transaction with strict durability; measured by the e2e run). A page killed inside that window loses that one edit; a browser offers no synchronous way to close it.
 - [3] `java` on the PATH is 17; `make apk` must set `JAVA_HOME=$HOME/.jdks/jdk-21` (Capacitor 8 needs 21).
 - [4] A repeating task's subtasks are not copied to the next one. Habits are the home of daily checklists; revisit if it grates.
 - [5] The end-of-day look back's one-line note has nowhere to live.

@@ -1,5 +1,5 @@
 // Two tabs of one browser are one device with one database: only one may run the engine.
-import { accountWith, digits, ready, signIn, username } from './app.ts';
+import { accountWith, digits, ready, signIn, statusLine, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 test('a second tab says heirloom is open elsewhere and shows no timer; closing the first hands it the running lap', async ({ deviceA: a }) => {
@@ -9,7 +9,7 @@ test('a second tab says heirloom is open elsewhere and shows no timer; closing t
   await ready(a.page);
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
   await expect(a.page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect(a.page.getByRole('status')).toHaveText('');
+  await expect(statusLine(a.page)).toHaveText('');
 
   const second = await a.context.newPage();
   await second.goto('/');

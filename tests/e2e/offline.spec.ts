@@ -3,7 +3,7 @@
 import { stats } from '../../client/src/core/stats.ts';
 import type { Session } from '../../client/src/core/stats.ts';
 import { serverRows } from '../sync/harness.ts';
-import { accountWith, digits, ready, server, sessionsWhen, signIn, username } from './app.ts';
+import { accountWith, digits, ready, server, sessionsWhen, signIn, statusLine, timerOnDisk, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const offlineWords = /^No connection\. .* safe on this laptop\.$/;
@@ -18,7 +18,7 @@ test('both laptops offline each run a lap; back online, both laps are kept, the 
   }
 
   for (const d of [a, b]) await d.setOffline(true);
-  for (const d of [a, b]) await expect(d.page.getByRole('status')).toHaveText('No connection. Your laps are safe on this laptop.');
+  for (const d of [a, b]) await expect(statusLine(d.page)).toHaveText('No connection. Your laps are safe on this laptop.');
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
   await a.page.waitForTimeout(1500);
   await b.page.getByRole('button', { name: 'Start lap 1' }).click();
@@ -26,7 +26,7 @@ test('both laptops offline each run a lap; back online, both laps are kept, the 
   for (const d of [a, b]) {
     await expect(d.page.getByRole('button', { name: 'Start 1 min break' })).toBeVisible({ timeout: 10000 });
     await expect(d.page.getByText('First lap of the day.')).toBeVisible();
-    await expect(d.page.getByRole('status').last()).toHaveText(offlineWords);
+    await expect(statusLine(d.page)).toHaveText(offlineWords);
   }
 
   for (const d of [a, b]) await d.setOffline(false);
@@ -57,9 +57,16 @@ test('a reload with no connection still opens the app (PRODUCT: works fully offl
   await signIn(a.page, name);
   await ready(a.page);
   await a.setOffline(true);
+  // The lap is safe once its transaction commits, a few ms after the tap. A reload sooner than
+  // that is a tab closed mid-write, which no store survives; this test is about the page coming back.
+  const onDisk = timerOnDisk(a.page);
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  const ms = await onDisk;
+  test.info().annotations.push({ type: 'tap to IndexedDB', description: `${ms.toFixed(1)} ms` });
+  console.log(`tap to the timer cell committed in IndexedDB: ${ms.toFixed(1)} ms`);
   await a.page.reload();
   await expect(a.page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(statusLine(a.page)).toHaveText('No connection. 1 change is safe on this laptop.');
 });
 
 test('a lap started offline is in IndexedDB: it survives a reload with the server out of reach, and reaches B after', async ({ deviceA: a, deviceB: b }) => {
@@ -80,7 +87,7 @@ test('a lap started offline is in IndexedDB: it survives a reload with the serve
   await a.context.setOffline(false);
   await a.page.reload();
   await expect(a.page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  await expect(a.page.getByRole('status')).toHaveText('No connection. 1 change is safe on this laptop.');
+  await expect(statusLine(a.page)).toHaveText('No connection. 1 change is safe on this laptop.');
   const after = await digits(a.page).textContent();
   expect(after! <= before!, `${after} after the reload, ${before} before it`).toBe(true);
   expect(before! > '24:50' && after! > '24:45', `${before} before, ${after} after`).toBe(true);
@@ -91,7 +98,7 @@ test('a lap started offline is in IndexedDB: it survives a reload with the serve
   await a.setOffline(true);
   await a.setOffline(false);
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 5000 });
-  await expect(a.page.getByRole('status')).toHaveText('');
+  await expect(statusLine(a.page)).toHaveText('');
   const shownA = await digits(a.page).textContent();
   const shownB = await digits(b.page).textContent();
   const shownA2 = await digits(a.page).textContent();
@@ -105,7 +112,7 @@ test('offline, the screen says so in the app\'s words, counts what waits, and no
     await signIn(d.page, name);
     await ready(d.page);
   }
-  const status = a.page.getByRole('status');
+  const status = statusLine(a.page);
   await expect(status).toHaveText('');
   await a.setOffline(true);
   await expect(status).toHaveText('No connection. Your laps are safe on this laptop.', { timeout: 2000 });
@@ -119,27 +126,44 @@ test('offline, the screen says so in the app\'s words, counts what waits, and no
   await expect(b.page.getByRole('button', { name: 'Resume' })).toBeVisible();
 });
 
-test('context.setOffline alone leaves an open socket open and silent; the app notices within two pings', async ({ browser }) => {
-  test.setTimeout(90000);
-  const name = username('rawsock');
+test('the browser going offline is said on screen within a second, with no help from the rail', async ({ browser }) => {
+  const name = username('offevent');
   await accountWith(name);
-  // A device without the rail's socket switch: only the browser's own offline emulation.
+  // A device without the rail's socket switch: only the browser's own offline emulation and its `offline` event.
   const context = await browser.newContext();
   const page = await context.newPage();
-  const closed: number[] = [];
-  page.on('websocket', (ws) => ws.on('close', () => closed.push(Date.now())));
   await signIn(page, name);
   await ready(page);
+  await expect(statusLine(page)).toHaveText('');
 
   const start = Date.now();
   await context.setOffline(true);
-  await page.waitForTimeout(3000);
-  expect(closed, 'the browser closed the socket by itself').toEqual([]);
-  await expect(page.getByRole('status')).toHaveText('');
-
-  await expect(page.getByRole('status')).toHaveText('No connection. Your laps are safe on this laptop.', { timeout: 60000 });
+  await expect(statusLine(page)).toHaveText('No connection. Your laps are safe on this laptop.', { timeout: 1500 });
   const ms = Date.now() - start;
-  test.info().annotations.push({ type: 'offline noticed after', description: `${ms} ms` });
-  console.log(`context.setOffline alone: the app said "No connection" after ${ms} ms`);
+  test.info().annotations.push({ type: 'offline event to words', description: `${ms} ms` });
+  console.log(`context.setOffline alone: "No connection" after ${ms} ms`);
   await context.close();
+});
+
+test('a socket that goes silent with no offline event is noticed within 35 s', async ({ deviceA: a }) => {
+  test.setTimeout(60000);
+  const name = username('silent');
+  await accountWith(name);
+  await signIn(a.page, name);
+  await ready(a.page);
+  await expect(statusLine(a.page)).toHaveText('');
+
+  // Wi-Fi up, internet gone: the socket stays open, nothing arrives, and the browser says nothing.
+  const start = Date.now();
+  a.silence(true);
+  await expect(statusLine(a.page)).toHaveText('No connection. Your laps are safe on this laptop.', { timeout: 40000 });
+  const ms = Date.now() - start;
+  // The worst case is a ping 25 s in and 10 s for its pong; a second more for the poll and the redraw.
+  expect(ms).toBeLessThan(36000 + 1000);
+  test.info().annotations.push({ type: 'silent socket noticed', description: `${ms} ms` });
+  console.log(`silent socket: "No connection" after ${ms} ms`);
+
+  // And it comes back by itself when frames flow again.
+  a.silence(false);
+  await expect(statusLine(a.page)).toHaveText('', { timeout: 35000 });
 });
