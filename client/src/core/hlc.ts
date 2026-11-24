@@ -19,12 +19,14 @@ const read = (stamp: Stamp): Clock => ({
   counter: parseInt(stamp.slice(25, 29), 16),
 });
 
+const write = (clock: Clock, device: string): Stamp =>
+  `${new Date(clock.ms).toISOString()}-${clock.counter.toString(16).padStart(4, '0')}-${device}`;
+
 /** Stamps one edit at `now` (server-corrected ms). Keep the returned clock, or the next stamp can repeat this one. */
 export function stamp(clock: Clock, now: number, device: string): { clock: Clock; stamp: Stamp } {
   let next = now > clock.ms ? { ms: now, counter: 0 } : { ms: clock.ms, counter: clock.counter + 1 };
   if (next.counter > 0xffff) next = { ms: next.ms + 1, counter: 0 };
-  const text = `${new Date(next.ms).toISOString()}-${next.counter.toString(16).padStart(4, '0')}-${device}`;
-  return { clock: next, stamp: text };
+  return { clock: next, stamp: write(next, device) };
 }
 
 /** The clock after seeing a stamp from anywhere, so the next edit is later than it. */
@@ -34,6 +36,18 @@ export function see(clock: Clock, seen: Stamp): Clock {
   if (Number.isNaN(s.ms) || Number.isNaN(s.counter)) return clock;
   return s.ms > clock.ms || (s.ms === clock.ms && s.counter > clock.counter) ? s : clock;
 }
+
+/**
+ * The stamp of something that happened at a known moment, whenever it is written down: the bell
+ * of a lap (protocol section 11). Counter 0, and no clock is read or moved.
+ */
+export const eventStamp = (ms: number, device: string): Stamp => write({ ms, counter: 0 }, device);
+
+/** When a stamp was made, in ms. */
+export const stampMs = (stamp: Stamp): number => read(stamp).ms;
+
+/** The device that made a stamp. */
+export const stampDevice = (stamp: Stamp): string => stamp.slice(30);
 
 /** The server's drift check: false when the stamp's time is more than five minutes past `serverTime`. */
 export function acceptable(stamp: Stamp, serverTime: number): boolean {

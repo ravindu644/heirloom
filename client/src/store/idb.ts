@@ -25,11 +25,11 @@ export function idbStores(factory: IDBFactory = indexedDB, persist: () => unknow
       const req = factory.open(name, 1);
       req.onupgradeneeded = () => STORES.forEach((s) => req.result.createObjectStore(s));
       req.onerror = () => reject(req.error);
-      req.onsuccess = () => resolve(wrap(req.result, askOnce));
+      req.onsuccess = () => resolve(wrap(req.result, askOnce, () => factory.deleteDatabase(name)));
     });
 }
 
-function wrap(db: IDBDatabase, askOnce: () => void): Store {
+function wrap(db: IDBDatabase, askOnce: () => void, remove: () => IDBOpenDBRequest): Store {
   return {
     load: () =>
       new Promise<Snapshot>((resolve, reject) => {
@@ -70,5 +70,14 @@ function wrap(db: IDBDatabase, askOnce: () => void): Store {
       }),
 
     close: () => db.close(),
+
+    destroy: () =>
+      new Promise<void>((resolve, reject) => {
+        db.close();
+        const req = remove();
+        // Blocked: another tab still has it open. The delete is queued and happens when that tab lets go.
+        req.onsuccess = req.onblocked = () => resolve();
+        req.onerror = () => reject(req.error);
+      }),
   };
 }

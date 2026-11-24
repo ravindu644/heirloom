@@ -25,6 +25,8 @@ export interface Store {
   load(): Promise<Snapshot>;
   write(write: Write): Promise<void>;
   close(): void;
+  /** Closes it and deletes the database, for good. A store opened by this name afterwards is new. */
+  destroy(): Promise<void>;
 }
 
 /** Opens the database with this name, making it if it is new. */

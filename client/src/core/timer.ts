@@ -29,7 +29,8 @@ export const IDLE: Readonly<TimerState> = Object.freeze({
 });
 
 export type TimerAction =
-  | { do: 'start'; phase: Phase; run: string; task: string | null; planned_ms: number }
+  // new_set: this lap is lap one whatever came before. Asked for on the first lap of a new day.
+  | { do: 'start'; phase: Phase; run: string; task: string | null; planned_ms: number; new_set?: boolean }
   | { do: 'pause' }
   | { do: 'resume' }
   | { do: 'extend'; ms: number }
@@ -65,7 +66,7 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
         paused_at: null,
         paused_ms: 0,
         planned_ms: action.planned_ms,
-        set_index: action.phase === 'work' ? nextLap(state, over) : state.set_index,
+        set_index: action.phase !== 'work' ? state.set_index : action.new_set ? 0 : nextLap(state, over),
       };
     case 'pause':
       return state.phase === 'idle' || paused || over ? state : { ...state, paused_at: now };

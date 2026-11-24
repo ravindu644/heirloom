@@ -111,6 +111,18 @@ for (const [kind, make] of kinds) {
       assert.deepEqual((await (await open('a')).load()).meta, {});
     });
 
+    it('destroy deletes the database and nothing else: the name opens empty, other names keep their data', async () => {
+      const open = make();
+      const mine = await open('heirloom-acct-a');
+      const other = await open('heirloom-acct-b');
+      await mine.write({ cells: [cell('t1', 'title', 'mine')], outbox: [['task/t1/title', true]], meta: { cursor: 4 } });
+      await other.write({ cells: [cell('t1', 'title', 'theirs')] });
+      await mine.destroy();
+      await assert.rejects(mine.write({ meta: { cursor: 5 } }));
+      assert.deepEqual(await (await open('heirloom-acct-a')).load(), { cells: [], outbox: [], meta: {} });
+      assert.deepEqual((await other.load()).cells, [cell('t1', 'title', 'theirs')]);
+    });
+
     it('what goes in and what comes out are copies', async () => {
       const store = await make()('a');
       const value = { phase: 'work', set_index: 1 };

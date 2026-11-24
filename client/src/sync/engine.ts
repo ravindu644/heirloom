@@ -7,7 +7,7 @@
 
 import { batch, computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal, Signal } from '@preact/signals-core';
-import { ZERO, see, stamp } from '../core/hlc.ts';
+import { ZERO, eventStamp, see, stamp } from '../core/hlc.ts';
 import type { Clock, Stamp } from '../core/hlc.ts';
 import { applyCell, cellKey, restamp } from '../core/merge.ts';
 import type { Cell, Cells } from '../core/merge.ts';
@@ -49,6 +49,8 @@ export interface Engine {
   readonly account: ReadonlySignal<Account | null>;
   /** How many edits are waiting to be sent. */
   readonly unsent: ReadonlySignal<number>;
+  /** True while the store refuses writes: edits are held in memory and still sent, but closing the app now could lose them. */
+  readonly unsaved: ReadonlySignal<boolean>;
   /** The timer cell, or idle before there is one. Feed it to core/timer.ts `view` with `now()`. */
   readonly timer: ReadonlySignal<TimerState>;
   /** This install's id. Made once, kept across sign outs. */
@@ -57,8 +59,15 @@ export interface Engine {
   now(): number;
   /** Every row of a dataset, by id. The same signal each call; it changes when any cell of the dataset does. */
   rows(dataset: string): ReadonlySignal<ReadonlyMap<string, Row>>;
-  /** Sets fields of a row. Shown at once, saved, then sent. Writes made in the same turn are saved as one transaction. */
-  write(dataset: string, row: string, fields: Record<string, unknown>): void;
+  /**
+   * Sets fields of a row. Shown at once, saved, then sent. Writes made in the same turn are saved as one transaction.
+   * With `at`, every cell is stamped at that moment (core/hlc.ts `eventStamp`) and the clock is
+   * left alone: for a row that must be the same whoever writes it and whenever (protocol section 11).
+   * Such a cell is dropped where a newer one is already held.
+   */
+  write(dataset: string, row: string, fields: Record<string, unknown>, at?: number): void;
+  /** The stamp of the cell held for a field: when it was last written, and by which device. */
+  stamp(dataset: string, row: string, field: string): Stamp | undefined;
   /** Applies a timer action at `now()` and writes the timer cell if it changed anything. */
   act(action: TimerAction): void;
   register(invite: string, username: string, password: string): Promise<AccountResult>;
@@ -142,6 +151,7 @@ export async function createEngine(env: Env): Promise<Engine> {
   const caughtUp = signal(false);
   const refused = signal(false);
   const unsent = signal(0);
+  const unsaved = signal(false);
   const sets = new Map<string, Signal<ReadonlyMap<string, Row>>>();
 
   const sync = computed<SyncState>(() => {
@@ -150,7 +160,8 @@ export async function createEngine(env: Env): Promise<Engine> {
     return caughtUp.value && unsent.value === 0 ? 'in-step' : 'syncing';
   });
 
-  const now = () => env.now() + (offset ?? 0);
+  // Whole ms: the smoothed offset is a fraction, and this number goes into timer states and session rows, whose schemas say integer.
+  const now = () => Math.round(env.now() + (offset ?? 0));
 
   function rows(dataset: string): Signal<ReadonlyMap<string, Row>> {
     let set = sets.get(dataset);
@@ -198,7 +209,9 @@ export async function createEngine(env: Env): Promise<Engine> {
       r.pending = null;
       try {
         await r.store.write(write);
+        if (db === r) unsaved.value = false;
       } catch {
+        if (db === r) unsaved.value = true;
         // Not saved, so not forgotten: it goes back in front of whatever came since and is tried
         // again. Meanwhile it is still pushed, because the server is the other safe place.
         r.pending = join(write, r.pending ?? {});
@@ -357,18 +370,20 @@ export async function createEngine(env: Env): Promise<Engine> {
     r.transport.start();
   }
 
-  async function close() {
+  // `forget`: delete the account's database too. Only for a sign out, when the outbox is empty.
+  async function close(forget = false) {
     const r = db;
     if (!r) return;
     r.transport.stop();
     while (r.saving) await r.saving;
     db = null;
-    r.store.close();
     batch(() => {
       for (const set of sets.values()) set.value = new Map();
-      connected.value = caughtUp.value = false;
+      connected.value = caughtUp.value = unsaved.value = false;
       unsent.value = 0;
     });
+    if (forget) await r.store.destroy();
+    else r.store.close();
   }
 
   async function ask(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }> {
@@ -427,12 +442,15 @@ export async function createEngine(env: Env): Promise<Engine> {
     sync,
     account,
     unsent,
+    unsaved,
     timer,
     device: me,
     now,
     rows,
 
-    write(dataset, row, fields) {
+    stamp: (dataset, row, field) => db?.cells.get(cellKey({ dataset, row, field }))?.stamp,
+
+    write(dataset, row, fields, at) {
       const r = db;
       if (!r) throw new Error('write before sign in: there is no account to write to');
       const made: Cell[] = [];
@@ -445,7 +463,8 @@ export async function createEngine(env: Env): Promise<Engine> {
         }
         const json = JSON.stringify(given);
         if (json === undefined) throw new Error(`${dataset}/${row}/${field}: write null to clear a field`);
-        const next = stamp(clock, now(), me);
+        // An event stamp says when the thing happened, not when it is written down: the clock is not asked and does not move.
+        const next = at === undefined ? stamp(clock, now(), me) : { clock, stamp: eventStamp(at, me) };
         clock = next.clock;
         // Through JSON and back: what is held here is exactly what the server will get, and the
         // caller changing its object afterwards changes nothing.
@@ -454,12 +473,12 @@ export async function createEngine(env: Env): Promise<Engine> {
         made.push(cell);
       }
       r.clock = clock;
-      for (const cell of made) {
-        applyCell(r.cells, cell);
-        r.outbox.add(cellKey(cell));
-      }
-      save(r, { cells: made, outbox: made.map((cell) => [cellKey(cell), true]) });
-      show(made);
+      // A stamp from the clock is always the newest. An event stamp may not be: then the newer cell stands and there is nothing to send.
+      const kept = made.filter((cell) => applyCell(r.cells, cell));
+      if (!kept.length) return;
+      for (const cell of kept) r.outbox.add(cellKey(cell));
+      save(r, { cells: kept, outbox: kept.map((cell) => [cellKey(cell), true]) });
+      show(kept);
     },
 
     act(action) {
@@ -480,7 +499,8 @@ export async function createEngine(env: Env): Promise<Engine> {
         if (r.outbox.size) return { ok: false, error: 'unsent' };
         // Best effort: offline with nothing to send, the device still signs out. The token is forgotten here either way.
         await ask('/api/logout', { token: r.session.token });
-        await close();
+        // Everything here is on the server by now. Left on a shared laptop it would be the next person's to read.
+        await close(true);
         await install.write({ meta: { session: null } });
         account.value = null;
         return { ok: true };

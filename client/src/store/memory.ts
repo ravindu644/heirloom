@@ -37,6 +37,10 @@ export function memoryStores(): OpenStore {
       close() {
         open = false;
       },
+      async destroy() {
+        open = false;
+        disk.delete(name);
+      },
     };
   };
 }

@@ -24,11 +24,14 @@ export function fakeTime(start: number = T0) {
         const due = [...timers].filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
         if (!due) break;
         timers.delete(due[0]);
-        t = due[1].at;
+        // A timer already overdue after a jump runs now: time does not go back for it.
+        t = Math.max(t, due[1].at);
         due[1].run();
       }
       t = end;
     },
+    /** How many timers are waiting to run. */
+    waiting: () => timers.size,
     /** Moves the clock without running anything: the device's clock was set, or it slept. */
     jump(ms: number) {
       t += ms;

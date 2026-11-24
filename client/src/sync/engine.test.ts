@@ -189,6 +189,66 @@ describe('a local edit', () => {
     assert.deepEqual(d.wire().sent[0]!.cells[0]!.value, { every: 2, days: [1, 3] });
   });
 
+  it('stamp() gives the stamp of the cell held for a field, and nothing for a field never written', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'x' });
+    assert.equal(d.engine.stamp('task', 't1', 'title'), `2026-11-24T04:30:00.000Z-0000-${d.engine.device}`);
+    d.wire().cells(0, 1, [theirs(30, 't1', 'title', 'theirs')]);
+    assert.equal(d.engine.stamp('task', 't1', 'title'), `2026-11-24T04:30:30.000Z-0000-${OTHER}`);
+    assert.equal(d.engine.stamp('task', 't1', 'notes'), undefined);
+  });
+
+  it('a write with a given stamp time: every cell stamped there, saved and sent like any edit, and the clock neither read nor moved', async () => {
+    const log: Write[] = [];
+    const d = await signedIn({ wrap: watching(log) });
+    d.engine.write('task', 't1', { title: 'an ordinary edit' });
+    d.time.advance(25 * 60000);
+    // A row stamped in the past, and one stamped ahead of the clock.
+    d.engine.write('session', 'run-1', { outcome: 'rang', ended: T0 + 1500000 }, T0);
+    d.engine.write('session', 'run-2', { outcome: 'rang' }, T0 + 3600000);
+    const me = d.engine.device;
+    assert.equal(d.engine.stamp('session', 'run-1', 'outcome'), `2026-11-24T04:30:00.000Z-0000-${me}`);
+    assert.equal(d.engine.stamp('session', 'run-1', 'ended'), `2026-11-24T04:30:00.000Z-0000-${me}`);
+    assert.equal(d.engine.stamp('session', 'run-2', 'outcome'), `2026-11-24T05:30:00.000Z-0000-${me}`);
+    assert.equal(d.engine.rows('session').value.get('run-1')?.outcome, 'rang');
+    assert.equal(d.engine.unsent.value, 4);
+    // The next ordinary edit is stamped at the wall time, as if those writes had not happened.
+    d.engine.write('task', 't2', { title: 'the next ordinary edit' });
+    assert.equal(d.engine.stamp('task', 't2', 'title'), `2026-11-24T04:55:00.000Z-0000-${me}`);
+    await d.engine.saved();
+    assert.deepEqual(log.at(-1)!.meta!.clock, { ms: T0 + 1500000, counter: 0 });
+    assert.equal(log.at(-1)!.outbox!.filter(([key]) => key.startsWith('session/')).length, 3);
+    assert.deepEqual(d.wire().sent.flatMap((push) => push.cells).map((c) => `${c.dataset}/${c.row}/${c.field}`).toSorted(), [
+      'session/run-1/ended', 'session/run-1/outcome', 'session/run-2/outcome', 'task/t1/title', 'task/t2/title',
+    ]);
+    // And it all survives a restart, outbox included.
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.engine.unsent.value, 5);
+    assert.equal(again.engine.stamp('session', 'run-1', 'outcome'), `2026-11-24T04:30:00.000Z-0000-${me}`);
+  });
+
+  it('a write with a given stamp time loses to a newer cell already held: nothing changes, nothing is queued or saved', async () => {
+    const log: Write[] = [];
+    const d = await signedIn({ wrap: watching(log) });
+    d.time.advance(60000);
+    d.engine.write('session', 'run-1', { outcome: 'void' });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    const writes = log.length;
+    d.engine.write('session', 'run-1', { outcome: 'rang', ended: T0 + 1500000 }, T0);
+    await d.engine.saved();
+    assert.equal(d.engine.rows('session').value.get('run-1')?.outcome, 'void');
+    // The field nobody had written is kept and sent. The one that lost is not.
+    assert.equal(d.engine.unsent.value, 1);
+    assert.deepEqual(log.at(-1)!.cells!.map((c) => c.field), ['ended']);
+    assert.equal(log.length, writes + 1);
+    d.engine.write('session', 'run-1', { outcome: 'rang' }, T0);
+    await d.engine.saved();
+    assert.equal(log.length, writes + 1);
+  });
+
   it('throws when nobody is signed in: there is no account to write to', async () => {
     const d = await device();
     assert.throws(() => d.engine.write('task', 't1', { title: 'x' }), /sign in/);
@@ -536,13 +596,20 @@ describe('a crash, then a restart', () => {
       return { ...store, write: (write) => (broken.now ? Promise.reject(new Error('disk full')) : store.write(write)) };
     };
     const d = await signedIn({ wrap });
+    assert.equal(d.engine.unsaved.value, false);
     broken.now = true;
     d.engine.write('task', 't1', { title: 'the disk was full' });
     await d.engine.saved();
+    assert.equal(d.engine.unsaved.value, true, 'the indicator can say: could not save on this device');
     assert.deepEqual(d.wire().sent[0]!.cells.map((c) => c.value), ['the disk was full']);
+    // Still refusing at the next try: still true.
+    d.time.advance(5000);
+    await d.engine.saved();
+    assert.equal(d.engine.unsaved.value, true);
     broken.now = false;
     d.time.advance(5000);
     await d.engine.saved();
+    assert.equal(d.engine.unsaved.value, false);
     await d.engine.stop();
     const again = await device({ stores: d.stores });
     assert.equal(title(again), 'the disk was full');
@@ -627,6 +694,11 @@ describe('what the UI reads', () => {
     assert.equal(d.engine.now(), T0 + 810);
     d.engine.write('task', 't1', { title: 'stamped in server time' });
     assert.match(d.engine.cells()[0]!.stamp, /^2026-11-24T04:30:00\.810Z/);
+    // The smoothed offset is now 810.75. That fraction never reaches a timer state or a row: the schemas say integer.
+    d.wire().handlers.time(813);
+    assert.equal(d.engine.now(), T0 + 811);
+    d.engine.act({ do: 'start', phase: 'work', run: 'run-1', task: null, planned_ms: 1500000 });
+    assert.equal(d.engine.timer.value.started, T0 + 811);
   });
 });
 
@@ -715,10 +787,31 @@ describe('accounts', () => {
     assert.equal(d.engine.account.value?.account, 'acct-nimal');
     assert.equal(title(d), undefined);
     assert.equal(d.wire().handlers.hello().cursor, 0);
-    await d.engine.signOut();
+  });
+
+  it('sign out deletes that account\'s database from the device: signing in again starts from nothing and asks the server for it all', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: "ravi's, on a shared laptop" });
+    await d.engine.saved();
+    d.wire().ack(0, 1);
+    await d.engine.saved();
+    assert.deepEqual(await d.engine.signOut(), { ok: true });
+    // Straight from the disk: nothing of the account is left there.
+    assert.deepEqual(await (await d.stores('heirloom-acct-ravi')).load(), { cells: [], outbox: [], meta: {} });
     await d.engine.signIn('ravi', 'correct horse');
-    assert.equal(title(d), "ravi's");
-    assert.equal(d.wire().handlers.hello().cursor, 1);
+    assert.equal(title(d), undefined);
+    assert.equal(d.wire().handlers.hello().cursor, 0);
+    assert.equal(d.engine.unsent.value, 0);
+  });
+
+  it('a refused sign out deletes nothing', async () => {
+    const d = await signedIn();
+    d.wire().handlers.down();
+    d.engine.write('task', 't1', { title: 'not sent yet' });
+    await d.engine.saved();
+    assert.deepEqual(await d.engine.signOut(), { ok: false, error: 'unsent' });
+    assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 1);
+    assert.equal(title(d), 'not sent yet');
   });
 
   it('bye token: signed out, the wire stopped, the data and the outbox kept, and signing in again sends it', async () => {
@@ -741,6 +834,8 @@ describe('accounts', () => {
     assert.equal(d.engine.unsent.value, 2);
     d.wire().welcome();
     assert.deepEqual(d.wire().sent[0]!.cells.map((c) => c.value), ['unsent when the token died', 'made while signed out']);
+    // Through all of it the database stayed: a bye is not a sign out.
+    assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 2);
   });
 
   it('a bye for any other reason is left to the transport: the engine stays signed in', async () => {

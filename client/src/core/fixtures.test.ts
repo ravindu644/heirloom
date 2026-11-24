@@ -8,8 +8,10 @@ import { ZERO, acceptable, see, stamp } from './hlc.ts';
 import type { Stamp } from './hlc.ts';
 import { applyCell } from './merge.ts';
 import type { Cell, Cells } from './merge.ts';
-import { stats } from './stats.ts';
-import type { Session, Stats } from './stats.ts';
+import { closeRun, mayWriteBell } from './session.ts';
+import type { Closed, End } from './session.ts';
+import { race, stats } from './stats.ts';
+import type { Race, Session, Stats } from './stats.ts';
 import { streak } from './streak.ts';
 import type { Streak } from './streak.ts';
 import { IDLE, act, view } from './timer.ts';
@@ -35,7 +37,13 @@ const timer: {
 
 const statsCases: {
   cases: { name: string; utc_offset_min: number; sessions: Session[]; expect: Stats }[];
+  race: { name: string; utc_offset_min: number; now: number; state: TimerState; sessions: Session[]; expect: Race }[];
 } = load('stats.json');
+
+const session: {
+  close: { name: string; state: TimerState; end: End; now: number; device: string; written: number; rang?: boolean; expect: Closed | null }[];
+  bell: { name: string; timer_stamp: Stamp; device: string; in_step: boolean; has_row: boolean; expect: boolean }[];
+} = load('session.json');
 
 const streakCases: {
   cases: { name: string; today: string; kept: string[]; days_mask?: number; window: number; expect: Streak }[];
@@ -110,9 +118,27 @@ describe('timer.json', () => {
   }
 });
 
-describe('stats.json', () => {
+describe('stats.json cases', () => {
   for (const c of statsCases.cases) {
     it(c.name, () => assert.deepEqual(stats(c.sessions, c.utc_offset_min), c.expect));
+  }
+});
+
+describe('stats.json race', () => {
+  for (const c of statsCases.race) {
+    it(c.name, () => assert.deepEqual(race(c.sessions, c.state, c.now, c.utc_offset_min), c.expect));
+  }
+});
+
+describe('session.json close', () => {
+  for (const c of session.close) {
+    it(c.name, () => assert.deepEqual(closeRun(c.state, c.end, c), c.expect));
+  }
+});
+
+describe('session.json bell', () => {
+  for (const c of session.bell) {
+    it(c.name, () => assert.equal(mayWriteBell(c.timer_stamp, c.device, c.in_step, c.has_row), c.expect));
   }
 });
 

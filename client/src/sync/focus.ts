@@ -1,17 +1,22 @@
-// What the Focus screen is given. The lead wrote this interface so the ui lane and the core lane
-// could build to it at the same time; the core lane fills in createFocus.
+// What the Focus screen is given, and the one place session rows are written: at the bell when
+// this device may, and when a run is stopped, set aside or replaced.
 // Rules: contracts/protocol.md sections 6 (timer), 7 (the race) and 11 (sessions).
+//
+// Create it once, right after the engine and before anything else runs: a run that another
+// device replaces while no Focus is listening is closed by nobody.
 
+import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import type { TimerState, TimerView } from '../core/timer.ts';
+import { stampDevice, stampMs } from '../core/hlc.ts';
+import { closeRun, mayWriteBell } from '../core/session.ts';
+import type { End } from '../core/session.ts';
+import { localDay, race } from '../core/stats.ts';
+import type { Race, Session } from '../core/stats.ts';
+import { act, view } from '../core/timer.ts';
+import type { TimerAction, TimerState, TimerView } from '../core/timer.ts';
 import type { Engine } from './engine.ts';
 
-/** You against the ghost: protocol section 7. `split_ms` under 0 is behind. No past day, no ghost. */
-export interface Race {
-  you_ms: number;
-  ghost: { day: string; ms: number; total_ms: number } | null;
-  split_ms: number | null;
-}
+export type { Race } from '../core/stats.ts';
 
 export interface Focus {
   /** The timer cell. Changes only when someone acts, on any device. */
@@ -50,7 +55,196 @@ export interface FocusEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
-/** Also writes the session rows: at the bell when this device may (protocol section 11), and when a run is stopped, set aside or replaced. */
-export function createFocus(engine: Engine, env: FocusEnv): Focus {
-  throw new Error('not built yet: createFocus, roadmap section 2');
+/** What Focus uses of the engine. */
+export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'rows' | 'write' | 'stamp'>;
+
+const EXTEND_MS = 300000;
+const LENGTHS = { work_ms: 1500000, short_ms: 300000, long_ms: 900000 };
+
+// A row still arriving cell by cell, or one from a build that writes something else, is not counted yet.
+const isSession = (row: Record<string, unknown>) =>
+  ['started', 'ended', 'paused_ms'].every((field) => typeof row[field] === 'number') &&
+  ['kind', 'outcome', 'device'].every((field) => typeof row[field] === 'string');
+
+/** `close()` stops the bell watch: for tests and for Node, where a waiting timer keeps the process alive. */
+export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close(): void } {
+  const me = engine.device;
+  const state = engine.timer;
+  const rows = engine.rows('session');
+  const sessions = computed(() => [...rows.value.values()].filter(isSession) as unknown as Session[]);
+
+  const lengths = computed(() => {
+    const set = engine.rows('settings').value.get('current');
+    const length = (name: keyof typeof LENGTHS) => {
+      const value = set?.[name];
+      return typeof value === 'number' && Number.isInteger(value) && value >= 1000 ? value : LENGTHS[name];
+    };
+    return { work_ms: length('work_ms'), short_ms: length('short_ms'), long_ms: length('long_ms') };
+  });
+
+  const timerStamp = () => engine.stamp('timer', 'current', 'state');
+  const today = (ms: number) => localDay(ms, env.utcOffsetMin());
+
+  // The timer last did something on an earlier local day: its bell if it rang, else the last
+  // time someone touched it. Then the next lap is lap one, and yesterday's half set earns no break.
+  function newDay(s: TimerState, v: TimerView, now: number): boolean {
+    const stamp = timerStamp();
+    if (!stamp) return false;
+    return today(v.over && v.ends_at !== null ? v.ends_at : stampMs(stamp)) < today(now);
+  }
+
+  function look(s: TimerState, now: number): TimerView {
+    const v = view(s, now);
+    return newDay(s, v, now) ? { ...v, next: { phase: 'work', set_index: 0 } } : v;
+  }
+
+  // A row already tells this run's story up to this bell. A row that ends earlier does not: the
+  // lap was extended after it rang, or went on here after another device stopped it.
+  function covered(run: string, endsAt: number): boolean {
+    const ended = rows.peek().get(run)?.ended;
+    return typeof ended === 'number' && ended >= endsAt;
+  }
+
+  // Closes a run as protocol section 11 says and writes the row it leaves, if any. `written` is
+  // the time in the stamp of the timer cell that held `s`.
+  function keep(s: TimerState, how: End, now: number, written: number) {
+    const closed = closeRun(s, how, { now, device: me, written, rang: rangOnce(s) });
+    if (!closed) return;
+    // The same rang row twice is harmless, but it is a push for nothing.
+    if (closed.stamp_at !== null && covered(closed.id, closed.row.ended)) return;
+    engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
+  }
+
+  const rangOnce = (s: TimerState) => s.run !== null && rows.peek().get(s.run)?.outcome === 'rang';
+
+  // The idle state a run leaves behind. A run that holds a rang row reached its bell once, so for
+  // the set of four it is done, even when an extension has reopened it: the pure rule only sees a
+  // lap that is not over and would hand out the same lap again, five laps before the long break.
+  // So for such a run the rule is asked at a moment the run is over.
+  function after(s: TimerState, now: number): TimerState {
+    if (!rangOnce(s)) return act(s, { do: 'stop' }, now);
+    const running = act(s, { do: 'resume' }, now);
+    return act(running, { do: 'stop' }, Math.max(now, view(running, now).ends_at ?? now));
+  }
+
+  // The run this device wrote last and has not seen end, and when it wrote it. If another
+  // device's run takes the timer, this is all that is left of ours, and what its row is made from.
+  let own: { state: TimerState; written: number } | null = null;
+
+  // `own` is set before the watch hears of the write, so it never takes our own next run for a replacement.
+  function put(next: TimerState) {
+    batch(() => {
+      engine.write('timer', 'current', { state: next });
+      const stamp = timerStamp();
+      own = stamp && next.phase !== 'idle' ? { state: next, written: stampMs(stamp) } : null;
+    });
+  }
+
+  const written = () => stampMs(timerStamp() ?? '');
+
+  // One turn, so one store transaction: the row of the run that ends and the timer cell that ends it.
+  function begin(lap: boolean, task: string | null | undefined) {
+    const s = state.peek();
+    const now = engine.now();
+    const v = look(s, now);
+    const phase = lap ? 'work' : v.next.phase;
+    const fresh = phase === 'work' && newDay(s, v, now);
+    // A lap begun over a run that rang once is the next lap: it starts from what that run leaves behind.
+    const from = phase === 'work' && rangOnce(s) ? after(s, now) : s;
+    batch(() => {
+      keep(s, 'stop', now, written());
+      const start: TimerAction = {
+        do: 'start',
+        phase,
+        run: env.runId(),
+        task: phase === 'work' ? (task ?? null) : null,
+        planned_ms: lengths.peek()[`${phase}_ms`],
+        ...(fresh && { new_set: true }),
+      };
+      put(act(from, start, now));
+    });
+  }
+
+  function end(how: 'stop' | 'void') {
+    const s = state.peek();
+    if (s.phase === 'idle') return;
+    const now = engine.now();
+    const idle = after(s, now);
+    batch(() => {
+      keep(s, how, now, written());
+      put(idle);
+    });
+  }
+
+  function change(action: TimerAction) {
+    const s = state.peek();
+    const next = act(s, action, engine.now());
+    if (next !== s) put(next);
+  }
+
+  // The watch. It runs when the timer cell, the sync state or the session rows change, and when
+  // the bell is due: so a device that wakes late, comes back online or catches up does the right thing.
+  const due = signal(0);
+  let cancel = () => {};
+  const stopWatch = effect(() => {
+    const s = state.value;
+    const inStep = engine.sync.value === 'in-step';
+    void rows.value;
+    void due.value;
+    untracked(() => {
+      const now = engine.now();
+      // Another device's run has the timer and ours never ended: it ends here, unless a row says
+      // it already did. An idle timer is not this: whoever stopped our run wrote its row.
+      const ours = own?.state.run;
+      if (own && ours && s.run !== null && s.run !== ours && !rows.peek().has(ours)) {
+        keep(own.state, 'replaced', now, own.written);
+      }
+      const stamp = timerStamp();
+      own = stamp && s.phase !== 'idle' && stampDevice(stamp) === me ? { state: s, written: stampMs(stamp) } : null;
+
+      cancel();
+      cancel = () => {};
+      const { over, ends_at } = view(s, now);
+      if (!stamp || s.run === null || ends_at === null) return;
+      if (!over) {
+        cancel = env.schedule(() => void due.value++, ends_at - now);
+      } else if (mayWriteBell(stamp, me, inStep, covered(s.run, ends_at))) {
+        keep(s, 'bell', now, stampMs(stamp));
+      }
+    });
+  });
+
+  return {
+    state,
+    lengths,
+    view: () => look(state.value, engine.now()),
+    ran: () => state.value.planned_ms - view(state.value, engine.now()).left_ms,
+
+    race() {
+      const s = state.value;
+      const now = engine.now();
+      // A row that ends before the run has got to (see `covered`) would hide the lap in progress.
+      const end = s.paused_at ?? Math.min(now, view(s, now).ends_at ?? now);
+      const list = sessions.value.filter((row) => !(row.id === s.run && row.ended < end));
+      return race(list, s, now, env.utcOffsetMin());
+    },
+
+    lapsToday() {
+      const day = today(engine.now());
+      return sessions.value.filter((row) => row.kind === 'work' && row.outcome === 'rang' && today(row.started) === day).length;
+    },
+
+    start: (task) => begin(false, task),
+    skipBreak: (task) => begin(true, task),
+    pause: () => change({ do: 'pause' }),
+    resume: () => change({ do: 'resume' }),
+    extend: () => change({ do: 'extend', ms: EXTEND_MS }),
+    stop: () => end('stop'),
+    setAside: () => end('void'),
+
+    close() {
+      stopWatch();
+      cancel();
+    },
+  };
 }

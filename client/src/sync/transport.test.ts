@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeSockets, fakeTime, settle } from './fakes.ts';
-import { PING_MS, POLL_MS, backoffMs, connect, smoothOffset } from './transport.ts';
+import { HELLO_MS, PING_MS, POLL_MS, backoffMs, connect, smoothOffset } from './transport.ts';
 import type { Fetch, Push, ServerMessage } from './transport.ts';
 
 function rig(random = 1) {
@@ -198,9 +198,43 @@ describe('the socket', () => {
     r.sockets.last().fail();
     r.transport.wake();
     assert.equal(r.sockets.all.length, 2);
+    r.sockets.last().accept();
+    r.sockets.last().say({ type: 'welcome', server_time: r.time.now(), head: 0 });
     // The wait that was running is cancelled, not left to open a third.
-    r.time.advance(60000);
+    r.time.advance(2 * HELLO_MS);
     assert.equal(r.sockets.all.length, 2);
+  });
+
+  it('a socket that opens and never answers the hello is dropped after ten seconds and tried again', () => {
+    const r = rig();
+    r.transport.start();
+    r.sockets.last().accept();
+    r.time.advance(HELLO_MS - 1);
+    assert.equal(r.sockets.last().closed, false);
+    r.time.advance(1);
+    assert.equal(r.sockets.all[0]!.closed, true);
+    // It was never up, so the engine is not told it went down.
+    assert.deepEqual(r.seen, []);
+    r.time.advance(1000);
+    assert.equal(r.sockets.all.length, 2);
+  });
+
+  it('a socket that never even opens is dropped the same way, and three of those bring the POST path in', () => {
+    const r = rig();
+    r.transport.start();
+    r.time.advance(HELLO_MS + 1000 + HELLO_MS + 2000 + HELLO_MS);
+    assert.equal(r.sockets.all.length, 3);
+    assert.ok(r.sockets.all.every((socket) => socket.closed));
+    assert.equal(r.posts.length, 1);
+  });
+
+  it('a welcome in time ends the wait: the socket is left alone', () => {
+    const r = rig();
+    welcomed(r);
+    r.time.advance(HELLO_MS);
+    assert.equal(r.sockets.last().closed, false);
+    assert.equal(r.sockets.all.length, 1);
+    assert.deepEqual(r.seen.map((m) => (m === 'down' ? m : m.type)), ['welcome']);
   });
 
   it('bye with reason token: passed on, and no more reconnecting', () => {

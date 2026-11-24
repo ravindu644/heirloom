@@ -79,6 +79,8 @@ export type Connect = (handlers: Handlers) => Transport;
 
 export const PING_MS = 25000;
 export const POLL_MS = 5000;
+/** How long a new socket has to say welcome. A proxy may accept the socket and then pass nothing on. */
+export const HELLO_MS = 10000;
 /** Socket attempts in a row with no welcome before POST takes over. */
 export const SOCKET_TRIES = 3;
 const BACKOFF_BASE_MS = 1000;
@@ -106,6 +108,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
   let waitingPong = false;
   let cancelRetry = never;
   let cancelPing = never;
+  let cancelHello = never;
 
   let polling = false;
   let polls = 0; // goes up when polling stops, so a reply still in the air is dropped
@@ -142,6 +145,10 @@ export function connect(wire: Wire, on: Handlers): Transport {
     sock.onclose = sock.onerror = () => {
       if (sock === ws) lost();
     };
+    // From the moment it is made, so one that never opens is caught as well.
+    cancelHello = wire.schedule(() => {
+      if (sock === ws) lost();
+    }, HELLO_MS);
   }
 
   function receive(msg: any, helloSent: number) {
@@ -153,6 +160,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
     if (msg.type === 'welcome') {
       live = true;
       failures = 0;
+      cancelHello();
       stopPolling();
       on.time(msg.server_time - (helloSent + wire.now()) / 2);
       cancelPing = wire.schedule(ping, PING_MS);
@@ -179,6 +187,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
     live = false;
     waitingPong = false;
     cancelPing();
+    cancelHello();
     if (!sock) return;
     sock.onopen = sock.onmessage = sock.onclose = sock.onerror = null;
     try {
