@@ -5,11 +5,12 @@
 // comes online and it must hold that:
 //   1. every device of an account holds exactly what a fresh device of that account gets;
 //   2. no device holds anything of another account;
-//   3. nothing was lost: every field ever written exists, holding a value some device wrote.
+//   3. nothing was lost: every field ever written exists, holding a value some device wrote;
+//   4. every edit shows on its own device at once: it is newer than anything that device has seen.
 // The seed picks the events, so a seed always makes the same list; the network decides the
 // timing, so a run is a sample of the interleavings that list allows. On a failure it prints
 // the seed and the shortest list it can find that still fails, then exits 1.
-// --seeds N runs N seeds from --seed up.
+// --seeds N runs N seeds from --seed up; only the first failure is shrunk.
 import { parseArgs } from 'node:util';
 import { converge, device, network, PASSWORD, restart, serverHolds, sleep, startServer, stopAll, table, until } from '../../tests/sync/harness.ts';
 import type { Device, Server } from '../../tests/sync/harness.ts';
@@ -23,6 +24,9 @@ const { values: args } = parseArgs({
     steps: { type: 'string', default: '120' },
   },
 });
+// A signal skips the exit handlers that stop each trial's server and remove its directory.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => process.exit(130));
+
 const DEVICES = Number(args.devices);
 const ACCOUNTS = Number(args.accounts);
 const MIN = 60000;
@@ -54,10 +58,11 @@ const accountOf = (d: number) => d % ACCOUNTS;
 const username = (a: number) => `sim${a}`;
 
 // Device 0 has a clock that jumps far ahead, device 1 one that falls behind, the rest drift a little.
+// Not whole ms: a real device's corrected time has a fraction, from the averaged offset.
 function clockFor(d: number, r: () => number) {
-  if (d === 0) return Math.round((6 + r() * 6) * MIN);
-  if (d === 1) return -Math.round((3 + r() * 9) * MIN);
-  return Math.round((r() - 0.5) * 4000);
+  if (d === 0) return (6 + r() * 6) * MIN;
+  if (d === 1) return -(3 + r() * 9) * MIN;
+  return (r() - 0.5) * 4000;
 }
 
 function events(seed: number, steps: number): Event[] {
@@ -77,6 +82,12 @@ function events(seed: number, steps: number): Event[] {
     else list.push({ k: 'wait', ms: 1 + Math.floor(r() * 30) });
   }
   return list;
+}
+
+// A screen is open on every dataset from the start, so what it shows is checked against what is held.
+function watch(dev: Device) {
+  for (const dataset of DATASETS) dev.engine.rows(dataset);
+  return dev;
 }
 
 /** Runs one list on a fresh server. Null when everything held, else what broke. */
@@ -100,6 +111,7 @@ async function play(server: Server, seed: number, list: Event[], stats: { nacks:
     const a = accountOf(d);
     const res = d < ACCOUNTS ? await dev.engine.register(server.invite(), username(a), PASSWORD) : await dev.engine.signIn(username(a), PASSWORD);
     if (!res.ok) return `device ${d} could not sign in: ${res.error}`;
+    watch(dev);
     devs.push(dev);
   }
   await until(() => devs.every((d) => d.engine.sync.value === 'in-step'), 10000, 'devices did not come up');
@@ -111,6 +123,12 @@ async function play(server: Server, seed: number, list: Event[], stats: { nacks:
     switch (e.k) {
       case 'write': {
         dev!.engine.write(e.dataset, e.row, { [e.field]: e.value });
+        // An edit is stamped later than everything the device has seen (protocol section 2), so
+        // it shows at once. If it does not, the person typed and nothing happened.
+        const now = dev!.engine.rows(e.dataset).value.get(e.row)?.[e.field];
+        if (now !== e.value) {
+          return `4. device ${e.d}'s edit of ${e.dataset}/${e.row}/${e.field} to ${e.value} did not take: it holds ${dev!.engine.stamp(e.dataset, e.row, e.field)} ${JSON.stringify(now)}`;
+        }
         const key = `${e.dataset}/${e.row}/${e.field}`;
         const seen = written[accountOf(e.d)]!;
         if (!seen.has(key)) seen.set(key, new Set());
@@ -128,7 +146,7 @@ async function play(server: Server, seed: number, list: Event[], stats: { nacks:
         dev!.net.noSocket();
         break;
       case 'restart':
-        devs[e.d] = await restart(server, dev!);
+        devs[e.d] = watch(await restart(server, dev!));
         break;
       case 'clock':
         dev!.skew.ms = e.ms;
@@ -149,7 +167,7 @@ async function play(server: Server, seed: number, list: Event[], stats: { nacks:
   for (let a = 0; a < ACCOUNTS; a++) {
     const mine = devs.filter((_, d) => accountOf(d) === a);
     try {
-      await converge(mine, 30000);
+      await converge(mine, 10000);
     } catch (err) {
       return `account ${a}: ${(err as Error).message}`;
     }
@@ -173,16 +191,16 @@ async function play(server: Server, seed: number, list: Event[], stats: { nacks:
   return null;
 }
 
-// Drops chunks of the list while it still fails: ddmin, with a budget so a flaky failure cannot run forever.
+// Drops chunks of the list while it still fails: ddmin, with two minutes to spend, because a
+// failing trial waits out the settle timeout and make check must still end.
 async function shrink(seed: number, list: Event[]): Promise<Event[]> {
+  const deadline = performance.now() + 120000;
   let n = 2;
-  let tries = 0;
-  while (list.length > 1 && tries < 80) {
+  while (list.length > 1 && performance.now() < deadline) {
     const size = Math.ceil(list.length / n);
     let smaller = false;
-    for (let i = 0; i < n && tries < 80; i++) {
+    for (let i = 0; i < n && performance.now() < deadline; i++) {
       const candidate = [...list.slice(0, i * size), ...list.slice((i + 1) * size)];
-      tries++;
       if (candidate.length && (await trial(seed, candidate))) {
         list = candidate;
         n = Math.max(n - 1, 2);
@@ -211,10 +229,21 @@ for (let seed = first; seed < first + Number(args.seeds); seed++) {
     continue;
   }
   failed++;
+  // One shrink is worth having; one per seed would turn a sweep into hours.
+  if (failed > 1) {
+    console.log(`sim seed ${seed}: FAILED in ${ms} ms: ${broke.split('\n')[0]}`);
+    continue;
+  }
   console.log(`sim seed ${seed}: FAILED in ${ms} ms\n${broke}\nshrinking...`);
   const small = await shrink(seed, list);
-  const again = await trial(seed, small);
-  console.log(`seed ${seed}, ${small.length} events (${again ? 'fails again' : 'did not fail on a second run: timing'}):`);
+  // The network decides the timing, so give the short list a few chances to show it is real.
+  let again: string | null = null;
+  let runs = 0;
+  while (!again && runs < 5) {
+    runs++;
+    again = await trial(seed, small);
+  }
+  console.log(`seed ${seed}, ${small.length} events (${again ? `failed again on re-run ${runs}` : 'did not fail again in 5 re-runs: timing'}):`);
   for (const e of small) console.log('  ' + JSON.stringify(e));
   if (again) console.log(again);
 }
