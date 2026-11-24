@@ -36,7 +36,9 @@ strings, so time decides, then the counter, then the device id.
 A device's clock is two numbers, `ms` and `counter`, both 0 at first: the highest stamp it has made
 or seen.
 
-- **To stamp an edit** at wall time `now` (`Date.now()` plus the measured offset to server time):
+- **To stamp an edit** at wall time `now` (`Date.now()` plus the measured offset to server time,
+  rounded to a whole millisecond: the offset is a fraction, the stamp's text is not, and a clock
+  holding `311.4` would rank itself above a stamp at `311` with a higher counter):
   if `now > ms`, the clock becomes `(now, 0)`; otherwise `(ms, counter + 1)`. A counter past `ffff`
   becomes `(ms + 1, 0)`. The stamp is the clock plus the device id.
 - **On seeing a stamp** from anywhere: if its `(ms, counter)` is higher than the clock, the clock

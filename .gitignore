@@ -7,6 +7,8 @@ node_modules/
 dist/
 client/dist/
 server/bin/
+server/web/dist/*
+!server/web/dist/.keep
 android/app/build/
 android/.gradle/
 *.apk

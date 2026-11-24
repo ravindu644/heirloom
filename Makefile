@@ -59,14 +59,16 @@ test-server:
 web: tokens
 	pnpm exec vite build
 
-server:
+# The binary carries the web app: the build is copied to where go:embed can reach it.
+server: web
+	rm -rf server/web/dist && mkdir -p server/web/dist && cp -r client/dist/. server/web/dist/ && touch server/web/dist/.keep
 	cd server && $(GOBUILD) -o bin/heirloomd ./cmd/heirloomd
 	cd server && GOOS=linux GOARCH=arm64 $(GOBUILD) -o bin/heirloomd-arm64 ./cmd/heirloomd
 
-budget: web server
+budget: server
 	node tools/budget.mjs
 
-e2e: web server
+e2e: server
 	pnpm exec playwright test -c tests/e2e
 
 dev: tokens
