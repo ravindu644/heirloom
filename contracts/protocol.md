@@ -561,3 +561,36 @@ nothing older than a day.
 those cells through the ordinary merge and puts every cell that was kept into the outbox. So it
 is safe to import twice, into another account's fresh database, or into a device that has moved
 on: the newer stamp wins, as everywhere.
+
+## 17. Ringing a browser that is not looking
+
+A page cannot ring from a closed tab, and a hidden tab's timers run late. So the server sends a
+Web Push at the bell to the browsers that asked for one. No paid service: the server makes its
+own VAPID key pair at first start and keeps it in its database.
+
+| Request | Body (beside `token`, `device`) | 200 reply |
+|---|---|---|
+| `GET /api/push/key` | none, and no token | `{"key":"<the VAPID public key, base64url>"}` |
+| `POST /api/push/subscribe` | `subscription` (the browser's own object: `endpoint` and `keys` with `p256dh` and `auth`), `words` (below) | `{}`. One subscription per device; a new one replaces the old |
+| `POST /api/push/unsubscribe` | nothing more | `{}` |
+
+`words` is what the notification will say, written by the app in its own voice so the server
+holds no copy of its own: `{"lap":["Lap 1 of 4, done.", four in all],"take":["Take five.",
+four in all, the fourth for the long break],"break":"Break over.","next":["Lap 1 is next.",
+four in all]}`. Each string is at most 80 characters.
+
+- **When.** At the moment an account's timer cell says a run ends (section 6: running, not
+  paused, `ends_at` reached), the server sends one push to each subscribed device of that
+  account. A timer that was paused, stopped, extended or replaced before then sends nothing at
+  the old time. Nothing is sent more than 60 s late (the server was down): a bell that late is
+  not a bell.
+- **What.** The encrypted payload (RFC 8291, `aes128gcm`) is
+  `{"t":"ring","run":"<run id>","at":<ends_at>,"title":"...","body":"..."}`, the title and body
+  picked from that device's `words` by the phase and `set_index`. TTL 60 s, urgency high.
+- **The browser's side.** The service worker shows the notification with the tag
+  `heirloom-ring`, unless a window of the app is visible, in which case the page rings itself
+  and the worker shows nothing. Either way it tells every open window the run has rung, so a
+  page whose own late timer fires afterwards stays quiet.
+- A push service that answers 404 or 410 for a subscription has dropped it: the server deletes
+  it. Any other failure is not retried: the bell has passed.
+- The server never sends anything else by push, and the payload holds no task title.
