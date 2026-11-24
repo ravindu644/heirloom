@@ -121,6 +121,24 @@ describe('the lists', () => {
     assert.deepEqual(open(d), ['one', 'two', 'three']);
   });
 
+  it('`list` is all of today\'s open tasks in order, so a screen can see where next sits beside the running one', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [one, two] = ['one', 'two', 'three'].map((t) => d.today.add(t)!);
+    assert.deepEqual(titles(d.today.list.value), ['one', 'two', 'three']);
+    // The running task first: next is below it. The running task second: next is above it.
+    d.focus.start(one);
+    assert.deepEqual(titles(d.today.list.value), ['one', 'two', 'three']);
+    assert.equal(d.today.next.value?.title, 'two');
+    assert.equal(d.today.list.value.indexOf(d.today.next.value!), 1);
+    assert.equal(d.today.list.value[0], d.today.running.value);
+    d.focus.stop();
+    d.focus.start(two);
+    assert.equal(d.today.next.value?.title, 'one');
+    assert.equal(d.today.list.value.indexOf(d.today.next.value!), 0);
+    assert.deepEqual(titles(d.today.later.value), ['two', 'three']);
+  });
+
   it('done shows what was done today, in the order it was done, and nothing done yesterday', async () => {
     const w = world();
     const d = await w.device('a');

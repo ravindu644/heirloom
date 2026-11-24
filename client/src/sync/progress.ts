@@ -2,63 +2,21 @@
 // lane could build to it at the same time; the core lane fills in createProgress.
 // Rules: contracts/protocol.md section 13, with sections 7 (counting) and 8 (the streak).
 
+import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { addDays, bests, estimates, outcomeOf, projectShares, since, streakView, weekRace } from '../core/progress.ts';
+import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
+import { focusOf, localDay, stats } from '../core/stats.ts';
+import type { Session } from '../core/stats.ts';
+import { asTask } from '../core/today.ts';
+import type { Task } from '../core/today.ts';
+import { createCounts } from './counts.ts';
+import { createDay } from './day.ts';
 import type { Engine } from './engine.ts';
+import { projectViews } from './today.ts';
 import type { ProjectView } from './today.ts';
 
-/** This week against last week, as running totals. Times in ms. */
-export interface WeekRace {
-  /** Monday of this week, `2026-11-23`. */
-  monday: string;
-  /** Seven days, Monday first. `you_ms` is null for days still to come; `ghost_ms` is last week's running total at that day's end. */
-  days: { day: string; you_ms: number | null; ghost_ms: number }[];
-  /** This week so far, the lap in progress included. */
-  you_ms: number;
-  /** Last week up to this weekday and time of day, and its whole total. */
-  ghost_now_ms: number;
-  ghost_total_ms: number;
-  /** `you_ms - ghost_now_ms`. Under 0 is behind. Null when last week has nothing. */
-  split_ms: number | null;
-}
-
-export interface StreakView {
-  /** Kept days since the last miss. */
-  streak: number;
-  /** Kept days and all days in the last 45 of the record: "41 of the last 45". */
-  kept: number;
-  of: number;
-  /** True when a miss lies inside those days: then the screen shows kept of, not the run. */
-  missed: boolean;
-  /** The last 14 days, oldest first, for the row of dots. Today is `open` until it has a lap. */
-  recent: { day: string; state: 'kept' | 'rest' | 'empty' | 'open' }[];
-}
-
-export interface YearCell {
-  day: string;
-  focus_ms: number;
-  laps: number;
-  /** 0 to 4. */
-  level: number;
-  rest: boolean;
-}
-
-export interface Since {
-  /** The first day with a counted session, or null before any. */
-  first: string | null;
-  focus_ms: number;
-  laps: number;
-  kept: number;
-  of: number;
-  /** 0 is Monday. Null until a weekday has come round three times. */
-  steadiest: { weekday: number; kept: number; of: number } | null;
-  /** One cell per day from `first` to today. */
-  cells: YearCell[];
-}
-
-export interface Bests {
-  day: { day: string; focus_ms: number } | null;
-  week: { monday: string; focus_ms: number } | null;
-}
+export type { Bests, Since, StreakView, WeekRace, YearCell } from '../core/progress.ts';
 
 export interface ProjectShare {
   project: ProjectView | null;
@@ -128,6 +86,135 @@ export interface ProgressEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
-export function createProgress(engine: Engine, env: ProgressEnv): Progress & { close(): void } {
-  throw new Error('not built yet: createProgress, roadmap section 5');
+const DAY_MS = 86400000;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const NOTE_MAX = 280;
+
+/**
+ * `close()` stops the midnight timer. `recomputed()` says how many times the whole history has
+ * been worked through: it is there for the test that proves this is not every keystroke.
+ */
+export function createProgress(engine: Engine, env: ProgressEnv): Progress & { close(): void; recomputed(): number } {
+  const counts = createCounts(engine, env.utcOffsetMin);
+  const clock = createDay(engine, env);
+  const sessionRows = engine.rows('session');
+  const offset = () => env.utcOffsetMin();
+
+  // The one pass over every session there is. Everything below reads this, and it is worked out
+  // again only when a session row has changed AND someone asks: a computed with nobody reading
+  // it does nothing. Task rows, the timer and the clock are not read here, so typing a title or
+  // starting a lap leaves it as it is.
+  let passes = 0;
+  const history = computed(() => {
+    passes += 1;
+    const sessions = counts.sessions.value;
+    const { days, overlaps } = stats(sessions, offset());
+    const taskLaps = new Map<string, number>();
+    for (const session of sessions) {
+      if (session.task !== null && session.kind === 'work' && session.outcome === 'rang') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
+    }
+    return { days, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps };
+  });
+
+  const tasks = computed(() => {
+    const all = new Map<string, Task>();
+    for (const [id, row] of engine.rows('task').value) {
+      const task = asTask(id, row);
+      if (task) all.set(id, task);
+    }
+    return all;
+  });
+  const projects = computed(() => new Map(projectViews(engine.rows('project').value).map((p) => [p.id, p])));
+  // The project a task is shown under: none for no task, a task with none, or a project archived or deleted.
+  const projectOf = (task: string | null): ProjectView | null => {
+    const project = task === null ? null : tasks.value.get(task)?.project;
+    return (project && projects.value.get(project)) || null;
+  };
+
+  // The sessions of the days from `from` to `to`, with the lap in progress in the place of its row.
+  function between(from: string, to: string, now: number): Session[] {
+    const open = counts.open(now);
+    const out: Session[] = [];
+    for (let day = from; day <= to; day = addDays(day, 1)) out.push(...(history.value.byDay.get(day) ?? []));
+    return open ? [...out.filter((session) => session.id !== open.id), open] : out;
+  }
+
+  return {
+    week() {
+      const now = engine.now();
+      const today = localDay(now, offset());
+      void clock.day.value;
+      const lastWeek = history.value.byDay.get(addDays(today, -7)) ?? [];
+      return weekRace(history.value.days, today, counts.race().you_ms, focusOf(lastWeek, now - 7 * DAY_MS));
+    },
+
+    projects() {
+      const now = engine.now();
+      const today = localDay(now, offset());
+      void clock.day.value;
+      return projectShares(between(addDays(today, -13), today, now), (session) => projectOf(session.task)?.id ?? null, today, offset()).map(
+        ({ project, ...sums }) => ({ project: (project !== null && projects.value.get(project)) || null, ...sums }),
+      );
+    },
+
+    lookBack() {
+      const now = engine.now();
+      const day = localDay(now, offset());
+      void clock.day.value;
+      const note = engine.rows('day').value.get(day)?.note;
+      const done = [...tasks.value.values()]
+        .filter((t) => t.parent === null && t.deleted === null && t.done !== null && localDay(t.done, offset()) === day)
+        .sort((a, b) => a.done! - b.done!);
+      return {
+        day,
+        focus_ms: counts.race().you_ms,
+        laps: counts.lapsToday(),
+        done: done.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate, laps: history.value.taskLaps.get(t.id) ?? 0 })),
+        note: typeof note === 'string' ? note : '',
+      };
+    },
+
+    streak: computed(() => streakView(history.value.days, clock.day.value)),
+    since: computed(() => since(history.value.days, clock.day.value)),
+    bests: computed(() => bests(history.value.days)),
+    estimates: computed(() => estimates([...tasks.value.values()], (id) => history.value.taskLaps.get(id) ?? 0, clock.day.value, offset())),
+
+    timeline(day) {
+      const { byDay, overlapping } = history.value;
+      return (byDay.get(day) ?? [])
+        .toSorted((a, b) => a.started - b.started)
+        .map((session) => {
+          const task = session.task === null ? undefined : tasks.value.get(session.task);
+          return {
+            id: session.id,
+            kind: session.kind,
+            outcome: session.outcome,
+            started: session.started,
+            ended: session.ended,
+            ran_ms: Math.max(0, session.ended - session.started - session.paused_ms),
+            task: task ? { id: task.id, title: task.title } : null,
+            project: projectOf(session.task),
+            overlap: overlapping.has(session.id),
+          };
+        });
+    },
+
+    setAside(id) {
+      const row = sessionRows.peek().get(id);
+      if (row?.kind === 'work' && (row.outcome === 'rang' || row.outcome === 'stopped')) engine.write('session', id, { outcome: 'void' });
+    },
+
+    countAgain(id) {
+      const session = counts.sessions.peek().find((row) => row.id === id);
+      if (session?.kind === 'work' && session.outcome === 'void') engine.write('session', id, { outcome: outcomeOf(session) });
+    },
+
+    setNote(day, text) {
+      if (DAY.test(day)) engine.write('day', day, { note: text.trim().slice(0, NOTE_MAX) });
+    },
+
+    wake: clock.wake,
+    close: clock.close,
+    recomputed: () => passes,
+  };
 }

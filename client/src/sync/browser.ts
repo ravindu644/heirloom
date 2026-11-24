@@ -6,6 +6,8 @@ import { createEngine } from './engine.ts';
 import type { Engine, Env } from './engine.ts';
 import { createFocus } from './focus.ts';
 import type { Focus } from './focus.ts';
+import { createProgress } from './progress.ts';
+import type { Progress } from './progress.ts';
 import { createToday } from './today.ts';
 import type { Today } from './today.ts';
 import { connect } from './transport.ts';
@@ -31,7 +33,7 @@ export function browserEnv(url: string = location.origin): Env {
  * replaces, so it must be listening before the first message arrives.
  * `url` is the server when it is not the page's own origin, as in the phone app.
  */
-export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today }> {
+export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today; progress: Progress }> {
   const env = browserEnv(url);
   // The wire is made here, so the browser's own word that the network is gone can reach it.
   let wire: Transport | undefined;
@@ -43,19 +45,19 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   const id = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
   const focus = createFocus(engine, { utcOffsetMin, runId: id, schedule: env.schedule });
   const today = createToday(engine, { utcOffsetMin, id, schedule: env.schedule });
-  // A background tab's timers are throttled and a sleeping phone's do not run at all, so the
-  // backoff may be far from done when the person is looking again.
-  addEventListener('online', () => {
+  const progress = createProgress(engine, { utcOffsetMin, schedule: env.schedule });
+  // What the clock may have passed while nothing ran: the connection, and the day.
+  const wake = () => {
     engine.wake();
     today.wake();
-  });
+    progress.wake();
+  };
+  // A background tab's timers are throttled and a sleeping phone's do not run at all, so the
+  // backoff may be far from done when the person is looking again.
+  addEventListener('online', wake);
   // Without this a network that vanished is only found by a ping, most of a minute later.
   addEventListener('offline', () => wire?.offline());
   // And a laptop that slept over midnight must not go on showing yesterday until a late timer fires.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
-    engine.wake();
-    today.wake();
-  });
-  return { engine, focus, today };
+  document.addEventListener('visibilitychange', () => document.hidden || wake());
+  return { engine, focus, today, progress };
 }

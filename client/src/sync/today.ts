@@ -9,7 +9,8 @@ import { view } from '../core/timer.ts';
 import { asRepeat, asTask, byOrder, keyBetween, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
 import type { Repeat, Task } from '../core/today.ts';
 import { createCounts, lapLengths } from './counts.ts';
-import type { Engine } from './engine.ts';
+import { createDay } from './day.ts';
+import type { Engine, Row } from './engine.ts';
 
 export type { Repeat } from '../core/today.ts';
 
@@ -81,6 +82,8 @@ export interface Today {
   readonly running: ReadonlySignal<TaskView | null>;
   /** Today's open tasks other than `next`, in order, the running one included, in its place. With `next` this is the whole list. */
   readonly later: ReadonlySignal<TaskView[]>;
+  /** All of today's open tasks in order: `next` and the running one each in its place. For knowing where `next` sits. */
+  readonly list: ReadonlySignal<TaskView[]>;
   /** Open tasks due after today, by day. */
   readonly upcoming: ReadonlySignal<TaskView[]>;
   /** Tasks done today, in the order they were done. */
@@ -122,11 +125,18 @@ export interface TodayEnv {
 }
 
 const COLORS: readonly ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
-const DAY_MS = 86400000;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
 const PULSE_MS = 15000;
 const KEY_MAX = 64;
+
+/** The projects to show, in order: named, and neither deleted nor archived. A colour this build does not know reads as ink. */
+export const projectViews = (rows: ReadonlyMap<string, Row>): ProjectView[] =>
+  [...rows.values()]
+    .filter((p) => typeof p.name === 'string' && typeof p.deleted !== 'number' && typeof p.archived !== 'number')
+    .map((p) => ({ id: p.id, order: typeof p.order === 'string' ? p.order : '', name: p.name as string, color: COLORS.find((c) => c === p.color) ?? 'ink' }))
+    .sort(byOrder)
+    .map(({ id, name, color }) => ({ id, name, color }));
 
 const sameRule = (a: Repeat, b: Repeat) => a?.every === b?.every && (a?.every !== 'week' || a.days === (b as typeof a).days);
 
@@ -136,21 +146,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   const taskRows = engine.rows('task');
   const projectRows = engine.rows('project');
   const settings = () => engine.rows('settings').value.get('current');
-  const dayNow = () => localDay(engine.now(), env.utcOffsetMin());
-
-  // The day turns over by itself. The wait is to the next local midnight, checked again when it
-  // comes: a clock that was corrected meanwhile may say it is not midnight yet.
-  const day = signal(dayNow());
-  let cancelMidnight = () => {};
-  // A sleeping laptop runs no timers, so this is also what waking calls: the day as it is now,
-  // and a fresh wait for the midnight after it.
-  function turn() {
-    cancelMidnight();
-    day.value = dayNow();
-    const midnight = Date.parse(day.peek()) + DAY_MS - env.utcOffsetMin() * 60000;
-    cancelMidnight = env.schedule(turn, Math.min(Math.max(midnight - engine.now(), 1000), DAY_MS));
-  }
-  turn();
+  const clock = createDay(engine, env);
+  const { day, now: dayNow, wake: turn } = clock;
 
   // While a lap runs on a task its square fills, so the lists are worked out again every few
   // seconds, and once more at the bell. Nothing else here moves with the clock.
@@ -175,11 +172,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     const state = engine.timer.value;
     const now = engine.now();
 
-    const projects: ProjectView[] = [...projectRows.value.values()]
-      .filter((p) => typeof p.name === 'string' && typeof p.deleted !== 'number' && typeof p.archived !== 'number')
-      .map((p) => ({ id: p.id, order: typeof p.order === 'string' ? p.order : '', name: p.name as string, color: COLORS.find((c) => c === p.color) ?? 'ink' }))
-      .sort(byOrder)
-      .map(({ id, name, color }) => ({ id, name, color }));
+    const projects = projectViews(projectRows.value);
     const project = new Map(projects.map((p) => [p.id, p]));
 
     const tasks = new Map<string, Task>();
@@ -213,6 +206,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       tasks,
       lists,
       projects,
+      todays,
       ...upNext(todays, lapOn),
       left: plannedLeft(todays),
       upcoming: lists.upcoming.map(show),
@@ -246,6 +240,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     next: computed(() => model.value.next),
     running: computed(() => model.value.running),
     later: computed(() => model.value.later),
+    list: computed(() => model.value.todays),
     upcoming: computed(() => model.value.upcoming),
     done: computed(() => model.value.done),
     deleted: computed(() => model.value.deleted),
@@ -399,7 +394,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     close() {
       stopPulse();
       cancelPulse();
-      cancelMidnight();
+      clock.close();
     },
   };
   return today;

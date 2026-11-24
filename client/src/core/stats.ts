@@ -46,7 +46,9 @@ function byDay<T extends Span>(spans: readonly T[], utcOffsetMin: number): Map<s
   const days = new Map<string, T[]>();
   for (const s of spans) {
     const day = localDay(s.started, utcOffsetMin);
-    days.set(day, [...(days.get(day) ?? []), s]);
+    const list = days.get(day);
+    if (list) list.push(s);
+    else days.set(day, [s]);
   }
   return days;
 }
@@ -72,17 +74,23 @@ export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats
     days[day] = { focus_ms: focus(list), laps: list.filter((s) => s.outcome === 'rang').length };
   }
 
-  // ponytail: every pair is compared. Sort by start and sweep if a history ever makes this slow.
+  // By start, each lap is compared only with those that begin before it ends: a year of laps is
+  // a few thousand comparisons, not millions.
   const overlaps: [string, string][] = [];
-  for (const a of counted) {
-    for (const b of counted) {
+  const inOrder = counted.toSorted((a, b) => from(a) - from(b));
+  inOrder.forEach((a, i) => {
+    for (let j = i + 1; j < inOrder.length && from(inOrder[j]!) < a.ended; j++) {
+      const b = inOrder[j]!;
       // More than an instant: back to back on two devices is not an overlap.
-      const shared = Math.min(a.ended, b.ended) - Math.max(from(a), from(b));
-      if (a.id < b.id && a.device !== b.device && shared > 0) overlaps.push([a.id, b.id]);
+      const shared = Math.min(a.ended, b.ended) - from(b);
+      if (a.device !== b.device && shared > 0) overlaps.push(a.id < b.id ? [a.id, b.id] : [b.id, a.id]);
     }
-  }
+  });
   return { days, overlaps: overlaps.sort((x, y) => (x[0] !== y[0] ? (x[0] < y[0] ? -1 : 1) : x[1] < y[1] ? -1 : 1)) };
 }
+
+/** The focus in these sessions with nothing after `upTo` counted: the counted ones, minutes two ran at once counted once. */
+export const focusOf = (sessions: readonly Session[], upTo = Infinity): number => focus(sessions.filter(counts), upTo);
 
 /** Today so far against the same stretch of a past day. `state` is the timer, for the lap in progress. */
 export function race(sessions: readonly Session[], state: TimerState, now: number, utcOffsetMin: number): Race {
