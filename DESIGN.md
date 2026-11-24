@@ -177,6 +177,7 @@ layout:
   lane-result: 40px
   chart: 192px
   heat-cell: 12px
+  heat-cell-lg: 24px
   heat-gap: 2px
   dot: 12px
   stroke: 2px
@@ -278,15 +279,25 @@ first, the rest after first paint.
   tabular digits of Barlow Condensed 600 each carry their own space at the left (a 1 the most, a
   4 the least), measured from pixels and kept as `layout.figure-bearing-0` to `-9`, in em of the
   figure's own size. The timer is pulled back by the bearing of whichever digit leads, so the
-  sentence under the digits starts exactly under their ink at 25:00 and at 18:42 alike. Smaller
-  figures, where the difference is under a pixel, use the one `layout.figure-bearing`.
+  sentence under the digits starts exactly under their ink at 25:00 and at 18:42 alike. Every
+  figure from `figure-lg` up that starts a column is pulled back the same way (the streak's
+  number over its dots); at `figure-md` and under the difference is less than a pixel and none
+  is applied.
 - **Rhythm.** Every vertical space is a step of the spacing scale. Things that belong together
   sit `xs` or `sm` apart (the line under the digits belongs to the digits); parts of one block
   `md`; one block from the next `lg`. Nothing related is ever further apart than `lg`.
 - **Free space goes to one place.** A screen may have one stretch of space that grows with the
-  screen, and it lies under the content: above the action row on a phone, at the bottom of the
-  canvas on a laptop. Content never floats in the middle of the screen with space above and
-  below it, and two related things are never pushed apart to fill a tall screen.
+  screen. On a laptop it lies at the bottom of the canvas. On a phone the screen is two groups:
+  what it says, at the top, and what to do next, at the bottom, which is the action row with the
+  sentence that explains it directly above ("Take five." belongs to "Start 5 min break"; "Start
+  now and it ends at 09:30." belongs to "Start lap 1"). The free space lies between those two
+  groups and nowhere else. It never splits a group: a sentence is not left at the top while its
+  button waits at the bottom, and content never floats in the middle with space above and below.
+- **Nothing scrolls sideways,** with one exception: on a phone the year scrolls inside its own
+  panel. And on a phone the page itself never scrolls: the screen's content scrolls between the
+  header and the bottom bar, which stay where they are.
+- **A form is the exception to the lower half:** its button follows its last field, wherever
+  that is, because that is where the eye and the thumb already are.
 - **Laptop, 1440:** a 232px labelled sidebar on the ground, the canvas at 32px gutters, a 12-column
   grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
 - Between the two, the sidebar collapses to the bottom bar under 720px.
@@ -327,7 +338,10 @@ Built once in `client/src/ui/kit/` and reused.
   on-you on a you fill when ahead (you on you-tint is under 4.5:1 at this size).
 - **Task row:** a 48px box to mark it done (the app's one stock control), the title, under it the
   project's square and name, and at the right the laps as small squares (filled, in progress,
-  empty) with "2 of 4" in `figure-sm` beside them. The count never outweighs the title.
+  empty) with "2 of 4" in `figure-sm` beside them. The count never outweighs the title. When
+  the row ends in a control (Start, Restore, Up and Down), the squares and count sit to its
+  left, centred on it and `md` away, so every row's count ends on one of two edges and never
+  touches a button.
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
   the task, and one button drawn as an outline in `ground`. When the lap has rung, its button to
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
@@ -336,10 +350,15 @@ Built once in `client/src/ui/kit/` and reused.
   quiet underlined Undo. It never covers the row it speaks of.
 - **The status line** keeps its space only where buttons sit at the bottom of a phone screen
   (Focus). Elsewhere it takes room when it has something to say and none when it is silent.
-- **Heat cell:** a 12px square, 2px gaps (`layout.heat-cell`, `heat-gap`), zero to four steps; a
-  rest day carries the rest mark, a hollow `rest` ring inside the square. Today has a `hair`
+- **Heat cell:** a square with 2px gaps (`heat-gap`), zero to four steps, in two sizes chosen by
+  fit: 24px (`layout.heat-cell-lg`) while all the weeks fit their panel, which is also a size a
+  finger can hit, and 12px (`layout.heat-cell`) once they do not. A short history is never a
+  stamp in the corner of an empty panel. On a laptop a year that outgrows its half panel takes
+  the canvas's full width instead of scrolling. A rest day carries the rest mark, a hollow
+  `rest` ring inside the square. Today has a `hair`
   outline in ink, the chosen day a `stroke` one.
-- **The week's chart:** drawn by hand, `layout.chart` tall. Your running total is a solid `you`
+- **The week's chart:** drawn by hand, `layout.chart` tall. A line's label stands clear of the
+  other line: above its dot when it is the upper line or near the floor, below otherwise. Your running total is a solid `you`
   line of `stroke` width that ends in a `dot` with its figure; last week's is a dashed `ghost`
   line with its total at its end. Grid lines are `hair` in `line`. No fill under a line, no
   legend box, no gradient: a line is labelled where it ends, and a sentence under the chart
@@ -347,7 +366,8 @@ Built once in `client/src/ui/kit/` and reused.
 - **The row of days:** fourteen `dot`s, `xs` apart: a kept day filled in `you`, a rest day the
   hollow `rest` ring, an empty day an empty-track dot, today open until it has a lap. The
   states differ by shape as well as colour.
-- **A day's timeline:** a `lane-set` lane on an hour axis: laps in `you`, breaks in `rest`, a
+- **A day's timeline:** a `lane-set` lane on an hour axis, each hour's label centred on its hour
+  (only a label at the lane's very end is pulled in): laps in `you`, breaks in `rest`, a
   lap set aside hollow. Two laps that ran on two devices at once sit on two rows and say so
   in words. Under it the same sessions as rows, because a block is too small to press.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`

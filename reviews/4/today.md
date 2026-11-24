@@ -1,5 +1,59 @@
 # Section 4: Today, the list
 
+## Second pass, 2026-11-25. Verdict: FAIL
+
+All 252 pictures in `reviews/4/shots/` opened (phone, wide 471x1020, small, laptop, the full-page
+and sheet-foot sets; light at reading size, dark as sheets). They were taken 03:16 to 03:25 and
+`kit/task-row.module.css` changed at 03:54, so the row was measured again from the running demo
+at 04:34. `node tools/design-audit.mjs`: 73 states, 0 violations.
+
+All six findings are fixed. One of the fixes made a new problem, and it is the kind this pass
+exists for, so the screen does not pass yet.
+
+### The six findings
+
+| # | Finding | Now | The picture |
+|---|---|---|---|
+| 1 | Numbers disagree after the bell | Fixed. "2h 30m, 6 laps", "6 of 8 laps today", K&R "3 of 4" with three squares, the same during the break. | `today-lap-over-phone-light`, `today-break-*` |
+| 2 | Two loud buttons at lap-over | Fixed. The bar's "Start 5 min break" takes the `you` fill, the row's Start steps down; Pause and Resume are outlines on the ink bar. | `today-lap-over-*`, `today-running-*` |
+| 3 | Project square beside the lap squares | Fixed. The project square stands alone at the left; the lap squares moved right, beside the count. | `today-phone-light` |
+| 4 | The count outweighs the title | Fixed. `figure-sm`, measured 14px at 600. | `today-phone-light` |
+| 5 | The last-tap bar covers its row, spans the canvas, shouts Undo | Fixed. As wide as the list, one line, underlined Undo, in the flow under the last row. | `today-added-laptop-light`, `today-after-*-phone-full-*` |
+| 6 | An empty 50px band cuts the list | Fixed. The list runs to the bottom bar. | `today-running-phone-light`, `today-*-small-*` |
+
+### Problems now
+
+1. **The count is jammed against the row's control.** Next row at 412: "2 of 4" ends at x=295 and
+   Start begins at 299, 4px apart, and the count (y 452 to 466) overlaps the button's lower edge
+   (y 410 to 458) by 6px. In Later rows the count ends at 376, so one list has two right edges
+   for the same number. The same at 471, 360 and 1440. In Recently deleted "1 of 1" ends at 324,
+   4px from "Restore", and sits lower than the word; in ordering mode it sits under Up and Down.
+   Taste gate, Rhythm and same job same look. Fix once in the kit row: with a trailing control
+   the squares and count are centred on the control's height and `md` (16px) from it, as far from
+   it as they are from the edge in a plain row.
+2. **The bar keeps its second sentence and drops the name.** At 412: "Done: Read ... It comes back
+   tomorrow.", "Deleted: Exercis... It keeps for 30 days." At 360 both halves are cut. The bar's
+   job is to say which task. Voice: specific. Fix: the title keeps at least half the line; the
+   second sentence is what gives way.
+3. Small: at 360 the lap-over bar reads "Lap 2 of 4, ..." and loses "done".
+
+### What the consistency pass changed
+
+- The header: mark and name left, the person at the right as a 48px target into Settings, the
+  same on all five screens and at 471. Sign out lives only in Settings. Good.
+- Three kinds of button, all filled, and underlined links for the small acts. Nothing pressable is
+  a bare word any more.
+- At 471x1020 the list simply gains width; nothing floats.
+- The black box around "Later today" in `today-after-delete-*` is the capture's keyboard focus
+  ring. Tested with a tap and a click: no ring. Not a finding.
+
+### Keep
+
+Unchanged: past the estimate nothing changes colour. "6 of 5" is still six squares and a plain
+figure.
+
+## First pass, 2026-11-25 (kept as written)
+
 Pictures: the 18 list states (`today-empty` to `today-after-delete`) at 412x915, 1440x900 and
 360x640, light and dark, 108 in all. Every one opened, beside
 `design/routes/b-pacer/screens/today-*`. Taken 02:18 to 02:20 from commit 615e847; the ui files
@@ -8,11 +62,11 @@ changed again at 02:33 (Undo now ten seconds, sheet closing), so retake after th
 A picture is one screen tall. On the phone that leaves Upcoming, Done, "Change the order" and the
 "Recently deleted" link below the fold and unseen. I judged them on the laptop only.
 
-## Verdict: FAIL
+### Verdict: FAIL
 
 The plan is all here and most of it is in the product's own language. Six things to fix.
 
-## Problems
+### Problems
 
 1. **After the bell the numbers disagree.** `today-lap-over-*`: Done says "2h 30m, 5 laps", the
    target "5 of 8 laps today", K&R "3 of 4" beside four filled squares. `today-break-*`: Done is
@@ -63,7 +117,7 @@ Not blocking:
 - "Nothing on today yet." and "Everything on today is done." use "on today" as a noun. "Nothing
   planned for today yet." reads first time.
 
-## PRODUCT.md section 2, row by row
+### PRODUCT.md section 2, row by row
 
 | Row | Delivered | Where |
 |---|---|---|
@@ -81,7 +135,7 @@ Not blocking:
 Here and not in PRODUCT.md: a manual order ("Change the order"). The Next row needs one, so it
 belongs, but it wants a line in the decision log. Notes on a task: see sheet.md.
 
-## The Look table
+### The Look table
 
 | Test | Result |
 |---|---|
@@ -94,7 +148,7 @@ belongs, but it wants a line in the decision log. Notes on a task: see sheet.md.
 | Dark | Pass. Neutral ground, the bar inverts to a light slab as in the reference, nothing glows. |
 | Tells | No floating add button, no "Are you sure?", no icon, no flame for a full target. Three tiles without icons come from the reference. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **No Start on any row while a lap counts or is paused: upheld.** It would end the lap. The Next
   row keeps its outline, so what is next is still marked.
@@ -114,7 +168,7 @@ belongs, but it wants a line in the decision log. Notes on a task: see sheet.md.
 - **A past due date as the plain date: upheld.** `today-carried-*`: "Sat 21 Nov", no colour, no
   "late". Voice rule 4.
 
-## For DESIGN.md (the lead)
+### For DESIGN.md (the lead)
 
 - **Task row** lists title, project, squares and "2 of 4". Add the done box and the count's size.
 - **A project's colour** may be `you`, `rest` or `ghost`, but the same section says red means
@@ -124,7 +178,7 @@ belongs, but it wants a line in the decision log. Notes on a task: see sheet.md.
 - **The lap in progress on a list** (the ink bar) and **what the last tap did** are components
   with no entry, and buttons on ink are a kind Buttons does not have.
 
-## The words
+### The words
 
 Every string in `today` read against the Voice section.
 
@@ -137,7 +191,7 @@ Every string in `today` read against the Voice section.
 - Fix: "Nothing on today yet." and "Everything on today is done.", above.
 - No exclamation mark, sentence case throughout, no padding word, no em dash.
 
-## Keep
+### Keep
 
 Past the estimate nothing changes colour. `today-over-*`: "6 of 5" is six tomato squares and a
 plain figure, and "13 of 8 laps today" is a full bar and a sentence. No amber, no "over", no
