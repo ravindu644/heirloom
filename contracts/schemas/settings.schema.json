@@ -14,6 +14,7 @@
     "celebrate": { "type": "boolean", "default": true },
     "day_target": { "type": "integer", "minimum": 0, "default": 0, "description": "Pomodoros a day. 0 is no target." },
     "share_task": { "type": "boolean", "default": false, "description": "Rooms may see the title of the task in progress." },
-    "rooms_hidden": { "type": "boolean", "default": false }
+    "rooms_hidden": { "type": "boolean", "default": false },
+    "marks": { "type": "object", "additionalProperties": { "type": "integer" }, "description": "Marks already shown, by key, with the time. protocol.md section 16." }
   }
 }

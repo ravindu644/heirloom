@@ -516,3 +516,39 @@ lap is for. It reads nothing else of anyone's, and logs none of it.
 is the device's to keep and send when it is back; nothing else is queued. A kept cheer that is
 answered `run` or `room` is dropped: the lap or the room is gone. Any other failure keeps it for
 the next connection.
+
+## 16. Settings, automatic starts, marks, and a person's own copy
+
+**Settings** are the fields of `settings/current`. A field nobody has written reads as its default.
+"Ring here" is not one of them: it belongs to one device and is kept there.
+
+**Automatic starts.** With `auto_break` on, the break a lap has earned starts at the lap's bell;
+with `auto_work` on, the next lap starts at a break's bell (for no task, or the same task if it is
+still first on today's list). The device that sees the bell writes the next timer state, and two
+devices that both see it must write the same one, or one of them would close the other's run as
+replaced:
+
+- its `started` is the bell's own time (`ends_at` of the run that rang), not the time of writing;
+- its `run` is the rung run's id with `+` appended (so `run-7f3a`, `run-7f3a+`, `run-7f3a++`);
+- its stamp is made as a rang row's is (section 11): the time of the timer cell it follows,
+  counter 1, the writer's device id. Anything a person does afterwards is newer.
+
+An automatic start is written only by a device that may write the bell (section 11), and never
+more than two hours after the bell: someone who comes back the next morning finds the timer
+idle, not a break that started itself nine hours ago. A set of four never chains past its long
+break: after a long break's bell nothing starts by itself.
+
+**Marks.** A mark is for something achieved, never for opening the app. Three kinds: the total of
+laps that rang reaching 1, 4, 25, 100, 250, 500, 1000 or 2500; a task marked done with its laps at
+or under its estimate; a week's focus passing the best week before it (only once there is a week
+before it). A mark is shown once per account: the device that shows it writes
+`settings/current` field `marks`, an object of mark keys to the time shown (`laps-25`,
+`estimate-<task id>`, `week-<monday>`), and no device shows a mark whose key is there. With
+`celebrate` off nothing is shown and nothing is written, so turning it on later does not replay
+the past: marks older than a day are written as seen without being shown.
+
+**A person's own copy.** Export is one JSON text: `{"heirloom": 1, "exported": <ms>, "account":
+"<username>", "cells": [...]}` with every cell the device holds, stamps included. Import applies
+those cells through the ordinary merge and puts every cell that was kept into the outbox. So it
+is safe to import twice, into another account's fresh database, or into a device that has moved
+on: the newer stamp wins, as everywhere.
