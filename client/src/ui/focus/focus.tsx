@@ -25,15 +25,20 @@ function lanes(race: RaceNow, workMs: number, now: number) {
   // With no ghost it is one set of four.
   const scale = Math.max(race.ghost?.total_ms ?? 4 * workMs, race.you_ms, 1);
   const day = race.ghost && s.pastDay(race.ghost.day, dayOf(now));
-  const split = race.split_ms ?? 0;
+  // The split is between the two totals as they are shown, in whole minutes: a chip that said
+  // 18 beside 2h 11m and 2h 30m would be arithmetic nobody can check.
+  const MIN = 60000;
+  const split = race.ghost ? (Math.floor(race.you_ms / MIN) - Math.floor(race.ghost.ms / MIN)) * MIN : 0;
   const text = s.race.split(split);
   return {
     day,
     you: { label: s.race.you, value: s.total(race.you_ms), share: race.you_ms / scale },
     ghost: race.ghost && { label: s.race.ghost, value: s.total(race.ghost.ms), share: race.ghost.ms / scale },
-    chip: { text, tone: text === 'level' ? 'level' : split < 0 ? 'behind' : 'ahead' } as const,
+    split,
+    chip: { text, tone: split === 0 ? 'level' : split < 0 ? 'behind' : 'ahead' } as const,
     // Laps that close the gap, were the ghost to stand still.
-    lapsBehind: (head = 0) => Math.max(0, Math.ceil((-split - head) / workMs)),
+    // From the true gap, not the shown one: a second can decide whether this lap is enough.
+    lapsBehind: (head = 0) => Math.max(0, Math.ceil((-(race.split_ms ?? 0) - head) / workMs)),
   };
 }
 
@@ -49,7 +54,7 @@ function RacePanel({ race, inLap, left, workMs, now }: { race: RaceNow; inLap: b
   return (
     <Panel title={l.day ? s.race.against(l.day) : s.race.today}>
       <Race you={l.you} ghost={l.ghost} />
-      <p class={css.say}>
+      <p>
         {l.day && (
           <>
             <SplitChip {...l.chip} /> {s.race.at(now)}{' '}
@@ -151,12 +156,12 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
         : l.chip.tone === 'level'
           ? s.result.level(l.day)
           : l.chip.tone === 'ahead'
-            ? s.result.ahead(race.split_ms ?? 0, l.day)
+            ? s.result.ahead(l.split, l.day)
             : s.result.behind(Math.max(1, l.lapsBehind()), nextLap, l.day);
     return (
       <div class={cx(css.focus, css.result, live && (set ? css.setMoment : css.lapMoment))}>
         <h1 class="sr">{s.focus.title}</h1>
-        <div>
+        <div class={css.laps}>
           {lapLine}
           <LapBar done={done} big={set} lighting={live && set} />
         </div>
@@ -184,7 +189,7 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
             <Button kind="primary" onClick={() => focus.start()}>
               {s.focus.startBreak(breakMs)}
             </Button>
-            <Button kind="text" onClick={() => focus.skipBreak(nextTask?.id)}>
+            <Button kind="quiet" onClick={() => focus.skipBreak(nextTask?.id)}>
               {s.focus.skipBreak}
             </Button>
           </div>
@@ -193,11 +198,14 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
     );
   }
 
-  // Ready, the line over the digits names the task a tap would start; in a lap, the task it is on.
-  // A lap on a task that is not on today's list still has its title, from the row itself.
-  const named = ready ? nextTask : state.phase === 'work' ? lapTask : null;
-  const row = !named && !ready && state.task ? engine.rows('task').value.get(state.task) : undefined;
-  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : '');
+  // The lines over the digits name the task: in a lap the one it is on, otherwise the one a tap
+  // would start. A lap on a task that is not on today's list still has its title, from the row
+  // itself. They are there in every state or in none, so the digits never move: a lap for nothing
+  // says so in the same two lines.
+  const inLap = state.phase === 'work' && !ready;
+  const named = inLap ? lapTask : nextTask;
+  const row = inLap && !named && state.task ? engine.rows('task').value.get(state.task) : undefined;
+  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : inLap && today.list.value.length > 0 ? s.focus.freeTitle : '');
   const upNext = [nextTask, ...today.later.value].filter((task): task is TaskView => !!task && !task.running && task !== named).slice(0, 3);
   const shown = ready ? lengths.work_ms : view.left_ms;
   // The digits are for eyes. A screen reader gets a sentence that changes once a minute.
@@ -214,8 +222,9 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
         <div class={css.face}>
           {title && (
             <div class={css.task}>
+              {!named && !row && <p class={css.about}>{s.focus.freeLabel}</p>}
               {named && (
-                <p>
+                <p class={css.about}>
                   {named.project && (
                     <span>
                       <i style={`background:var(--${named.project.color})`} />
@@ -230,26 +239,34 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
               </p>
             </div>
           )}
-          <div class={cx(css.digits, !ready && (view.paused ? css.held : isBreak && css.resting))} aria-hidden="true">
-            {s.clock(shown)}
+          <div class={css.time}>
+            {/* Each digit sits a little differently in its box. Where DESIGN.md gives the bearing of
+                the digit that leads, the ink lands exactly on the edge; else the one bearing serves. */}
+            <div
+              class={cx(css.digits, !ready && (view.paused ? css.held : isBreak && css.resting))}
+              style={`--bearing:var(--layout-figure-bearing-${s.clock(shown).charAt(0)}, var(--layout-figure-bearing))`}
+              aria-hidden="true"
+            >
+              {s.clock(shown)}
+            </div>
+            <p class="sr" role="timer" aria-live="polite">
+              {heard}
+            </p>
+            <p class={css.sub}>
+              {ready && note && focus.undoable.value ? (
+                <>
+                  {note}
+                  <Button kind="link" class={css.undo} onClick={() => focus.undo()}>
+                    {s.focus.undo}
+                  </Button>
+                </>
+              ) : ready
+                ? note || s.focus.endsIfStarted(now + lengths.work_ms)
+                : view.ends_at !== null
+                  ? s.focus.endsAt(state.planned_ms, view.ends_at)
+                  : s.focus.pausedSince(state.planned_ms, state.paused_at ?? now)}
+            </p>
           </div>
-          <p class="sr" role="timer" aria-live="polite">
-            {heard}
-          </p>
-          <p class={css.sub}>
-            {ready && note && focus.undoable.value ? (
-              <>
-                {note}
-                <Button kind="small" class={css.undo} onClick={() => focus.undo()}>
-                  {s.focus.undo}
-                </Button>
-              </>
-            ) : ready
-              ? note || s.focus.endsIfStarted(now + lengths.work_ms)
-              : view.ends_at !== null
-                ? s.focus.endsAt(state.planned_ms, view.ends_at)
-                : s.focus.pausedSince(state.planned_ms, state.paused_at ?? now)}
-          </p>
         </div>
       </div>
       <div class={css.rail}>
@@ -288,24 +305,25 @@ export function FocusScreen({ engine, focus, today }: { engine: Engine; focus: F
             <Button onClick={() => focus.pause()}>{s.focus.pause}</Button>
           )}
           {state.phase === 'work' && !ready && (
-            <Button kind="text" onClick={stop}>
+            <Button kind="quiet" onClick={stop}>
               {s.focus.stop(focus.ran())}
+            </Button>
+          )}
+          {/* Starting must not need planning: the lesser choice beside the task that is next. */}
+          {ready && nextTask && (
+            <Button kind="quiet" onClick={() => focus.start(null)}>
+              {s.focus.startFree}
             </Button>
           )}
         </div>
         <div class={css.quiet}>
-          {ready && nextTask && (
-            <Button kind="small" onClick={() => focus.start(null)}>
-              {s.focus.startFree}
-            </Button>
-          )}
           {!ready && !view.paused && state.phase === 'work' && (
-            <Button kind="small" onClick={() => focus.extend()}>
+            <Button kind="link" onClick={() => focus.extend()}>
               {s.focus.extend(EXTEND_MS)}
             </Button>
           )}
           {!ready && state.phase === 'work' && (
-            <Button kind="small" onClick={setAside}>
+            <Button kind="link" onClick={setAside}>
               {s.focus.setAside}
             </Button>
           )}

@@ -11,14 +11,17 @@
   padding: 0 var(--space-md);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: none;
-  font: var(--type-body);
+  background: var(--surface);
+  font: var(--type-body-strong);
   cursor: pointer;
   transition: background-color var(--motion-press) var(--motion-ease), border-color var(--motion-press) var(--motion-ease);
 }
 .choice:hover { border-color: var(--ghost); }
-.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); font: var(--type-body-strong); line-height: inherit; }
+/* Chosen: the fill steps to raised and the line to ink. The words keep their weight, so nothing shifts. */
+.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); }
 .choice i { width: var(--layout-lane); height: var(--layout-lane); }
+/* Seven days on one line of a phone: seven targets and six small gaps. */
+.days { gap: var(--space-xs); }
 .weekday { min-width: var(--layout-touch); padding: 0; justify-content: center; }
 
 .making { display: grid; gap: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--raised); }
@@ -56,8 +59,14 @@
 }
 .sub input:focus-visible { border-color: var(--ink); outline-offset: 0; }
 
+.removed { color: var(--muted); }
+.removed button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
+
 .ends { display: flex; gap: var(--space-sm); }
+/* On a phone the two buttons fill the row, as every button row does. */
+.ends > * { flex: 1; }
 
 @media (min-width: 720px) {
+  .ends > * { flex: none; }
   .pair { grid-template-columns: 1fr 1fr; }
 }

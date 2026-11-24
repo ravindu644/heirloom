@@ -42,8 +42,9 @@ interface Scene {
   tap?: string | string[];
   /** The day's tasks. Left out, there are none. */
   day?: DemoDay;
-  /** Opens on Today, not on Focus. */
+  /** Opens on Today, or on Settings, not on Focus. */
   today?: boolean;
+  settings?: boolean;
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -72,8 +73,8 @@ const TODAY: Record<string, Scene> = {
   today: { ...idleAt2, about: 'Today, the day of the mockup, nothing running', day: day() },
   'today-running': { about: 'Today with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-paused': { about: 'Today with that lap paused', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
-  'today-lap-over': { about: 'Today just after the bell: the break is one tap away', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
-  'today-break': { about: 'Today during a short break', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
+  'today-lap-over': { about: 'Today just after the bell: the lap counts everywhere, and the break is one tap away', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-break': { about: 'Today during a short break', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] }), { done_ms: 150 * MIN, laps: 6 }) },
   'today-done': { ...idleAt2, about: 'Everything on today done', day: day(TASKS.map((task) => ({ ...task, done: true })), { done_ms: 325 * MIN, laps: 13 }) },
   'today-over': { about: 'A task past its estimate: 6 of 5, and running', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5, squares: [1, 1, 1, 0.4, 1, 1, 1] })) },
   'today-long': {
@@ -108,7 +109,7 @@ const TODAY: Record<string, Scene> = {
   'today-deleted': {
     ...idleAt2,
     about: 'Recently deleted, with Restore',
-    day: day([...TASKS, { id: 'old1', title: 'Install a C compiler', project: 'c', estimate: 1, squares: [1], deleted: true }, { id: 'old2', title: 'Watch a talk about monads', estimate: 2, deleted: true }]),
+    day: day([...TASKS, { id: 'old1', title: 'Install a C compiler', project: 'c', estimate: 1, squares: [1], deleted: new Date(2026, 10, 22, 21).getTime() }, { id: 'old2', title: 'Watch a talk about monads', estimate: 2, deleted: new Date(2026, 9, 27, 9).getTime() }]),
     tap: 'Recently deleted',
   },
   sheet: { ...idleAt2, about: 'A task open in the sheet', day: day(), tap: 'Exercise 5-3' },
@@ -119,17 +120,19 @@ const TODAY: Record<string, Scene> = {
       ...swap('ex', { notes: 'The book wants strcat(s, t) to copy t to the end of s. Do it with pointers only, no indexes.' }),
       { id: 's1', title: 'Write it with array indexes first', parent: 'ex', done: true },
       { id: 's2', title: 'Rewrite with two pointers', parent: 'ex' },
-      { id: 's3', title: 'Test with an empty string', parent: 'ex' },
+      { id: 's3', title: 'Test with an empty string, a string of one letter, and two strings that are the same string', parent: 'ex' },
     ]),
     tap: 'Exercise 5-3',
   },
   'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 9 })), tap: 'Exercise 5-3' },
   'sheet-project': { ...idleAt2, about: 'The sheet making a new project', day: day(), tap: ['Exercise 5-3', 'New project'] },
   'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 }, when: 'after dinner' })), tap: 'Exercise 5-3' },
-  'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day() },
-  'focus-task': { about: 'Focus with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
-  'focus-break-task': { about: 'Focus on a break, with tasks up next', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] })) },
-  'focus-result-task': { about: 'The result naming the task', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { title: 'K&R chapter 5', squares: [1, 1, 1] })) },
+  // An estimate of five here, so "lap 3 of 5 on this task" cannot be taken for the set of four above it.
+  'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day(swap('kr', { estimate: 5 })) },
+  'focus-task': { about: 'Focus with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5 })) },
+  'focus-break-task': { about: 'Focus on a break, with tasks up next', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] }), { done_ms: 150 * MIN, laps: 6 }) },
+  'focus-result-task': { about: 'The result naming the task', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { title: 'K&R chapter 5', estimate: 5 })) },
+  'focus-result-long': { about: 'The result for a task with a long title: it says "This task"', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
 };
 for (const [id, scene] of Object.entries(TODAY)) if (!id.startsWith('focus')) scene.today = true;
 
@@ -158,6 +161,9 @@ const SCENES: Record<string, Scene> = {
   'undo-stop': { about: 'Just stopped: the sentence, and Undo for ten seconds', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Stop' },
   'undo-aside': { about: 'Just set aside, with Undo', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Set aside' },
   elsewhere: { about: 'A second tab of the same browser', elsewhere: true },
+  settings: { ...idleAt2, about: 'Settings: the account', settings: true, day: day() },
+  'settings-refused': { ...idleAt2, about: 'Settings after the server signed this device out', settings: true, sync: 'signed-out', day: day() },
+  'settings-unsent': { ...idleAt2, about: 'Settings: a sign out refused, edits unsent', settings: true, sync: 'offline', unsent: 3, day: day(), tap: 'Sign out' },
   'lap-live': { about: 'Three seconds before the bell: watch the lap-done moment', run: { ...lap2, left: 3000 }, you: 106 * MIN, laps: 4, ghost: tuesday },
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
@@ -202,13 +208,13 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
     if (over()) laps++;
     if (over() || ran() >= MIN) {
       you += ran();
-      if (task) today.credit(task, ran() / state.value.planned_ms);
+      today.credit(task, ran() / state.value.planned_ms, ran());
     }
   };
   const begin = (phase: Phase, task: string | null = null) => {
     state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: phase === 'work' ? task : null, planned_ms: LENGTHS[`${phase}_ms`] }, now());
   };
-  const today = demoToday(scene.day ?? { tasks: [] }, state, () => ran() / (state.value.planned_ms || 1));
+  const today = demoToday(scene.day ?? { tasks: [] }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: ran(), over: over() }), now);
 
   // Ten seconds to take a stop or a set aside back, as the real one gives.
   const undoable = signal(false);
@@ -263,7 +269,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
   const account = signal(scene.signedOut ? null : { account: 'demo', username: 'ravi' });
   const sync = signal<SyncState>(scene.sync ?? (scene.signedOut ? 'signed-out' : 'in-step'));
   const unsent = signal(scene.unsent ?? 0);
-  const tasks = signal<ReadonlyMap<string, Row>>(new Map([['long', { id: 'long', title: LONG_TITLE }]]));
+  const long = signal<ReadonlyMap<string, Row>>(new Map([['long', { id: 'long', title: LONG_TITLE }]]));
   const none = signal<ReadonlyMap<string, Row>>(new Map());
   // The demo's server. A password that is an error's code gets that error, so each sentence can
   // be read: taken, invite, credentials, slow_down, bad_request, offline, server.
@@ -282,7 +288,8 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
     timer: state,
     device: 'demo',
     now,
-    rows: (dataset) => (dataset === 'task' ? tasks : none),
+    // The old long-title scene has a task with no day around it; every other scene's rows come from its day.
+    rows: (dataset) => (dataset !== 'task' ? none : scene.day ? today.rows : long),
     write() {},
     stamp: () => undefined,
     act() {},
@@ -294,6 +301,11 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
       return { ok: true };
     },
     wake() {},
+    onRoom: () => () => {},
+    request: async () => ({ ok: false, error: 'offline' }),
+    kept: () => undefined,
+    keep() {},
+    merge: () => 0,
     saved: async () => {},
     cells: () => [],
     stop: async () => {},
@@ -303,7 +315,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
-if (scene?.today && !location.hash) location.hash = '#/today';
+if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : '';
 render(
   scene?.elsewhere ? (
     <Elsewhere />

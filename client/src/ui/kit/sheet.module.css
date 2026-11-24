@@ -19,8 +19,8 @@
 }
 .sheet[open] { animation: rise var(--motion-sheet) var(--motion-ease); }
 @keyframes rise { from { opacity: 0; transform: translateY(var(--space-lg)); } }
-/* The page behind steps back into the ground: lighter in light, darker in dark. */
-.sheet::backdrop { background: color-mix(in srgb, var(--ground), transparent calc(var(--state-press) * 2)); }
+/* The page behind fades toward the ground, never to grey or black. */
+.sheet::backdrop { background: color-mix(in srgb, var(--ground) var(--state-scrim), transparent); }
 
 .inside {
   display: grid;

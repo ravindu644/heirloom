@@ -3,7 +3,9 @@
 // behind is a fact with a way back, and one exclamation mark in the whole app, for a set.
 
 const MIN = 60000;
-const mins = (ms: number) => Math.round(ms / MIN);
+// Whole minutes, never rounded up: a figure must not claim more than was run, and the same
+// seconds must read the same on every screen.
+const mins = (ms: number) => Math.floor(ms / MIN);
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 export const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const two = (n: number) => String(n).padStart(2, '0');
@@ -52,7 +54,8 @@ export function pastDay(day: string, today: string): string {
   const name = WEEKDAYS[then.getUTCDay()]!;
   if (ago === 1) return 'yesterday';
   if (ago < 7) return name;
-  return ago === 7 ? `last ${name}` : `${name} the ${ordinal(then.getUTCDate())}`;
+  // The two words of "last Tuesday" never part at the end of a line.
+  return ago === 7 ? `last\u00a0${name}` : `${name} the ${ordinal(then.getUTCDate())}`;
 }
 
 export const brand = 'heirloom';
@@ -113,6 +116,9 @@ export const focus = {
   onTask: (lap: number, estimate: number | null) => (estimate === null ? `lap ${lap} on this task` : `lap ${lap} of ${estimate} on this task`),
   // Starting must not need planning: the quiet way past the task that is next.
   startFree: 'Start without a task',
+  // A lap for no task, said in the two lines a task would have, so nothing moves.
+  freeLabel: 'This lap is for',
+  freeTitle: 'Nothing in particular',
   upNext: 'Up next',
 
   // What a screen reader hears, once a minute.
@@ -126,7 +132,7 @@ export const race = {
   you: 'You',
   ghost: 'Ghost',
   /** The chip: a sign and a number, or the word. */
-  split: (ms: number) => (mins(ms) === 0 ? 'level' : `${ms < 0 ? '−' : '+'}${total(Math.abs(ms))}`),
+  split: (ms: number) => (ms === 0 ? 'level' : `${ms < 0 ? '−' : '+'}${total(Math.abs(ms))}`),
   at: (now: number) => `at ${wall(now)}.`,
 
   noGhost: 'No ghost yet. Today sets the pace for next time.',
@@ -198,6 +204,16 @@ export const ring = {
 
 export const elsewhere = 'heirloom is open in another tab of this browser. Close that one and this one takes over by itself.';
 
+export const settings = {
+  /** The person in the header, for a screen reader: where a press on them leads. */
+  open: (name: string) => `Settings, signed in as ${name}`,
+  title: 'Settings',
+  back: 'Back',
+  account: 'Account',
+  where: (device: string, server: string) => `This ${device} keeps step with the server at ${server}.`,
+  refused: (device: string, server: string) => `The server at ${server} signed this ${device} out. Your laps are safe on it.`,
+};
+
 export const account = {
   signIn: 'Sign in',
   signInIntro: (device: string) => `Your laps live on your own server. Sign in and this ${device} keeps step with your other devices.`,
@@ -220,7 +236,12 @@ export const account = {
       credentials: 'That username and password do not match.',
       invite: 'That invite is not known here, or it has been used. A code works once.',
       taken: 'That username is taken. Pick another.',
-      slow_down: `Too many tries. This username can sign in again in ${plural(Math.max(1, Math.ceil((retryAfter ?? 60) / 60)), 'minute', 'minutes')}.`,
+      // The same code means two things: a username locked after five wrong tries (minutes), or a
+      // server with a line of sign-ins ahead of this one (a second or two).
+      slow_down:
+        (retryAfter ?? 60) < 30
+          ? 'The server is busy with other sign-ins. Try again in a few seconds.'
+          : `Too many tries. This username can sign in again in ${plural(Math.ceil((retryAfter ?? 60) / 60), 'minute', 'minutes')}.`,
       bad_request: 'Usernames are 3 to 32 characters: a to z, 0 to 9 and _. Passwords are 8 characters or more.',
       offline: 'Needs a connection. Nothing was sent.',
       // Storage is refusing writes and edits are unsent: another account now would lose them.
@@ -252,7 +273,6 @@ export const today = {
 
   add: 'Add a task',
   addHint: 'Add a task. End with ~3 for three laps.',
-  added: (title: string, estimate: number | null) => (estimate === null ? `Added: ${title}.` : `Added: ${title}, ${laps(estimate)}.`),
 
   // The bar of the lap in progress.
   free: 'A lap for nothing in particular',
@@ -264,6 +284,7 @@ export const today = {
   later: 'Later today',
   laterCount: (tasks: number, left: number) => `${plural(tasks, 'task', 'tasks')}, ${laps(left)}`,
   order: 'Change the order',
+  ordering: 'Today, in order',
   orderKeep: 'Keep this order',
   up: 'Up',
   down: 'Down',
@@ -272,8 +293,8 @@ export const today = {
   upcoming: 'Upcoming',
   doneToday: 'Done',
 
-  empty: 'Nothing on today yet. Add the first thing to work on, and guess its laps.',
-  allDone: 'Everything on today is done.',
+  empty: 'Nothing planned for today yet. Add the first thing to work on, and guess its laps.',
+  allDone: 'Everything planned for today is done.',
 
   of: (estimate: number | null) => (estimate === null ? '' : ` of ${estimate}`),
   check: (title: string) => `Done: ${title}`,
@@ -283,10 +304,23 @@ export const today = {
     return days === 1 ? 'tomorrow' : days === -1 ? 'yesterday' : dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
   },
 
-  markedDone: (title: string) => `Done: ${title}.`,
-  comesBack: (title: string, day: string, today: string) => `Done: ${title}. It comes back ${comingDay(day, today)}.`,
-  removed: (title: string) => `Deleted: ${title}. It keeps for 30 days.`,
+  // What the last tap did, in three parts so a long title can be cut short and the rest still read:
+  // "Done: {title}. It comes back tomorrow."
+  saidDone: 'Done:',
+  saidAdded: 'Added:',
+  saidRemoved: 'Deleted:',
+  comesBack: (day: string, today: string) => `It comes back ${comingDay(day, today)}.`,
+  keeps: 'It keeps for 30 days.',
+  addedLaps: (estimate: number) => `${laps(estimate)}.`,
   undo: 'Undo',
+  /** The strip's short name for the ghost's day: "Last Tue", "Yesterday", "Mon", "Tue 3 Nov". */
+  ghostDay: (day: string, today: string) => {
+    const ago = Math.round((Date.parse(today) - Date.parse(day)) / (24 * 60 * MIN));
+    const name = dated(day, { weekday: 'short' });
+    return ago === 1 ? 'Yesterday' : ago < 7 ? name : ago === 7 ? `Last\u00a0${name}` : dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
+  },
+  /** On a deleted task: the day it goes for good. `at` is when it was deleted. */
+  gone: (at: number) => `gone on ${new Date(at + 30 * 24 * 60 * MIN).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
 
   bin: (n: number) => `Recently deleted, ${n}`,
   binTitle: 'Recently deleted',
@@ -326,14 +360,16 @@ export const task = {
   weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
   when: 'When in the day',
   whenHint: 'after dinner',
-  notes: 'Notes',
 
   subtasks: 'Subtasks',
-  subtaskAdd: 'Add a subtask',
+  // The field has its own name, so a screen reader hears "New subtask" when the nudge sends the cursor there.
+  subtaskNew: 'New subtask',
+  subtaskAdd: 'Add',
   subtaskHint: 'A smaller piece of it',
   subtaskTitle: 'Subtask',
   subtaskCheck: (title: string) => `Done: ${title}`,
   remove: 'Remove',
+  subtaskRemoved: (title: string) => `Removed: ${title}.`,
 
   done: 'Mark done',
   notDone: 'Not done after all',

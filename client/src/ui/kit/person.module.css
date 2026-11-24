@@ -1,0 +1,11 @@
+.person { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; font: var(--type-label); color: var(--ink); }
+.person i {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--space-xl);
+  height: var(--space-xl);
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  font: var(--type-body-strong);
+}

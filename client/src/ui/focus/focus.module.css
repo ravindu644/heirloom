@@ -1,7 +1,10 @@
-/* Phone first. The clock sits in the middle of the free space and the actions at the bottom, so
-   the button a thumb wants is in the same place in every state. */
-.focus { display: flex; flex-direction: column; gap: var(--layout-gap); min-height: 100%; }
+/* One column, one left edge, and DESIGN.md's rhythm: what belongs together sits `sm` apart, the
+   parts of one block `md`, one block from the next `lg`. The screen's one stretch of free space
+   lies under the content, above the action row, so the button a thumb wants is in the same place
+   in every state and nothing above it is pushed apart to fill a tall phone. */
+.focus { display: flex; flex-direction: column; gap: var(--space-lg); min-height: 100%; }
 
+/* The lap line and its bar. */
 .lapline {
   display: flex;
   justify-content: space-between;
@@ -10,7 +13,8 @@
   font: var(--type-label);
   color: var(--muted);
 }
-.lapline b { color: var(--ink); }
+/* Which lap it is, in ink; the rest of the line muted. One weight: DESIGN.md has no bold label. */
+.lapline b { font-weight: inherit; color: var(--ink); }
 .rest {
   display: inline-block;
   width: var(--space-sm);
@@ -20,11 +24,13 @@
   background: var(--rest);
 }
 
-.clock { display: flex; flex: 1; flex-direction: column; }
-.face { display: flex; flex: 1; flex-direction: column; justify-content: center; padding-top: var(--layout-gap); }
+.clock { display: flex; flex-direction: column; gap: var(--space-lg); }
+/* The task and the time are one block. */
+.face { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+
 /* The task the lap is for: its project and which lap of it this is, then its title. */
-.task { display: grid; gap: var(--space-xs); margin-bottom: var(--space-md); }
-.task p:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
+.task { display: grid; gap: var(--space-xs); }
+.about { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
 .task span { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); }
 .task i { width: var(--layout-lane); height: var(--layout-lane); }
 .title {
@@ -33,22 +39,21 @@
   font: var(--type-title);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  /* One line on a phone: the digits stay where they are whatever the task is called. */
+  -webkit-line-clamp: 1;
 }
 
-.rail { display: grid; align-content: start; gap: var(--layout-gap); }
-/* On the phone the next task is named over the digits and Today is one tap away; the room goes
-   to the digits. */
-.upnext { display: none; }
-.upnext ul { display: grid; padding: 0; list-style: none; }
-.upnext li { display: flex; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
-.upnext li + li { border-top: 1px solid var(--line); }
-.upnext li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.upnext b { flex: none; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); line-height: inherit; color: var(--muted); }
-/* The timer never animates: the digits change. */
+/* The line under the digits belongs to the digits. */
+.time { display: grid; gap: var(--space-sm); }
+/* The timer never animates: the digits change. Their ink, not their box, sits on the column's
+   left edge: Barlow Condensed's digits carry space at their left, and the bearing pulls it back. */
 .digits {
-  margin-left: calc(var(--space-xs) * -1);
+  margin-left: var(--bearing, var(--layout-figure-bearing));
   font: var(--type-figure-xl);
+  /* A phone is not always 412 wide. The timer keeps its share of the width: smaller on a narrow
+     phone, so the last digit stays on the screen, larger on a wide one, so it does not sit small
+     at the left. Under 720px it cannot reach the laptop's size. */
+  font-size: calc(100vw * 168 / 412);
   font-feature-settings: var(--feature-figure-xl);
   letter-spacing: var(--tracking-figure-xl);
   white-space: nowrap;
@@ -57,25 +62,32 @@
    The lap line says the same in words. */
 .resting { color: var(--rest); }
 .held { color: var(--muted); }
-/* Two lines kept on the phone, so a longer sentence after a tap does not move the digits. */
-.sub { min-height: 2lh; margin-top: var(--space-sm); color: var(--muted); }
+.sub { color: var(--muted); }
 /* A full target for a thumb that takes no more room than the words beside it. */
 .undo { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
 
-/* Reversed on the phone: the asides sit above, so the main row never moves when they come and go.
-   Stuck to the bottom, so on a short phone the screen scrolls behind the buttons, never over them. */
-.actions { position: sticky; bottom: 0; display: flex; flex-direction: column-reverse; background: var(--ground); }
+.rail { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
+/* On the phone the next task is named over the digits and Today is one tap away. */
+.upnext { display: none; }
+.upnext ul { display: grid; padding: 0; list-style: none; }
+.upnext li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
+.upnext li + li { border-top: 1px solid var(--line); }
+.upnext li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upnext b { flex: none; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); }
+
+/* The actions take the free space above them and stick to the bottom, so on a short phone the
+   screen scrolls behind the buttons, never over them. The links sit above the buttons, in a row
+   that keeps its place when it is empty: the buttons never move when the links come and go. */
+.actions { position: sticky; bottom: 0; display: flex; flex-direction: column-reverse; margin-top: auto; background: var(--ground); }
 .main { display: flex; gap: var(--space-sm); }
 .main > * { flex: 1; }
-/* The asides keep their row and the sentence its two lines even when empty: starting a lap, or
-   the ghost pulling ahead, must not move the digits. */
-.quiet { display: flex; justify-content: space-between; gap: var(--layout-gap); min-height: var(--layout-touch); }
-.say { min-height: 2lh; }
+.quiet { display: flex; justify-content: space-between; gap: var(--space-lg); min-height: var(--layout-touch); }
 
-/* The result of a lap. */
-.told { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: var(--layout-gap); }
+/* The result of a lap: the same column, the same edge. */
+.told { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 .headline { font: var(--type-headline); letter-spacing: var(--tracking-headline); text-wrap: balance; }
-.facts { max-width: 60ch; }
+/* Balanced, so "Take five." is never left alone on a line. */
+.facts { text-wrap: balance; }
 
 /* lap-done: the bar runs and the chip turns in the kit; the words come last. */
 .lapMoment .words { animation: say calc(var(--motion-lap-done) * 0.3) var(--motion-ease) calc(var(--motion-lap-done) * 0.7) both; }
@@ -83,23 +95,18 @@
 .setMoment .told { animation: say calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * 5 / 6) both; }
 @keyframes say { from { opacity: 0; } }
 
-/* DESIGN.md sets the digits at 168px on a 412px phone. A narrower phone keeps that proportion,
-   or the last digit would leave the screen. */
-@media (width < 412px) {
-  .digits { font-size: calc(100vw * 168 / 412); }
-}
 
+/* With a sidebar there is no thumb to serve: the actions follow the content, and the free space
+   is the bottom of the canvas. */
 @media (min-width: 720px) {
   .focus { min-height: 0; max-width: 80ch; }
-  .actions { position: static; }
-  .upnext { display: block; }
-  .clock, .face, .told { flex: none; }
-  .face { padding-top: var(--space-xl); }
-  .actions { flex-direction: column; }
+  .actions { position: static; flex-direction: column; margin-top: 0; }
   .main > * { flex: none; }
   .quiet { justify-content: flex-start; min-height: 0; }
-  .say, .sub { min-height: 0; }
-  .result { max-width: none; gap: var(--space-xl); }
+  .upnext { display: block; }
+  .digits { font: var(--type-figure-xl); }
+  .facts { max-width: 60ch; }
+  .title { -webkit-line-clamp: 2; }
   .headline { font: var(--type-headline-lg); letter-spacing: var(--tracking-headline-lg); }
 }
 
@@ -120,5 +127,8 @@
     font-feature-settings: var(--feature-figure-xxl);
     letter-spacing: var(--tracking-figure-xxl);
   }
+  /* The lanes of a result run the whole canvas. Its lap bar keeps the width it had while the lap
+     ran, the clock's two thirds, so it does not jump at the bell. */
   .result { display: flex; }
+  .result .laps { width: calc((100% - var(--space-lg)) * 2 / 3); }
 }

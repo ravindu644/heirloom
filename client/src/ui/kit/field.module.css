@@ -1,7 +1,7 @@
 .field { display: grid; gap: var(--space-xs); }
 .field span { font: var(--type-label); color: var(--muted); }
 .field small { font: var(--type-label); color: var(--muted); }
-.field input, .field textarea {
+.field input {
   width: 100%;
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
@@ -10,6 +10,5 @@
   background: var(--surface);
   transition: border-color var(--motion-press) var(--motion-ease);
 }
-.field textarea { padding: var(--space-sm) var(--space-md); font: inherit; color: inherit; resize: vertical; }
-.field :is(input, textarea):hover { border-color: var(--ghost); }
-.field :is(input, textarea):focus-visible { border-color: var(--ink); outline-offset: 0; }
+.field input:hover { border-color: var(--ghost); }
+.field input:focus-visible { border-color: var(--ink); outline-offset: 0; }

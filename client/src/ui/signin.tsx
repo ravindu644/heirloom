@@ -1,9 +1,9 @@
 import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Engine } from '../sync/engine.ts';
-import { Brand } from './kit/brand.tsx';
 import { Button } from './kit/button.tsx';
 import { Field } from './kit/field.tsx';
+import { Shell } from './shell.tsx';
 import css from './signin.module.css';
 import * as s from './strings.ts';
 
@@ -45,11 +45,8 @@ export function SignIn({ engine, again, onDone }: { engine: Engine; again?: stri
   };
 
   return (
-    <main class={css.page}>
+    <Shell>
       <form class={css.form} onSubmit={submit}>
-        <p class={css.brand}>
-          <Brand name={s.brand} />
-        </p>
         <h1>{joining ? s.account.join : s.account.signIn}</h1>
         {/* What went wrong takes the place of the welcome, so nothing below it moves. The second
             line is the same sentence for a screen reader, which only announces a region that was
@@ -84,12 +81,12 @@ export function SignIn({ engine, again, onDone }: { engine: Engine; again?: stri
             {joining ? (busy ? s.account.joining : s.account.joinGo) : busy ? s.account.signingIn : s.account.signIn}
           </Button>
           {again ? (
-            <Button kind="text" onClick={onDone}>
+            <Button kind="quiet" onClick={onDone}>
               {s.account.notNow}
             </Button>
           ) : (
             <Button
-              kind="text"
+              kind="quiet"
               onClick={() => {
                 setJoining(!joining);
                 setError('');
@@ -100,6 +97,6 @@ export function SignIn({ engine, again, onDone }: { engine: Engine; again?: stri
           )}
         </div>
       </form>
-    </main>
+    </Shell>
   );
 }

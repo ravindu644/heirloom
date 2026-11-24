@@ -1,0 +1,8 @@
+/* The pages of the screens not built yet, and the sentence of a notice. */
+.later { display: grid; gap: var(--space-md); }
+.later h1 { font: var(--type-title); }
+.later p { color: var(--muted); }
+/* A measure caps a line of text only where there is a sidebar; a phone's column runs margin to margin. */
+@media (min-width: 720px) {
+  .later, .notice { max-width: 60ch; }
+}

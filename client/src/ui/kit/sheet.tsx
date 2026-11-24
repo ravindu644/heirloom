@@ -16,36 +16,51 @@ interface Props {
  * What floats: up from the bottom on the phone, a centred panel on the laptop. A native dialog, so
  * the browser keeps the focus inside, closes it on Escape and hands the focus back to where it
  * came from. It is also one step of history, so the back button of a phone closes it and nothing
- * else; every other way out goes back that same step.
+ * else. However it goes, that step goes with it: left behind, it would eat the next back press.
  */
+let sheets = 0;
+
 export function Sheet({ title, close, onClose, children }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const closed = useRef(onClose);
   closed.current = onClose;
+  // Closed while it is still in the page: that is what hands the focus back.
+  const shut = () => {
+    dialog.current?.close();
+    closed.current();
+  };
   useEffect(() => {
-    const el = dialog.current!;
-    el.showModal();
-    history.pushState({ sheet: true }, '');
-    // Closed while it is still in the page: that is what hands the focus back.
+    dialog.current!.showModal();
+    const mine = ++sheets;
+    history.pushState({ sheet: mine }, '');
+    // The person went back themselves: the step is already behind them.
+    let wentBack = false;
     const back = () => {
-      el.close();
-      closed.current();
+      wentBack = true;
+      shut();
     };
     addEventListener('popstate', back);
-    return () => removeEventListener('popstate', back);
+    return () => {
+      removeEventListener('popstate', back);
+      // Closed any other way, by its own button or by the screen behind taking it away (the task
+      // was deleted elsewhere, midnight passed): take the step back, if it is still the one we are on.
+      if (!wentBack && history.state?.sheet === mine) history.back();
+    };
   }, []);
-  const back = () => history.back();
   return (
     <dialog
       ref={dialog}
       class={css.sheet}
       aria-label={title}
       onCancel={(event) => {
+        // A date field inside has a cancel of its own, for its picker, and it comes up through
+        // here. Only the dialog's own is a way out: one Escape, one step back.
+        if (event.target !== dialog.current) return;
         event.preventDefault();
-        back();
+        shut();
       }}
       // A tap on the page behind lands on the dialog itself, never on what is inside it.
-      onClick={(event) => event.target === dialog.current && back()}
+      onClick={(event) => event.target === dialog.current && shut()}
     >
       <div class={css.inside}>
         <header class={css.head}>
@@ -53,7 +68,7 @@ export function Sheet({ title, close, onClose, children }: Props) {
           <h2 tabIndex={-1} autofocus>
             {title}
           </h2>
-          <Button kind="small" onClick={back}>
+          <Button kind="link" onClick={shut}>
             {close}
           </Button>
         </header>

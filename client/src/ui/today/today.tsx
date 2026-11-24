@@ -1,5 +1,7 @@
 import type { ComponentChildren, TargetedSubmitEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { UNDO_MS } from '../../sync/focus.ts';
+import type { Engine } from '../../sync/engine.ts';
 import type { Focus } from '../../sync/focus.ts';
 import type { TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
@@ -8,24 +10,31 @@ import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
+import { cx } from '../kit/cx.ts';
 import { TaskRow } from '../kit/task-row.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
 import { TaskSheet } from './task-sheet.tsx';
 import css from './today.module.css';
 
-// How long the line about the last tap, and its Undo, stay.
-const SAID_MS = 8000;
+// A row comes in over `motion.fill`. This long after a task is first seen, it has arrived.
+const ARRIVING_MS = 1000;
 // More laps than this in a day target and the bar would be dust.
 const TARGET_MAX = 24;
 
-/** The line that says what the last tap did, with a way to take it back. */
+type List = 'next' | 'later' | 'upcoming' | 'done';
+
+/** What the last tap did, in parts, so a long title can be cut short and the rest still read. */
 interface Said {
-  text: string;
+  lead: string;
+  title: string;
+  tail?: string;
+  /** The task it speaks of, when that task has a row to keep clear of the bar. */
+  row?: string;
   undo?: () => void;
 }
 
-export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
+export function TodayScreen({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
   useTick(focus);
   const day = today.day.value;
   const next = today.next.value;
@@ -46,17 +55,24 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
   const [said, setSaid] = useState<Said | null>(null);
   useEffect(() => {
     if (!said) return;
-    const timer = setTimeout(() => setSaid(null), SAID_MS);
+    const timer = setTimeout(() => setSaid(null), UNDO_MS);
     return () => clearTimeout(timer);
   }, [said]);
 
+  // Every task the screen shows. The running one is in `later`, in its place.
   const all = [next, ...later, ...upcoming, ...done].filter((task): task is TaskView => task !== null);
-  // The rows the screen opened with are just there. One that comes later arrives, once.
+  // The rows the screen opened with are just there. A task added later arrives, once: at the
+  // moment it is first seen, not again when it moves to another section.
   const settled = useRef(false);
-  const born = useRef(new Map<string, boolean>());
-  for (const task of all) if (!born.current.has(task.id)) born.current.set(task.id, settled.current);
+  const seen = useRef(new Map<string, number>());
+  for (const task of all) if (!seen.current.has(task.id)) seen.current.set(task.id, settled.current ? performance.now() : -Infinity);
   useEffect(() => void (settled.current = true), []);
   const opened = all.find((task) => task.id === open);
+  // The open task went away, deleted here or on another device: its sheet must not come back
+  // by itself when the task does.
+  useEffect(() => {
+    if (open && !opened) setOpen(null);
+  }, [open, opened]);
 
   const add = (event: TargetedSubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -66,7 +82,7 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
     // Emptied and still focused: ready for the next line.
     field.value = '';
     const made = [today.next.value, ...today.later.value].find((task) => task?.id === id);
-    if (made) setSaid({ text: s.today.added(made.title, made.estimate) });
+    if (made) setSaid({ lead: s.today.saidAdded, title: made.title, tail: made.estimate === null ? undefined : s.today.addedLaps(made.estimate), row: id });
   };
 
   const setDone = (task: TaskView, isDone: boolean) => {
@@ -75,46 +91,74 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
     // A repeating task has made its next one by now: say when that is, from the row itself.
     const series = task.id.replace(/-\d{8}$/, '');
     const again = task.repeat && today.upcoming.value.find((other) => other.id !== task.id && other.id.startsWith(`${series}-`));
-    setSaid({
-      text: again?.due ? s.today.comesBack(task.title, again.due, day) : s.today.markedDone(task.title),
-      undo: () => today.setDone(task.id, false),
-    });
+    setSaid({ lead: s.today.saidDone, title: task.title, tail: again?.due ? s.today.comesBack(again.due, day) : undefined, undo: () => today.setDone(task.id, false) });
   };
   const remove = (task: TaskView) => {
+    setOpen(null);
     today.remove(task.id);
-    setSaid({ text: s.today.removed(task.title), undo: () => today.restore(task.id) });
+    setSaid({ lead: s.today.saidRemoved, title: task.title, tail: s.today.keeps, undo: () => today.restore(task.id) });
   };
 
-  // The order is among the tasks that are not running: the running one is in the bar above.
-  const movable = [next, ...later].filter((task): task is TaskView => task !== null && !task.running);
+  // Today's open tasks in their true order. While the order is being changed the screen shows this
+  // one list, so that Up and Down move a row exactly where they seem to: the Next card and the
+  // list under it put the running task somewhere else than its place.
+  const movable = today.list.value;
   const moves = (task: TaskView) => {
-    const at = movable.indexOf(task);
+    const at = movable.findIndex((other) => other.id === task.id);
     return (
       // The first has no way up and the last no way down. Their buttons keep their place, unseen.
       <span class={css.moves}>
-        <Button kind="small" aria-label={s.today.upLabel(task.title)} disabled={at === 0} onClick={() => today.move(task.id, movable[at - 1]!.id)}>
+        <Button kind="link" aria-label={s.today.upLabel(task.title)} disabled={at === 0} onClick={() => today.move(task.id, movable[at - 1]!.id)}>
           {s.today.up}
         </Button>
-        <Button kind="small" aria-label={s.today.downLabel(task.title)} disabled={at === movable.length - 1} onClick={() => today.move(task.id, movable[at + 2]?.id ?? null)}>
+        <Button kind="link" aria-label={s.today.downLabel(task.title)} disabled={at === movable.length - 1} onClick={() => today.move(task.id, movable[at + 2]?.id ?? null)}>
           {s.today.down}
         </Button>
       </span>
     );
   };
 
-  const row = (task: TaskView, extra: { next?: boolean; end?: ComponentChildren } = {}) => (
+  // Where the focus goes when the sheet closes. The dialog hands it back to the row that opened
+  // it; when that row has moved or gone, it is sent to the task's row where it now is, or, for a
+  // task that is done or deleted, to the heading of the list it left.
+  const from = useRef<{ id: string; list: List } | null>(null);
+  useEffect(() => {
+    const was = from.current;
+    if (open || !was) return;
+    from.current = null;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const stillOpen = [next, ...later, ...upcoming].some((task) => task?.id === was.id);
+    const to =
+      (stillOpen && document.querySelector<HTMLElement>(`[data-task="${CSS.escape(was.id)}"]`)) ||
+      document.getElementById(`list-${was.list}`) ||
+      document.getElementById('list-today');
+    to?.focus();
+  }, [open]);
+
+  // The bar never covers the row it speaks of: a new task that lands under it is nudged clear.
+  const bar = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const row = said?.row && document.querySelector(`[data-task="${CSS.escape(said.row)}"]`)?.parentElement;
+    if (!row || !bar.current) return;
+    const under = row.getBoundingClientRect().bottom - bar.current.getBoundingClientRect().top;
+    if (under > 0 && row.getBoundingClientRect().top < bar.current.getBoundingClientRect().bottom) bar.current.closest('main')?.scrollBy(0, under + bar.current.offsetHeight / 4);
+  }, [said]);
+
+  const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => (
     <TaskRow
       key={task.id}
       task={task}
       of={s.today.of(task.estimate)}
-      // Where a button takes the count's place, the count moves in beside the squares.
-      note={[extra.end && !ordering ? `${task.laps}${s.today.of(task.estimate)}` : '', task.due && task.due !== day ? s.today.due(task.due, day) : '', task.when ?? ''].filter(Boolean).join(', ')}
+      note={[task.due && task.due !== day ? s.today.due(task.due, day) : '', task.when ?? ''].filter(Boolean).join(', ')}
       checkLabel={s.today.check(task.title)}
       onDone={(isDone) => setDone(task, isDone)}
-      onOpen={() => setOpen(task.id)}
+      onOpen={() => {
+        from.current = { id: task.id, list };
+        setOpen(task.id);
+      }}
       next={extra.next}
-      arriving={born.current.get(task.id)}
-      end={ordering && !task.running && !task.done && movable.includes(task) ? moves(task) : extra.end}
+      arriving={performance.now() - seen.current.get(task.id)! < ARRIVING_MS}
+      end={ordering && list !== 'upcoming' && list !== 'done' ? moves(task) : extra.end}
     />
   );
 
@@ -124,17 +168,23 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
   ];
   // On a first day there is no past you to show, and no hole where it would be.
   if (figures.ghost) {
-    strip.push({ label: s.cap(s.pastDay(figures.ghost.day, day)), figure: s.total(figures.ghost.total_ms), note: s.today.laps(figures.ghost.laps) });
+    strip.push({ label: s.today.ghostDay(figures.ghost.day, day), figure: s.total(figures.ghost.total_ms), note: s.today.laps(figures.ghost.laps) });
   }
 
   const isBreak = state.phase === 'short' || state.phase === 'long';
+  // The bell has gone on a lap and its break has not been started.
+  const rung = state.phase === 'work' && view.over;
+  const deletedAt = (id: string) => engine.rows('task').value.get(id)?.deleted;
   const running = today.running.value;
   const leftInLater = later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
   return (
     <div class={css.today}>
+      <div class={css.summary}>
       <header class={css.head}>
-        <h1>{s.today.title}</h1>
+        <h1 id="list-today" tabIndex={-1}>
+          {s.today.title}
+        </h1>
         <p>{s.today.date(day)}</p>
       </header>
 
@@ -147,7 +197,7 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
             <p>
               {s.today.targetAt(figures.laps, figures.target)}
               {!targeting && (
-                <Button kind="small" onClick={() => setTargeting(true)}>
+                <Button kind="link" onClick={() => setTargeting(true)}>
                   {s.today.targetChange}
                 </Button>
               )}
@@ -157,7 +207,7 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
           <p>
             {s.today.targetNone}
             <Button
-              kind="small"
+              kind="link"
               onClick={() => {
                 // What is on the list is the plan for the day; with no list, one set of four.
                 today.setTarget(Math.min(TARGET_MAX, figures.laps + figures.left_laps || 4));
@@ -171,18 +221,17 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
         {targeting && figures.target > 0 && (
           <div class={css.targeting}>
             <Stepper
-              label={s.today.target}
               text={s.today.targetText(figures.target)}
               less={s.today.targetLess}
               more={s.today.targetMore}
               onLess={() => today.setTarget(Math.max(1, figures.target - 1))}
               onMore={() => today.setTarget(Math.min(TARGET_MAX, figures.target + 1))}
             />
-            <Button kind="small" onClick={() => setTargeting(false)}>
+            <Button kind="link" onClick={() => setTargeting(false)}>
               {s.today.targetKeep}
             </Button>
             <Button
-              kind="small"
+              kind="link"
               onClick={() => {
                 today.setTarget(0);
                 setTargeting(false);
@@ -194,6 +243,8 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
         )}
       </section>
 
+      </div>
+
       <div class={css.cols}>
         <div class={css.now}>
           <form class={css.add} onSubmit={add}>
@@ -204,7 +255,7 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
             <div class={css.bar}>
               <i class={isBreak ? css.rest : undefined} />
               <a href="#/focus" aria-label={s.today.toFocus}>
-                {view.over ? (
+                {rung ? (
                   <span>{s.today.lapDone(state.set_index + 1)}</span>
                 ) : (
                   <>
@@ -213,86 +264,117 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
                   </>
                 )}
               </a>
-              {view.over ? (
-                <Button onClick={() => focus.start()}>{s.focus.startBreak(view.next.phase === 'long' ? focus.lengths.value.long_ms : focus.lengths.value.short_ms)}</Button>
+              {/* Its button is an outline on the bar. When the lap has rung, the break is what comes
+                  next, here as on Focus: its button takes the fill and the list's Start steps down. */}
+              {rung ? (
+                <Button kind="primary" onClick={() => focus.start()}>
+                  {s.focus.startBreak(view.next.phase === 'long' ? focus.lengths.value.long_ms : focus.lengths.value.short_ms)}
+                </Button>
               ) : view.paused ? (
-                <Button onClick={() => focus.resume()}>{s.focus.resume}</Button>
+                <Button class={css.onBar} onClick={() => focus.resume()}>
+                  {s.focus.resume}
+                </Button>
               ) : (
-                !isBreak && <Button onClick={() => focus.pause()}>{s.focus.pause}</Button>
+                !isBreak && (
+                  <Button class={css.onBar} onClick={() => focus.pause()}>
+                    {s.focus.pause}
+                  </Button>
+                )
               )}
             </div>
           )}
 
-          {next && (
+          {ordering ? (
             <section>
-              <h2 class={css.sect}>{s.today.next}</h2>
-              {row(next, {
-                next: true,
-                // The one filled button of the screen. It starts a lap on this task, now, break or no break.
-                end: inLap ? undefined : (
-                  <Button kind="primary" onClick={() => focus.skipBreak(next.id)}>
-                    {s.today.start}
-                  </Button>
-                ),
-              })}
-            </section>
-          )}
-
-          {later.length > 0 && (
-            <section>
-              <h2 class={css.sect}>
-                {s.today.later}
-                <span>{s.today.laterCount(later.length, leftInLater)}</span>
+              <h2 class={css.sect} id="list-later" tabIndex={-1}>
+                {s.today.ordering}
               </h2>
-              <div class={css.rows}>{later.map((task) => row(task))}</div>
+              <div class={css.rows}>{movable.map((task) => row(task, 'later', { next: task.id === next?.id }))}</div>
             </section>
+          ) : (
+            <>
+              {next && (
+                <section>
+                  <h2 class={css.sect} id="list-next" tabIndex={-1}>
+                    {s.today.next}
+                  </h2>
+                  {row(next, 'next', {
+                    next: true,
+                    // The one filled button of the screen. It starts a lap on this task, now, break or no break.
+                    end: inLap ? undefined : (
+                      <Button kind={rung ? 'secondary' : 'primary'} onClick={() => focus.skipBreak(next.id)}>
+                        {s.today.start}
+                      </Button>
+                    ),
+                  })}
+                </section>
+              )}
+
+              {later.length > 0 && (
+                <section>
+                  <h2 class={css.sect} id="list-later" tabIndex={-1}>
+                    {s.today.later}
+                    <span>{s.today.laterCount(later.length, leftInLater)}</span>
+                  </h2>
+                  <div class={css.rows}>{later.map((task) => row(task, 'later'))}</div>
+                </section>
+              )}
+            </>
           )}
 
           {movable.length > 1 && (
-            <Button kind="small" onClick={() => setOrdering(!ordering)}>
+            <Button kind="link" onClick={() => setOrdering(!ordering)}>
               {ordering ? s.today.orderKeep : s.today.order}
             </Button>
           )}
 
           {!next && later.length === 0 && <p class={css.empty}>{done.length ? s.today.allDone : s.today.empty}</p>}
+
+          {said && (
+            <p class={css.said} role="status" ref={bar}>
+              <span>
+                {said.lead} <span class={css.saidTitle}>{said.title}{said.tail && said.lead === s.today.saidAdded ? ',' : '.'}</span>
+                {said.tail && <span class={css.saidTail}>{said.tail}</span>}
+              </span>
+              {said.undo && (
+                <Button
+                  kind="link"
+                  onClick={() => {
+                    said.undo!();
+                    setSaid(null);
+                  }}
+                >
+                  {s.today.undo}
+                </Button>
+              )}
+            </p>
+          )}
         </div>
 
         <div class={css.then}>
           {upcoming.length > 0 && (
             <section>
-              <h2 class={css.sect}>{s.today.upcoming}</h2>
-              <div class={css.rows}>{upcoming.map((task) => row(task))}</div>
+              <h2 class={css.sect} id="list-upcoming" tabIndex={-1}>
+                {s.today.upcoming}
+              </h2>
+              <div class={css.rows}>{upcoming.map((task) => row(task, 'upcoming'))}</div>
             </section>
           )}
           {done.length > 0 && (
             <section>
-              <h2 class={css.sect}>{s.today.doneToday}</h2>
-              <div class={css.rows}>{done.map((task) => row(task))}</div>
+              <h2 class={css.sect} id="list-done" tabIndex={-1}>
+                {s.today.doneToday}
+              </h2>
+              <div class={css.rows}>{done.map((task) => row(task, 'done'))}</div>
             </section>
           )}
           {deleted.length > 0 && (
-            <Button kind="small" onClick={() => setBin(true)}>
+            <Button kind="link" onClick={() => setBin(true)}>
               {s.today.bin(deleted.length)}
             </Button>
           )}
         </div>
       </div>
-
-      {said && (
-        <p class={css.said} role="status">
-          <span>{said.text}</span>
-          {said.undo && (
-            <Button
-              onClick={() => {
-                said.undo!();
-                setSaid(null);
-              }}
-            >
-              {s.today.undo}
-            </Button>
-          )}
-        </p>
-      )}
 
       {opened && (
         <TaskSheet
@@ -312,8 +394,9 @@ export function TodayScreen({ focus, today }: { focus: Focus; today: Today }) {
                 key={task.id}
                 task={task}
                 of={s.today.of(task.estimate)}
+                note={typeof deletedAt(task.id) === 'number' ? s.today.gone(deletedAt(task.id) as number) : undefined}
                 end={
-                  <Button kind="small" onClick={() => today.restore(task.id)}>
+                  <Button kind="link" onClick={() => today.restore(task.id)}>
                     {s.today.restore}
                   </Button>
                 }

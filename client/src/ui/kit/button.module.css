@@ -16,18 +16,19 @@
 .primary:active { background: color-mix(in srgb, var(--you), var(--ink) var(--state-press)); }
 
 .secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
-.secondary:hover, .secondary:active { background: var(--raised); }
+.secondary:hover { background: color-mix(in srgb, var(--surface), var(--ink) var(--state-hover)); }
+.secondary:active { background: color-mix(in srgb, var(--surface), var(--ink) var(--state-press)); }
 
-.text { color: var(--muted); }
-.text:hover, .text:active { color: var(--ink); }
+.quiet { background: var(--raised); color: var(--ink); }
+.quiet:hover { background: color-mix(in srgb, var(--raised), var(--ink) var(--state-hover)); }
+.quiet:active { background: color-mix(in srgb, var(--raised), var(--ink) var(--state-press)); }
 
-.small {
+.link {
   min-width: var(--layout-touch);
   padding: 0;
   font: var(--type-label);
   color: var(--muted);
   text-decoration: underline;
-  text-decoration-color: var(--ghost);
   text-underline-offset: var(--space-xs);
 }
-.small:hover, .small:active { color: var(--ink); }
+.link:hover, .link:active { color: var(--ink); }

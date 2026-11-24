@@ -1,5 +1,7 @@
 /* One column that cannot be pushed wider than the screen by a long title. */
-.today { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); min-height: 100%; }
+.today { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; padding-bottom: var(--space-md); }
+/* The day at a glance is one block: the heading, the figures, the target. */
+.summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
 .head { display: flex; align-items: baseline; gap: var(--space-md); }
 .head h1 { font: var(--type-title); }
@@ -13,7 +15,7 @@
 .moves { display: flex; gap: var(--space-xs); }
 .moves button:disabled { visibility: hidden; }
 
-.cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 .now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
 .now > button, .then > button { justify-self: start; }
 
@@ -25,7 +27,6 @@
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.add input::placeholder { color: var(--muted); opacity: 1; }
 .add input:focus-visible { border-color: var(--ink); outline-offset: 0; }
 
 /* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
@@ -43,35 +44,42 @@
 .bar a { display: flex; flex: 1; align-items: center; gap: var(--space-md); min-width: 0; min-height: var(--layout-touch); }
 .bar b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A button on the bar is an outline in the ground. */
+.bar .onBar { border-color: var(--ground); background: none; color: var(--ground); }
+.bar .onBar:hover { background: color-mix(in srgb, var(--ground) var(--state-hover), transparent); }
 
 .sect { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); font: var(--type-label); color: var(--muted); }
 .sect span { font-weight: inherit; }
 .rows { display: grid; gap: var(--space-sm); }
 
-.empty { max-width: 60ch; color: var(--muted); }
+.empty { color: var(--muted); }
 
-/* What the last tap did, stuck to the bottom of the scroll so it is seen wherever the list is. */
+/* What the last tap did: as wide as the list, one line, stuck to the bottom of the scroll so it
+   is seen wherever the list is. It sits after the last row, so that row scrolls clear of it. */
 .said {
   position: sticky;
   bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-md);
-  min-height: calc(var(--layout-touch) + var(--space-md));
-  margin-top: auto;
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+  min-height: var(--layout-touch);
+  padding: 0 var(--space-md);
   border-radius: var(--radius-md);
   background: var(--ink);
   color: var(--ground);
 }
-.said span { overflow-wrap: anywhere; }
+.said > span { display: flex; flex: 1; gap: var(--space-xs); min-width: 0; white-space: nowrap; }
+/* The title gives way first, down to a few letters; on the narrowest phone what comes next is cut short too. */
+.saidTitle { flex: 0 10000 auto; min-width: 6ch; overflow: hidden; text-overflow: ellipsis; }
+.saidTail { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.said button { color: var(--ground); text-decoration-color: var(--ground); }
+.said button:hover { color: var(--ground); }
 
 .binNote { color: var(--muted); }
 
 @media (min-width: 720px) {
-  .today { gap: var(--layout-gap); max-width: 80ch; }
-  .cols { gap: var(--layout-gap); }
+  .today { max-width: 80ch; }
+  .empty { max-width: 60ch; }
   .target p { justify-content: flex-start; }
 }
 

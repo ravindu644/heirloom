@@ -15,7 +15,7 @@ interface Props {
   next?: boolean;
   /** It was added while the screen was open: it comes in with the `fill` motion, once. */
   arriving?: boolean;
-  /** In place of the count at the end: a button, the move controls. */
+  /** At the row's end, where the laps otherwise are: a button, the move controls. The laps move under the title. */
   end?: ComponentChildren;
   /** What the box marks, for a screen reader. Left out with `onDone`, there is no box. */
   checkLabel?: string;
@@ -25,40 +25,47 @@ interface Props {
 
 /** A task as a row: the box, the title, its project and laps, and the count. The words open it. */
 export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDone, onOpen }: Props) {
+  // The laps as squares, with the count they picture. They sit at the row's right, apart from the
+  // project's square: side by side the two would read as one more lap.
+  const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && (
+    <span class={css.laps}>
+      <LapSquares squares={task.squares} estimate={task.estimate} />
+      <span class={css.count}>
+        <b>{task.laps}</b>
+        {of}
+      </span>
+    </span>
+  );
   const words = (
     <>
       <span class={css.title}>{task.title}</span>
-      <span class={css.meta}>
-        {task.project && (
-          <span class={css.project}>
-            {/* The square is never alone: the name follows it. */}
-            <i style={`background:var(--${task.project.color})`} />
-            {task.project.name}
-          </span>
-        )}
-        <LapSquares squares={task.squares} estimate={task.estimate} />
-        {note && <span>{note}</span>}
-      </span>
+      {(task.project || note || (end && laps)) && (
+        <span class={css.meta}>
+          {task.project && (
+            <span class={css.project}>
+              {/* The square is never alone: the name follows it. */}
+              <i style={`background:var(--${task.project.color})`} />
+              {task.project.name}
+            </span>
+          )}
+          {note && <span>{note}</span>}
+          {/* A button at the row's end takes the laps' place; they move here, to the far side of the line. */}
+          {end && laps}
+        </span>
+      )}
     </>
   );
   return (
     <div class={cx(css.row, next && css.next, arriving && css.arriving, task.done && css.done, !onDone && css.plain)}>
       {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
       {onOpen ? (
-        <button type="button" class={css.words} onClick={onOpen}>
+        <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>
           {words}
         </button>
       ) : (
         <div class={css.words}>{words}</div>
       )}
-      <div class={css.end}>
-        {end ?? (
-          <span class={css.count}>
-            <b>{task.laps}</b>
-            {of}
-          </span>
-        )}
-      </div>
+      <div class={css.end}>{end ?? laps}</div>
     </div>
   );
 }

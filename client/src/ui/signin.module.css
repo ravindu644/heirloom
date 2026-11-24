@@ -1,16 +1,15 @@
-/* The page is its own scroller, and nothing in it sticks, so nothing can cover a field when the
-   keyboard takes half the screen. signin.tsx scrolls the button and the field into view. */
-.page {
-  display: grid;
-  height: 100dvh;
-  overflow-y: auto;
-  padding: calc(var(--layout-gap) + env(safe-area-inset-top)) var(--layout-margin) calc(var(--layout-gap) + env(safe-area-inset-bottom));
-  scroll-padding: var(--space-md) 0;
-}
-/* Auto margins centre it and, unlike centring the grid, never push its top out of reach. */
-.form { display: grid; gap: var(--space-md); width: 100%; max-width: 44ch; margin: auto; }
-.form h1 { font: var(--type-headline); letter-spacing: var(--tracking-headline); }
-.brand { display: flex; align-items: center; margin-bottom: var(--space-xl); font: var(--type-body-strong); }
-.intro, .error { min-height: 2lh; margin-bottom: var(--space-sm); }
+/* The form stands in the same frame as every other screen: the mark where it always is, the
+   form on the screen's one left edge, the free space under it. Nothing here sticks, so nothing
+   can cover a field when the keyboard takes half the screen; signin.tsx scrolls the button and
+   the field into view. */
+.form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); padding-bottom: var(--space-lg); }
+.form h1 { font: var(--type-title); }
+.intro, .error { min-height: 2lh; text-wrap: pretty; }
 .intro { color: var(--muted); }
-.actions { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* On a phone the two buttons fill the row, as every button row does. */
+.actions > * { flex: 1; }
+@media (min-width: 720px) {
+  .form { max-width: 44ch; }
+  .actions > * { flex: none; }
+}

@@ -2,8 +2,6 @@ import { Button } from './button.tsx';
 import css from './stepper.module.css';
 
 interface Props {
-  /** What is being counted, for a screen reader. */
-  label: string;
   /** The value as words: "4 laps". */
   text: string;
   /** What the two buttons do, for a screen reader: "One lap less", "One lap more". */
@@ -13,10 +11,13 @@ interface Props {
   onMore: () => void;
 }
 
-/** A number changed one step at a time. The caller keeps it inside its bounds. */
-export function Stepper({ label, text, less, more, onLess, onMore }: Props) {
+/**
+ * A number changed one step at a time. The caller keeps it inside its bounds, and names what is
+ * counted in the section it sits in: named here as well, a screen reader would say it twice.
+ */
+export function Stepper({ text, less, more, onLess, onMore }: Props) {
   return (
-    <div class={css.stepper} role="group" aria-label={label}>
+    <div class={css.stepper}>
       {/* The signs are drawings, like the tick in a box: the labels carry the words. */}
       <Button aria-label={less} onClick={onLess}>
         −

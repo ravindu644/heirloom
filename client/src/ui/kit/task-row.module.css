@@ -31,13 +31,16 @@
 }
 div.words { cursor: auto; }
 /* Three lines hold any title a person would write; the sheet shows the rest. */
-.title { display: -webkit-box; overflow: hidden; font: var(--type-body); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.title { display: -webkit-box; overflow: hidden; font: var(--type-body); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; text-wrap: pretty; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); overflow-wrap: anywhere; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
 .end { display: flex; flex: none; align-items: center; gap: var(--space-xs); }
-.count { font: var(--type-label); color: var(--muted); white-space: nowrap; }
-.count b { margin-right: calc(var(--space-xs) / 2); font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); color: var(--ink); }
+.laps { display: inline-flex; align-items: center; gap: var(--space-sm); }
+.meta .laps { margin-left: auto; }
+/* Small, so a day's list never reads as a column of large zeros. */
+.count { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
+.count b { font: inherit; color: var(--ink); }
 
 .done .title { color: var(--muted); text-decoration: line-through; }

@@ -1,10 +1,11 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useRef, useState } from 'preact/hooks';
-import type { ProjectColor, TaskView, Today } from '../../sync/today.ts';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { UNDO_MS } from '../../sync/focus.ts';
+import type { ProjectColor, SubtaskView, TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Check } from '../kit/check.tsx';
 import { cx } from '../kit/cx.ts';
-import { Area, Field } from '../kit/field.tsx';
+import { Field } from '../kit/field.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import * as s from '../strings.ts';
@@ -14,6 +15,37 @@ const COLORS: ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
 // PRODUCT: over this many laps a task wants breaking down.
 const NUDGE_OVER = 7;
 const ESTIMATE_MAX = 99;
+
+/**
+ * A text that is saved as it is typed. While the field has the focus it shows what the person
+ * typed and never what was stored: the stored text is trimmed, and pushed back into the field it
+ * would eat the space just typed. Leaving the field shows the stored text again.
+ */
+function useTyped(stored: string, save: (text: string) => void) {
+  const [typed, setTyped] = useState<string | null>(null);
+  return {
+    value: typed ?? stored,
+    onInput: (event: { currentTarget: HTMLInputElement }) => {
+      setTyped(event.currentTarget.value);
+      save(event.currentTarget.value);
+    },
+    onBlur: () => setTyped(null),
+  };
+}
+
+function Subtask({ sub, today, onRemove }: { sub: SubtaskView; today: Today; onRemove: () => void }) {
+  // An empty title is not saved: the last one that said something stays.
+  const title = useTyped(sub.title, (text) => text.trim() && today.editSubtask(sub.id, { title: text }));
+  return (
+    <div class={css.sub}>
+      <Check checked={sub.done} label={s.task.subtaskCheck(sub.title)} onChange={(done) => today.editSubtask(sub.id, { done })} />
+      <input aria-label={s.task.subtaskTitle} {...title} />
+      <Button kind="link" onClick={onRemove}>
+        {s.task.remove}
+      </Button>
+    </div>
+  );
+}
 
 interface Props {
   task: TaskView;
@@ -32,11 +64,20 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
   const subtask = useRef<HTMLInputElement>(null);
   const estimate = task.estimate ?? 0;
   const edit = today.edit.bind(today, task.id);
-  // Leaving goes back the one step of history the sheet is, which closes it.
+  const title = useTyped(task.title, (text) => text.trim() && edit({ title: text }));
+  const when = useTyped(task.when ?? '', (text) => edit({ when: text.trim() ? text : null }));
   const leave = (then: () => void) => () => {
-    history.back();
     then();
+    onClose();
   };
+
+  // A subtask removed can be had back for as long as any Undo lasts.
+  const [removed, setRemoved] = useState<SubtaskView | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const timer = setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [removed]);
 
   const addProject = (event: TargetedSubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,8 +95,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
 
   return (
     <Sheet title={s.task.sheet} close={s.task.close} onClose={onClose}>
-      {/* An empty title is not saved: the last one that said something stays. */}
-      <Field label={s.task.title} value={task.title} onInput={(event) => event.currentTarget.value.trim() && edit({ title: event.currentTarget.value })} />
+      <Field label={s.task.title} {...title} />
 
       <fieldset class={css.group}>
         <legend>{s.task.project}</legend>
@@ -70,7 +110,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
             </button>
           ))}
           {!making && (
-            <Button kind="small" onClick={() => setMaking(true)}>
+            <Button kind="link" onClick={() => setMaking(true)}>
               {s.task.newProject}
             </Button>
           )}
@@ -94,7 +134,6 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         <legend>{s.task.estimate}</legend>
         <div class={css.line}>
           <Stepper
-            label={s.task.estimate}
             text={s.task.estimateText(estimate)}
             less={s.task.less}
             more={s.task.more}
@@ -106,7 +145,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
         {estimate > NUDGE_OVER && (
           <p class={css.nudge}>
             {s.task.nudge(estimate)}
-            <Button kind="small" onClick={() => subtask.current?.focus()}>
+            <Button kind="link" onClick={() => subtask.current?.focus()}>
               {s.task.nudgeGo}
             </Button>
           </p>
@@ -115,7 +154,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
 
       <div class={css.pair}>
         <Field label={s.task.due} type="date" value={task.due ?? ''} onInput={(event) => edit({ due: event.currentTarget.value || null })} />
-        <Field label={s.task.when} value={task.when ?? ''} placeholder={s.task.whenHint} onInput={(event) => edit({ when: event.currentTarget.value.trim() ? event.currentTarget.value : null })} />
+        <Field label={s.task.when} placeholder={s.task.whenHint} {...when} />
       </div>
 
       <fieldset class={css.group}>
@@ -149,7 +188,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
           </button>
         </div>
         {chosen && task.repeat?.every !== 'day' && (
-          <div class={css.choices}>
+          <div class={cx(css.choices, css.days)}>
             {s.task.weekdays.map((name, bit) => (
               <button
                 key={name}
@@ -171,29 +210,39 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove }: Props) {
       <fieldset class={css.group}>
         <legend>{s.task.subtasks}</legend>
         {task.subtasks.map((sub) => (
-          <div key={sub.id} class={css.sub}>
-            <Check checked={sub.done} label={s.task.subtaskCheck(sub.title)} onChange={(done) => today.editSubtask(sub.id, { done })} />
-            <input
-              aria-label={s.task.subtaskTitle}
-              value={sub.title}
-              onInput={(event) => event.currentTarget.value.trim() && today.editSubtask(sub.id, { title: event.currentTarget.value })}
-            />
-            <Button kind="small" onClick={() => today.remove(sub.id)}>
-              {s.task.remove}
-            </Button>
-          </div>
+          <Subtask
+            key={sub.id}
+            sub={sub}
+            today={today}
+            onRemove={() => {
+              today.remove(sub.id);
+              setRemoved(sub);
+            }}
+          />
         ))}
+        {removed && (
+          <p class={css.removed} role="status">
+            {s.task.subtaskRemoved(removed.title)}
+            <Button
+              kind="link"
+              onClick={() => {
+                today.restore(removed.id);
+                setRemoved(null);
+              }}
+            >
+              {s.today.undo}
+            </Button>
+          </p>
+        )}
         <form class={css.sub} onSubmit={addSubtask}>
-          <input ref={subtask} aria-label={s.task.subtaskAdd} placeholder={s.task.subtaskHint} autocomplete="off" enterkeyhint="done" />
+          <input ref={subtask} aria-label={s.task.subtaskNew} placeholder={s.task.subtaskHint} autocomplete="off" enterkeyhint="done" />
           <Button type="submit">{s.task.subtaskAdd}</Button>
         </form>
       </fieldset>
 
-      <Area label={s.task.notes} rows={3} value={task.notes} onInput={(event) => edit({ notes: event.currentTarget.value })} />
-
       <div class={css.ends}>
         <Button onClick={leave(onDone)}>{task.done ? s.task.notDone : s.task.done}</Button>
-        <Button kind="text" onClick={leave(onRemove)}>
+        <Button kind="quiet" onClick={leave(onRemove)}>
           {s.task.delete}
         </Button>
       </div>

@@ -48,7 +48,6 @@
   color: var(--ink);
   font: var(--type-figure-sm);
   font-feature-settings: var(--feature-figure-sm);
-  line-height: var(--space-md);
 }
 .ahead { background: var(--you); color: var(--on-you); }
 /* lap-done: the chip turns over once your bar is nearly home. */
