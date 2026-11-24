@@ -119,7 +119,8 @@ that apply everywhere:
 ## Later, maybe
 
 Ideas that may come back after v1, each needing its own decision: a desktop app (Tauri), iOS, white
-noise, app blocking during focus, a companion character, widgets, a public read-only progress page.
+noise, app blocking during focus, a companion character, widgets, a public read-only progress page,
+a push to the phone so a timer started on the laptop rings on a phone whose app is closed.
 
 ## Decision log
 
