@@ -150,7 +150,7 @@ Actions, each a pure function of the state, the action and `now`:
 
 | Action | New state |
 |---|---|
-| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the timer cell was last written on an earlier local day, so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
+| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
 | `pause` | `paused_at = now`. Nothing when idle, paused or over |
 | `resume` | `paused_ms += now - paused_at`, `paused_at = null`. Nothing unless paused |
 | `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap |
@@ -266,15 +266,21 @@ offline with unsent work. Otherwise signing out would be a way to lose a lap.
 A run of the timer becomes a `session` row (id: the run id) when it ends. How it ended decides the
 row, and who may write it.
 
-**Closing a run.** From the timer state, what ended it, `now` and the writer's device id:
+**Closing a run.** From the timer state, when the timer cell was last written (the time in its
+stamp), what ended it, `now`, the writer's device id, and whether a rang row for this run is
+already held:
 
 | What ended it | Row |
 |---|---|
-| The bell (the run is over) | `outcome: rang`, `ended` the planned end (`ends_at`). Every cell of the row is stamped at `ends_at`, counter 0, with the writer's device id, not at the time of writing |
+| The bell (the run is over) | `outcome: rang`, `ended` the planned end (`ends_at`). Every cell of the row is stamped at the time the timer cell was last written, counter 0, with the writer's device id, not at the time of writing |
 | Stop, before the bell | `outcome: stopped`, `ended` now, or the moment the pause began if it is paused |
 | Set aside (void), before or after the bell | `outcome: void`, `ended` as above, or the planned end if the bell has gone |
 | Replaced: a newer timer state for another run arrives while this device's run is open | As stop |
 | Stop or replaced, after the bell | It rang: the row of the first line |
+| Stop or replaced, on a run that rang once and was then extended | Still `rang`: a lap that reached its bell stays a lap. `ended` as for stop, an ordinary stamp |
+
+A run that holds a rang row counts as over for the set of four as well: after it, the next lap is
+the next lap of the set, extended or not.
 
 - `kind`, `task`, `started`, `planned_ms` and `paused_ms` are the state's; `device` is the writer.
 - A run that did not reach the bell and had under 60000 ms of running time (`ended - started -
@@ -282,17 +288,21 @@ row, and who may write it.
 - Stopped and void rows are things a person did, so their cells take ordinary stamps from the clock.
 - Starting a run while another is open closes the open one first, as stop.
 
-Why a rang row is stamped at the bell: it is the same row whoever writes it and whenever. The
-laptop may write it at the bell while the phone, asleep, writes it an hour later. With the stamp
-at the bell the two are one row, and anything a person did to it after the bell (set it aside,
-moved it to another task) is newer than both.
+Why a rang row is stamped when the timer cell was written, and not when the row is: it is the
+same row whoever writes it and whenever. The laptop may write it at the bell while the phone,
+asleep, writes it an hour later; with one stamp the two are one row. And everything a person did
+to that run afterwards is newer than it: a stop on another device ten minutes in, a lap set
+aside from the timeline, a task changed. A phone that slept through a stop cannot bring the lap
+back as rung. An extension rewrites the timer cell, so the second bell's row is newer than the
+first.
 
 **Who writes the bell.** A device that sees a run over writes the rang row only when it holds no
-row for that run, and either it is in step with the server (caught up, connected) or it was the
+row for that run that ends at or after this bell, and either it is in step with the server (caught up, connected) or it was the
 last to write the timer cell (the cell's stamp ends in its own device id). A device that is
 offline with another device's timer waits: that lap may have been stopped where it was running.
 
 Fixture: `session.json`. `close` cases call the closing rule with `state`, `end` (`bell`, `stop`,
-`void`, `replaced`), `now` and `device`, and expect `null` or the row, its `id`, and `stamp_at`
-(the bell's time, or `null` for an ordinary stamp). `bell` cases ask whether to write, from the
+`void`, `replaced`), `now`, `device`, `written` (the time in the timer cell's stamp) and `rang`
+(true when a rang row is already held), and expect `null` or the row, its `id`, and `stamp_at`
+(`written` for a bell's row, or `null` for an ordinary stamp). `bell` cases ask whether to write, from the
 timer cell's stamp, the device, `in_step` and `has_row`.
