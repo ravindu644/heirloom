@@ -58,6 +58,24 @@ typography:
     fontWeight: 500
     lineHeight: 1.1
     fontFeature: '"tnum" 1'
+  figure-sm:
+    fontFamily: Barlow Condensed
+    fontSize: 14px
+    fontWeight: 600
+    lineHeight: 1
+    fontFeature: '"tnum" 1'
+  headline-lg:
+    fontFamily: Barlow
+    fontSize: 44px
+    fontWeight: 600
+    lineHeight: 1.05
+    letterSpacing: -0.02em
+  headline:
+    fontFamily: Barlow
+    fontSize: 34px
+    fontWeight: 600
+    lineHeight: 1.1
+    letterSpacing: -0.02em
   title:
     fontFamily: Barlow
     fontSize: 24px
@@ -68,6 +86,11 @@ typography:
     fontSize: 16px
     fontWeight: 400
     lineHeight: 1.45
+  body-strong:
+    fontFamily: Barlow
+    fontSize: 16px
+    fontWeight: 600
+    lineHeight: 1.3
   label:
     fontFamily: Barlow
     fontSize: 13px
@@ -142,6 +165,13 @@ components:
   page:
     backgroundColor: "{colors.ground}"
     textColor: "{colors.muted}"
+layout:
+  touch: 48px
+  sidebar: 232px
+  margin: 20px
+  gutter: 32px
+  gap: 24px
+  canvas: 1144px
 motion:
   press: 100ms
   fill: 160ms
@@ -194,6 +224,9 @@ digits let the timer run at 168px on a 412px phone (`figure-xl`) and 300px on a 
 are the faces of timing boards, made to be read at a distance. Tabular figures (`tnum`) wherever a
 number updates, so digits do not jiggle.
 
+The result sentence of a finished lap is `headline` on the phone and `headline-lg` on the laptop;
+buttons and panel headings are `body-strong`; the split chip's figure is `figure-sm`.
+
 Files, latin subset, OFL 1.1, in `design/fonts/`: barlow-condensed-500 (21 KB), -600 (22 KB),
 barlow-400, -500, -600 (22 to 23 KB each). About 110 KB for the whole app; load the timer weight
 first, the rest after first paint.
@@ -207,6 +240,8 @@ first, the rest after first paint.
   grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
 - Between the two, the sidebar collapses to the bottom bar under 720px.
 - Touch targets at least 48px. Nothing scrolls sideways.
+- These numbers are tokens under `layout:` (`touch`, `sidebar`, `margin`, `gutter`, `gap`, `canvas`).
+  The 720px breakpoint is the one size written in CSS, because a media query cannot read a variable.
 
 ## Elevation & Depth
 

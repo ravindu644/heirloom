@@ -15,6 +15,7 @@ test('tokens: DESIGN.md builds, dark values land under the plain names', () => {
   assert.match(css, /prefers-color-scheme: dark[^}]*\{[^}]*--you: #FF6A4D;/);
   assert.match(css, /--type-figure-xl: 600 168px\/0\.9 "Barlow Condensed", sans-serif;/);
   assert.match(css, /--motion-press: 100ms;/);
+  assert.match(css, /--layout-sidebar: 232px;/);
   assert.equal(css.match(/@font-face/g).length, 5);
   assert.doesNotMatch(css, /--dark-/);
 });

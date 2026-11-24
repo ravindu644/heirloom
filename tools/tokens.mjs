@@ -1,6 +1,6 @@
 // Usage: node tools/tokens.mjs
 // Writes client/src/ui/tokens.css from the front matter of DESIGN.md: colours (the dark set under
-// prefers-color-scheme), type, spacing, radii, motion, and one @font-face per family and weight.
+// prefers-color-scheme), type, spacing, radii, layout sizes, motion, and one @font-face per family and weight.
 // Fails on a colour without a dark twin, a reference to a role that does not exist, or a font
 // file missing from design/fonts.
 import fs from 'node:fs';
@@ -49,7 +49,7 @@ export function build(designMd, fontExists) {
 ${[...faces.values()].join('\n')}
 :root {
   color-scheme: light dark;
-${block([...light, ...type, ...vars('space-', d.spacing), ...vars('radius-', d.rounded), ...vars('motion-', d.motion)])}
+${block([...light, ...type, ...vars('space-', d.spacing), ...vars('radius-', d.rounded), ...vars('layout-', d.layout), ...vars('motion-', d.motion)])}
 }
 @media (prefers-color-scheme: dark) {
   :root {
