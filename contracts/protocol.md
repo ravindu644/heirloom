@@ -593,8 +593,10 @@ four in all]}`. Each string is 1 to 80 characters.
   bell is still rung for it.
 - **The browser's side.** The service worker shows the notification with the tag
   `heirloom-ring`, unless a window of the app is visible, in which case the page rings itself
-  and the worker shows nothing. Either way it tells every open window the run has rung, so a
-  page whose own late timer fires afterwards stays quiet.
+  and the worker shows nothing. Either way it tells every open window the run has rung and
+  whether it showed the notification, so a page whose own late timer fires afterwards stays
+  quiet, and a page that is open but hidden behind another window of the app rings if nothing
+  was shown.
 - A push service that answers 404 or 410 for a subscription has dropped it: the server deletes
   it. Any other failure is not retried: the bell has passed.
 - The server never sends anything else by push, and the payload holds no task title.

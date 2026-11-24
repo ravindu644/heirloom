@@ -4,10 +4,24 @@
 // throttled too (Chrome lets one fire up to a minute late after five minutes hidden, and pauses
 // timers while the machine sleeps). So one timer per plan, set from outside any timer callback so
 // Chrome does not count it as a chain and throttle it harder, a fresh look whenever the tab comes
-// back into view, and a lateness cut-off. The server's Web Push (section 9) covers the closed tab.
+// back into view, and a lateness cut-off. The server's Web Push covers the closed tab and the
+// sleeping one; push.ts keeps this browser subscribed.
+//
+// Who rings, push or page, so that a bell is never rung twice nor missed (the worker posts `rang`
+// to every open window and shows the notification only when no window of the app is visible):
+// - Visible: the page's timer is on time. It rings the bell; the worker shows nothing. If the push
+//   comes first, `rang` arrives with nothing shown, and the page rings then. One bell.
+// - Hidden, tab open: whichever is first. The worker's notification and the page's own share the
+//   tag heirloom-ring, so one replaces the other quietly. `rang` with a notification shown forgets
+//   the plan, so the throttled timer that fires later stays quiet.
+// - Tab closed: the worker's notification alone.
+// - Laptop asleep: nothing can ring. On waking, a push less than 60 s old (its TTL) is shown; the
+//   page rings by itself if it looks first and the bell is under LATE_MS old.
 
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
+import { createPush } from './push.ts';
+import type { PushEnv } from './push.ts';
 import { createBell } from './sound.ts';
 import type { Bell } from './sound.ts';
 /** A ring this late is still worth hearing: past it, the person has moved on. Covers the throttle. */
@@ -29,19 +43,39 @@ export interface WebEnv {
   bell(): void;
   /** Missing where the browser has no notifications. */
   Notification?: NotificationApi;
+  /** Web Push, where the page has a service worker and a server to ask. */
+  push?: PushEnv & {
+    /** Runs `hear` with each message from the service worker. */
+    onMessage(hear: (data: unknown) => void): void;
+  };
 }
+
+/** The service worker's word that a push rang this run's end. `shown`: whether it showed the notification. */
+interface Rang {
+  t: 'rang';
+  run: string;
+  at: number;
+  shown?: boolean;
+}
+const isRang = (m: unknown): m is Rang => typeof m === 'object' && m !== null && (m as Rang).t === 'rang';
 
 export function createWebNotifier(env: WebEnv): Notifier {
   let planned: Ring | null = null;
+  // The last plan given, kept while "ring here" is off, so switching it on plans it again.
+  let wanted: Ring | null = null;
+  let here = true;
   let cancel = () => {};
+  const push = env.push && createPush(env.push);
+  const granted = () => env.Notification?.permission === 'granted';
+  const subscribe = () => void (here && granted() && push?.subscribe());
 
-  // Rings the plan if it is due, then forgets it, so each plan rings at most once.
-  const look = () => {
-    if (!planned || env.now() < planned.at) return false;
+  // Rings the plan now, then forgets it, so each plan rings at most once.
+  const ring = () => {
+    if (!planned) return;
     const { title, body, at } = planned;
     planned = null;
     cancel();
-    if (env.now() - at > LATE_MS) return true;
+    if (env.now() - at > LATE_MS) return;
     env.bell();
     const N = env.Notification;
     // A visible page has the screen itself; a notification on top of it is noise.
@@ -51,6 +85,10 @@ export function createWebNotifier(env: WebEnv): Notifier {
         new N(title, { body, tag: 'heirloom-ring' });
       } catch {}
     }
+  };
+  const look = () => {
+    if (!planned || env.now() < planned.at) return false;
+    ring();
     return true;
   };
 
@@ -62,21 +100,59 @@ export function createWebNotifier(env: WebEnv): Notifier {
 
   env.onShow(() => look() || arm());
 
+  env.push?.onMessage((m) => {
+    const p = planned?.push;
+    if (!isRang(m) || !p || p.run !== m.run || p.at !== m.at) return;
+    // A worker that does not say whether it showed one decided by whether a window was visible,
+    // and this is the only window that rings.
+    if (m.shown ?? env.hidden()) {
+      planned = null;
+      cancel();
+    } else ring();
+  });
+
+  // At start: the browser may hand out a different subscription, or the words may have changed.
+  subscribe();
+
+  const plan = (next: Ring | null) => {
+    // A due ring that the throttle held back still rings before it is replaced.
+    look();
+    if (next && planned?.at === next.at) {
+      planned = next;
+      return;
+    }
+    planned = next && next.at - env.now() >= MOMENT_MS ? next : null;
+    arm();
+  };
+
   return {
-    plan(ring) {
-      // A due ring that the throttle held back still rings before it is replaced.
-      look();
-      if (ring && planned?.at === ring.at) {
-        planned = ring;
-        return;
-      }
-      planned = ring && ring.at - env.now() >= MOMENT_MS ? ring : null;
-      arm();
+    plan(next) {
+      wanted = next;
+      plan(here ? next : null);
     },
     async allow() {
       const N = env.Notification;
       if (!N || N.permission === 'denied') return false;
-      return N.permission === 'granted' || (await N.requestPermission()) === 'granted';
+      const ok = N.permission === 'granted' || (await N.requestPermission()) === 'granted';
+      if (ok) subscribe();
+      return ok;
+    },
+    ringHere(on) {
+      if (on === here) return;
+      here = on;
+      if (on) {
+        plan(wanted);
+        subscribe();
+      } else {
+        // Not through plan(): a held-back bell must not ring at the moment the person says not here.
+        planned = null;
+        cancel();
+        void push?.unsubscribe(true);
+      }
+    },
+    account(change) {
+      if (change === 'in') subscribe();
+      else void push?.unsubscribe(false);
     },
   };
 }
@@ -101,8 +177,23 @@ export function whenVisible(doc: Pick<Document, 'hidden' | 'addEventListener'>):
   return (run) => doc.addEventListener('visibilitychange', () => doc.hidden || run());
 }
 
-/** The app's notifier in the browser. */
-export function webNotifier(): Notifier {
+/** What the app hands the browser for Web Push. */
+export interface PushFrom {
+  request: PushEnv['request'];
+  remembered: PushEnv['remembered'];
+  remember: PushEnv['remember'];
+  words: PushEnv['words'];
+}
+
+/** The page's push manager, once its service worker is active; none where nothing is registered. */
+async function manager() {
+  const sw = typeof navigator === 'undefined' ? undefined : navigator.serviceWorker;
+  if (!sw || typeof PushManager === 'undefined' || !(await sw.getRegistration())) return undefined;
+  return (await sw.ready).pushManager;
+}
+
+/** The app's notifier in the browser. Without `from` it rings only while the page is open. */
+export function webNotifier(from?: PushFrom): Notifier {
   return createWebNotifier({
     now: () => Date.now(),
     schedule: timer,
@@ -110,5 +201,12 @@ export function webNotifier(): Notifier {
     onShow: whenVisible(document),
     bell: pageBell().play,
     Notification: typeof Notification === 'undefined' ? undefined : Notification,
+    push: from && {
+      ...from,
+      manager,
+      key: async () => ((await (await fetch('/api/push/key')).json()) as { key: string }).key,
+      warn: (error) => console.warn('heirloom: push', error),
+      onMessage: (hear) => navigator.serviceWorker?.addEventListener('message', (e) => hear(e.data)),
+    },
   });
 }

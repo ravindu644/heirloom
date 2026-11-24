@@ -36,9 +36,12 @@ self.addEventListener('push', (e) => {
   try { d = e.data.json(); } catch {}
   if (!d || d.t !== 'ring') return;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-    for (const w of windows) w.postMessage({ t: 'rang', run: d.run, at: d.at });
-    if (windows.some((w) => w.visibilityState === 'visible')) return;
-    return self.registration.showNotification(d.title, { body: d.body, tag: 'heirloom-ring' });
+    // A window that is looking at the timer rings by itself. The "open in another tab" window
+    // has no timer, but it cannot be told apart from here, so each window is told whether a
+    // notification was shown, and the one with the timer rings if none was.
+    const shown = !windows.some((w) => w.visibilityState === 'visible');
+    for (const w of windows) w.postMessage({ t: 'rang', run: d.run, at: d.at, shown });
+    if (shown) return self.registration.showNotification(d.title, { body: d.body, tag: 'heirloom-ring' });
   }));
 });
 self.addEventListener('notificationclick', (e) => {

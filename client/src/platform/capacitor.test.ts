@@ -251,6 +251,35 @@ describe('the phone notifier', () => {
   });
 });
 
+describe('ring here, on the phone', () => {
+  it('off cancels the alarm and clears the countdown, plans nothing while off, and on again schedules the bell', async () => {
+    const { calls, scheduled, notifier, ring, done } = rig();
+    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
+    await done();
+    notifier.ringHere(false);
+    await done();
+    assert.deepEqual(calls.slice(-2), ['cancel', 'clear']);
+    notifier.plan(ring(30 * MIN, 'Lap 1 of 4'));
+    await done();
+    assert.equal(scheduled.length, 1);
+    notifier.ringHere(true);
+    await done();
+    assert.deepEqual(
+      scheduled.map((n) => n.schedule.at.getTime()),
+      [T0 + 25 * MIN, T0 + 30 * MIN],
+    );
+  });
+
+  it('off, the page keeps quiet too, even without permission', async () => {
+    const { time, pageRings, notifier, ring, done } = rig({ display: 'denied' });
+    notifier.plan(ring(25 * MIN));
+    notifier.ringHere(false);
+    await done();
+    time.advance(60 * MIN);
+    assert.deepEqual(pageRings, []);
+  });
+});
+
 describe('in front again, on the phone', () => {
   it("is Capacitor's resume", () => {
     const seen: [string, () => void][] = [];

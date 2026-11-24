@@ -52,6 +52,10 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   // life must be cancelled when the timer it was for has since been stopped.
   let applied: string | undefined;
   let current: Ring | null = null;
+  // The person's "ring here" for this phone. Off: no alarm, no countdown, no page bell.
+  let here = true;
+  // A phase that has already ended, or is ending now, rings nowhere.
+  const pending = () => (here && current && current.at - now() >= MOMENT_MS ? current : null);
   // What Android actually holds, which is less than `applied` while permission is missing.
   let live = 'null';
 
@@ -109,22 +113,31 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   // Sets the pending bell if Android does not hold it yet, once the plans before this have run.
   const fill = () =>
     run(async () => {
-      const planned = current && current.at - now() >= MOMENT_MS ? current : null;
+      const planned = pending();
       if (JSON.stringify(planned) !== live) await apply(planned);
     });
   // Permission may have been given in Android's settings while the person was away.
   onResume(fill);
 
+  const settle = () => {
+    const planned = pending();
+    const key = JSON.stringify(planned);
+    if (key === applied) return;
+    applied = key;
+    run(() => apply(planned));
+  };
+
   return {
     plan(ring) {
-      // A phase that has already ended, or is ending now, rings nowhere.
-      current = ring && ring.at - now() >= MOMENT_MS ? ring : null;
-      const key = JSON.stringify(current);
-      if (key === applied) return;
-      applied = key;
-      const planned = current;
-      run(() => apply(planned));
+      current = ring;
+      settle();
     },
+    ringHere(on) {
+      here = on;
+      settle();
+    },
+    // The phone's own alarm needs nothing from the account; a sign out stops the timer, which plans null.
+    account() {},
     async allow() {
       // main.tsx calls this as `void notifier.allow()`: a bridge failure is a no, not an unhandled rejection.
       const ok = await (async () =>
