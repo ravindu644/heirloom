@@ -104,3 +104,27 @@ reviews had let through. Each is now a row above; this is why.
   questioned. Account actions belong behind the person.
 - **Consistency is checked across screens, not inside one.** Review each new screen side by side
   with the ones already built: same header, same headings, same buttons, same gaps.
+
+## 7. Lessons from the review that measured
+
+Written 2026-11-25, after the first review done with a ruler (the audit tool, then
+`getBoundingClientRect()` by hand) found sixteen things the pictures alone had hidden.
+
+- **A fix can move a hole instead of closing it.** "Free space above the action row" closed the
+  gap under the timer and opened 530px between "Take five." and its button. Ask of every fix:
+  which two related things are now further apart? A sentence travels with the button it explains.
+- **A fix can make the next collision.** Moving the lap squares beside the count put the count
+  against the row's Start button. After a fix, measure the neighbours of what moved, in every
+  variant of the row (with a control, without, in ordering mode).
+- **A hidden element can still take room.** A visually hidden status line, absolute with no
+  positioned ancestor, made the phone page 1403px tall and the bottom bar slide. Scroll every
+  phone state to its end; the page itself must not move.
+- **A component sized for the full case is a stamp in the short one.** A year of 12px squares is
+  right at 54 weeks and lost at ten. Look at every component with the least data and the most.
+- **Baselines come from text, never from a mark.** An inline-flex name took its baseline from its
+  colour square and the figure beside it floated 10px. Where a figure sits beside a label,
+  measure both baselines.
+- **A label must stand clear of every line that can cross it.** Check a chart in each case of its
+  data: ahead, behind, level, empty, and with one value near the floor.
+- **Check PRODUCT.md row by row.** Two rows of Progress were half built and nothing looked
+  missing. A screen that looks finished is compared with the list, not with the eye.
