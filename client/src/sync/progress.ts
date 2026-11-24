@@ -24,6 +24,8 @@ export interface ProjectShare {
   laps: number;
   /** The same sum over the seven days before. */
   before_ms: number;
+  /** All time: every counted session there is whose task is in the project, the lap in progress included. */
+  all_ms: number;
 }
 
 export interface Estimates {
@@ -31,6 +33,8 @@ export interface Estimates {
   ratio: number | null;
   /** The eight done most recently, newest first. */
   tasks: { id: string; title: string; estimate: number; laps: number }[];
+  /** The same ratio for each of the last eight Monday to Sunday weeks, oldest first, this week last. Null for a week with no such task. */
+  weeks: { monday: string; ratio: number | null }[];
 }
 
 export interface TimelineEntry {
@@ -116,10 +120,20 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const sessions = counts.sessions.value;
     const { days, overlaps } = stats(sessions, offset());
     const taskLaps = new Map<string, number>();
+    const ofTask = new Map<string | null, Session[]>();
     for (const session of sessions) {
       if (session.task !== null && session.kind === 'work' && session.outcome === 'rang') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
+      const list = ofTask.get(session.task);
+      if (list) list.push(session);
+      else ofTask.set(session.task, [session]);
     }
-    return { days, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps };
+    // All the focus there has ever been on each task, and on no task: counted as a day is, the
+    // minutes two devices ran at once on the one task counted once.
+    const taskFocus = new Map<string | null, number>();
+    for (const [task, list] of ofTask) {
+      taskFocus.set(task, Object.values(stats(list, offset()).days).reduce((sum, day) => sum + day.focus_ms, 0));
+    }
+    return { days, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps, taskFocus };
   });
 
   const tasks = computed(() => {
@@ -136,6 +150,17 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const project = task === null ? null : tasks.value.get(task)?.project;
     return (project && projects.value.get(project)) || null;
   };
+
+  // All time per project: its tasks' totals added up. Worked out again when a task moves project
+  // or a session changes, from the totals the one pass already made, not from the sessions.
+  const allTime = computed(() => {
+    const totals = new Map<string | null, number>();
+    for (const [task, focus] of history.value.taskFocus) {
+      const project = projectOf(task)?.id ?? null;
+      totals.set(project, (totals.get(project) ?? 0) + focus);
+    }
+    return totals;
+  });
 
   // The sessions of the days from `from` to `to`, with the lap in progress in the place of its row.
   function between(from: string, to: string, now: number): Session[] {
@@ -158,8 +183,18 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       const now = engine.now();
       const today = localDay(now, offset());
       void clock.day.value;
+      // The lap in progress is in this week's figure, so it is in the all-time one too: what it
+      // has run so far, less whatever a row for it already holds.
+      const open = counts.open(now);
+      const held = open && sessionRows.value.get(open.id);
+      const running = open ? open.ended - open.started - open.paused_ms - (typeof held?.ended === 'number' ? Math.max(0, held.ended - open.started - open.paused_ms) : 0) : 0;
+      const runningFor = open ? (projectOf(open.task)?.id ?? null) : undefined;
       return projectShares(between(addDays(today, -13), today, now), (session) => projectOf(session.task)?.id ?? null, today, offset()).map(
-        ({ project, ...sums }) => ({ project: (project !== null && projects.value.get(project)) || null, ...sums }),
+        ({ project, ...sums }) => ({
+          project: (project !== null && projects.value.get(project)) || null,
+          ...sums,
+          all_ms: (allTime.value.get(project) ?? 0) + (project === runningFor ? Math.max(0, running) : 0),
+        }),
       );
     },
 

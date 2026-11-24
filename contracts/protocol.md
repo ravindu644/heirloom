@@ -396,9 +396,18 @@ sessions whose task is in it, and their laps; and the same sum over the seven da
 for comparison. A session with no task, or a task with no project, is under no project. Projects
 with nothing in either window are left out. Most time first.
 
+Each listed project also carries its focus of all time: for each of its tasks, the focus of every
+counted session there is, counted as a day is (per local day the union of that task's intervals),
+and the tasks added up, the lap in progress included. Two devices at once on one task count
+once; on two tasks of one project they count for each task.
+
 **Estimates.** Over tasks done in the last 28 days that have an estimate and are not deleted: the
 laps run over the laps guessed, as one ratio (1.3 means a task takes 1.3 laps for each one
 guessed), and the eight done most recently with their two numbers. No such task, no ratio.
+
+And over time: the same ratio for each of the last eight Monday to Sunday weeks, oldest first,
+this week last, over the tasks whose `done` time falls in the week by local day. A week with no
+such task has no ratio.
 
 **A day's timeline.** Every session that started on the day, breaks and set-aside laps included,
 oldest first, each with its kind, times, outcome, task, and whether it is one of a pair that ran

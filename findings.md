@@ -38,6 +38,7 @@ when it is done.
 - [6] Habit reminders on the phone are not exact: Android may deliver one late (minutes usually; up to an hour is the documented worst case, unverified on this phone). They stop 14 days after the app was last opened, and a habit checked in on the laptop still reminds on a sleeping phone. A reminder already in the shade stays after the check-in.
 - [6] The tap that sets a habit's reminder time should also ask for notification permission (`notifier.allow()`): someone who never starts a lap is otherwise never asked.
 - [8] "This phone" is chosen by pointer, so a tablet used with a finger is called a phone.
+- [5] A project's all-time figure counts minutes twice when two devices ran two different tasks of the one project at once (the seven-day figure counts them once). Exact would make every title edit redo the pass over all sessions; left as is.
 - [5] In the year, Left and Right move a week and Up and Down a day. It matches the grid, but the control is a slider and a screen reader's user expects Left and Right to step one day. Decide with the design review.
 - [5] For the ui lane's next round, from the browser tests: signing in after a sign out lands on Settings (the address is still `#/settings`): go to Focus. The last-tap line's parts have no space between them in the markup ("chapter 3,4 laps."), so a screen reader runs them together.
 - [4] A task's `notes` field has no screen: PRODUCT section 2 does not list notes, so the design review had it taken out of the sheet. The user's call.

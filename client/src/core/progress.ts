@@ -214,22 +214,32 @@ export function projectShares(
 }
 
 /**
- * How the guesses have held, over tasks done in the last 28 days that have an estimate and are
- * not deleted: laps run for each lap guessed, and the eight done most recently, newest first.
+ * How the guesses have held, over tasks that are done, have an estimate and are not deleted:
+ * laps run for each lap guessed over the last 28 days, the eight done most recently (newest
+ * first), and the same ratio for each of the last eight Monday to Sunday weeks, oldest first,
+ * this week last. A week with no such task has no ratio.
  */
 export function estimates(
   tasks: readonly Task[],
   lapsOf: (task: string) => number,
   today: string,
   utcOffsetMin: number,
-): { ratio: number | null; tasks: { id: string; title: string; estimate: number; laps: number }[] } {
-  const from = addDays(today, -27);
-  const done = tasks
-    .filter((t) => t.done !== null && t.estimate !== null && t.deleted === null && localDay(t.done, utcOffsetMin) >= from)
+): { ratio: number | null; tasks: { id: string; title: string; estimate: number; laps: number }[]; weeks: { monday: string; ratio: number | null }[] } {
+  // Laps run over laps guessed, for a set of tasks. None, no ratio.
+  const ratio = (list: readonly { estimate: number; laps: number }[]) => {
+    const guessed = list.reduce((sum, t) => sum + t.estimate, 0);
+    return guessed > 0 ? list.reduce((sum, t) => sum + t.laps, 0) / guessed : null;
+  };
+  const guessed = tasks
+    .filter((t) => t.done !== null && t.estimate !== null && t.deleted === null)
     .sort((a, b) => b.done! - a.done!)
-    .map((t) => ({ id: t.id, title: t.title, estimate: t.estimate!, laps: lapsOf(t.id) }));
-  const guessed = done.reduce((sum, t) => sum + t.estimate, 0);
-  return { ratio: guessed > 0 ? done.reduce((sum, t) => sum + t.laps, 0) / guessed : null, tasks: done.slice(0, 8) };
+    .map((t) => ({ id: t.id, title: t.title, estimate: t.estimate!, laps: lapsOf(t.id), day: localDay(t.done!, utcOffsetMin) }));
+  const recent = guessed.filter((t) => t.day >= addDays(today, -27));
+  const weeks = Array.from({ length: 8 }, (_, i) => {
+    const monday = addDays(mondayOf(today), (i - 7) * 7);
+    return { monday, ratio: ratio(guessed.filter((t) => t.day >= monday && t.day < addDays(monday, 7))) };
+  });
+  return { ratio: ratio(recent), tasks: recent.slice(0, 8).map(({ id, title, estimate, laps }) => ({ id, title, estimate, laps })), weeks };
 }
 
 /** What a lap that was set aside goes back to when it is counted again: the row itself says. */

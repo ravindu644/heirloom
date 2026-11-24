@@ -342,16 +342,33 @@ describe('by project', () => {
     lap(d, '2026-11-21', 9, 0, { task: stale, outcome: 'void' });
 
     assert.deepEqual(p.projects(), [
-      { project: null, focus_ms: 75 * MIN, laps: 3, before_ms: 0 },
-      { project: { id: c, name: 'The C book', color: 'you' }, focus_ms: 60 * MIN, laps: 2, before_ms: 25 * MIN },
-      { project: { id: react, name: 'React', color: 'rest' }, focus_ms: 25 * MIN, laps: 1, before_ms: 0 },
-      { project: { id: old, name: 'Only last week', color: 'ink' }, focus_ms: 0, laps: 0, before_ms: 50 * MIN },
+      { project: null, focus_ms: 75 * MIN, laps: 3, before_ms: 0, all_ms: 75 * MIN },
+      { project: { id: c, name: 'The C book', color: 'you' }, focus_ms: 60 * MIN, laps: 2, before_ms: 25 * MIN, all_ms: 85 * MIN },
+      // All time reaches back past both windows: the lap on the 10th is in it.
+      { project: { id: react, name: 'React', color: 'rest' }, focus_ms: 25 * MIN, laps: 1, before_ms: 0, all_ms: 50 * MIN },
+      { project: { id: old, name: 'Only last week', color: 'ink' }, focus_ms: 0, laps: 0, before_ms: 50 * MIN, all_ms: 50 * MIN },
     ]);
+    // "Nothing in either week" has a lap, long ago. Its all-time figure is not 0, and it is still left out of this list.
+    assert.equal(p.projects().some((share) => share.project?.id === never), false);
 
     // A lap in progress on a task counts under its project as it runs.
     d.focus.start(hooks);
     w.time.advance(10 * MIN);
-    assert.equal(p.projects().find((share) => share.project?.id === react)?.focus_ms, 35 * MIN);
+    const running = p.projects().find((share) => share.project?.id === react)!;
+    assert.deepEqual([running.focus_ms, running.all_ms], [35 * MIN, 60 * MIN], 'in this week and in all time alike');
+    // Its row is written at the bell: the figure does not jump or count the lap twice.
+    w.time.advance(15 * MIN);
+    assert.equal(p.projects().find((share) => share.project?.id === react)!.all_ms, 75 * MIN);
+    // Five more minutes on the lap, two of them run: the row of its first bell is not counted on top of the lap itself.
+    w.time.advance(MIN);
+    d.focus.extend();
+    w.time.advance(2 * MIN);
+    assert.equal(p.projects().find((share) => share.project?.id === react)!.all_ms, 78 * MIN);
+    d.focus.stop();
+    // The task moves to another project, and its time goes with it.
+    d.today.edit(hooks, { project: c });
+    assert.equal(p.projects().find((share) => share.project?.id === c)!.all_ms, 163 * MIN);
+    assert.equal(p.projects().some((share) => share.project?.id === react), false);
   });
 });
 
@@ -387,13 +404,47 @@ describe('estimates', () => {
         { id: under, title: 'under', estimate: 4, laps: 2 },
         { id: over, title: 'over', estimate: 2, laps: 3 },
       ],
+      weeks: [...['10-05', '10-12', '10-19', '10-26', '11-02', '11-09', '11-16'].map((monday) => ({ monday: `2026-${monday}`, ratio: null })), { monday: '2026-11-23', ratio: 5 / 6 }],
     });
   });
 
   it('no task done with an estimate: no ratio', async () => {
     const { d, p } = await one();
     d.today.setDone(d.today.add('no guess')!, true);
-    assert.deepEqual(p.estimates.value, { ratio: null, tasks: [] });
+    assert.deepEqual([p.estimates.value.ratio, p.estimates.value.tasks], [null, []]);
+    assert.deepEqual(p.estimates.value.weeks.map((week) => week.ratio), Array(8).fill(null));
+  });
+
+  it('accuracy over time: the last eight weeks, oldest first, each its own ratio, and none for a week with no such task', async () => {
+    const { d, p } = await one();
+    let n = 0;
+    // A task done on a day, with its guess and the laps it took.
+    const done = (day: string, estimate: number | null, laps: number, over: object = {}) => {
+      const id = `t${++n}`;
+      d.engine.write('task', id, { title: id, estimate, done: at(day, 18), ...over });
+      for (let k = 0; k < laps; k++) lap(d, day, 8 + k, 0, { task: id });
+      return id;
+    };
+    done('2026-09-25', 1, 3);                           // nine weeks back: before the eight
+    done('2026-10-05', 2, 1);                           // the first of the eight, its Monday
+    done('2026-10-11', 2, 2);                           // the same week, its Sunday
+    done('2026-10-12', 1, 1);                           // the Monday after: the next week, not this one
+    done('2026-11-10', 2, 4);                           // the week of the 9th: twice the guess
+    done('2026-11-12', null, 5);                        // no estimate: not counted
+    done('2026-11-13', 1, 9, { deleted: T0 });          // deleted: not counted
+    done('2026-11-24', 4, 2);                           // this week: half the guess
+    assert.deepEqual(p.estimates.value.weeks, [
+      { monday: '2026-10-05', ratio: 3 / 4 },
+      { monday: '2026-10-12', ratio: 1 },
+      { monday: '2026-10-19', ratio: null },
+      { monday: '2026-10-26', ratio: null },
+      { monday: '2026-11-02', ratio: null },
+      { monday: '2026-11-09', ratio: 2 },
+      { monday: '2026-11-16', ratio: null },
+      { monday: '2026-11-23', ratio: 0.5 },
+    ]);
+    // The one ratio above them is still the last 28 days: the 27th of October on.
+    assert.equal(p.estimates.value.ratio, 6 / 6);
   });
 
   it('only the last 28 days are looked at, and only the eight done most recently are listed', async () => {
