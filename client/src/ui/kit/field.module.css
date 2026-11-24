@@ -1,7 +1,7 @@
 .field { display: grid; gap: var(--space-xs); }
 .field span { font: var(--type-label); color: var(--muted); }
 .field small { font: var(--type-label); color: var(--muted); }
-.field input {
+.field input, .field textarea {
   width: 100%;
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
@@ -10,5 +10,8 @@
   background: var(--surface);
   transition: border-color var(--motion-press) var(--motion-ease);
 }
-.field input:hover { border-color: var(--ghost); }
-.field input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+/* As tall as what is in it, never less than a field.
+   ponytail: field-sizing does the growing; a browser without it shows one line that scrolls. */
+.field textarea { padding: calc(var(--space-sm) + var(--space-xs)) var(--space-md); font: inherit; color: inherit; resize: none; field-sizing: content; }
+.field :is(input, textarea):hover { border-color: var(--ghost); }
+.field :is(input, textarea):focus-visible { border-color: var(--ink); outline-offset: 0; }

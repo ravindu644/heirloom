@@ -14,6 +14,9 @@ import type { Today } from '../sync/today.ts';
 import { App, Elsewhere } from './app.tsx';
 import { DAY, PROJECTS, demoToday } from './demo-today.ts';
 import type { DemoDay, DemoTask } from './demo-today.ts';
+import { demoProgress } from './demo-progress.ts';
+import type { DemoRecord } from './demo-progress.ts';
+import type { Progress } from '../sync/progress.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -42,9 +45,11 @@ interface Scene {
   tap?: string | string[];
   /** The day's tasks. Left out, there are none. */
   day?: DemoDay;
-  /** Opens on Today, or on Settings, not on Focus. */
+  /** Opens on Today, on Progress or on Settings, not on Focus. */
   today?: boolean;
   settings?: boolean;
+  /** The record behind Progress. Given, the scene opens there. */
+  record?: DemoRecord;
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -136,8 +141,30 @@ const TODAY: Record<string, Scene> = {
 };
 for (const [id, scene] of Object.entries(TODAY)) if (!id.startsWith('focus')) scene.today = true;
 
+// Progress: twelve weeks of record, and the ways a week, a streak and a first day can stand.
+const week: Scene = { ...idleAt2, about: '', day: day() };
+const PROGRESS: Record<string, Scene> = {
+  progress: { about: 'Progress: twelve weeks, one lap behind last week, a lap running', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {} },
+  'progress-ahead': { ...week, about: 'Progress: a week ahead of the last', record: { today: 300 } },
+  'progress-level': { ...week, about: 'Progress: level with last week', record: { today: 150 } },
+  'progress-behind': { ...week, about: 'Progress: three laps behind, nothing running', record: { today: 75 } },
+  'progress-first-day': { about: 'Progress on a first day: nothing to compare, one square', next: 1, at: [10, 50], you: 25 * MIN, laps: 1, record: { history: 'day', today: 25, scripted: false } },
+  'progress-nothing': { about: 'Progress before the first lap', next: 0, at: [9, 5], record: { history: 'none', scripted: false } },
+  'progress-first-week': { ...week, about: 'Progress in a first week: no last week to race', record: { history: 'week' } },
+  'progress-year': { ...week, about: 'A year and a week of record: the grid opens on its newest weeks', record: { history: 'year' } },
+  'progress-run': { ...week, about: 'A streak with no rest day in its last fortnight', record: { fill: ['2026-11-11', '2026-11-19'] } },
+  'progress-miss': { ...week, about: 'A miss inside the last 45 days: days kept of days, not the run', record: { empty: ['2026-11-12'] } },
+  'progress-day': { ...week, about: 'A day chosen in the year: its timeline, and the way back to today', record: {}, tap: 'demo:day' },
+  'progress-aside': { ...week, about: 'Just after a lap is set aside in the timeline: Undo', record: {}, tap: 'Set aside' },
+  'progress-note': { ...week, about: 'The look back with a note at its longest', record: { note: 'Pointers finally clicked once I drew the array as boxes and stopped reading a[i] as magic. The second lap after lunch went on two devices by mistake, the laptop was still running. Tomorrow: exercise 5-3 first, before the lecture, while the picture of the boxes is still in my head.' } },
+  'progress-long-project': { ...week, about: 'A long project name, and time under no project', record: { projects: 'long' } },
+  'progress-many-projects': { ...week, about: 'Nine rows by project', record: { projects: 'many' } },
+  'progress-no-projects': { ...week, about: 'No projects and no estimates yet', record: { projects: 'none', estimates: false } },
+};
+
 const SCENES: Record<string, Scene> = {
   ...TODAY,
+  ...PROGRESS,
   'signed-out': { about: 'Nobody is signed in', signedOut: true },
   idle: { about: 'The morning, before the first lap', at: [9, 5], next: 0, ghost: [5 * MIN, 200 * MIN] },
   'first-day': { about: 'No ghost yet: lap 1 of the first day', run: { phase: 'work', lap: 0, left: 21 * MIN + 7000 } },
@@ -168,7 +195,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -310,12 +337,13 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today } {
     cells: () => [],
     stop: async () => {},
   };
-  return { engine, focus, today };
+  const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
+  return { engine, focus, today, progress };
 }
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
-if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : '';
+if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : '';
 render(
   scene?.elsewhere ? (
     <Elsewhere />
@@ -325,7 +353,7 @@ render(
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>
       {Object.entries(SCENES).map(([id, { about }]) => (
-        <a key={id} href={`?state=${id}${SCENES[id]?.today ? '#/today' : ''}`} style="text-decoration: underline">
+        <a key={id} href={`?state=${id}`} style="text-decoration: underline">
           {id}: {about}
         </a>
       ))}
@@ -341,6 +369,9 @@ render(
       const field = document.querySelector<HTMLInputElement>('input[name=task]')!;
       field.value = 'pointers chapter 3 ~4';
       field.form!.requestSubmit();
+    } else if (words === 'demo:day') {
+      // A week back in the year, by the keyboard.
+      document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     } else [...document.querySelectorAll('button')].find((button) => (button.textContent || button.ariaLabel)?.startsWith(words))?.click();
   }, 100 * (i + 1)),
 );

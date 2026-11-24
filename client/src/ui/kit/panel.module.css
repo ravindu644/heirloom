@@ -1,5 +1,7 @@
 .panel {
   display: grid;
+  /* One column that a long title or a wide drawing inside cannot push wider than the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-md);
   padding: var(--space-md);
   border-radius: var(--radius-md);

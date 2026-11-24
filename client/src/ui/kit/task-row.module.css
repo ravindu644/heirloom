@@ -37,10 +37,7 @@ div.words { cursor: auto; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
 .end { display: flex; flex: none; align-items: center; gap: var(--space-xs); }
-.laps { display: inline-flex; align-items: center; gap: var(--space-sm); }
-.meta .laps { margin-left: auto; }
-/* Small, so a day's list never reads as a column of large zeros. */
-.count { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
-.count b { font: inherit; color: var(--ink); }
+/* Where a button takes the laps' place at the row's end, they sit at the far side of this line. */
+.far { display: flex; margin-left: auto; }
 
 .done .title { color: var(--muted); text-decoration: line-through; }

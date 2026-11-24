@@ -71,7 +71,6 @@ export const nav = {
 
 // Screens that later sections build. Each says what will live there and that it does not yet.
 export const later = {
-  progress: 'Your year of focus, and this week against last week. Not built yet. Every lap you run now is kept for it.',
   habits: 'The things you do every day, with one tap to check in. Not built yet.',
   room: 'The friends you study beside, and who is focusing now. Not built yet.',
 };
@@ -200,6 +199,9 @@ export const ring = {
   // The two kinds of notification, as the phone's settings list them.
   bellChannel: 'Bell',
   countdownChannel: 'Time left',
+  remindChannel: 'Habit reminders',
+  // A habit's reminder: its own title, and one plain line. It reminds; it does not ask why not yet.
+  remindBody: 'Planned for today.',
 };
 
 export const elsewhere = 'heirloom is open in another tab of this browser. Close that one and this one takes over by itself.';
@@ -374,4 +376,103 @@ export const task = {
   done: 'Mark done',
   notDone: 'Not done after all',
   delete: 'Delete',
+};
+
+const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Monday first, as a week runs.
+const weekdayName = (day: string) => WEEKDAYS[new Date(day).getUTCDay()]!;
+const shortDate = (day: string) => dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
+const lapsWord = (n: number) => (n === 1 ? 'One lap' : `${n} laps`);
+
+export const progress = {
+  weekOf: (monday: string) => `Progress, week of ${dated(monday, { day: 'numeric', month: 'long' })}`,
+
+  // The finding the screen opens with. Behind is a fact with a way back, never a verdict.
+  firstWeek: (ms: number) => (ms < MIN ? 'Your first week starts with the next lap.' : `Your first week. ${cap(length(ms))} so far.`),
+  level: 'Level with last week.',
+  ahead: (ms: number) => `${cap(length(ms))} ahead of last week.`,
+  behind: (laps: number) => `${lapsWord(laps)} behind last week.`,
+  closeNow: 'The lap you are in now draws you level.',
+  close: (laps: number) => (laps === 1 ? 'One lap draws you level.' : `${laps} laps draw you level.`),
+  ghostEnded: (ms: number) => `Last week ended on ${total(ms)}.`,
+  pastAll: 'That is more than all of last week.',
+
+  week: 'This week against last week',
+  weekdays: WEEKDAYS_SHORT,
+  hours: (h: number) => `${h}h`,
+  byNow: (ms: number, day: string) => `Last week had ${total(ms)} by this time on ${weekdayName(day)}.`,
+  noLastWeek: 'Last week has nothing to race. This week becomes the one to beat.',
+  chart: (you: number, ghostNow: number, ghostTotal: number) =>
+    ghostTotal > 0 ? `This week ${total(you)} so far. Last week ${total(ghostNow)} by now, ${total(ghostTotal)} in all.` : `This week ${total(you)} so far.`,
+  total,
+
+  streak: 'Streak',
+  inARow: (n: number) => (n === 1 ? 'day in a row' : 'days in a row'),
+  ofLast: (of: number) => `of the last ${of} days`,
+  streakStart: 'A day counts with one lap that rings. Two rest days a week do not break it.',
+  todayOpen: 'Today joins with its first lap that rings.',
+  restDay: (day: string) => `${weekdayName(day)} the ${ordinal(new Date(day).getUTCDate())} was a rest day. Two a week keep the streak going.`,
+  restKeeps: 'Two rest days a week keep it going.',
+  dots: (kept: number, rest: number) => `The last 14 days: ${kept} with a lap${rest ? `, ${plural(rest, 'rest day', 'rest days')}` : ''}.`,
+
+  bests: 'Your bests',
+  longestDay: 'Longest day',
+  bestWeek: 'Best week',
+  on: shortDate,
+  from: (monday: string) => `from ${shortDate(monday)}`,
+
+  since: 'Since your first lap',
+  ofFocus: (n: number) => `of focus, ${plural(n, 'lap', 'laps')}`,
+  keptOf: (kept: number, of: number) => `${kept} of ${of}`,
+  daysKept: 'days with at least one lap',
+  steadiest: (weekday: number) => `${WEEKDAYS[(weekday + 1) % 7]}s`,
+  steadiestNote: (kept: number, of: number) => `${kept} of ${of} with a lap, your steadiest day`,
+  year: 'The days since your first lap. Arrow keys choose a day.',
+  rowNames: WEEKDAYS_SHORT,
+  month: (month: number) => MONTHS_SHORT[month]!,
+  cell: (day: string, ms: number, n: number, rest: boolean) =>
+    `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}: ${n > 0 || ms >= MIN ? `${total(ms)}, ${plural(n, 'lap', 'laps')}` : rest ? 'a rest day' : 'nothing ran'}`,
+  key: ['none', '1 to 3 laps', '4 to 6', '7 or 8', '9 or more'],
+  keyRest: 'rest day',
+  firstSquare: 'One square so far. Every day with a lap adds the next.',
+  noYear: 'The year starts with your first lap: one square a day, darker the more laps it held.',
+
+  projects: 'Last 7 days by project',
+  noProject: 'No project',
+  shareLine: (n: number, now: number, before: number) => {
+    const diff = mins(now) - mins(before);
+    const change = before < MIN ? 'none the week before' : diff === 0 ? 'same as the week before' : `${diff > 0 ? 'up' : 'down'} ${total(Math.abs(diff) * MIN)} on the week before`;
+    return `${plural(n, 'lap', 'laps')}, ${change}`;
+  },
+  before: 'the 7 days before',
+  noProjects: 'No lap in these 7 days was on a task with a project. Give a task a project on Today and its time shows here.',
+
+  estimates: 'Estimates',
+  ratio: (ratio: number) => `A task takes about ${ratio.toFixed(1)} laps for each one you guess.`,
+  noEstimates: 'No guess to check yet. Give a task an estimate, finish it, and this says how close the guess was.',
+
+  dayTitle: (day: string, today: string) => (day === today ? 'Today, hour by hour' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, hour by hour`),
+  toToday: 'Back to today',
+  lap: 'Lap',
+  stopped: 'Stopped lap',
+  aside: 'Lap set aside',
+  shortBreak: 'Short break',
+  longBreak: 'Long break',
+  span: (start: number, end: number) => `${wall(start)} to ${wall(end)}`,
+  ran: (ms: number) => (ms < MIN ? 'under a minute' : length(ms)),
+  twoDevices: 'ran on two devices',
+  setAside: 'Set aside',
+  countAgain: 'Count again',
+  ranAside: (ms: number) => `${ms < MIN ? 'under a minute' : length(ms)}, counted nowhere`,
+  forLap: (words: string, start: number) => `${words}, the lap at ${wall(start)}`,
+  asideDone: (start: number) => `Set aside: the lap at ${wall(start)}. It counts nowhere.`,
+  dayEmpty: (isToday: boolean) => (isToday ? 'Nothing has run today yet. The first lap starts on Focus.' : 'Nothing ran on this day.'),
+
+  lookBack: 'Looking back on today',
+  lookTotals: (ms: number, n: number) => (n === 0 && ms < MIN ? 'No lap has rung today yet.' : `${cap(length(ms))} of focus in ${plural(n, 'lap', 'laps')}.`),
+  lookDone: 'Done today',
+  note: 'One line about today',
+  noteHint: 'what went well, or what got in the way',
+  noteLeft: (n: number) => plural(n, 'character left', 'characters left'),
 };

@@ -5,12 +5,17 @@ import './tokens.css';
 import './base.css';
 import type { Engine } from '../sync/engine.ts';
 import type { Focus } from '../sync/focus.ts';
+import type { Habits } from '../sync/habits.ts';
+import type { Progress } from '../sync/progress.ts';
+import type { Rooms } from '../sync/rooms.ts';
+import type { Settings as SettingsData } from '../sync/settings.ts';
 import type { Today } from '../sync/today.ts';
 import css from './app.module.css';
 import { Settings } from './settings.tsx';
 import { DESTINATIONS, Shell } from './shell.tsx';
 import type { Destination } from './shell.tsx';
 import { FocusScreen } from './focus/focus.tsx';
+import { ProgressScreen } from './progress/progress.tsx';
 import { SignIn } from './signin.tsx';
 import { TodayScreen } from './today/today.tsx';
 import * as s from './strings.ts';
@@ -43,7 +48,18 @@ export function Elsewhere() {
   return <Notice text={s.elsewhere} />;
 }
 
-export function App({ engine, focus, today }: { engine: Engine; focus: Focus; today: Today }) {
+/** Everything `startApp` returns. The last three are for screens not built yet: taken, so the wiring is done once. */
+interface Props {
+  engine: Engine;
+  focus: Focus;
+  today: Today;
+  progress: Progress;
+  habits?: Habits;
+  rooms?: Rooms;
+  settings?: SettingsData;
+}
+
+export function App({ engine, focus, today, progress }: Props) {
   const screen = useScreen();
   const account = engine.account.value;
   const sync = engine.sync.value;
@@ -69,6 +85,8 @@ export function App({ engine, focus, today }: { engine: Engine; focus: Focus; to
         <FocusScreen engine={engine} focus={focus} today={today} />
       ) : screen === 'today' ? (
         <TodayScreen engine={engine} focus={focus} today={today} />
+      ) : screen === 'progress' ? (
+        <ProgressScreen focus={focus} progress={progress} />
       ) : screen === 'settings' ? (
         <Settings engine={engine} onSignIn={() => setAgain(true)} />
       ) : (

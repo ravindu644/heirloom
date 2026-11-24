@@ -1,0 +1,34 @@
+/* DESIGN.md's heat cell: a 12px square with 2px between. Each square is drawn inside a 14px box,
+   a pixel in from every side, so the boxes touch and the grid has no loose gaps of its own. */
+.heat, .key { --box: calc(var(--space-md) - var(--space-xs) / 2); }
+.heat { display: flex; gap: var(--space-sm); min-width: 0; cursor: pointer; }
+
+/* Mon, Wed, Fri, Sun beside their rows, under the line of month names. */
+.rows { display: grid; flex: none; grid-template-rows: repeat(7, var(--box)); margin-top: calc(var(--space-md) + var(--space-xs)); font: var(--type-label); color: var(--muted); }
+/* Each name fills its row and the unnamed one under it, and sits level with the first. */
+.rows span { position: relative; top: calc((var(--box) - 1lh) / 2); }
+
+/* Wider than its place, the grid opens on its newest weeks and scrolls to the older ones: it is
+   laid from the right, and when it fits, the free space is pushed to its right so it starts on
+   the panel's left edge. */
+.window { display: flex; flex: 1; flex-direction: row-reverse; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.weeks { display: grid; flex: none; gap: var(--space-xs); margin-right: auto; }
+.months { display: grid; grid-auto-columns: var(--box); grid-auto-flow: column; height: var(--space-md); font: var(--type-label); color: var(--muted); }
+.months span { grid-row: 1; white-space: nowrap; }
+.cells { display: grid; grid-auto-columns: var(--box); grid-auto-flow: column; grid-template-rows: repeat(7, var(--box)); }
+.cells i, .key i { position: relative; box-sizing: border-box; width: var(--box); height: var(--box); padding: 1px; background-clip: content-box; }
+
+/* Zero is the empty track; then you, mixed into the surface, getting darker. */
+.level0 { background-color: var(--track, var(--line)); }
+.level1 { background-color: var(--heat-1); }
+.level2 { background-color: var(--heat-2); }
+.level3 { background-color: var(--heat-3); }
+.level4 { background-color: var(--you); }
+/* A rest day carries the rest mark: the hollow ring, inside the square. */
+.rest::after { content: ""; position: absolute; inset: calc(var(--space-xs) - 1px); border: 2px solid var(--rest); border-radius: var(--radius-full); }
+/* Today has a line round it; the day chosen a heavier one. */
+.today { box-shadow: inset 0 0 0 1px var(--ink); }
+.chosen { outline: 2px solid var(--ink); }
+
+.key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); font: var(--type-label); color: var(--muted); }
+.key span { display: inline-flex; align-items: center; gap: var(--space-xs); }

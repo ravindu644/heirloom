@@ -1,0 +1,23 @@
+/* Room at the left for the hours, at the right for half of Sunday's name, and on top for last
+   week's total, which stands over the end of its line. */
+.chart { padding: var(--space-lg) var(--space-md) 0 calc(var(--space-lg) + var(--space-sm)); }
+.plot { position: relative; height: calc(var(--layout-touch) * 4); }
+.plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; }
+.plot polyline { stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.you { stroke: var(--you); }
+/* Past you: dashed, no hue. */
+.ghost { stroke: var(--ghost); stroke-dasharray: var(--space-xs) var(--space-xs); }
+
+/* Light lines at each step of the scale, with the hours beside them. */
+.grid { position: absolute; right: 0; left: 0; height: 1px; background: var(--line); }
+.grid span { position: absolute; right: calc(100% + var(--space-sm)); transform: translateY(-50%); font: var(--type-label); color: var(--muted); }
+
+.dot { position: absolute; width: var(--space-sm); height: var(--space-sm); border-radius: var(--radius-full); background: var(--you); transform: translate(-50%, -50%); }
+.yourTotal, .ghostTotal { position: absolute; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); white-space: nowrap; }
+.yourTotal { margin: var(--space-sm) 0 0 var(--space-sm); color: var(--you); }
+.before { margin-left: calc(var(--space-sm) * -1); transform: translateX(-100%); }
+.ghostTotal { right: 0; margin-top: calc(var(--space-xs) * -1); color: var(--muted); transform: translateY(-100%); }
+
+.days { position: relative; height: calc(1lh + var(--space-sm)); font: var(--type-label); color: var(--muted); }
+.days span { position: absolute; top: var(--space-sm); transform: translateX(-50%); }
+.days .today { color: var(--ink); }

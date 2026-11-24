@@ -11,7 +11,7 @@ const root = document.getElementById('app')!;
 async function start() {
   // The phone app is another origin, built knowing its server. In a browser the server is the page's own.
   const app = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
-  const { engine, focus, today } = app;
+  const { engine, focus, settings } = app;
   // The phone's WebView says it is visible right through screen off, so the browser's own
   // "visible again" never fires there. The platform knows when the app is really in front again:
   // reconnect then, and let everything that depends on the day look at the clock.
@@ -20,7 +20,37 @@ async function start() {
     for (const part of [app.today, app.progress, app.habits]) part.wake();
   });
   // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
-  const notifier = await startPlatform({ ring: ring.bellChannel, countdown: ring.countdownChannel });
+  // In a browser it also asks the server to push at a bell, for a tab that is closed or out of
+  // sight, with the words to say: the server holds no copy of its own (protocol.md section 17).
+  const laps = [1, 2, 3, 4];
+  const breaks = focus.lengths.peek();
+  const notifier = await startPlatform(
+    { ring: ring.bellChannel, countdown: ring.countdownChannel, remind: ring.remindChannel },
+    {
+      request: (path, body) => engine.request(path, body),
+      remembered: () => engine.kept('push'),
+      remember: (sent) => engine.keep('push', sent),
+      words: {
+        lap: laps.map(ring.lapDone),
+        take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
+        next: laps.map(ring.lapNext),
+        break: ring.breakOver,
+      },
+    },
+  );
+  // "Ring here" is this device's own switch; and the notifier is told who is signed in, so a
+  // sign out stops this browser being pushed to.
+  effect(() => notifier.ringHere(settings.ringHere.value));
+  effect(() => notifier.account(engine.account.value ? 'in' : 'out'));
+  // A habit with a reminder time is reminded on this device on the days it is planned, until it
+  // is checked in. The notifier keeps what the phone holds equal to this list.
+  effect(() =>
+    notifier.reminders(
+      app.habits.list.value
+        .filter((habit) => habit.remind)
+        .map((habit) => ({ habit: habit.id, title: habit.title, body: ring.remindBody, time: habit.remind!, days: habit.days, doneToday: habit.today.done })),
+    ),
+  );
 
   // The ring is planned whenever the timer changes, on any device. The timer counts in server
   // time and the notifier in this device's own, so the end is moved across by the difference.
@@ -33,11 +63,14 @@ async function start() {
     const view = focus.view();
     if (state.phase === 'idle' || view.ends_at === null) return notifier.plan(null);
     const at = view.ends_at - (engine.now() - Date.now());
+    // The server names a bell by its run and its end in server time; the same pair lets the page
+    // know a push it hears of is for the bell it has planned.
+    const push = state.run === null ? undefined : { run: state.run, at: view.ends_at };
     const lap = state.set_index + 1;
     notifier.plan(
       state.phase === 'work'
-        ? { at, title: ring.lapDone(lap), body: result.take(lap === 4 ? lengths.long_ms : lengths.short_ms), during: ring.lapRunning(lap) }
-        : { at, title: ring.breakOver, body: ring.lapNext(view.next.set_index + 1), during: ring.breakRunning(state.phase === 'long') },
+        ? { at, title: ring.lapDone(lap), body: result.take(lap === 4 ? lengths.long_ms : lengths.short_ms), during: ring.lapRunning(lap), push }
+        : { at, title: ring.breakOver, body: ring.lapNext(view.next.set_index + 1), during: ring.breakRunning(state.phase === 'long'), push },
     );
   });
 
@@ -49,7 +82,7 @@ async function start() {
     skipBreak: (task) => (void notifier.allow(), focus.skipBreak(task)),
   };
 
-  render(<App engine={engine} focus={asking} today={today} />, root);
+  render(<App {...app} focus={asking} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

@@ -2,7 +2,7 @@ import type { ComponentChildren } from 'preact';
 import type { TaskView } from '../../sync/today.ts';
 import { Check } from './check.tsx';
 import { cx } from './cx.ts';
-import { LapSquares } from './lap-squares.tsx';
+import { Laps } from './laps.tsx';
 import css from './task-row.module.css';
 
 interface Props {
@@ -27,15 +27,7 @@ interface Props {
 export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDone, onOpen }: Props) {
   // The laps as squares, with the count they picture. They sit at the row's right, apart from the
   // project's square: side by side the two would read as one more lap.
-  const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && (
-    <span class={css.laps}>
-      <LapSquares squares={task.squares} estimate={task.estimate} />
-      <span class={css.count}>
-        <b>{task.laps}</b>
-        {of}
-      </span>
-    </span>
-  );
+  const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />;
   const words = (
     <>
       <span class={css.title}>{task.title}</span>
@@ -50,7 +42,7 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
           )}
           {note && <span>{note}</span>}
           {/* A button at the row's end takes the laps' place; they move here, to the far side of the line. */}
-          {end && laps}
+          {end && laps && <span class={css.far}>{laps}</span>}
         </span>
       )}
     </>

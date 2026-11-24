@@ -8,6 +8,7 @@ import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
+import { useTyped } from '../kit/typed.ts';
 import * as s from '../strings.ts';
 import css from './task-sheet.module.css';
 
@@ -15,23 +16,6 @@ const COLORS: ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
 // PRODUCT: over this many laps a task wants breaking down.
 const NUDGE_OVER = 7;
 const ESTIMATE_MAX = 99;
-
-/**
- * A text that is saved as it is typed. While the field has the focus it shows what the person
- * typed and never what was stored: the stored text is trimmed, and pushed back into the field it
- * would eat the space just typed. Leaving the field shows the stored text again.
- */
-function useTyped(stored: string, save: (text: string) => void) {
-  const [typed, setTyped] = useState<string | null>(null);
-  return {
-    value: typed ?? stored,
-    onInput: (event: { currentTarget: HTMLInputElement }) => {
-      setTyped(event.currentTarget.value);
-      save(event.currentTarget.value);
-    },
-    onBlur: () => setTyped(null),
-  };
-}
 
 function Subtask({ sub, today, onRemove }: { sub: SubtaskView; today: Today; onRemove: () => void }) {
   // An empty title is not saved: the last one that said something stays.

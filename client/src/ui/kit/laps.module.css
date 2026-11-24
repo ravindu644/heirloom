@@ -1,0 +1,4 @@
+.laps { display: inline-flex; flex: none; align-items: center; gap: var(--space-sm); }
+/* Small, so a list never reads as a column of large zeros. */
+.count { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
+.count b { font: inherit; color: var(--ink); }
