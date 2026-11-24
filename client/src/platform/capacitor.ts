@@ -11,16 +11,20 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
+import { isReminderId, upcoming } from './reminders.ts';
+import type { Reminder } from './reminders.ts';
 import { bellOnDemand } from './sound.ts';
 import { createWebNotifier, timer } from './web.ts';
 
 /** The one bell. Planning reuses the id, so a new plan always takes the old one's place. */
 export const RING_ID = 1;
 
-/** The names of the two channels in the phone's notification settings. The words come from the caller. */
+/** The names of the channels in the phone's notification settings. The words come from the caller. */
 export interface Channels {
   ring: string;
   countdown: string;
+  /** Habit reminders. Until it is named, the phone schedules none. */
+  remind?: string;
 }
 
 /** The countdown plugin in android/app (CountdownPlugin.java). */
@@ -31,7 +35,7 @@ export interface Countdown {
 
 export type Alarms = Pick<
   LocalNotificationsPlugin,
-  'createChannel' | 'schedule' | 'cancel' | 'checkPermissions' | 'requestPermissions' | 'checkExactNotificationSetting'
+  'createChannel' | 'schedule' | 'cancel' | 'getPending' | 'checkPermissions' | 'requestPermissions' | 'checkExactNotificationSetting'
 >;
 
 export interface PhoneEnv {
@@ -67,6 +71,8 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     // makes its sound; the countdown is low so it never makes one.
     alarms.createChannel({ id: 'ring', name: channels.ring, importance: 4, visibility: 1, vibration: true }),
     alarms.createChannel({ id: 'countdown', name: channels.countdown, importance: 2, visibility: 1, vibration: false }),
+    // Between the two: the default sound, no heads-up over whatever the person is doing.
+    channels.remind && alarms.createChannel({ id: 'remind', name: channels.remind, importance: 3, visibility: 1, vibration: true }),
   ]).catch(warn);
   const run = (step: () => Promise<unknown>) => {
     queue = queue.then(step).catch(warn);
@@ -116,8 +122,48 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
       const planned = pending();
       if (JSON.stringify(planned) !== live) await apply(planned);
     });
-  // Permission may have been given in Android's settings while the person was away.
-  onResume(fill);
+  // Habit reminders: one-shots for the next fourteen days, rebuilt on every change and every time
+  // the app is in front, so today's is left out once the habit is done. Not exact alarms: a few
+  // minutes late is fine for a reminder, and the bell keeps the exact allowance (Android 12 and
+  // later hold an inexact one-shot to at most an hour past its time; in practice, minutes).
+  let habits: Reminder[] = [];
+  const remind = () =>
+    run(async () => {
+      const ok = here && !!channels.remind && (await alarms.checkPermissions()).display === 'granted';
+      const want = ok ? upcoming(habits, now()) : [];
+      // What Android holds, read back each time: a reminder from an earlier life of the app, or one
+      // whose habit is gone, is found by its id range and cancelled. Fired ones stay in the
+      // plugin's list; their time is past, so they are not ours to keep.
+      const held = new Map<number, string>();
+      for (const n of (await alarms.getPending()).notifications) {
+        const sig = (n.extra as { sig?: unknown } | undefined)?.sig;
+        if (isReminderId(n.id) && typeof sig === 'string' && JSON.parse(sig)[1] > now()) held.set(n.id, sig);
+      }
+      const keep = new Set(want.filter((d) => held.get(d.id) === d.sig).map((d) => d.id));
+      const stale = [...held.keys()].filter((id) => !keep.has(id));
+      const fresh = want.filter((d) => !keep.has(d.id));
+      if (stale.length) await alarms.cancel({ notifications: stale.map((id) => ({ id })) });
+      if (fresh.length)
+        await alarms.schedule({
+          notifications: fresh.map((d) => ({
+            id: d.id,
+            title: d.title,
+            body: d.body,
+            channelId: 'remind',
+            autoCancel: true,
+            isExactNotification: false,
+            extra: { sig: d.sig },
+            schedule: { at: new Date(d.at), allowWhileIdle: true },
+          })),
+        });
+    });
+
+  // Permission may have been given in Android's settings while the person was away; and days
+  // further on come into the reminders' fourteen.
+  onResume(() => {
+    fill();
+    remind();
+  });
 
   const settle = () => {
     const planned = pending();
@@ -135,6 +181,11 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     ringHere(on) {
       here = on;
       settle();
+      remind();
+    },
+    reminders(set) {
+      habits = set;
+      remind();
     },
     // The phone's own alarm needs nothing from the account; a sign out stops the timer, which plans null.
     account() {},
@@ -145,7 +196,10 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
         (await alarms.checkExactNotificationSetting()).exact_alarm === 'granted')().catch((error) => (warn(error), false));
       // The start that asked also planned its bell, likely while the prompt was up and nothing
       // could be scheduled.
-      if (ok) fill();
+      if (ok) {
+        fill();
+        remind();
+      }
       return ok;
     },
   };

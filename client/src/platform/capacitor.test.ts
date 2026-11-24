@@ -11,7 +11,7 @@ import { createWebNotifier } from './web.ts';
 const MIN = 60_000;
 type Grant = 'granted' | 'denied' | 'prompt';
 
-function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0, hidden = false } = {}) {
+function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0, hidden = false, remind = undefined as string | undefined } = {}) {
   const time = fakeTime();
   // The page: the browser's own notifier on the same fake clock, its bell heard only in view.
   const app = { hidden, resume: [] as (() => void)[] };
@@ -28,6 +28,8 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
   const shown: any[] = [];
   const warned: unknown[] = [];
   const state = { display, exact };
+  // What the plugin holds, by id, as getPending gives it back.
+  const held = new Map<number, any>();
   const alarms = {
     async createChannel(channel: any) {
       calls.push(`channel ${channel.id} ${channel.importance}`);
@@ -36,10 +38,15 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
       calls.push('schedule');
       if (failures-- > 0) throw new Error('bridge gone');
       scheduled.push(...options.notifications);
+      for (const n of options.notifications) held.set(n.id, n);
       return { notifications: [] };
     },
-    async cancel() {
+    async cancel(options: any) {
       calls.push('cancel');
+      for (const n of options.notifications) held.delete(n.id);
+    },
+    async getPending() {
+      return { notifications: [...held.values()] };
     },
     async checkPermissions() {
       return { display: state.display };
@@ -67,7 +74,7 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     alarms,
     countdown,
     now: time.now,
-    channels: { ring: 'Bell', countdown: 'Time left' },
+    channels: { ring: 'Bell', countdown: 'Time left', remind },
     warn: (error) => warned.push(error),
     page,
     onResume: (run) => app.resume.push(run),
@@ -77,7 +84,7 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
   const done = async () => {
     for (let i = 0; i < 20; i++) await settle();
   };
-  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume };
+  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume, held };
 }
 
 describe('the phone notifier', () => {
@@ -277,6 +284,104 @@ describe('ring here, on the phone', () => {
     await done();
     time.advance(60 * MIN);
     assert.deepEqual(pageRings, []);
+  });
+});
+
+describe('habit reminders, on the phone', () => {
+  // T0 is Tuesday 24 November 2026, 10:00 in Colombo (the zone these tests run in).
+  process.env.TZ = 'Asia/Colombo';
+  const DAILY = 0b1111111;
+  const habit = (id: string, time: string, days = DAILY, doneToday = false) => ({ habit: id, title: `${id}?`, body: 'Five minutes is enough.', time, days, doneToday });
+  const reminders = (held: Map<number, any>) =>
+    [...held.values()].filter((n) => n.id >= 100_000).map((n) => [new Date(n.schedule.at).toString().slice(0, 21), n.title]).sort();
+
+  it('schedules each planned day of the next fourteen, on their own quiet-but-audible channel, not as exact alarms', async () => {
+    const { notifier, done, held, calls } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '18:00'), habit('read', '07:30', 0b0000001)]);
+    await done();
+    assert.ok(calls.includes('channel remind 3'));
+    const got = reminders(held);
+    // walk: today 18:00 and the 13 days after; read: Mondays only, 30 November and 7 December.
+    assert.equal(got.filter(([, t]) => t === 'walk?').length, 14);
+    assert.deepEqual(got.filter(([, t]) => t === 'read?').map(([at]) => at), ['Mon Dec 07 2026 07:30', 'Mon Nov 30 2026 07:30']);
+    for (const n of [...held.values()].filter((n) => n.id >= 100_000)) {
+      assert.equal(n.channelId, 'remind');
+      assert.equal(n.isExactNotification, false);
+      assert.equal(n.schedule.allowWhileIdle, true);
+    }
+  });
+
+  it('today is left out once the habit is done, and kept while it is not', async () => {
+    const { notifier, done, held, calls } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '18:00')]);
+    await done();
+    assert.ok(reminders(held).some(([at]) => at === 'Tue Nov 24 2026 18:00'));
+    const before = calls.length;
+    notifier.reminders([habit('walk', '18:00', DAILY, true)]);
+    await done();
+    assert.ok(!reminders(held).some(([at]) => at === 'Tue Nov 24 2026 18:00'));
+    assert.equal(reminders(held).length, 13);
+    // Only today's was touched: one cancel, nothing scheduled again.
+    assert.deepEqual(calls.slice(before), ['cancel']);
+  });
+
+  it('the set is applied exactly: a habit gone loses its reminders, a changed time moves them', async () => {
+    const { notifier, done, held } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '18:00'), habit('read', '07:30')]);
+    await done();
+    notifier.reminders([habit('walk', '19:15')]);
+    await done();
+    const got = reminders(held);
+    assert.equal(got.length, 14);
+    assert.ok(got.every(([at, title]) => title === 'walk?' && at.endsWith('19:15')));
+  });
+
+  it('the same set twice cancels and schedules nothing the second time', async () => {
+    const { notifier, done, calls } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '18:00'), habit('read', '07:30')]);
+    await done();
+    const before = calls.length;
+    notifier.reminders([habit('walk', '18:00'), habit('read', '07:30')]);
+    await done();
+    assert.deepEqual(calls.slice(before), []);
+  });
+
+  it('ring here off, or no permission, or no channel named: none are held', async () => {
+    const off = rig({ remind: 'Habits' });
+    off.notifier.reminders([habit('walk', '18:00')]);
+    await off.done();
+    off.notifier.ringHere(false);
+    await off.done();
+    assert.deepEqual(reminders(off.held), []);
+
+    for (const options of [{ remind: 'Habits', display: 'denied' as Grant }, { remind: 'Habits', display: 'prompt' as Grant }, {}]) {
+      const { notifier, done, held, calls } = rig(options);
+      notifier.reminders([habit('walk', '18:00')]);
+      await done();
+      assert.deepEqual(reminders(held), []);
+      assert.ok(!calls.includes('ask'));
+    }
+  });
+
+  it('coming to the front rebuilds: the window moves on with the days', async () => {
+    const { time, notifier, done, held, resume } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '18:00')]);
+    await done();
+    time.jump(3 * 24 * 60 * MIN);
+    resume();
+    await done();
+    const future = [...held.values()].filter((n) => n.id >= 100_000 && new Date(n.schedule.at).getTime() > time.now());
+    assert.equal(future.length, 14);
+    assert.ok(reminders(held).some(([at]) => at === 'Thu Dec 10 2026 18:00'));
+  });
+
+  it('ten habits planned every day fit, far under the 500 alarms Android allows an app', async () => {
+    const { notifier, done, held } = rig({ remind: 'Habits' });
+    notifier.reminders(Array.from({ length: 10 }, (_, i) => habit(`habit${i}`, `0${i}:30`)));
+    await done();
+    // Every time is before 10:00, so today's have passed: thirteen days each.
+    assert.equal(reminders(held).length, 10 * 13);
+    assert.equal(new Set([...held.keys()]).size, held.size);
   });
 });
 

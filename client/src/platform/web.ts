@@ -21,11 +21,15 @@
 import { MOMENT_MS } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
 import { createPush } from './push.ts';
+import { upcoming } from './reminders.ts';
+import type { Reminder } from './reminders.ts';
 import type { PushEnv } from './push.ts';
 import { createBell } from './sound.ts';
 import type { Bell } from './sound.ts';
 /** A ring this late is still worth hearing: past it, the person has moved on. Covers the throttle. */
 export const LATE_MS = 2 * 60_000;
+/** A habit reminder this late is still worth showing. */
+export const REMIND_LATE_MS = 60 * 60_000;
 
 /** The parts of `Notification` used here, so a test can hand in its own. */
 export interface NotificationApi {
@@ -98,7 +102,6 @@ export function createWebNotifier(env: WebEnv): Notifier {
     if (planned) cancel = env.schedule(() => look() || arm(), planned.at - env.now());
   };
 
-  env.onShow(() => look() || arm());
 
   env.push?.onMessage((m) => {
     const p = planned?.push;
@@ -113,6 +116,35 @@ export function createWebNotifier(env: WebEnv): Notifier {
 
   // At start: the browser may hand out a different subscription, or the words may have changed.
   subscribe();
+
+  // Habit reminders. A page cannot schedule a notification for when it is closed, so this is the
+  // honest minimum: while a tab is open, a notification at the reminder's time, if permitted and
+  // the habit is not done. A closed tab reminds of nothing.
+  let habits: Reminder[] = [];
+  // Reminders due after this and up to now have been looked at.
+  let since = env.now();
+  let stopReminding = () => {};
+  const remind = () => {
+    stopReminding();
+    const now = env.now();
+    const ok = here && granted();
+    // A throttled or sleeping tab may look long after: an hour late is still a reminder, more is not.
+    for (const d of ok ? upcoming(habits, since, 2) : []) {
+      if (d.at > now) break;
+      if (now - d.at > REMIND_LATE_MS) continue;
+      try {
+        new env.Notification!(d.title, { body: d.body, tag: `heirloom-remind-${d.id}` });
+      } catch {}
+    }
+    since = now;
+    const [next] = ok ? upcoming(habits, now, 2, 1) : [];
+    // A timer that fires early finds nothing due yet and is set again.
+    stopReminding = next ? env.schedule(remind, next.at - now) : () => {};
+  };
+  env.onShow(() => {
+    if (!look()) arm();
+    remind();
+  });
 
   const plan = (next: Ring | null) => {
     // A due ring that the throttle held back still rings before it is replaced.
@@ -137,9 +169,14 @@ export function createWebNotifier(env: WebEnv): Notifier {
       if (ok) subscribe();
       return ok;
     },
+    reminders(set) {
+      habits = set;
+      remind();
+    },
     ringHere(on) {
       if (on === here) return;
       here = on;
+      remind();
       if (on) {
         plan(wanted);
         subscribe();

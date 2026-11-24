@@ -1,6 +1,8 @@
 // The one way the app rings. The browser and the phone each implement it; screens never reach
 // past it to a plugin, so "ring here" and the phone's exact alarm stay in one place.
 
+import type { Reminder } from './reminders.ts';
+
 /** What to ring and when. `at` is this device's own clock, in ms. The words come from the caller. */
 export interface Ring {
   at: number;
@@ -26,4 +28,6 @@ export interface Notifier {
   ringHere(on: boolean): void;
   /** The account changed: `in` after a sign in, `out` at sign out. */
   account(change: 'in' | 'out'): void;
+  /** Every habit reminder wanted, whole: what this device holds is made to match it and nothing else. */
+  reminders(set: Reminder[]): void;
 }

@@ -296,3 +296,48 @@ describe('in front again, in the browser', () => {
   });
 });
 
+describe('habit reminders, in an open tab', () => {
+  process.env.TZ = 'Asia/Colombo';
+  // T0 is 10:00 in Colombo.
+  const habit = (id: string, time: string, doneToday = false) => ({ habit: id, title: `${id}?`, body: 'b', time, days: 0b1111111, doneToday });
+
+  it('shows each one due at its time, two at once included, and nothing more', () => {
+    const { time, shown, notifier } = rig({ hidden: true });
+    notifier.reminders([habit('walk', '10:30'), habit('read', '10:30'), habit('stretch', '11:00', true)]);
+    time.advance(30 * MIN - 1);
+    assert.equal(shown.length, 0);
+    time.advance(1);
+    assert.deepEqual(shown.map((n) => n.title).sort(), ['read?', 'walk?']);
+    time.advance(60 * MIN);
+    assert.equal(shown.length, 2);
+  });
+
+  it('shows nothing without permission, or with ring here off', () => {
+    for (const setup of [{ permission: 'denied' as const }, { permission: 'default' as const }]) {
+      const { time, shown, notifier } = rig({ hidden: true, ...setup });
+      notifier.reminders([habit('walk', '10:30')]);
+      time.advance(60 * MIN);
+      assert.deepEqual(shown, []);
+    }
+    const { time, shown, notifier } = rig({ hidden: true });
+    notifier.reminders([habit('walk', '10:30')]);
+    notifier.ringHere(false);
+    time.advance(60 * MIN);
+    assert.deepEqual(shown, []);
+  });
+
+  it('a throttled tab that looks half an hour late still shows it; two hours late, not', () => {
+    const late = rig({ hidden: true });
+    late.notifier.reminders([habit('walk', '10:30')]);
+    late.time.jump(60 * MIN);
+    late.page.show();
+    assert.equal(late.shown.length, 1);
+
+    const later = rig({ hidden: true });
+    later.notifier.reminders([habit('walk', '10:30')]);
+    later.time.jump(150 * MIN);
+    later.page.show();
+    assert.equal(later.shown.length, 0);
+  });
+});
+
