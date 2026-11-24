@@ -1,0 +1,123 @@
+{
+ "version": "alpha",
+ "name": "Tally",
+ "description": "Route A, safe. The tally gate (four strokes, one across) is the pomodoro set, and every count in the app is written in strokes. A quiet, type-led page with one hand-made mark.",
+ "format": {
+  "kind": "app screen",
+  "size": [
+   412,
+   915
+  ],
+  "seen": "a phone propped on a desk next to a laptop, glanced at from 60 to 90 cm for a second at a time",
+  "safe": 0.04
+ },
+ "idea": {
+  "message": "Every pomodoro you finish is a stroke you get to keep.",
+  "sentence": "The tally gate a student scratches on a desk becomes the set of four, and the long break strikes through it.",
+  "method": "borrowed format",
+  "route": "safe"
+ },
+ "method": {
+  "name": "pen strokes on a quiet type-led page",
+  "marks": [
+   "tapered round-ended strokes",
+   "a slight lean and bend per stroke",
+   "pencil grey for strokes not yet earned"
+  ],
+  "allow": []
+ },
+ "limits": {
+  "typefaces": 2,
+  "colors": 17,
+  "words": 120
+ },
+ "colors": {
+  "ground": "#F3F5F7",
+  "surface": "#FFFFFF",
+  "ink": "#18202E",
+  "muted": "#4A5262",
+  "rule": "#D9E0E8",
+  "stroke": "#C2361F",
+  "stroke-tint": "#F6DDD6",
+  "pencil": "#B9C2CD",
+  "on-stroke": "#FFFFFF",
+  "dark-ground": "#121519",
+  "dark-surface": "#1A1E24",
+  "dark-ink": "#E9EDF2",
+  "dark-muted": "#9AA4B1",
+  "dark-rule": "#2A3039",
+  "dark-stroke": "#F0664D",
+  "dark-stroke-tint": "#3A1F1A",
+  "dark-pencil": "#4A5260"
+ },
+ "typography": {
+  "clock": {
+   "fontFamily": "Literata",
+   "fontSize": "132px",
+   "fontWeight": 600,
+   "lineHeight": 1,
+   "letterSpacing": "-0.03em",
+   "fontFeature": "\"tnum\" 1, \"lnum\" 1"
+  },
+  "heading": {
+   "fontFamily": "Literata",
+   "fontSize": "30px",
+   "fontWeight": 600,
+   "lineHeight": 1.15,
+   "letterSpacing": "-0.015em"
+  },
+  "body": {
+   "fontFamily": "Schibsted Grotesk",
+   "fontSize": "16px",
+   "fontWeight": 400,
+   "lineHeight": 1.5
+  },
+  "label": {
+   "fontFamily": "Schibsted Grotesk",
+   "fontSize": "13px",
+   "fontWeight": 500,
+   "lineHeight": 1.3
+  }
+ },
+ "rounded": {
+  "sm": "6px",
+  "md": "10px",
+  "full": "999px"
+ },
+ "spacing": {
+  "xs": "4px",
+  "sm": "8px",
+  "md": "16px",
+  "lg": "24px",
+  "xl": "48px"
+ },
+ "components": {
+  "button-primary": {
+   "backgroundColor": "#18202E",
+   "textColor": "#FFFFFF",
+   "rounded": "999px",
+   "height": "48px",
+   "padding": "0 22px"
+  },
+  "button-secondary": {
+   "backgroundColor": "#FFFFFF",
+   "textColor": "#18202E",
+   "rounded": "999px",
+   "height": "48px"
+  },
+  "task-row": {
+   "backgroundColor": "#FFFFFF",
+   "textColor": "#18202E",
+   "rounded": "6px",
+   "padding": "14px 0"
+  },
+  "tally-done": {
+   "backgroundColor": "#FFFFFF",
+   "textColor": "#C2361F"
+  },
+  "tally-planned": {
+   "backgroundColor": "#FFFFFF",
+   "textColor": "#4A5262"
+  }
+ }
+}

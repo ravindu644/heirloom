@@ -1,0 +1,32 @@
+# machine-specific details: addresses, logins, adb serials
+.local/*
+!.local/ENV.example.md
+
+# build output
+node_modules/
+dist/
+client/dist/
+server/bin/
+android/app/build/
+android/.gradle/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# generated from DESIGN.md
+client/src/ui/tokens.css
+
+# test output
+test-results/
+playwright-report/
+reviews/*/shots/
+
+# secrets
+.env
+.env.*
+
+# other people's work, kept locally for re-checking, never committed
+design/refs/*
+!design/refs/README.md
+docs/research/pages/

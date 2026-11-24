@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../route.css">
+<script src="../../../shared/data.js"></script><script src="../../../shared/shell.js"></script><script src="../c.js"></script>
+<title>Progress</title>
+<style>
+  .f { max-width: 1120px; }
+  .lead { font: 800 34px/1.1 var(--font-heading); letter-spacing: -0.02em; margin-top: 8px; max-width: 20em; }
+  .grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; margin-top: 22px; }
+  .card { background: var(--paper); border-radius: 12px; padding: 20px; }
+  .card h2 { font: 700 16px var(--font-heading); display: flex; justify-content: space-between; }
+  .card h2 small { font: 400 13px var(--font-body); color: var(--muted); }
+  .heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 30px); grid-auto-columns: 30px; gap: 4px; margin-top: 14px; }
+  .heat i { border-radius: 50%; border: 1.5px solid var(--muted); display: block; }
+  .heat i[class^=s], .heat i.none { border: 0; }
+  .hr { display: flex; gap: 40px; align-items: flex-start; }
+  .tot { padding-top: 18px; display: grid; gap: 16px; }
+  .tot b { font: 800 30px var(--font-heading); display: block; }
+  .tot span { font-size: 14px; color: var(--muted); }
+  @media (max-width: 999px) { .tot { display: none; } }
+  .heat i.s1 { background: var(--stage-green); } .heat i.s2 { background: var(--stage-breaker); } .heat i.s3 { background: var(--stage-turning); } .heat i.s4 { background: var(--stage-red); }
+  .heat i.none { background: none; }
+  .heat i.today { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .stages { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .stages span { display: inline-flex; align-items: center; gap: 6px; }
+  .stages i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; align-items: end; height: 150px; margin-top: 16px; }
+  .wk div { display: flex; gap: 3px; align-items: flex-end; height: 100%; position: relative; }
+  .wk b { flex: 1; background: var(--ripe); }
+  .wk u { flex: 1; border: 2px solid var(--unripe); border-bottom: 0; }
+  .wkl { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; font: 700 12px var(--font-label); color: var(--muted); margin-top: 6px; text-align: center; }
+  .key { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+  .key i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
+  .big { font: 800 56px/1 var(--font-heading); letter-spacing: -0.03em; }
+  .pr { display: grid; grid-template-columns: 70px 1fr 68px; gap: 10px; align-items: center; padding: 7px 0; }
+  .pr .bar { height: 14px; border-radius: 999px; background: var(--ground); overflow: hidden; }
+  .pr .bar b { display: block; height: 100%; background: var(--ripe); border-radius: 999px; }
+  .pr .v { text-align: right; font: 800 16px var(--font-heading); font-variant-numeric: tabular-nums; }
+  @media (max-width: 999px) { .grid { grid-template-columns: 1fr; gap: 10px; margin-top: 14px; } .lead { font-size: 26px; } .heat { grid-template-rows: repeat(7, 20px); grid-auto-columns: 20px; } .card { padding: 16px; } .wk { height: 110px; } }
+</style></head>
+<body><script>
+const st = m => m == null ? 'none' : m === 0 ? '' : m <= 75 ? 's1' : m <= 150 ? 's2' : m <= 200 ? 's3' : 's4';
+const tw = D.thisWeek.map(d => d.min), lw = D.lastWeek.map(d => d.min);
+const H = 300;
+shell({ active: 'Progress', name: C.name, mark: C.mark(), main: `
+<div class="f">
+  <h1>Progress</h1>
+  <p class="lead">37 ripe in the last seven days. Two more than the seven before.</p>
+  <div class="grid">
+    <div class="card"><h2>Since your first one <small>14 September</small></h2>
+      <div class="hr"><div class="heat">${D.days.slice(7).map(d => `<i class="${st(d.min)}${d.isToday ? ' today' : ''}"></i>`).join('')}</div>
+      <div class="tot"><div><b>383</b><span>ripe since September</span></div><div><b>61 of 72</b><span>days with at least one</span></div><div><b>Sundays</b><span>never missed one</span></div></div></div>
+      <div class="stages"><span><i style="border:1.5px solid var(--muted)"></i>none</span><span><i style="background:var(--stage-green)"></i>green, 1 to 3</span><span><i style="background:var(--stage-breaker)"></i>breaker, 4 to 6</span><span><i style="background:var(--stage-turning)"></i>turning, 7 or 8</span><span><i style="background:var(--stage-red)"></i>red, 9 or more</span></div>
+    </div>
+    <div class="card"><h2>Streak</h2>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:10px"><span class="big">13</span><span class="sub">days</span></div>
+      <p style="margin-top:8px">Thursday the 19th was a rest day. One a week does not break it.</p>
+      <h2 style="margin-top:22px">Last seven days <small>15h 25m</small></h2>
+      <div style="margin-top:8px">${D.split.map(s => `<div class="pr"><span style="font-weight:700">${C.proj(s.project)}</span><div class="bar"><b style="width:${s.min / 375 * 100}%"></b></div><span class="v">${D.fmt(s.min)}</span></div>`).join('')}</div>
+    </div>
+    <div class="card" style="grid-column:1/-1"><h2>This week and last <small>one behind by Tuesday, one ripening</small></h2>
+      <div class="wk">${tw.map((m, i) => `<div><b style="height:${(m || 0) / H * 100}%"></b><u style="height:${lw[i] / H * 100}%"></u></div>`).join('')}</div>
+      <div class="wkl">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(x => `<span>${x}</span>`).join('')}</div>
+      <div class="key"><span><i style="background:var(--ripe)"></i>this week</span><span><i style="border:2px solid var(--unripe)"></i>last week</span></div>
+    </div>
+  </div>
+</div>` });
+</script></body></html>

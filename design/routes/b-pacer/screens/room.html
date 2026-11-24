@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Room</title>
+<link rel="stylesheet" href="../route.css">
+<script src="../../../shared/data.js"></script><script src="../../../shared/shell.js"></script><script src="../b.js"></script>
+<style>
+  .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+  .lanes { margin-top: 22px; display: grid; gap: 8px; }
+  .lane-r { display: grid; grid-template-columns: 200px 1fr 220px 110px 96px; align-items: center; gap: 20px; padding: 16px 20px; background: var(--surface); border-radius: 8px; }
+  .lane-r.me { box-shadow: inset 4px 0 0 var(--you); }
+  .who { display: flex; gap: 12px; align-items: center; }
+  .who b { font-weight: 600; font-size: 16px; display: block; }
+  .who small { font-size: 13px; color: var(--muted); }
+  .task-s { font-size: 15px; }
+  .task-s.hidden { color: var(--muted); }
+  .left { font: 600 34px/1 var(--font-figure-lg); font-variant-numeric: tabular-nums; text-align: right; }
+  .left.rest { color: var(--rest); }
+  .left.away { color: var(--muted); font-size: 18px; }
+  .them .laps i.done, .them .laps i.now::after { background: var(--ink); }
+  .left.away { color: var(--muted); }
+  .cheer-b { height: 36px; line-height: 36px; font-size: 14px; padding: 0 14px; }
+  .feed { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .ev { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .ev:first-of-type { border-top: 0; }
+  .ev .fig { color: var(--muted); font-size: 16px; }
+  .xx { display: grid; grid-template-columns: 64px 1fr 72px; gap: 8px 12px; align-items: center; }
+  .race2 .lane { height: 12px; background: var(--raised); position: relative; }
+  .race2 .lane b { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
+  .race2 .lane.me b { background: var(--you); }
+  .race2 .fig { text-align: right; font-size: 18px; }
+  @media (max-width: 999px) {
+    .lane-r { grid-template-columns: 1fr auto; gap: 10px 12px; padding: 14px 16px; }
+    .lane-r .task-s { grid-column: 1 / -1; order: 3; }
+    .lane-r .laps-c { order: 4; align-self: center; }
+    .lane-r .cheer-c { order: 5; }
+    .lane-r.me .laps-c { grid-column: 1 / -1; }
+    .lane-r .cheer-c:empty { display: none; }
+    .lane-r .laps-c:empty { display: none; }
+    .left { font-size: 30px; }
+    .feed { grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+    .feed .tally { display: none; }
+    .head .btn { display: none; }
+  }
+</style></head>
+<body><script>
+const st = { focus: 'Focusing', break: 'Short break', away: 'Away' };
+const lane = f => `<div class="lane-r${f.name === 'You' ? ' me' : ''}">
+  <div class="who"><span class="avatar">${f.initial}</span><div><b>${f.name}</b><small><span class="dot${f.state === 'break' ? ' rest' : f.state === 'away' ? ' away' : ''}"></span> ${st[f.state]}${f.state === 'away' ? ' since ' + f.since : ', lap ' + f.inSet + ' of 4'}</small></div></div>
+  <div class="task-s${f.task ? '' : ' hidden'}">${f.task ? esc(f.task) : f.state === 'away' ? `Did ${D.fmt(f.today)} before she left` : 'Not sharing what they are on'}</div>
+  <div class="laps-c${f.name === 'You' ? '' : ' them'}">${f.state === 'away' ? '' : B.laps(f.inSet, f.state === 'break' ? 0 : f.name === 'You' ? 25 : 56)}</div>
+  <div class="left${f.state === 'break' ? ' rest' : f.state === 'away' ? ' away' : ''}">${f.left || '-'}</div>
+  <div class="cheer-c">${f.name === 'You' || f.state === 'away' ? '' : `<a class="btn cheer-b" href="#">Cheer</a>`}</div>
+</div>`;
+shell({ active: 'Room', mark: B.mark, name: B.name, side: '', main: `
+<div class="head"><div><h1>Second years</h1><p class="sub" style="margin-top:4px">Four of you. Two focusing, Dilan on a break, Amaya away.</p></div><a class="btn" href="#">Copy invite link</a></div>
+<div class="lanes">${D.friends.map(lane).join('')}</div>
+<div class="feed">
+  <div class="panel">
+    <h2 style="margin-bottom:6px">Cheers today</h2>
+    <div class="ev"><span>Sachi cheered you</span><span class="fig">16:31</span></div>
+    <div class="ev"><span>You cheered Dilan on lap 4</span><span class="fig">15:58</span></div>
+    <div class="ev"><span>Amaya cheered the room</span><span class="fig">13:40</span></div>
+  </div>
+  <div class="panel tally">
+    <h2 style="margin-bottom:10px">Together today</h2>
+    <div style="display:flex;align-items:baseline;gap:10px"><span class="fig" style="font-size:44px">1h 15m</span><span class="sub">you and Sachi focused at the same time</span></div>
+    <p style="margin-top:12px;font-size:15px">Three laps side by side, the last one still running. Time spent together counts once for each of you, it is not a score.</p>
+  </div>
+</div>` });
+</script></body></html>

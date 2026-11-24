@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../route.css">
+<script src="../../../shared/data.js"></script><script src="../../../shared/shell.js"></script><script src="../a.js"></script>
+<title>Today</title>
+<style>
+  .f { display: grid; grid-template-columns: 1fr 340px; gap: 64px; }
+  .sub1 { font-size: 16px; color: var(--muted); margin-top: 6px; }
+  .plan { margin: 22px 0 6px; }
+  .planline { display: flex; justify-content: space-between; font: 500 13px var(--font-label); color: var(--muted); }
+  .add { margin-top: 22px; height: 48px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); display: flex; align-items: center; padding: 0 20px; color: var(--muted); }
+  .next { margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; background: var(--surface); border-radius: 10px; }
+  .next .k { font: 500 13px var(--font-label); color: var(--muted); }
+  .next .t { font-weight: 500; }
+  .sect { font: 600 17px var(--font-heading); margin: 26px 0 2px; }
+  .now { padding: 20px; background: var(--surface); border-radius: 10px; }
+  .now .clock { font-size: 72px; margin: 6px 0 4px; }
+  @media (max-width: 999px) { .f { display: block; } .right { display: none; } .add, .next { margin-top: 16px; } .sect { margin-top: 18px; } }
+</style></head>
+<body><script>
+const t = D.tasks;
+const plan = []; t.forEach(x => { for (let i = 0; i < x.est; i++) plan.push(i < x.done ? 'ink' : (x.running && i === x.done ? 0.25 : 'pencil')); });
+plan.sort((a, b) => (a === 'ink' ? 0 : typeof a === 'number' ? 1 : 2) - (b === 'ink' ? 0 : typeof b === 'number' ? 1 : 2));
+const row = x => `<div class="row${x.done === x.est ? ' done' : ''}"><span class="t">${esc(x.title)}</span><span class="tal">${tally(taskMarks(x, x.running), { h: 26, gap: 8, w: 3, slashes: [], seed: x.id })}</span><span class="p">${A.proj(x.project)}${x.running ? ', running now' : ''}</span></div>`;
+shell({ active: 'Today', name: A.name, main: `
+<div class="col f">
+  <section>
+    <h1>Tuesday</h1>
+    <p class="sub1">Five pomodoros done and one under way. Fifteen planned.</p>
+    <div class="plan">${tally(plan, { h: 40, gap: 9, w: 3.2, groupGap: 22, slashes: ['ink', 'pencil', 'pencil', 'pencil'], seed: 9 })}</div>
+    <div class="planline"><span>2h 05m done</span><span>about 4h 10m to go</span></div>
+    <div class="add">Add a task, then ~2 for two pomodoros</div>
+    <div class="next"><div><div class="k">When this one ends</div><div class="t">${esc(t[1].title)}</div></div><a class="btn go" href="#">Start next</a></div>
+    <div class="sect">Planned</div>
+    ${row(t[0])}${row(t[2])}${row(t[3])}${row(t[4])}
+    <div class="sect">Done</div>
+    ${row(t[5])}
+  </section>
+  <aside class="right">
+    <div class="now"><div class="k sub" style="font:500 13px var(--font-label)">Running</div><div class="clock">18:42</div><div style="font-weight:500">${esc(t[0].title)}</div><div style="margin-top:14px"><a class="btn" href="#">Pause</a></div></div>
+    <p style="margin-top:22px;font:600 17px var(--font-heading)">Last Tuesday</p>
+    <p class="sub" style="margin-top:6px">Eight pomodoros, 3h 20m. Two of them after 19:30.</p>
+  </aside>
+</div>` });
+</script></body></html>

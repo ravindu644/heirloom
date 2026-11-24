@@ -1,0 +1,26 @@
+/* generated from DESIGN.md: edit that, not this */
+:root {
+  --ground: #E8EDDC;
+  --paper: #FAFBF6;
+  --ink: #1B1A14;
+  --muted: #4C5040;
+  --unripe: #93B45C;
+  --ripe: #EC5135;
+  --calyx: #2E6A2B;
+  --on-calyx: #FFFFFF;
+  --stage-green: #D5E2B3;
+  --stage-breaker: #EBCB72;
+  --stage-turning: #EE8E4A;
+  --stage-red: #D93A22;
+  --line: #C9D2B6;
+  --font-clock: "Atkinson Hyperlegible Next";
+  --size-clock: 128px;
+  --font-statement: "Atkinson Hyperlegible Next";
+  --size-statement: 40px;
+  --font-heading: "Atkinson Hyperlegible Next";
+  --size-heading: 24px;
+  --font-body: "Atkinson Hyperlegible Next";
+  --size-body: 16px;
+  --font-label: "Atkinson Hyperlegible Next";
+  --size-label: 13px;
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../route.css">
+<script src="../../../shared/data.js"></script><script src="../../../shared/shell.js"></script><script src="../a.js"></script>
+<title>Progress</title>
+<style>
+  .f { display: grid; grid-template-columns: 1fr 380px; gap: 64px; }
+  .lead { font: 600 26px/1.25 var(--font-heading); letter-spacing: -0.01em; margin-top: 10px; max-width: 22em; }
+  .sect { font: 600 18px var(--font-heading); margin: 30px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  .sect small { font: 500 13px var(--font-label); color: var(--muted); }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+  .cal div { border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); min-height: 64px; padding: 6px 6px 4px; background: var(--surface); }
+  .cal div.off { background: none; }
+  .cal div.today { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .cal .d { font: 500 12px var(--font-label); color: var(--muted); display: flex; justify-content: space-between; }
+  .cal .d b { color: var(--ink); font-weight: 600; }
+  .cal .rest { color: var(--ink); font: 500 12px var(--font-label); margin-top: 8px; }
+  .cal svg { margin-top: 6px; }
+  .wd { display: grid; grid-template-columns: repeat(7, 1fr); font: 600 12px var(--font-label); color: var(--ink); margin-bottom: 6px; }
+  .weeks { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px 14px; align-items: center; }
+  .weeks .v { font: 600 18px var(--font-heading); font-variant-numeric: tabular-nums; text-align: right; }
+  .big { font: 600 64px/1 var(--font-heading); letter-spacing: -0.03em; }
+  @media (max-width: 999px) { .f { display: block; } .right { margin-top: 30px; } .lead { font-size: 22px; } .cal div { min-height: 50px; padding: 4px; } .right .sect:first-child { margin-top: 26px; } .big { font-size: 48px; } }
+</style></head>
+<body><script>
+const phone = innerWidth < 1000;
+const nov = D.days.filter(d => d.date.getMonth() === 10);
+const marks = n => Array.from({ length: n / 25 }, () => 'ink');
+const slashes = n => Array.from({ length: Math.floor(n / 100) }, () => 'ink');
+const lead = Array.from({ length: (nov[0].date.getDay() + 6) % 7 });
+const cell = d => {
+  if (d.min == null) return `<div class="off"><span class="d">${d.date.getDate()}</span></div>`;
+  const rest = D.rests.includes(d);
+  return `<div class="${d.isToday ? 'today' : ''}"><span class="d"><b>${d.date.getDate()}</b></span>${rest ? '<span class="rest" style="display:block">rest day</span>' : d.min ? tally(marks(d.min), { h: phone ? 14 : 20, gap: phone ? 3.4 : 5, w: phone ? 1.7 : 2.2, groupGap: phone ? 7 : 10, slashes: slashes(d.min), seed: d.date.getDate() }) : ''}</div>`;
+};
+const proj = D.split.map(s => `<div class="row"><span class="t">${A.proj(s.project)}</span><span class="tal" style="text-align:right"><span style="font:600 17px var(--font-heading)">${D.fmt(s.min)}</span></span><span class="p">${tally(marks(s.min), { h: 18, gap: 5, w: 2.2, groupGap: 10, slashes: slashes(s.min), seed: s.min })}</span></div>`).join('');
+const wk = (label, days) => `<span class="sub" style="font-size:14px">${label}</span><span>${tally(marks(D.sum(days.map(d => d.min || 0))), { h: 22, gap: 5.5, w: 2.4, groupGap: 11, slashes: slashes(D.sum(days.map(d => d.min || 0))), seed: label.length })}</span><span class="v">${D.fmt(D.sum(days.map(d => d.min || 0)))}</span>`;
+shell({ active: 'Progress', name: A.name, main: `
+<div class="col f">
+  <section>
+    <h1>How it is going</h1>
+    <p class="lead">Thirty-seven pomodoros in the last seven days, two more than the seven before.</p>
+    <div class="sect">November <small>each stroke is one pomodoro</small></div>
+    <div class="wd">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(x => `<span>${x}</span>`).join('')}</div>
+    <div class="cal">${lead.map(() => '<div class="off"></div>').join('')}${nov.map(cell).join('')}</div>
+  </section>
+  <aside class="right">
+    <div class="sect" style="margin-top:0">Streak</div>
+    <div class="big">13 days</div>
+    <p class="sub" style="margin-top:8px">Thursday the 19th was your rest day. You get one a week, so the run carries on.</p>
+    <div class="sect">This week and last, by Tuesday</div>
+    <div class="weeks">${wk('This week', D.thisWeek.slice(0, 2))}${wk('Last week', D.lastWeek.slice(0, 2))}</div>
+    <p class="sub" style="margin-top:10px">One behind, and one is running.</p>
+    <div class="sect">Last seven days <small>15h 25m</small></div>
+    ${proj}
+  </aside>
+</div>` });
+</script></body></html>

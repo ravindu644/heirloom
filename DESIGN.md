@@ -1,0 +1,293 @@
+---
+version: alpha
+name: heirloom
+description: Past you is a ghost who runs beside you on every screen. A pomodoro is a lap, a set is four laps, and the day is a race against your usual day, told in splits. Chosen 2026-11-24 from three routes; the screens in design/routes/b-pacer/screens/ are the visual reference.
+colors:
+  ground: "#EEF0EC"
+  surface: "#FFFFFF"
+  raised: "#E4E7E2"
+  ink: "#121412"
+  muted: "#474C47"
+  line: "#D5D9D3"
+  you: "#C4321A"
+  you-tint: "#FBE2DA"
+  on-you: "#FFFFFF"
+  ghost: "#8A9089"
+  heat-1: "#F2D2CD"
+  heat-2: "#E4A398"
+  heat-3: "#D56B5A"
+  rest: "#23704E"
+  dark-ground: "#0E100E"
+  dark-surface: "#181A18"
+  dark-raised: "#232623"
+  dark-ink: "#F0F2EE"
+  dark-muted: "#A4A9A3"
+  dark-line: "#2B2F2B"
+  dark-you: "#FF6A4D"
+  dark-you-tint: "#3B1D16"
+  dark-on-you: "#140806"
+  dark-ghost: "#7C827B"
+  dark-heat-1: "#4B2C24"
+  dark-heat-2: "#803E30"
+  dark-heat-3: "#BE543E"
+  dark-rest: "#5DBE8D"
+typography:
+  figure-xl:
+    fontFamily: Barlow Condensed
+    fontSize: 168px
+    fontWeight: 600
+    lineHeight: 0.9
+    letterSpacing: -0.01em
+    fontFeature: '"tnum" 1'
+  figure-lg:
+    fontFamily: Barlow Condensed
+    fontSize: 44px
+    fontWeight: 600
+    lineHeight: 1
+    fontFeature: '"tnum" 1'
+  figure-md:
+    fontFamily: Barlow Condensed
+    fontSize: 26px
+    fontWeight: 500
+    lineHeight: 1.1
+    fontFeature: '"tnum" 1'
+  title:
+    fontFamily: Barlow
+    fontSize: 24px
+    fontWeight: 600
+    lineHeight: 1.2
+  body:
+    fontFamily: Barlow
+    fontSize: 16px
+    fontWeight: 400
+    lineHeight: 1.45
+  label:
+    fontFamily: Barlow
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.3
+rounded:
+  none: 0px
+  sm: 4px
+  md: 8px
+  full: 999px
+spacing:
+  xs: 4px
+  sm: 8px
+  md: 16px
+  lg: 24px
+  xl: 40px
+components:
+  button-primary:
+    backgroundColor: "{colors.you}"
+    textColor: "{colors.on-you}"
+    rounded: "{rounded.sm}"
+    height: 48px
+    padding: 0 20px
+  button-primary-dark:
+    backgroundColor: "{colors.dark-you}"
+    textColor: "{colors.dark-on-you}"
+    rounded: "{rounded.sm}"
+    height: 48px
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+    height: 48px
+  lap-bar:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.none}"
+    height: 8px
+  task-row:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    padding: 14px 16px
+  split-chip:
+    backgroundColor: "{colors.you-tint}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+    padding: 2px 8px
+  nav-item-active:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+  ghost-lane:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.none}"
+    height: 8px
+  heat-cell:
+    backgroundColor: "{colors.heat-1}"
+    rounded: "{rounded.none}"
+    size: 12px
+  room-member:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    padding: 16px
+  rest-mark:
+    backgroundColor: "{colors.rest}"
+    rounded: "{rounded.full}"
+    size: 8px
+  divider:
+    backgroundColor: "{colors.line}"
+    height: 1px
+  page:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.muted}"
+motion:
+  press: 100ms
+  fill: 160ms
+  sheet: 200ms
+  lap-done: 700ms
+  set-done: 1200ms
+  ease: cubic-bezier(0.2, 0, 0, 1)
+---
+
+# heirloom
+
+## Overview
+
+The records you used to look back at become a ghost who runs beside you. Every screen answers "how
+am I doing against my usual day?" and nothing else competes with it. The method is race timing:
+lanes, splits, laps and condensed figures that read from across a desk. It is clean by nature, so
+there is no texture and no hand wobble. Warmth comes from the words, not from decoration.
+
+You are always tomato. The ghost is always grey, hollow and dashed: past you has no colour because
+it is only a memory. Being behind is never red. Red means you.
+
+The rendered screens in `design/routes/b-pacer/screens/` (phone 412x915, laptop 1440x900, light and
+dark) are the reference for every screen. Where this file and a screen disagree, this file wins and
+the screen is redrawn.
+
+## Colors
+
+Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` writes both into
+`tokens.css`, the dark set under `prefers-color-scheme: dark`.
+
+- **ground:** the chalk of a lane line, one step off white, so white surfaces read as lanes on it.
+  In dark, a true neutral near-black, never navy.
+- **surface / raised:** lanes and the active nav pill, separated by tone, not by shadow.
+- **ink / muted:** text. Muted passes 4.5:1 on ground and surface in both themes. Text smaller than
+  16px uses ink or muted only, never ghost.
+- **line:** dividers, the empty part of a lane.
+- **you:** the one hue. Your marks, your line, your current lap, the one primary button per screen.
+- **you-tint:** the fill of a split chip and the selected row.
+- **on-you:** text on a you-filled button.
+- **ghost:** past you. Hollow blocks, dashed lines, grey labels. Never filled, never in a hue.
+- **rest:** breaks and rest days only, the calyx green of the tomato.
+- **heat-1 to heat-3, then you:** the four steps of the heatmap, you mixed into the surface at 22,
+  45 and 72 percent, so the scale is one hue getting darker. Zero is `raised`.
+
+## Typography
+
+Barlow Condensed for every figure, Barlow for words. One superfamily, two widths: the condensed
+digits let the timer run at 168px on a 412px phone (300px on a laptop), and their DIN-like shapes
+are the faces of timing boards, made to be read at a distance. Tabular figures (`tnum`) wherever a
+number updates, so digits do not jiggle.
+
+Files, latin subset, OFL 1.1, in `design/fonts/`: barlow-condensed-500 (21 KB), -600 (22 KB),
+barlow-400, -500, -600 (22 to 23 KB each). About 110 KB for the whole app; load the timer weight
+first, the rest after first paint.
+
+## Layout
+
+- **Phone, 412 wide:** 20px margins, one column, a bottom bar of five labelled destinations
+  (Focus, Today, Progress, Habits, Room). The primary action sits in the lower half, in reach of a
+  thumb.
+- **Laptop, 1440:** a 232px labelled sidebar on the ground, the canvas at 32px gutters, a 12-column
+  grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
+- Between the two, the sidebar collapses to the bottom bar under 720px.
+- Touch targets at least 48px. Nothing scrolls sideways.
+
+## Elevation & Depth
+
+Flat. Surfaces step by tone. Only a menu, a sheet or the completion moment floats, with one shadow.
+
+## Shapes
+
+Lanes and bars are square ended: a track has no rounded corners. Rows and buttons take 4 to 8px
+(`rounded.sm`, `rounded.md`). People and the rest mark are circles. Nothing else is round.
+
+## Components
+
+Built once in `client/src/ui/kit/` and reused.
+
+- **Lap bar:** four segments, 8px tall, 4px gaps. Done laps filled in you, the current lap filled to
+  its elapsed share, the long break after lap four named in words beside it.
+- **Race strip:** two lanes, you over ghost, on one scale; the split between them as a chip.
+- **Ghost lane:** the same lane as yours, hollow, with a dashed 1px ghost outline.
+- **Split chip:** "-19m" in ink on you-tint when behind, "+6m" in you when ahead, "level" in ink.
+- **Task row:** title, project, laps as small squares (filled, in progress, empty), "2 of 4".
+- **Heat cell:** a 12px square, 2px gaps, zero to four steps; a rest day carries the rest mark.
+- **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
+  figure-md, the task only if shared, and a Cheer button.
+- **Buttons:** one primary (you) per screen at most; secondary on surface; text buttons for the
+  rest. 48px tall.
+- **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
+
+## Motion
+
+Tokens under `motion:`. Short, and only when state changes.
+
+| Event | Token | Rule |
+|---|---|---|
+| Hover, press | `press` 100ms | Colour only |
+| A lap segment filling, a row arriving | `fill` 160ms | Transform and opacity only, ease-out |
+| A sheet or menu | `sheet` 200ms | Transform and opacity |
+| The timer | none | Digits change; nothing animates |
+| A lap done | `lap-done` 700ms | Your bar runs to meet the ghost's line, the split chip turns over, then the words. Tap anywhere to skip |
+| A set of four done | `set-done` 1200ms | The four segments light in turn and the long break is offered. Skippable, once per set |
+
+Under `prefers-reduced-motion` every moment shows its final state at once. No animation runs on a
+loop, ever.
+
+## The reward moment
+
+A finished lap is a race result against yourself: "Level with last Tuesday." over two lanes ending
+on one line, the day's total in you, one line of facts, a friend's cheer if one came in, and one
+button to start the break. Ahead, it reads "6 minutes ahead of last Tuesday." Behind, it names the
+lap that closes the gap. The ghost is never a judge. Every celebration can be turned off in
+Settings.
+
+## Voice
+
+A running partner who counts for you. Plain, specific, warm, never a coach shouting.
+
+1. **Numbers before adjectives.** "4 of 5 laps" beats "great progress".
+2. **Say what happened, then what is next.** "Level with last Tuesday. Take five."
+3. **Behind is a fact with a way back.** "One lap behind last week. The lap you are in now draws you
+   level." Never "you missed", never "you failed".
+4. **A void pomodoro is set aside,** not lost or failed. A missed day is not mentioned the day after.
+5. **No exclamation marks** except in the one big moment of a set, and then one.
+6. **Short sentences, one idea each.** Sentence case everywhere, including buttons.
+7. **Name the thing, not the feature.** "Who is focusing now", not "Live presence".
+
+Sample strings, the register to match:
+
+- "Finish this lap and you draw level."
+- "Level with last Tuesday."
+- "Thursday the 19th was your rest day. One a week keeps the streak going."
+- "41 of the last 45 days."
+- "Not sharing what they are on."
+- "Needs a connection. Your laps are safe on this phone."
+
+## Accessibility
+
+- Text contrast at least 4.5:1, large figures at least 3:1, in both themes. The route's review
+  found three small labels at 3.8 to 4.4:1 ("10 laps" on Today); fix them by using ink, not by
+  shrinking the rule.
+- Never colour alone: ahead and behind carry a sign and a word, rest days a mark, the ghost a dash.
+- Every control has a label a screen reader can say; the timer announces once a minute, not every
+  second.
+
+## Do's and Don'ts
+
+- Do compare with past you only. Friends are in the Room, side by side, never on a leaderboard
+  unless a room opts in.
+- Do say behind in plain numbers, with the lap that closes it.
+- Do keep one primary action per screen.
+- Don't draw a ring timer, confetti, flames, trophies or a mascot.
+- Don't colour "behind" red, and don't put the ghost in any hue.
+- Don't use gradients, blur, glass, or more than one shadow.
+- Don't show a spinner for data that is already on the device.

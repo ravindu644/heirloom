@@ -1,0 +1,125 @@
+{
+ "version": "alpha",
+ "name": "Ripening",
+ "description": "Route C, scary. A pomodoro ripens. The Focus screen is one flat field that turns from unripe green to tomato red as the 25 minutes pass, read from across the room by colour alone. Every other count in the app uses the tomato's ripening stages.",
+ "format": {
+  "kind": "app screen",
+  "size": [
+   412,
+   915
+  ],
+  "seen": "a phone propped on a desk next to a laptop, read from across the room by colour alone",
+  "safe": 0.04
+ },
+ "idea": {
+  "message": "A pomodoro ripens, and you can see how ripe it is from across the room.",
+  "sentence": "The tomato's ripening from green to red becomes the timer, a flat field that fills with red over 25 minutes.",
+  "method": "extreme situation",
+  "route": "scary"
+ },
+ "method": {
+  "name": "flat screen-printed fields",
+  "marks": [
+   "hard-edged colour fields",
+   "a level with five-minute ticks",
+   "an uneven hand-cut calyx"
+  ],
+  "allow": []
+ },
+ "limits": {
+  "typefaces": 1,
+  "colors": 13,
+  "words": 120
+ },
+ "colors": {
+  "ground": "#E8EDDC",
+  "paper": "#FAFBF6",
+  "ink": "#1B1A14",
+  "muted": "#4C5040",
+  "unripe": "#93B45C",
+  "ripe": "#EC5135",
+  "calyx": "#2E6A2B",
+  "on-calyx": "#FFFFFF",
+  "stage-green": "#D5E2B3",
+  "stage-breaker": "#EBCB72",
+  "stage-turning": "#EE8E4A",
+  "stage-red": "#D93A22",
+  "line": "#C9D2B6"
+ },
+ "typography": {
+  "clock": {
+   "fontFamily": "Atkinson Hyperlegible Next",
+   "fontSize": "128px",
+   "fontWeight": 800,
+   "lineHeight": 0.95,
+   "letterSpacing": "-0.03em",
+   "fontFeature": "\"tnum\" 1"
+  },
+  "statement": {
+   "fontFamily": "Atkinson Hyperlegible Next",
+   "fontSize": "40px",
+   "fontWeight": 800,
+   "lineHeight": 1.05,
+   "letterSpacing": "-0.02em"
+  },
+  "heading": {
+   "fontFamily": "Atkinson Hyperlegible Next",
+   "fontSize": "24px",
+   "fontWeight": 700,
+   "lineHeight": 1.2
+  },
+  "body": {
+   "fontFamily": "Atkinson Hyperlegible Next",
+   "fontSize": "16px",
+   "fontWeight": 400,
+   "lineHeight": 1.45
+  },
+  "label": {
+   "fontFamily": "Atkinson Hyperlegible Next",
+   "fontSize": "13px",
+   "fontWeight": 700,
+   "lineHeight": 1.3
+  }
+ },
+ "rounded": {
+  "sm": "4px",
+  "md": "12px",
+  "full": "999px"
+ },
+ "spacing": {
+  "xs": "4px",
+  "sm": "8px",
+  "md": "16px",
+  "lg": "24px",
+  "xl": "48px"
+ },
+ "components": {
+  "button-primary": {
+   "backgroundColor": "#1B1A14",
+   "textColor": "#FAFBF6",
+   "rounded": "999px",
+   "height": "52px",
+   "padding": "0 24px"
+  },
+  "button-start": {
+   "backgroundColor": "#2E6A2B",
+   "textColor": "#FFFFFF",
+   "rounded": "999px",
+   "height": "44px"
+  },
+  "field-work": {
+   "backgroundColor": "#93B45C",
+   "textColor": "#1B1A14"
+  },
+  "field-done": {
+   "backgroundColor": "#EC5135",
+   "textColor": "#1B1A14"
+  },
+  "task-row": {
+   "backgroundColor": "#FAFBF6",
+   "textColor": "#1B1A14",
+   "rounded": "12px",
+   "padding": "14px 16px"
+  }
+ }
+}

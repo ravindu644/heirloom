@@ -1,0 +1,35 @@
+---
+name: device-test
+description: How to test heirloom on the user's Android phone over adb and deploy to the S10 server container. Load before any [android] or deploy box, or any check that needs a real device.
+---
+
+# Testing on real devices
+
+Details that differ per machine (adb serial, the S10 container's address and login) are in
+`.local/ENV.md`, gitignored. If it is missing, ask the user. Never guess a password, and never write
+one into the repository.
+
+## The phone
+1. `adb devices` first, every time. If no line ends in `device`, stop and tell the user.
+2. Install the debug build: `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`.
+3. Exact alarm proof, after starting a 1-minute timer:
+   - `adb shell dumpsys alarm | grep -A3 <applicationId>` shows the alarm, its type and when.
+   - Turn the screen off (`adb shell input keyevent 26`), wait past the end, then
+     `adb shell dumpsys notification --noredact | grep -A5 <applicationId>` shows it was posted.
+   - Note the posting time against the planned end. Over 2 s late is a failure.
+4. Permission state: `adb shell appops get <applicationId> SCHEDULE_EXACT_ALARM` and check
+   `USE_EXACT_ALARM` is in the merged manifest (`aapt dump permissions`).
+5. Logs: `adb logcat -d | grep -i <tag>`; WebView console with `chrome://inspect` from the laptop.
+6. Leave the phone as you found it: uninstall test builds the user did not ask to keep, turn the
+   screen back on, end any `adb` port forwards you opened.
+
+## The S10 server container
+- Deploy only with `make deploy` (built in roadmap section 9): it cross-compiles for arm64, copies
+  the binary, and restarts the systemd unit. Never edit files on the container by hand.
+- Memory proof: `grep VmRSS /proc/$(pidof heirloomd)/status`, idle and under the simulator.
+- The container is shared with other services; do not install packages or open ports without
+  asking the user.
+
+## Two devices at once
+The user's own phone plus a laptop browser is the real test of live sync. A second browser profile
+stands in for a friend's account in rooms.

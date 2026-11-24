@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="../route.css">
+<script src="../../../shared/data.js"></script><script src="../../../shared/shell.js"></script><script src="../c.js"></script>
+<title>Focus</title>
+<style>
+  body { background: var(--unripe); }
+  .side, .tabbar { background: var(--ground); }
+  .main { padding: 0; }
+  .field { position: absolute; inset: 0; background: var(--unripe); }
+  .level { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ripe); }
+  .content { position: relative; height: 100%; display: flex; flex-direction: column; padding: 36px 48px 40px; }
+  .set { display: flex; align-items: center; gap: 12px; font: 700 15px var(--font-label); }
+  .task { margin-top: 28px; }
+  .task .p { font: 700 14px var(--font-label); margin-bottom: 4px; }
+  .task h1 { font-size: 30px; max-width: 18em; }
+  .clock { margin-top: 26px; }
+  .state { font: 700 18px var(--font-body); margin-top: 8px; }
+  .ctrl { margin-top: auto; display: flex; gap: 8px; align-items: center; }
+  .ticks { position: absolute; right: 0; top: 0; bottom: 0; width: 64px; }
+  .ticks span { position: absolute; right: 0; display: flex; align-items: center; gap: 6px; font: 700 13px var(--font-label); transform: translateY(-50%); }
+  .ticks span::after { content: ""; width: 22px; height: 2px; background: var(--ink); }
+  @media (min-width: 1000px) { .clock { font-size: 280px; margin-top: 40px; } .task h1 { font-size: 40px; } .content { padding: 40px 120px 48px 56px; } }
+  @media (max-width: 999px) { .content { padding: 8px 20px 24px; } .main { margin-top: 0; } .ctrl .btn { flex: 1; } .ticks { width: 48px; } }</style></head>
+<body><script>
+const t = D.tasks[0], share = (6 * 60 + 18) / 1500;
+shell({ active: 'Focus', name: C.name, mark: C.mark(), main: `
+<div class="field"><div class="level" style="height:${(share * 100).toFixed(1)}%"></div></div>
+<div class="ticks">${[5, 10, 15, 20].map(m => `<span style="top:${(1 - m / 25) * 100}%">${m}</span>`).join('')}</div>
+<div class="content">
+  <div class="set"><span class="fruit big"><i class="r"></i><i class="h"></i><i></i><i></i></span><span>Second of four</span></div>
+  <div class="task"><div class="p">${C.proj(t.project)}</div><h1>${esc(t.title)}</h1></div>
+  <div class="clock">18:42</div>
+  <div class="state">Ripening. Ends at 16:59.</div>
+  <div class="ctrl"><a class="btn" href="#">Pause</a><a class="btn quiet" href="#">Stop</a></div>
+</div>` });
+</script></body></html>

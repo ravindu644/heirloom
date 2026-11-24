@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>heirloom design routes</title>
+<style>
+:root{--bg:#f3f3f1;--fg:#141414;--mute:#5c5c5c;--line:#d9d9d4;--pick:#c4321a}
+@media (prefers-color-scheme:dark){:root{--bg:#121212;--fg:#ececec;--mute:#a0a0a0;--line:#2c2c2c;--pick:#ff6a4d}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+header{padding:20px 16px 8px;max-width:1200px;margin:auto}
+h1{font-size:20px;margin:0 0 4px} p{margin:0;color:var(--mute)}
+nav{display:flex;gap:8px;flex-wrap:wrap;padding:8px 16px;max-width:1200px;margin:auto;position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);z-index:2}
+button{font:inherit;background:none;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button[aria-pressed=true]{border-color:var(--pick);color:var(--pick)}
+.sep{width:1px;background:var(--line);margin:0 4px}
+main{max-width:1200px;margin:auto;padding:16px}
+.idea{margin:0 0 16px;color:var(--mute)} .idea b{color:var(--fg)}
+section{margin:0 0 32px} h2{font-size:16px;margin:0 0 8px}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+figure{margin:0} figcaption{font-size:12px;color:var(--mute);margin-top:4px}
+img{display:block;border:1px solid var(--line);border-radius:6px;max-width:100%}
+.phone img{width:340px}.laptop img{width:min(100%,1100px)}
+a{color:inherit}
+</style></head><body>
+<header><h1>heirloom: three design directions</h1>
+<p>Pick a direction, then flip screens, sizes and themes. Each route's reasoning is in its README.md. Click a picture to open it full size.</p></header>
+<nav id="nav"></nav><main id="main"></main>
+<script>
+const DATA=[{"slug": "a-tally", "name": "A. Tally", "grade": "safe", "idea": "Four pomodoros are four tally strokes; the long break strikes through them. Book serif, hand-drawn marks, the quietest route.", "screens": [{"id": "focus", "label": "Focus (running)", "files": ["focus-laptop-light.png", "focus-phone-light.png"]}, {"id": "done", "label": "Pomodoro done (reward moment)", "files": ["done-laptop-light.png", "done-phone-light.png"]}, {"id": "today", "label": "Today", "files": ["today-laptop-light.png", "today-phone-light.png"]}, {"id": "progress", "label": "Progress", "files": ["progress-laptop-light.png", "progress-phone-light.png"]}]}, {"slug": "b-pacer", "name": "B. Pacer", "grade": "adventurous, recommended", "idea": "Your past records are a grey ghost running beside you. A pomodoro is a lap; the day is a race against your usual day. Never red for being behind.", "screens": [{"id": "focus", "label": "Focus (running)", "files": ["focus-laptop-dark.png", "focus-laptop-light.png", "focus-phone-dark.png", "focus-phone-light.png"]}, {"id": "done", "label": "Pomodoro done (reward moment)", "files": ["done-laptop-dark.png", "done-laptop-light.png", "done-phone-dark.png", "done-phone-light.png"]}, {"id": "today", "label": "Today", "files": ["today-laptop-dark.png", "today-laptop-light.png", "today-phone-dark.png", "today-phone-light.png"]}, {"id": "progress", "label": "Progress", "files": ["progress-laptop-dark.png", "progress-laptop-light.png", "progress-phone-dark.png", "progress-phone-light.png"]}, {"id": "habits", "label": "Habits", "files": ["habits-laptop-dark.png", "habits-laptop-light.png", "habits-phone-dark.png", "habits-phone-light.png"]}, {"id": "room", "label": "Study room", "files": ["room-laptop-dark.png", "room-laptop-light.png", "room-phone-dark.png", "room-phone-light.png"]}]}, {"slug": "c-ripening", "name": "C. Ripening", "grade": "scary", "idea": "A pomodoro ripens: the focus screen fills from green to tomato red, readable across the room. Risky for colour blindness and at night.", "screens": [{"id": "focus", "label": "Focus (running)", "files": ["focus-laptop-light.png", "focus-phone-light.png"]}, {"id": "done", "label": "Pomodoro done (reward moment)", "files": ["done-laptop-light.png", "done-phone-light.png"]}, {"id": "today", "label": "Today", "files": ["today-laptop-light.png", "today-phone-light.png"]}, {"id": "progress", "label": "Progress", "files": ["progress-laptop-light.png", "progress-phone-light.png"]}]}];
+let st={route:"b-pacer",size:"phone",theme:"all"};
+try{Object.assign(st,JSON.parse(localStorage.getItem("hl-gallery")||"{}"))}catch(e){}
+function save(){try{localStorage.setItem("hl-gallery",JSON.stringify(st))}catch(e){}}
+function btn(txt,on,fn){const b=document.createElement("button");b.textContent=txt;b.setAttribute("aria-pressed",on);b.onclick=fn;return b}
+function sep(){const s=document.createElement("span");s.className="sep";return s}
+function render(){
+ const nav=document.getElementById("nav");nav.innerHTML="";
+ DATA.forEach(r=>nav.append(btn(r.name,st.route===r.slug,()=>{st.route=r.slug;save();render()})));
+ nav.append(sep());
+ ["phone","laptop"].forEach(s=>nav.append(btn(s,st.size===s,()=>{st.size=s;save();render()})));
+ nav.append(sep());
+ ["all","light","dark"].forEach(t=>nav.append(btn(t==="all"?"both themes":t,st.theme===t,()=>{st.theme=t;save();render()})));
+ const r=DATA.find(x=>x.slug===st.route),m=document.getElementById("main");
+ m.innerHTML=`<p class="idea"><b>${r.name}</b> (${r.grade}). ${r.idea} <a href="routes/${r.slug}/README.md">README</a> · <a href="routes/${r.slug}/DESIGN.md">DESIGN.md</a></p>`;
+ r.screens.forEach(s=>{
+  const files=s.files.filter(f=>f.includes("-"+st.size+"-")&&(st.theme==="all"||f.endsWith("-"+st.theme+".png")));
+  if(!files.length)return;
+  const sec=document.createElement("section");sec.innerHTML=`<h2>${s.label}</h2>`;
+  const row=document.createElement("div");row.className="row "+st.size;
+  files.forEach(f=>{const p=`routes/${r.slug}/screens/${f}`;row.insertAdjacentHTML("beforeend",`<figure><a href="${p}" target="_blank"><img loading="lazy" src="${p}" alt="${s.label}, ${f}"></a><figcaption>${f.replace(".png","")}</figcaption></figure>`)});
+  sec.append(row);m.append(sec)});
+ if(!m.querySelector("section"))m.insertAdjacentHTML("beforeend","<p>This route was not drawn at this size or theme.</p>");
+}
+render();
+</script></body></html>
