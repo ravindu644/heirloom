@@ -45,6 +45,8 @@ export interface TimelineEntry {
   project: ProjectView | null;
   /** One of a pair that ran on two devices at once. */
   overlap: boolean;
+  /** Which of two rows it is drawn on: 1 for an entry that began while the one it overlaps was on row 0, else 0. */
+  row: 0 | 1;
 }
 
 export interface LookBack {
@@ -61,6 +63,10 @@ export interface Progress {
   week(): WeekRace;
   projects(): ProjectShare[];
   lookBack(): LookBack;
+  /** The local day, `2026-11-24`. It changes at midnight and on `wake()`. */
+  readonly today: ReadonlySignal<string>;
+  /** The one line about any day, '' when there is none. */
+  note(day: string): string;
   /** These change when a session row does, and at local midnight. */
   readonly streak: ReadonlySignal<StreakView>;
   readonly since: ReadonlySignal<Since>;
@@ -179,12 +185,25 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     bests: computed(() => bests(history.value.days)),
     estimates: computed(() => estimates([...tasks.value.values()], (id) => history.value.taskLaps.get(id) ?? 0, clock.day.value, offset())),
 
+    today: clock.day,
+
+    note(day) {
+      const note = engine.rows('day').value.get(day)?.note;
+      return typeof note === 'string' ? note : '';
+    },
+
     timeline(day) {
       const { byDay, overlapping } = history.value;
+      // The first of a pair to start is on row 0 and the one that began during it on row 1, here
+      // and nowhere else, so every screen draws the pair the same way.
+      let upper = -Infinity;
       return (byDay.get(day) ?? [])
         .toSorted((a, b) => a.started - b.started)
         .map((session) => {
           const task = session.task === null ? undefined : tasks.value.get(session.task);
+          const overlap = overlapping.has(session.id);
+          const row = overlap && session.started < upper ? 1 : 0;
+          if (overlap && row === 0) upper = session.ended;
           return {
             id: session.id,
             kind: session.kind,
@@ -194,7 +213,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
             ran_ms: Math.max(0, session.ended - session.started - session.paused_ms),
             task: task ? { id: task.id, title: task.title } : null,
             project: projectOf(session.task),
-            overlap: overlapping.has(session.id),
+            overlap,
+            row,
           };
         });
     },

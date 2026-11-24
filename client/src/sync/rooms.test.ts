@@ -372,6 +372,10 @@ describe('cheering', () => {
     say(d, room('r_1', [member(ME, 'ravi', { last: lastLap() }), member(SACHI, 'sachi')]));
     r.cheer('r_1', SACHI);
     r.cheer('r_nowhere', SACHI);
+    // Your own lap is not yours to cheer: not shown as cheered, not queued, not sent.
+    r.cheer('r_1', ME);
+    assert.equal(r.list.value[0]!.members[0]!.last?.cheered, false);
+    assert.equal(d.engine.kept('cheers'), undefined);
     await settle();
     assert.deepEqual(cheers(w), []);
     // A cheer waiting for a room that then ends has nowhere to go.

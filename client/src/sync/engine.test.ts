@@ -49,7 +49,7 @@ function fakeAccounts() {
   const server = {
     reachable: true,
     calls: [] as { path: string; body: any; signal?: AbortSignal }[],
-    fail: null as null | { status: number; error: string; retryAfter?: string },
+    fail: null as null | { status: number; error: string; retryAfter?: string; times?: number },
     /** Set, and the next logout waits for it: the request is on its way and has not come back. */
     logoutWaits: null as null | Promise<void>,
   };
@@ -60,7 +60,9 @@ function fakeAccounts() {
     server.calls.push({ path, body, signal: init.signal });
     if (path === '/api/logout') await server.logoutWaits;
     const fail = server.fail;
-    if (fail) {
+    // With `times`, only that many calls fail: the server's hashing line clears.
+    if (fail && fail.times !== undefined && fail.times-- <= 0) server.fail = null;
+    if (server.fail && fail) {
       return { ok: false, status: fail.status, headers: { get: () => fail.retryAfter ?? null }, json: async () => ({ error: fail.error }) };
     }
     const reply = path === '/api/logout' ? {} : { token: `token-of-${body.username}`, account: `acct-${body.username}`, username: body.username };
@@ -957,6 +959,55 @@ describe('accounts', () => {
     assert.deepEqual(await d.engine.signIn('ravi', 'correct horse'), { ok: false, error: 'offline' });
     assert.equal(d.engine.account.value, null);
     assert.equal(d.engine.sync.value, 'signed-out');
+  });
+
+  it('the engine says which server it keeps step with', async () => {
+    const d = await device();
+    assert.equal(d.engine.server, 'https://heirloom.test');
+  });
+
+  it('slow_down for a second is the server catching its breath: waited out and tried again, and the person is not told', async () => {
+    const d = await device();
+    d.server.fail = { status: 429, error: 'slow_down', retryAfter: '1', times: 2 };
+    let answer: unknown;
+    void d.engine.signIn('ravi', 'correct horse').then((result) => (answer = result));
+    await settle();
+    assert.equal(d.server.calls.length, 1);
+    d.time.advance(999);
+    await settle();
+    assert.equal(d.server.calls.length, 1, 'not before the second is up');
+    d.time.advance(1);
+    await settle();
+    assert.equal(d.server.calls.length, 2);
+    assert.equal(answer, undefined);
+    d.time.advance(1000);
+    await settle();
+    assert.deepEqual(answer, { ok: true });
+    assert.equal(d.server.calls.length, 3);
+    assert.equal(d.engine.account.value?.username, 'ravi');
+  });
+
+  it('three more tries and no further: a line that stays full is answered as slow_down', async () => {
+    const d = await device();
+    d.server.fail = { status: 429, error: 'slow_down', retryAfter: '2' };
+    let answer: unknown;
+    void d.engine.register('invite-code', 'ravi', 'correct horse').then((result) => (answer = result));
+    for (let n = 0; n < 5; n++) {
+      await settle();
+      d.time.advance(2000);
+    }
+    await settle();
+    assert.deepEqual(answer, { ok: false, error: 'slow_down', retry_after: 2 });
+    assert.equal(d.server.calls.length, 4, 'the first and three more');
+  });
+
+  it('a longer wait is the lock for wrong passwords: answered at once, with the seconds, and not tried again', async () => {
+    const d = await device();
+    d.server.fail = { status: 429, error: 'slow_down', retryAfter: '3' };
+    assert.deepEqual(await d.engine.signIn('ravi', 'wrong'), { ok: false, error: 'slow_down', retry_after: 3 });
+    d.time.advance(60000);
+    await settle();
+    assert.equal(d.server.calls.length, 1);
   });
 
   it('sign out is refused while offline with unsent work, and nothing is touched', async () => {

@@ -436,11 +436,11 @@ describe('a day\'s timeline', () => {
     const { p, project, task, ids } = await morning();
     const view = { id: project, name: 'The C book', color: 'you' };
     assert.deepEqual(p.timeline('2026-11-23'), [
-      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, task: { id: task, title: 'pointers' }, project: view, overlap: false },
-      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, task: null, project: null, overlap: false },
-      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, task: null, project: null, overlap: false },
-      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, task: null, project: null, overlap: true },
-      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, task: null, project: null, overlap: true },
+      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, task: { id: task, title: 'pointers' }, project: view, overlap: false, row: 0 },
+      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, task: null, project: null, overlap: false, row: 0 },
+      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, task: null, project: null, overlap: false, row: 0 },
+      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, task: null, project: null, overlap: true, row: 0 },
+      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, task: null, project: null, overlap: true, row: 1 },
     ]);
     assert.equal(p.timeline('2026-11-22').length, 1);
     assert.deepEqual(p.timeline('2026-11-21'), []);
@@ -452,6 +452,19 @@ describe('a day\'s timeline', () => {
     const short = stopped(d, '2026-11-23', 9, 5, 5);
     const elsewhere = stopped(d, '2026-11-23', 9, 20, 10, { device: 'b2c3d4e5f6071829' });
     assert.deepEqual(p.timeline('2026-11-23').map((entry) => [entry.id, entry.overlap]), [[long, true], [short, false], [elsewhere, true]]);
+    assert.deepEqual(p.timeline('2026-11-23').map((entry) => entry.row), [0, 0, 1], 'the first to start is on row 0, the one that began during it on row 1');
+  });
+
+  it('a second pair later in the day starts on row 0 again, and a chain of three alternates', async () => {
+    const { d, p } = await one();
+    const other = { device: 'b2c3d4e5f6071829' };
+    // 09:00 here, 09:10 there, 09:30 here again while the other still runs; then a pair in the afternoon.
+    lap(d, '2026-11-23', 9, 0);
+    lap(d, '2026-11-23', 9, 10, { ...other, ended: at('2026-11-23', 9, 50), planned_ms: 40 * MIN });
+    lap(d, '2026-11-23', 9, 30);
+    lap(d, '2026-11-23', 14, 0, other);
+    lap(d, '2026-11-23', 14, 5);
+    assert.deepEqual(p.timeline('2026-11-23').map((entry) => [entry.overlap, entry.row]), [[true, 0], [true, 1], [true, 0], [true, 0], [true, 1]]);
   });
 
   it('setting aside one of an overlapping pair is the way out: the mark goes from both, and the minutes are no longer counted once too few', async () => {
@@ -521,6 +534,17 @@ describe('the look back', () => {
       ],
       note: 'Pointers finally clicked.',
     });
+  });
+
+  it('any day\'s note can be read, and `today` is the local day as a signal', async () => {
+    const { w, p } = await one();
+    assert.equal(p.today.value, '2026-11-24');
+    assert.equal(p.note('2026-11-20'), '');
+    p.setNote('2026-11-20', 'The day pointers made sense.');
+    assert.equal(p.note('2026-11-20'), 'The day pointers made sense.');
+    assert.equal(p.note('2026-11-24'), '');
+    w.time.advance(14 * HOUR);
+    assert.equal(p.today.value, '2026-11-25');
   });
 
   it('the note is the day row\'s: empty is an empty string, a long one is cut at 280, and what is not a day is not written', async () => {

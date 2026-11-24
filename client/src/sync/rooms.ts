@@ -261,8 +261,10 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     update: (room, fields) => ask('/api/rooms/update', { room, ...fields }),
 
     cheer(room, member) {
-      const last = list.peek().find((r) => r.id === room)?.members.find((m) => m.id === member)?.last;
-      if (!last || last.cheered) return;
+      const whom = list.peek().find((r) => r.id === room)?.members.find((m) => m.id === member);
+      const last = whom?.last;
+      // Nobody cheers their own lap: the server would answer `run`, so it is not asked.
+      if (!whom || whom.you || !last || last.cheered) return;
       queue([...waiting.peek(), { room, to: member, run: last.run }]);
     },
 

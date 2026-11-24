@@ -41,7 +41,7 @@ describe('adding', () => {
     const next = d.today.next.value!;
     assert.deepEqual(next, {
       id, title: 'pointers chapter 3', notes: '', project: null, estimate: 4, laps: 0, squares: [], running: false,
-      due: TODAY, when: null, repeat: null, done: false, subtasks: [],
+      due: TODAY, when: null, repeat: null, done: false, deleted: null, subtasks: [],
     });
   });
 
@@ -164,6 +164,8 @@ describe('the lists', () => {
     d.today.remove(two!);
     assert.deepEqual(open(d), []);
     assert.deepEqual(titles(d.today.deleted.value), ['two', 'one']);
+    // Each says when it was deleted, so the screen can say when it goes for good.
+    assert.deepEqual(d.today.deleted.value.map((t) => t.deleted), [T0 + DAY, T0]);
     w.time.advance(29 * DAY - 1);
     assert.deepEqual(titles(d.today.deleted.value), ['two', 'one']);
     w.time.advance(DAY);
@@ -195,7 +197,7 @@ describe('the lists', () => {
     d.engine.write('task', 't1', { title: 'odd fields', estimate: 'four', due: 'next week', repeat: { every: 'month' }, when: 9, notes: null, order: 3, project: 'gone' });
     assert.deepEqual(d.today.next.value, {
       id: 't1', title: 'odd fields', notes: '', project: null, estimate: null, laps: 0, squares: [], running: false,
-      due: null, when: null, repeat: null, done: false, subtasks: [],
+      due: null, when: null, repeat: null, done: false, deleted: null, subtasks: [],
     });
   });
 });

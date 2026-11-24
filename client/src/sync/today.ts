@@ -47,6 +47,8 @@ export interface TaskView {
   when: string | null;
   repeat: Repeat;
   done: boolean;
+  /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after. */
+  deleted: number | null;
   subtasks: SubtaskView[];
 }
 
@@ -198,6 +200,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       when: t.when,
       repeat: t.repeat,
       done: t.done !== null,
+      deleted: t.deleted,
       subtasks: (lists.subtasks.get(t.id) ?? []).map((sub) => ({ id: sub.id, title: sub.title, done: sub.done !== null })),
     });
     const todays = lists.today.map(show);

@@ -63,6 +63,8 @@ export interface Engine {
   readonly timer: ReadonlySignal<TimerState>;
   /** This install's id. Made once, kept across sign outs. */
   readonly device: string;
+  /** The server this device keeps step with: the address the app was started with. */
+  readonly server: string;
   /** Server-corrected time in ms. Everything stamped or shown uses this, never the device's own clock. */
   now(): number;
   /** Every row of a dataset, by id. The same signal each call; it changes when any cell of the dataset does. */
@@ -158,6 +160,9 @@ const SIGN_OUT_WAIT_MS = 10000;
 // all, so it waits less: the next sign in queues behind it.
 const ASK_MS = 20000;
 const LOGOUT_MS = 5000;
+// A `slow_down` asking for this many seconds or fewer is waited out; a longer one is the lock, and is answered.
+const SLOW_WAIT_S = 2;
+const SLOW_TRIES = 3;
 const INSTALL_DB = 'heirloom';
 // What `keep` stores sits in the meta beside the clock and the cursor, under this prefix.
 const LOCAL = 'local.';
@@ -534,7 +539,15 @@ export async function createEngine(env: Env): Promise<Engine> {
       // Before the server is asked: a new token for this device would cut the open account's socket.
       const here = db;
       if (here && !(await settle(here)) && here.outbox.size) return { ok: false, error: 'unsaved' };
-      const reply = await ask(path, { ...body, device: me });
+      let reply = await ask(path, { ...body, device: me });
+      // `slow_down` with a wait of a second or two is the server's hashing line being full, not
+      // a lock for wrong passwords: nothing the person did, so they are not told. The wait is
+      // sat out and the call made again, three times at most.
+      for (let tries = 0; tries < SLOW_TRIES && !reply.ok && reply.error === 'slow_down' && (reply.retry_after ?? Infinity) <= SLOW_WAIT_S; tries++) {
+        const wait = reply.retry_after! * 1000;
+        await new Promise<void>((done) => env.schedule(done, wait));
+        reply = await ask(path, { ...body, device: me });
+      }
       if (!reply.ok) return reply;
       const { token, account: id, username } = reply.data;
       // Unsent work of whoever was here stays in their own database until they sign in again.
@@ -567,6 +580,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     unsaved,
     timer,
     device: me,
+    server: env.url,
     now,
     rows,
 
