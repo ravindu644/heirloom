@@ -25,5 +25,34 @@ export interface Stats {
 
 /** `utcOffsetMin` is the viewer's offset from UTC in minutes, 330 for Sri Lanka. */
 export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats {
-  throw new Error('not built yet: stats, roadmap section 5');
+  const counted = sessions.filter((s) => s.kind === 'work' && s.outcome !== 'void');
+  const from = (s: Session) => s.started + s.paused_ms;
+
+  const byDay = new Map<string, Session[]>();
+  for (const s of counted) {
+    const day = new Date(s.started + utcOffsetMin * 60000).toISOString().slice(0, 10);
+    byDay.set(day, [...(byDay.get(day) ?? []), s]);
+  }
+  const days: Stats['days'] = {};
+  for (const [day, list] of byDay) {
+    // The union: walk the laps by start and count only what reaches past everything before.
+    let focus_ms = 0;
+    let reach = -Infinity;
+    for (const s of list.toSorted((a, b) => from(a) - from(b))) {
+      focus_ms += Math.max(0, s.ended - Math.max(reach, from(s)));
+      reach = Math.max(reach, s.ended);
+    }
+    days[day] = { focus_ms, laps: list.filter((s) => s.outcome === 'rang').length };
+  }
+
+  // ponytail: every pair is compared. Sort by start and sweep if a history ever makes this slow.
+  const overlaps: [string, string][] = [];
+  for (const a of counted) {
+    for (const b of counted) {
+      // More than an instant: back to back on two devices is not an overlap.
+      const shared = Math.min(a.ended, b.ended) - Math.max(from(a), from(b));
+      if (a.id < b.id && a.device !== b.device && shared > 0) overlaps.push([a.id, b.id]);
+    }
+  }
+  return { days, overlaps: overlaps.sort((x, y) => (x[0] !== y[0] ? (x[0] < y[0] ? -1 : 1) : x[1] < y[1] ? -1 : 1)) };
 }

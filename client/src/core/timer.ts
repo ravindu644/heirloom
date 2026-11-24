@@ -45,11 +45,51 @@ export interface TimerView {
   next: { phase: Phase; set_index: number };
 }
 
+// The index of the lap a tap on start begins: the one rule start, stop and next share.
+const nextLap = (state: TimerState, over: boolean): number => {
+  if (state.phase === 'idle') return state.set_index;
+  if (state.phase === 'long') return 0;
+  return state.phase === 'short' || over ? (state.set_index + 1) % 4 : state.set_index;
+};
+
 /** The state after an action at `now` (server time). An action with nothing to act on returns the state it got. */
 export function act(state: TimerState, action: TimerAction, now: number): TimerState {
-  throw new Error('not built yet: act, roadmap section 1');
+  const { over, paused } = view(state, now);
+  switch (action.do) {
+    case 'start':
+      return {
+        phase: action.phase,
+        run: action.run,
+        task: action.task,
+        started: now,
+        paused_at: null,
+        paused_ms: 0,
+        planned_ms: action.planned_ms,
+        set_index: action.phase === 'work' ? nextLap(state, over) : state.set_index,
+      };
+    case 'pause':
+      return state.phase === 'idle' || paused || over ? state : { ...state, paused_at: now };
+    case 'resume':
+      return state.paused_at === null
+        ? state
+        : { ...state, paused_ms: state.paused_ms + now - state.paused_at, paused_at: null };
+    case 'extend':
+      return state.phase === 'idle' ? state : { ...state, planned_ms: state.planned_ms + action.ms };
+    case 'stop':
+      return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state, over) };
+  }
 }
 
 export function view(state: TimerState, now: number): TimerView {
-  throw new Error('not built yet: view, roadmap section 1');
+  if (state.phase === 'idle' || state.started === null) {
+    return { left_ms: 0, ends_at: null, over: false, paused: false, next: { phase: 'work', set_index: state.set_index } };
+  }
+  const paused = state.paused_at !== null;
+  const ends_at = paused ? null : state.started + state.paused_ms + state.planned_ms;
+  const ran = (state.paused_at ?? now) - state.started - state.paused_ms;
+  const next: TimerView['next'] =
+    state.phase === 'work'
+      ? { phase: state.set_index === 3 ? 'long' : 'short', set_index: state.set_index }
+      : { phase: 'work', set_index: nextLap(state, false) };
+  return { left_ms: Math.max(0, state.planned_ms - ran), ends_at, over: ends_at !== null && now >= ends_at, paused, next };
 }

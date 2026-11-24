@@ -12,17 +12,30 @@ export interface Clock {
 
 export const ZERO: Clock = { ms: 0, counter: 0 };
 
+const MAX_AHEAD_MS = 300000;
+
+const read = (stamp: Stamp): Clock => ({
+  ms: Date.parse(stamp.slice(0, 24)),
+  counter: parseInt(stamp.slice(25, 29), 16),
+});
+
 /** Stamps one edit at `now` (server-corrected ms). Keep the returned clock, or the next stamp can repeat this one. */
 export function stamp(clock: Clock, now: number, device: string): { clock: Clock; stamp: Stamp } {
-  throw new Error('not built yet: stamp, roadmap section 1');
+  let next = now > clock.ms ? { ms: now, counter: 0 } : { ms: clock.ms, counter: clock.counter + 1 };
+  if (next.counter > 0xffff) next = { ms: next.ms + 1, counter: 0 };
+  const text = `${new Date(next.ms).toISOString()}-${next.counter.toString(16).padStart(4, '0')}-${device}`;
+  return { clock: next, stamp: text };
 }
 
 /** The clock after seeing a stamp from anywhere, so the next edit is later than it. */
 export function see(clock: Clock, seen: Stamp): Clock {
-  throw new Error('not built yet: see, roadmap section 1');
+  const s = read(seen);
+  // A stamp that does not parse must not reach the clock: one NaN there and no edit could be stamped again.
+  if (Number.isNaN(s.ms) || Number.isNaN(s.counter)) return clock;
+  return s.ms > clock.ms || (s.ms === clock.ms && s.counter > clock.counter) ? s : clock;
 }
 
 /** The server's drift check: false when the stamp's time is more than five minutes past `serverTime`. */
 export function acceptable(stamp: Stamp, serverTime: number): boolean {
-  throw new Error('not built yet: acceptable, roadmap section 1');
+  return read(stamp).ms - serverTime <= MAX_AHEAD_MS;
 }
