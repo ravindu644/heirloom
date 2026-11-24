@@ -60,12 +60,13 @@ type frame struct {
 	Batch  string            `json:"batch"`
 	Cells  []json.RawMessage `json:"cells"`
 	T      json.RawMessage   `json:"t"`
-	// Minutes east of UTC, in a hello. A device that does not say is taken to be on UTC.
-	UTCOffsetMin int `json:"utc_offset_min"`
+	// Minutes east of UTC, in a hello. A device that does not say changes nothing: the
+	// last offset the account sent stands.
+	UTCOffsetMin *int `json:"utc_offset_min"`
 }
 
-// The offsets the world uses run from UTC-12 to UTC+14.
-func validOffset(min int) bool { return min >= -720 && min <= 840 }
+// The offsets the world uses run from UTC-12 to UTC+14. Saying nothing is allowed.
+func validOffset(min *int) bool { return min == nil || *min >= -720 && *min <= 840 }
 
 type welcomeMsg struct {
 	Type       string `json:"type"`
@@ -114,8 +115,8 @@ type SyncRequest struct {
 	Token  string `json:"token"`
 	Device string `json:"device"`
 	Cursor *int64 `json:"cursor"`
-	// As in a hello: minutes east of UTC, 0 when left out.
-	UTCOffsetMin int `json:"utc_offset_min"`
+	// As in a hello: minutes east of UTC, and nothing changes when it is left out.
+	UTCOffsetMin *int `json:"utc_offset_min"`
 	Push         *struct {
 		Batch string            `json:"batch"`
 		Cells []json.RawMessage `json:"cells"`
@@ -315,9 +316,13 @@ func (h *Hub) Sync(req SyncRequest) (SyncReply, error) {
 }
 
 // offset keeps the account's latest offset from UTC. A new one moves its "today", which
-// every room it is in shows.
-func (h *Hub) offset(account int64, min int) error {
-	changed, err := h.rooms.SetOffset(account, min)
+// every room it is in shows. A device that sent none (an older build) leaves it alone:
+// taking that for UTC would move a person's midnight every time their old phone woke up.
+func (h *Hub) offset(account int64, min *int) error {
+	if min == nil {
+		return nil
+	}
+	changed, err := h.rooms.SetOffset(account, *min)
 	if err == nil && changed {
 		h.mu.Lock()
 		h.announceOf(account)

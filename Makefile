@@ -92,12 +92,21 @@ apk: tokens
 	pnpm exec cap sync android
 	cd android && JAVA_HOME=$(JDK21) ./gradlew assembleDebug
 
-# Section 9 adds the systemd unit and its restart. Until then the binary only lands in the home folder.
+# Puts the binary and its systemd unit on the S10 and restarts the service there. It listens on
+# the container's localhost only; the tunnel is what lets anyone in. The sudo password goes from
+# .local/ENV.md straight into ssh's stdin: never in a variable, an argument or the log.
 deploy: server
 	$(need-s10)
 	scp server/bin/heirloomd-arm64 $(S10):heirloomd
+	scp server/deploy/heirloomd.service $(S10):heirloomd.service
+	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(S10) 'sudo -S -p "" sh -ec "\
+		id heirloomd >/dev/null 2>&1 || useradd --system --home-dir /var/lib/heirloomd --shell /usr/sbin/nologin heirloomd; \
+		install -m 0755 /home/$(S10_USER)/heirloomd /usr/local/bin/heirloomd; \
+		install -m 0644 /home/$(S10_USER)/heirloomd.service /etc/systemd/system/heirloomd.service; \
+		systemctl daemon-reload; systemctl enable heirloomd >/dev/null 2>&1; systemctl restart heirloomd; \
+		sleep 3; systemctl is-active heirloomd; /usr/local/bin/heirloomd -version"'
 
-# Idle memory on the real hardware: run it on localhost there for 3 s, read VmRSS, stop it.
+# Memory of the running service on the real hardware.
 s10-rss:
 	$(need-s10)
-	@ssh $(S10) 'd=$$(mktemp -d); ./heirloomd -addr 127.0.0.1:18787 -data $$d & p=$$!; sleep 3; ./heirloomd -version; grep VmRSS /proc/$$p/status; kill $$p; wait $$p 2>/dev/null; rm -rf $$d'
+	@ssh $(S10) 'p=$$(systemctl show -p MainPID --value heirloomd); test "$$p" -gt 0 && grep VmRSS /proc/$$p/status || { echo "heirloomd is not running on the S10"; exit 1; }'

@@ -32,6 +32,11 @@ const (
 	// low five bits pick one evenly.
 	alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	codeLen  = 8
+	// Wrong codes an account may try in an hour before every join of its is refused until
+	// the hour is up. A code is one of 2^40, so ten an hour finds nothing in a lifetime,
+	// and nobody copying a code from a friend's screen gets it wrong ten times.
+	maxWrongCodes = 10
+	wrongWindow   = time.Hour
 )
 
 var (
@@ -105,10 +110,47 @@ type Service struct {
 	mu     gosync.Mutex
 	totals map[int64]totals
 	counts int // times a week of sessions was read, for the test that says how seldom
+
+	// Wrong codes tried, by account. At most one entry an account, and accounts are by invite.
+	guessMu gosync.Mutex
+	guesses map[int64]guesses
+}
+
+type guesses struct {
+	n     int
+	since time.Time
 }
 
 func New(db *sql.DB, cells *sync.Store, now func() time.Time) *Service {
-	return &Service{db: db, cells: cells, now: now, totals: map[int64]totals{}}
+	return &Service{db: db, cells: cells, now: now, totals: map[int64]totals{}, guesses: map[int64]guesses{}}
+}
+
+// guess counts a try at a code before the code is looked at, as sign-ins are counted, so
+// tries sent all at once cannot each slip past the limit. right is true when the try
+// turned out to be a real code, and the count is given back.
+func (s *Service) guess(account int64, right bool) error {
+	s.guessMu.Lock()
+	defer s.guessMu.Unlock()
+	now := s.now()
+	g := s.guesses[account]
+	if now.Sub(g.since) >= wrongWindow {
+		g = guesses{since: now}
+	}
+	switch {
+	case right:
+		g.n--
+	case g.n >= maxWrongCodes:
+		wait := g.since.Add(wrongWindow).Sub(now)
+		return &auth.Error{Status: 429, Code: "slow_down", RetryAfter: int((wait + time.Second - 1) / time.Second)}
+	default:
+		g.n++
+	}
+	if g.n <= 0 {
+		delete(s.guesses, account)
+	} else {
+		s.guesses[account] = g
+	}
+	return nil
 }
 
 // Create makes a room with the account as its first member and returns the room's ids.
@@ -157,6 +199,9 @@ func (s *Service) Create(account int64, name string) (public string, room int64,
 func (s *Service) Join(account int64, code string) (public string, room int64, err error) {
 	// Typed from a friend's screen: lower case and a stray space are not a wrong code.
 	code = strings.ToUpper(strings.TrimSpace(code))
+	if err := s.guess(account, false); err != nil {
+		return "", 0, err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return "", 0, fmt.Errorf("begin join: %w", err)
@@ -168,6 +213,7 @@ func (s *Service) Join(account int64, code string) (public string, room int64, e
 	} else if err != nil {
 		return "", 0, fmt.Errorf("read room: %w", err)
 	}
+	s.guess(account, true)
 	var in bool
 	var members int
 	if err := tx.QueryRow("select count(*), coalesce(max(account = ?), 0) from member where room = ?", account, room).Scan(&members, &in); err != nil {

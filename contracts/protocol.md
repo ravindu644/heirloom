@@ -464,6 +464,7 @@ errors as section 10, and these of their own:
 | 404 | `code` | No room has this code |
 | 409 | `full` | The room has 8 members, or the account is in 5 rooms |
 | 404 | `run` | `to` is not a member, or has no such session that rang |
+| 429 | `slow_down` | Ten wrong codes from one account inside an hour: every join by it, the right code included, until the hour is up. `Retry-After` carries the seconds |
 
 A room's `code` is 8 characters of `A-Z 2-9` without the look-alikes (`I`, `O`, `0`, `1`), made
 by the server. Whoever has it can join; any member can read it.

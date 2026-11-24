@@ -56,9 +56,9 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 		w.Write(health)
 	})
 	mux.HandleFunc("GET /api/ws", h.ServeWS)
-	mux.HandleFunc("POST /api/sync", post(maxSyncBody, func(_ context.Context, req hub.SyncRequest) (hub.SyncReply, error) {
+	mux.HandleFunc("POST /api/sync", bigBodies(make(chan struct{}, maxBigSyncs), post(maxSyncBody, func(_ context.Context, req hub.SyncRequest) (hub.SyncReply, error) {
 		return h.Sync(req)
-	}))
+	})))
 	mux.HandleFunc("POST /api/register", post(maxAccountBody, func(ctx context.Context, c credentials) (auth.Session, error) {
 		return accounts.Register(ctx, c.Invite, c.Username, c.Password, c.Device)
 	}))

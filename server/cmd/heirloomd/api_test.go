@@ -65,7 +65,11 @@ func start(t *testing.T) *world {
 		t.Fatal(err)
 	}
 	api, h := newAPI(db, func() time.Time { return time.UnixMilli(w.ms.Load()) }, "test", app)
-	srv := httptest.NewServer(api)
+	// Behind the same bound on connections as the real listener, so every test here
+	// also says the bound is not in the way of ordinary use.
+	srv := httptest.NewUnstartedServer(api)
+	srv.Listener = limit(srv.Listener, maxConns)
+	srv.Start()
 	t.Cleanup(func() { h.Close(); srv.Close(); db.Close() })
 	w.url, w.db, w.hub = srv.URL, db, h
 	return w

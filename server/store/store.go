@@ -22,8 +22,21 @@ func Open(dir string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve data directory: %w", err)
 	}
+	db, err := open(dsn(path))
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate %s: %w", path, err)
+	}
+	return db, nil
+}
+
+// dsn is how every connection to the live database is opened.
+func dsn(path string) string {
 	// Built as a URL so a "?" or "%" in the path cannot be read as an option.
-	dsn := url.URL{Scheme: "file", Path: path, RawQuery: url.Values{
+	return (&url.URL{Scheme: "file", Path: path, RawQuery: url.Values{
 		// Every transaction takes the write lock when it begins. One that read first and
 		// asked for the lock later would fail outright if "heirloomd -invite" wrote in between.
 		"_txlock": {"immediate"},
@@ -35,16 +48,7 @@ func Open(dir string) (*sql.DB, error) {
 			"busy_timeout(5000)",
 			"foreign_keys(1)",
 		},
-	}.Encode()}
-	db, err := open(dsn.String())
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", path, err)
-	}
-	if err := migrate(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("migrate %s: %w", path, err)
-	}
-	return db, nil
+	}.Encode()}).String()
 }
 
 // migrations[i] takes the schema from version i to i+1. A released one is never edited:

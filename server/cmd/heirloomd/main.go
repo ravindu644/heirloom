@@ -22,6 +22,10 @@ import (
 // Set by the Makefile with -X main.version=...
 var version = "dev"
 
+// How often the server asks whether today has its backup yet. The copy itself is made
+// once a day; this only decides how soon after midnight UTC, and after a start.
+const backupCheck = 10 * time.Minute
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "heirloomd:", err)
@@ -61,10 +65,11 @@ func run() error {
 	defer db.Close()
 
 	// Listen before the start line, so a taken port is an error and not a lie in the log.
-	ln, err := net.Listen("tcp", *addr)
+	tcp, err := net.Listen("tcp", *addr)
 	if err != nil {
 		return fmt.Errorf("start: %w", err) // net's error already names the address
 	}
+	ln := limit(tcp, maxConns)
 	app, err := web.App()
 	if err != nil {
 		return err
@@ -79,6 +84,27 @@ func run() error {
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
 	log.Printf("heirloomd %s sqlite %s listening on %s", version, sqliteVersion, ln.Addr())
+
+	// The daily copy, from inside the server: no second process, no cron line to forget.
+	// A failure is one line in the log and nothing more; tomorrow it is tried again.
+	backedUp := make(chan struct{})
+	go func() {
+		defer close(backedUp)
+		backups := store.NewBackups(*data)
+		every := time.NewTicker(backupCheck)
+		defer every.Stop()
+		for {
+			// The error names files and SQLite's complaint, never what is in the database.
+			if _, err := backups.Tick(time.Now()); err != nil {
+				log.Printf("backup: %v", err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-every.C:
+			}
+		}
+	}()
 
 	select {
 	case err := <-served:
@@ -97,6 +123,9 @@ func run() error {
 	}
 	// Shutdown does not know about sockets. Close them and wait, so nothing is mid-write.
 	sockets.Close()
+	// A copy in the making has its own connection. Let it finish: ours must be the last
+	// to close, or the -wal file is left behind.
+	<-backedUp
 	// Closing the last connection checkpoints the WAL and removes the -wal and -shm files.
 	if err := db.Close(); err != nil {
 		return fmt.Errorf("close database: %w", err)

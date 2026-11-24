@@ -941,7 +941,7 @@ func TestOnePushIsOneMessage(t *testing.T) {
 	t.Logf("40 pushes in a row reached the other device as %d room messages", len(burst))
 }
 
-func TestOffsetIsCheckedAndMissingIsUTC(t *testing.T) {
+func TestOffsetIsCheckedAndMissingChangesNothing(t *testing.T) {
 	w := start(t)
 	ravi := w.person("ravi", phone, 330)
 	for what, offset := range map[string]any{"15 hours east": 900, "13 hours west": -780, "half a minute": 0.5, "words": "+05:30"} {
@@ -972,10 +972,18 @@ func TestOffsetIsCheckedAndMissingIsUTC(t *testing.T) {
 			t.Errorf("after a sync at %d the stored offset is %d: the latest one is kept", edge, stored())
 		}
 	}
-	// A device that does not say is on UTC.
+	// A device that does not say changes nothing, by either road: the last one known stands.
 	w.connect(ravi.Token, phone, 0)
-	if stored() != 0 {
-		t.Errorf("after a hello with no offset the stored offset is %d, want 0", stored())
+	w.sync(ravi.Token, phone, 0, nil)
+	if stored() != 840 {
+		t.Errorf("after a hello and a sync with no offset the stored offset is %d, want the 840 sent last", stored())
+	}
+	// And before any is known, it is 0.
+	sachi := w.signUp("sachi", laptop)
+	w.connect(sachi.Token, laptop, 0)
+	var first int
+	if err := w.db.QueryRow("select utc_offset_min from account where username = 'sachi'").Scan(&first); err != nil || first != 0 {
+		t.Errorf("an account no device has told an offset: %d, %v; want 0", first, err)
 	}
 }
 
