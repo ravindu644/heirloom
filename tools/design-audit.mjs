@@ -344,7 +344,9 @@ export function collect(colours) {
   const drawn = (cs, el, own) => {
     const colours = [];
     if (own) colours.push(['color', cs.color]);
-    if (!clear(cs.backgroundColor)) colours.push(['background-color', cs.backgroundColor]);
+    // A project's picked colour is the person's, not DESIGN.md's: the one place a colour value is
+    // written in a style attribute (kit/square.tsx), and the one fill this check lets by.
+    if (!clear(cs.backgroundColor) && !/background:\s*(#|rgb)/.test(el.getAttribute('style') ?? '')) colours.push(['background-color', cs.backgroundColor]);
     for (const side of SIDES) if (px(cs[`border-${side}-width`]) > 0 && !/none|hidden/.test(cs[`border-${side}-style`])) colours.push([`border-${side}-color`, cs[`border-${side}-color`]]);
     if (own && cs.textDecorationLine !== 'none') colours.push(['text-decoration-color', cs.textDecorationColor]);
     if (el instanceof SVGElement) {
