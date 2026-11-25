@@ -134,14 +134,76 @@ func Client() *http.Client {
 	}
 }
 
+// notPublic is every range the IANA special-purpose registries (IPv4 and IPv6) set apart
+// from the public internet, with multicast. A push service has an address in none of
+// them. The private and loopback ranges are the obvious ones; the rest are here because
+// each is somebody's inside network: 100.64.0.0/10 is carrier NAT and Tailscale,
+// 198.18.0.0/15 is lab equipment, 2002::/16 and 2001::/32 wrap an IPv4 address in IPv6.
+var notPublic = prefixes(
+	"0.0.0.0/8",         // "this network"
+	"10.0.0.0/8",        // private
+	"100.64.0.0/10",     // shared address space: carrier NAT, Tailscale
+	"127.0.0.0/8",       // loopback
+	"169.254.0.0/16",    // link local, and the cloud metadata address
+	"172.16.0.0/12",     // private
+	"192.0.0.0/24",      // IETF protocol assignments
+	"192.0.2.0/24",      // documentation
+	"192.31.196.0/24",   // AS112
+	"192.52.193.0/24",   // AMT
+	"192.88.99.0/24",    // 6to4 relays, deprecated
+	"192.168.0.0/16",    // private
+	"192.175.48.0/24",   // AS112
+	"198.18.0.0/15",     // benchmarking
+	"198.51.100.0/24",   // documentation
+	"203.0.113.0/24",    // documentation
+	"224.0.0.0/4",       // multicast
+	"240.0.0.0/4",       // reserved, and broadcast
+	"::/128",            // unspecified
+	"::1/128",           // loopback
+	"64:ff9b:1::/48",    // NAT64 for local use
+	"100::/64",          // discard
+	"100:0:0:1::/64",    // dummy prefix
+	"2001::/23",         // IETF protocol assignments: Teredo, benchmarking, ORCHID
+	"2001:db8::/32",     // documentation
+	"2002::/16",         // 6to4: an IPv4 address inside
+	"2620:4f:8000::/48", // AS112
+	"3fff::/20",         // documentation
+	"5f00::/16",         // segment routing
+	"fc00::/7",          // unique local
+	"fe80::/10",         // link local
+	"ff00::/8",          // multicast
+)
+
+// nat64 is how an IPv6-only network reaches IPv4 hosts: the IPv4 address is the last four
+// bytes. It is judged by that address, so such a network can still reach push services
+// and cannot be used to reach 10.0.0.1 by another spelling.
+var nat64 = netip.MustParsePrefix("64:ff9b::/96")
+
+func prefixes(list ...string) []netip.Prefix {
+	out := make([]netip.Prefix, len(list))
+	for i, p := range list {
+		out[i] = netip.MustParsePrefix(p)
+	}
+	return out
+}
+
 // public reports whether an address a name resolved to is one a push service could have.
 func public(address string) bool {
 	ap, err := netip.ParseAddrPort(address)
 	if err != nil {
 		return false
 	}
-	ip := ap.Addr().Unmap()
-	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast()
+	ip := ap.Addr().Unmap() // ::ffff:10.0.0.1 is 10.0.0.1
+	if nat64.Contains(ip) {
+		bytes := ip.As16()
+		ip = netip.AddrFrom4([4]byte(bytes[12:]))
+	}
+	for _, p := range notPublic {
+		if p.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 // New reads the server's VAPID key, making it on the first start, and sets a bell for
@@ -441,10 +503,19 @@ func (s *Service) send(account int64, device, endpoint string, ua *ecdh.PublicKe
 		return
 	}
 	res.Body.Close()
+	// 404 and 410: the push service has dropped this subscription. 401 and 403: it will not
+	// take our word for this one, which is what happens when the browser subscribed under
+	// another key (a database restored from before the key was made). Either way the row
+	// would be tried at every bell for ever, so it goes; the app subscribes again when it
+	// sees the key is not the one it used.
+	//
+	// But 401 and 403 are also what a push service says when it does not like the sender,
+	// and with no -contact set that may be all it is. Then the fault is ours, every
+	// subscription would get the same answer, and none of them may be thrown away for it.
+	refused := (res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden) && s.contact != DefaultContact
 	switch {
-	case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusGone:
-		// The push service has dropped this subscription. So do we, unless the device
-		// has subscribed anew in the meantime.
+	case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusGone || refused:
+		// Unless the device has subscribed anew in the meantime.
 		if _, err := s.db.Exec("delete from push_subscription where account = ? and device = ? and endpoint = ?", account, device, endpoint); err != nil {
 			log.Printf("push: %v", err)
 		}

@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"math/big"
 	"net/http"
+	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -151,6 +153,51 @@ func TestOnlyPublicAddressesAreDialled(t *testing.T) {
 		"224.0.0.1:443":                  false,
 		"localhost:443":                  false,
 		"not an address":                 false,
+	} {
+		if got := public(address); got != want {
+			t.Errorf("public(%q) = %v, want %v", address, got, want)
+		}
+	}
+	// Every range the IANA registries set apart from the public internet: its first
+	// address, its last, and one inside.
+	for _, prefix := range notPublic {
+		first := prefix.Addr()
+		bytes := first.AsSlice()
+		for bit := prefix.Bits(); bit < len(bytes)*8; bit++ {
+			bytes[bit/8] |= 1 << (7 - bit%8)
+		}
+		last, _ := netip.AddrFromSlice(bytes)
+		for _, ip := range []netip.Addr{first, last, first.Next()} {
+			if prefix.Contains(ip) && public(netip.AddrPortFrom(ip, 443).String()) {
+				t.Errorf("%s, in %s, would be dialled", ip, prefix)
+			}
+		}
+	}
+	for _, prefix := range []string{
+		"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24",
+		"192.88.99.0/24", "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4",
+		"::/128", "::1/128", "64:ff9b:1::/48", "100::/64", "2001::/23", "2001:db8::/32", "2002::/16", "3fff::/20", "5f00::/16", "fc00::/7", "fe80::/10", "ff00::/8",
+	} {
+		if !slices.Contains(notPublic, netip.MustParsePrefix(prefix)) {
+			t.Errorf("%s is not in the list", prefix)
+		}
+	}
+	// An IPv6-only network reaches IPv4 hosts through 64:ff9b::/96, so those are judged
+	// by the IPv4 address inside.
+	for address, want := range map[string]bool{
+		"[64:ff9b::8.8.8.8]:443":       true,
+		"[64:ff9b::10.0.0.5]:443":      false,
+		"[64:ff9b::100.64.0.1]:443":    false,
+		"[64:ff9b::127.0.0.1]:443":     false,
+		"[64:ff9b::192.168.41.30]:443": false,
+		"100.100.100.100:443":          false, // Tailscale lives in 100.64.0.0/10
+		"198.18.0.1:443":               false,
+		"198.19.255.255:443":           false,
+		"198.20.0.1:443":               true,
+		"100.128.0.1:443":              true,
+		"[2001:4860:4860::8888]:443":   true, // not in 2001::/23
+		"[2a00:1450:4001::200a]:443":   true,
+		"1.1.1.1:443":                  true,
 	} {
 		if got := public(address); got != want {
 			t.Errorf("public(%q) = %v, want %v", address, got, want)

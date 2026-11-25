@@ -23,7 +23,9 @@ At a bell the server sends a Web Push to each browser that asked for one. Push s
 know who is sending, in case something goes wrong. Until the unit's `ExecStart` is given
 `-contact mailto:you@example.org` (or an `https:` address), they are told
 `mailto:contact-not-set@heirloom.invalid`, which says what it is. Some push services refuse a
-sender they cannot write to, so set it before relying on the bell.
+sender they cannot write to, so set it before relying on the bell. Once it is set, a browser
+whose push service answers 401 or 403 is taken to have subscribed under an older key and is
+dropped; the app subscribes again by itself. While it is not set, such a browser is kept.
 
 The server's key for this is made at the first start and lives in the database. Restoring a
 backup from before that first start would make a new key, and every browser would have to

@@ -208,7 +208,10 @@ func (w *world) pushKey() string {
 }
 
 // restart is the server going down and coming back, as far as bells are concerned.
-func (w *world) restart() {
+func (w *world) restart() { w.restartAs(contact) }
+
+// restartAs is a restart with another -contact.
+func (w *world) restartAs(contact string) {
 	w.t.Helper()
 	w.bells.Close()
 	bells, err := push.New(w.db, sync.New(w.db, w.now), w.now, w.gateway.Client(), contact)
@@ -629,6 +632,48 @@ func TestGoneDeletesTheSubscriptionAndAnErrorDoesNot(t *testing.T) {
 		t.Errorf("the next bell went to %s", p.path)
 	}
 	w.gateway.none("two of the three subscriptions are gone")
+}
+
+// 401 and 403 are what a push service says when the subscription was made under another
+// key (a backup from before the key was restored), and also when it does not like the
+// sender. With a contact set the first is what it means, and the row would otherwise be
+// tried at every bell for ever. With none set it may be about us, and every subscription
+// there is must not be thrown away for that.
+func TestRefusedSubscriptionIsDroppedOnceTheSenderHasAName(t *testing.T) {
+	w := start(t)
+	ravi := w.person("ravi", phone, 330)
+	lap, tab := w.signIn("ravi", laptop), w.signIn("ravi", tablet)
+	forbidden, unauthorized, fine := w.gateway.browser("forbidden"), w.gateway.browser("unauthorized"), w.gateway.browser("fine")
+	forbidden.subscribe(w, ravi.Token, phone)
+	unauthorized.subscribe(w, lap.Token, laptop)
+	fine.subscribe(w, tab.Token, tablet)
+	w.gateway.answer[forbidden.path()], w.gateway.answer[unauthorized.path()] = 403, 401
+	bell := func(run string, pushes, left int) {
+		t.Helper()
+		ravi.set(timerCell(running("work", run, nil, w.ms.Load(), bellMs, 0)))
+		w.pass(bellMs * time.Millisecond)
+		w.gateway.wait(pushes)
+		for range 200 {
+			if w.subscriptions() == left {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if got := w.subscriptions(); got != left {
+			t.Errorf("after %s: %d subscriptions are kept, want %d", run, got, left)
+		}
+		w.gateway.none("one push a device a bell")
+	}
+
+	// The owner has set no contact: a refusal may be the push service not liking that.
+	w.restartAs(push.DefaultContact)
+	bell("run-1", 3, 3)
+	bell("run-2", 3, 3)
+
+	// With a contact set, a refusal is about the subscription. It goes, and is not tried again.
+	w.restartAs(contact)
+	bell("run-3", 3, 1)
+	bell("run-4", 1, 1)
 }
 
 // A push service that does not answer must cost nobody anything: a device pushing its
