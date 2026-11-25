@@ -780,6 +780,43 @@ func TestCheerOncePerPersonPerRun(t *testing.T) {
 	}
 }
 
+// What a room counts and what it lets be cheered are two things since a stopped lap
+// became a lap: the count takes every lap that was not set aside, the cheer still wants a bell.
+func TestRoomCountsStoppedLapsAndCheersOnlyBells(t *testing.T) {
+	w := start(t)
+	ravi, sachi := w.person("ravi", phone, 330), w.person("sachi", laptop, 330)
+	room, _ := together(t, "Sachi and me", ravi, sachi)
+	now := w.ms.Load()
+	cells := sessionCells("run-rang", "work", "rang", now-5*lapMs, ravi.id)
+	add := func(run, kind, outcome string, started, ranMs int64) {
+		for k, v := range sessionCells(run, kind, outcome, started, ravi.id) {
+			cells[k] = v
+		}
+		cells[[3]string{"session", run, "ended"}] = started + ranMs
+	}
+	add("run-stopped", "work", "stopped", now-3*lapMs, 10*60*1000)
+	add("run-stopped-at-once", "work", "stopped", now-2*lapMs, 20*1000) // twenty seconds is still a lap
+	add("run-void", "work", "void", now-lapMs, lapMs)
+	add("run-break", "short", "rang", now-lapMs/2, 5*60*1000)
+	ravi.set(cells)
+
+	got := who(t, sachi.room(), "ravi")
+	if got.TodayLaps != 3 {
+		t.Errorf("today_laps = %d, want 3: the lap that rang and the two that were stopped, not the one set aside, not the break", got.TodayLaps)
+	}
+	if want := int64(lapMs + 10*60*1000 + 20*1000); got.TodayMs != want || got.WeekMs != want {
+		t.Errorf("today %d ms, week %d ms, want %d", got.TodayMs, got.WeekMs, want)
+	}
+	// The lap that can be cheered is still the last one that rang, though two laps ended after it.
+	if got.Last == nil || got.Last.Run != "run-rang" {
+		t.Errorf("last = %+v, want the lap that rang", got.Last)
+	}
+	for _, run := range []string{"run-stopped", "run-stopped-at-once", "run-void", "run-break"} {
+		sachi.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": run}).refused(t, "a cheer for "+run, 404, "run")
+	}
+	sachi.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": "run-rang"}).ok(t, "a cheer for the lap that rang")
+}
+
 func TestRoomsComeWithTheWelcomeAndInThePOSTReply(t *testing.T) {
 	w := start(t)
 	ravi, sachi, mali := w.person("ravi", phone, 330), w.person("sachi", laptop, 330), w.person("mali", tablet, 330)

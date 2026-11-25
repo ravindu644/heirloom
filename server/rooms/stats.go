@@ -54,9 +54,10 @@ func Stats(sessions []Session, offsetMin int) (days map[string]Day, overlaps [][
 		}
 		d.FocusMs += max(0, s.Ended-max(reach[day], s.from()))
 		reach[day] = max(reach[day], s.Ended)
-		if s.Outcome == "rang" {
-			d.Laps++
-		}
+		// Every counted session is a lap: one that was stopped is a lap that ended early.
+		// What is earned by the bell (a cheer, the lap a room shows as the last) is asked
+		// for by outcome where it is decided, not here.
+		d.Laps++
 		days[day] = d
 	}
 

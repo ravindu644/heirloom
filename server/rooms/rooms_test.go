@@ -57,6 +57,35 @@ func TestFixtureStats(t *testing.T) {
 	}
 }
 
+// A lap ends at its bell or when the person stops it, and either way it is a lap: a
+// stopped one is a lap that ended early, however early. Only one set aside is not.
+func TestStoppedLapIsALap(t *testing.T) {
+	const start = 1_795_581_000_000
+	sessions := []Session{
+		{ID: "rang", Kind: "work", Started: start, Ended: start + 1_500_000, Outcome: "rang", Device: "a"},
+		{ID: "stopped", Kind: "work", Started: start + 2_000_000, Ended: start + 2_600_000, Outcome: "stopped", Device: "a"},
+		// Twenty seconds: far under the minute a break must run to leave a row. A lap always leaves one.
+		{ID: "stopped at once", Kind: "work", Started: start + 3_000_000, Ended: start + 3_020_000, Outcome: "stopped", Device: "a"},
+		{ID: "paused, then stopped", Kind: "work", Started: start + 4_000_000, Ended: start + 4_090_000, PausedMs: 60_000, Outcome: "stopped", Device: "a"},
+		{ID: "set aside", Kind: "work", Started: start + 5_000_000, Ended: start + 6_500_000, Outcome: "void", Device: "a"},
+		{ID: "a break that rang", Kind: "short", Started: start + 7_000_000, Ended: start + 7_300_000, Outcome: "rang", Device: "a"},
+		{ID: "a break stopped", Kind: "long", Started: start + 8_000_000, Ended: start + 8_100_000, Outcome: "stopped", Device: "a"},
+	}
+	days, _ := Stats(sessions, 0)
+	day := days[localDay(start, 0)]
+	if len(days) != 1 || day.Laps != 4 {
+		t.Errorf("laps = %d over %d days, want 4: the one that rang and the three that were stopped", day.Laps, len(days))
+	}
+	if want := int64(1_500_000 + 600_000 + 20_000 + 30_000); day.FocusMs != want {
+		t.Errorf("focus = %d ms, want %d: the minutes are counted as they always were", day.FocusMs, want)
+	}
+	// A day of nothing but stopped laps is a day with laps.
+	only, _ := Stats(sessions[1:3], 0)
+	if got := only[localDay(start, 0)].Laps; got != 2 {
+		t.Errorf("two stopped laps and no bell: %d laps, want 2", got)
+	}
+}
+
 func TestWatchReadsATimerAtAMoment(t *testing.T) {
 	const started = 1_795_581_000_000
 	const lap = 25 * 60 * 1000
