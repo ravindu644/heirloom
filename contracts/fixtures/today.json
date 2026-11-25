@@ -26,28 +26,28 @@
    "text": "exercise 5-3 ~12",
    "expect": {
     "title": "exercise 5-3",
-    "estimate": 8
+    "estimate": 12
    }
   },
   {
-   "text": "eight is the most ~8",
+   "text": "thirty-two is the most ~32",
    "expect": {
-    "title": "eight is the most",
-    "estimate": 8
+    "title": "thirty-two is the most",
+    "estimate": 32
    }
   },
   {
-   "text": "nine is taken as eight ~9",
+   "text": "thirty-three is taken as thirty-two ~33",
    "expect": {
-    "title": "nine is taken as eight",
-    "estimate": 8
+    "title": "thirty-three is taken as thirty-two",
+    "estimate": 32
    }
   },
   {
    "text": "and so is ninety-nine ~99",
    "expect": {
     "title": "and so is ninety-nine",
-    "estimate": 8
+    "estimate": 32
    }
   },
   {

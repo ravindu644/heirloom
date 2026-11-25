@@ -376,7 +376,7 @@ The rules behind the Today screen. They are worked out on the device from `task`
 `session` and `settings` rows; the server knows none of them.
 
 **Quick add.** One line of text makes one task. If the trimmed text ends in a space, `~` and a
-number from 1 to 99, that number is the estimate in laps, 8 at most (a larger one is taken as 8),
+number from 1 to 99, that number is the estimate in laps, 32 at most (a larger one is taken as 32),
 and the rest, trimmed, is the title.
 Anything else is all title. An empty title adds nothing.
 
@@ -392,7 +392,8 @@ own, so each day's laps stay with that day's task:
 - its id is the series id, `-`, and that day as eight digits: `task-read-20261125`. The series id
   is the done task's id without such an ending. Two devices that mark the same task done offline
   therefore make the same row;
-- it copies `project`, `title`, `notes`, `estimate`, `repeat`, `when`, `time` and `order`.
+- it copies `project`, `title`, `notes`, `estimate`, `repeat`, `when`, `time`, `work_ms`, `short_ms`,
+  `long_ms` and `order`.
   Subtasks are not copied.
 
 Marking it not done again sets `deleted` on that next row; done again clears it.
@@ -452,9 +453,18 @@ by `order`, then by row id, so two devices that picked the same key still agree.
 
 A subtask shows inside its parent only.
 
-**An estimate** is offered from 1 to 8 laps. Past that a task is several tasks, and a row of
-forty squares is no picture of anything. A larger number in a row from an older build is kept and
-shown as it is; the first edit of the estimate brings it to 8.
+**An estimate** is offered from 1 to 32 laps: four rows of eight squares, which is what a row can
+draw (the user, 2026-11-25: 8 was too few). A larger number in a row from an older build is kept
+and shown as it is; the first edit of the estimate brings it to 32.
+
+**A task's own lengths.** `work_ms`, `short_ms` and `long_ms` on a task, each a length or `null`.
+A lap begun on the task takes its `work_ms` as `planned_ms`; the break begun after a lap on it
+(by a tap or by itself) takes its `short_ms` or `long_ms`. A field that is `null`, absent or not
+a length the settings would take falls back to the account's own (section 16), each field by
+itself. The timer cell carries no new field: a length is read once, when the run begins, by the
+device that begins it, so a task edited mid-lap changes the next run and not this one.
+"Planned, left" counts each task's laps at that task's lap length. The next task of a repeating
+series copies all three.
 
 **The free words for when** (`when`) are no longer shown or edited: with a clock time beside
 them nobody could say what they were for (the user, 2026-11-25). The field stays in the schema and
@@ -553,8 +563,20 @@ Worked out on the device from `habit` and `checkin` rows.
   every past day.
 - **This week against last:** the check-ins of all habits (not archived, not deleted) from Monday
   to now, and last week's from its Monday to the same weekday and time.
-- `remind` is a local time of day, `07:30`. The reminder is for the days the habit is planned and
-  is not shown on a day the habit is already done. It is a device's own notification; nothing is
+- `reminds` is a list of local times of day, sorted, `["06:00", "22:00"]`: at most one for each
+  time a day the habit is done (`target`), and fewer is fine. The first is for the first
+  check-in of the day, the second for the second, and so on: the reminder at place k is shown
+  on a planned day only while that day has fewer than k check-ins. A habit done twice by noon is
+  not reminded at 22:00; one done once is. A device writes the whole list in one cell, and with
+  it `remind`, the list's first time or `null`, so a build that knows only `remind` still
+  reminds once. It writes `remind` first, so the list's stamp is the later of the two. A device
+  reads `reminds` when it is a list and `remind` as a list of one when it is not; and when
+  `remind` carries the later stamp, an older build has changed its one time since, and that is
+  read in the list's place (`null` as no times), so every device reminds at what was set last.
+  Lowering `target` under the list's length cuts the list. An entry that is not a
+  time of day makes the whole list read as empty; the cell is left as it is.
+- `remind` is a local time of day, `07:30`, kept for older builds as said above. A reminder is
+  for the days the habit is planned and is not shown on a day the habit is already done. It is a device's own notification; nothing is
   sent by the server.
 - Order, delete and restore work as for tasks (section 12): `order` is a fractional index,
   `deleted` a time, restorable for 30 days. `archived` takes a habit off the list and keeps its
@@ -663,7 +685,9 @@ replaced:
 An automatic start is written only by the device that writes the bell's row, in the same write
 (section 11 says who may), and never more than two hours after the bell: someone who comes back the next morning finds the timer
 idle, not a break that started itself nine hours ago. A set of four never chains past its long
-break: after a long break's bell nothing starts by itself.
+break: after a long break's bell nothing starts by itself. A lap that starts by itself goes on
+with the task of the lap that rang before the break, while that task is open (not done, not
+deleted); otherwise it is for no task.
 
 **Marks.** A mark is for something achieved, never for opening the app. Three kinds: the total of
 laps that rang reaching 1, 4, 25, 100, 250, 500, 1000 or 2500; a task marked done with its laps at
