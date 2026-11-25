@@ -5,11 +5,13 @@
 import type { Cell } from '../core/merge.ts';
 import { memoryStores } from '../store/memory.ts';
 import type { OpenStore, Write } from '../store/store.ts';
+import { createAdmins } from './admins.ts';
 import { createEngine } from './engine.ts';
 import type { Engine } from './engine.ts';
 import { fakeSockets, fakeTime } from './fakes.ts';
 import { createFocus } from './focus.ts';
 import { createHabits } from './habits.ts';
+import { createInvites } from './invites.ts';
 import { createProgress } from './progress.ts';
 import { createRooms } from './rooms.ts';
 import { createSettings } from './settings.ts';
@@ -59,8 +61,9 @@ export function world() {
       WebSocket: fakeSockets().FakeSocket,
       fetch: async (url, init) => {
         const path = new URL(url).pathname;
-        const body = JSON.parse(init.body);
-        let answer: Answer = { status: 200, body: { token: `token-${name}`, account: body.username === 'ravi' ? 'acct' : `acct-${body.username}`, username: body.username } };
+        // /healthz is a GET and has no body. It is the test's to answer, as every call but the account's is.
+        const body = JSON.parse(init.body ?? 'null');
+        let answer: Answer = { status: 200, body: { token: `token-${name}`, account: body?.username === 'ravi' ? 'acct' : `acct-${body?.username}`, username: body?.username } };
         if (!['/api/login', '/api/register', '/api/logout'].includes(path)) {
           server.requests.push({ path, body, from: name });
           answer = (await server.reply?.(path, body)) ?? { status: 200, body: {} };
@@ -102,6 +105,8 @@ export function world() {
     let habits: ReturnType<typeof createHabits> | undefined;
     let rooms: ReturnType<typeof createRooms> | undefined;
     let settings: ReturnType<typeof createSettings> | undefined;
+    let invites: ReturnType<typeof createInvites> | undefined;
+    let admins: ReturnType<typeof createAdmins> | undefined;
 
     const d = {
       name,
@@ -122,7 +127,15 @@ export function world() {
       get settings() {
         return (settings ??= createSettings(engine, { utcOffsetMin: () => OFFSET }));
       },
+      get invites() {
+        return (invites ??= createInvites(engine));
+      },
+      get admins() {
+        return (admins ??= createAdmins(engine));
+      },
       close() {
+        invites?.close();
+        admins?.close();
         focus.close();
         today?.close();
         progress?.close();
@@ -144,11 +157,14 @@ export function world() {
           wire().handlers.message({ type: 'ack', batch: push.batch, from, cursor: from + push.cells.length });
         }
       },
-      async connect() {
+      /** The server's welcome. A `role` is said in it; none is an older server, whose accounts are members. */
+      async connect(role?: string) {
         d.online = true;
-        wire().handlers.message({ type: 'welcome', server_time: 0, head: wire().handlers.hello().cursor });
+        wire().handlers.message({ type: 'welcome', server_time: 0, head: wire().handlers.hello().cursor, ...(role && { role }) });
         await d.settle();
       },
+      /** The owner changed this account's role while it was connected. */
+      role: (role: string) => wire().handlers.message({ type: 'role', role }),
       disconnect() {
         d.online = false;
         wire().handlers.down();

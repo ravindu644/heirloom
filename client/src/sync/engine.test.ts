@@ -3,13 +3,14 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { effect } from '@preact/signals-core';
 import type { Cell } from '../core/merge.ts';
 import { memoryStores } from '../store/memory.ts';
 import type { OpenStore, Write } from '../store/store.ts';
 import { createEngine } from './engine.ts';
 import type { Env } from './engine.ts';
 import { T0, fakeSockets, fakeTime, settle } from './fakes.ts';
-import { connect } from './transport.ts';
+import { HEALTH_MS, connect } from './transport.ts';
 import type { Fetch, Handlers, Push, Transport } from './transport.ts';
 
 const OTHER = 'b2c3d4e5f6071829';
@@ -52,10 +53,18 @@ function fakeAccounts() {
     fail: null as null | { status: number; error: string; retryAfter?: string; times?: number },
     /** Set, and the next logout waits for it: the request is on its way and has not come back. */
     logoutWaits: null as null | Promise<void>,
+    /** What /healthz says. 'hangs' never answers. */
+    health: { ok: true, version: 'test', sqlite: 'test' } as unknown,
   };
   const fetch: Fetch = async (url, init) => {
     if (!server.reachable) throw new TypeError('fetch failed');
     const path = new URL(url).pathname;
+    if (path === '/healthz') {
+      // A GET: a body here would make a real fetch throw.
+      server.calls.push({ path: `${init.method} ${url}`, body: init.body, signal: init.signal });
+      if (server.health === 'hangs') return new Promise(() => {});
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => server.health };
+    }
     const body = JSON.parse(init.body);
     server.calls.push({ path, body, signal: init.signal });
     if (path === '/api/logout') await server.logoutWaits;
@@ -1267,6 +1276,153 @@ describe('accounts', () => {
     d.wire().handlers.message({ type: 'bye', reason: 'protocol' });
     assert.equal(d.engine.sync.value, 'in-step');
     assert.equal(d.wire().running, true);
+  });
+});
+
+describe('the role', () => {
+  const welcome = (d: Awaited<ReturnType<typeof device>>, role?: string | null) =>
+    d.wire().handlers.message({ type: 'welcome', server_time: 0, head: 0, ...(role !== undefined && { role }) });
+  // Read through a function: an assert on a signal's value narrows it for the rest of the test.
+  const role = (d: Awaited<ReturnType<typeof device>>) => d.engine.role.value;
+
+  it('is member with nobody signed in, and until the server has said otherwise', async () => {
+    const d = await device();
+    assert.equal(role(d), 'member');
+    await d.engine.register('invite-code', 'ravi', 'correct horse');
+    assert.equal(role(d), 'member');
+  });
+
+  it('is what each welcome says: an older server says none, which is member, and so is a word this build does not know', async () => {
+    const d = await signedIn({ head: null });
+    welcome(d, 'owner');
+    assert.equal(role(d), 'owner');
+    welcome(d, 'admin');
+    assert.equal(role(d), 'admin');
+    welcome(d);
+    assert.equal(role(d), 'member');
+    welcome(d, 'admin');
+    welcome(d, 'moderator');
+    assert.equal(role(d), 'member');
+  });
+
+  it('is kept: after a restart it is there before any connection', async () => {
+    const d = await signedIn({ head: null });
+    welcome(d, 'admin');
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.engine.account.value?.username, 'ravi');
+    assert.equal(role(again), 'admin');
+    // And a role taken away while this device was closed is heard at the next welcome, and kept so.
+    welcome(again, 'member');
+    await again.engine.stop();
+    assert.equal(role(await device({ stores: d.stores })), 'member');
+  });
+
+  it('a POST reply standing in for a welcome does not say the role: what is held stays', async () => {
+    const d = await signedIn({ head: null });
+    welcome(d, 'admin');
+    welcome(d, null);
+    assert.equal(role(d), 'admin');
+  });
+
+  it('a role message is the role as a welcome says it: shown at once, and kept', async () => {
+    const d = await signedIn();
+    d.wire().handlers.message({ type: 'role', role: 'admin' });
+    assert.equal(role(d), 'admin');
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(role(again), 'admin');
+    again.wire().handlers.message({ type: 'role', role: 'moderator' });
+    assert.equal(role(again), 'member');
+  });
+
+  it('roleSaid moves each time the server says the role, the same one too, and not for a POST reply that does not say', async () => {
+    const d = await signedIn({ head: null });
+    const said = () => d.engine.roleSaid.value;
+    assert.equal(said(), 0);
+    welcome(d, 'admin');
+    assert.equal(said(), 1);
+    welcome(d, 'admin');
+    assert.equal(said(), 2);
+    d.wire().handlers.message({ type: 'role', role: 'admin' });
+    assert.equal(said(), 3);
+    // An older server's welcome says none, and that is saying "member".
+    welcome(d);
+    assert.equal(said(), 4);
+    welcome(d, null);
+    assert.equal(said(), 4);
+    // Whoever watches both sees the new role with the count, not one before the other.
+    const seen: string[] = [];
+    const stop = effect(() => void seen.push(`${d.engine.roleSaid.value} ${d.engine.role.value}`));
+    welcome(d, 'owner');
+    stop();
+    assert.deepEqual(seen, ['4 member', '5 owner']);
+  });
+
+  it('sign out resets it, in the same turn as the account, and it stays reset after a restart', async () => {
+    const d = await signedIn({ head: null });
+    welcome(d, 'owner');
+    const seen: string[] = [];
+    const stop = effect(() => void seen.push(`${d.engine.account.value?.username ?? 'nobody'} ${d.engine.role.value}`));
+    assert.deepEqual(await d.engine.signOut(), { ok: true });
+    stop();
+    assert.deepEqual(seen, ['ravi owner', 'nobody member']);
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(role(again), 'member');
+    // The next to sign in here is not handed the last one's role.
+    await again.engine.signIn('ravi', 'correct horse');
+    assert.equal(role(again), 'member');
+  });
+
+  it('belongs to the account it was said of: someone else signing in here starts as a member, after a restart too', async () => {
+    const d = await signedIn({ head: null });
+    welcome(d, 'owner');
+    assert.deepEqual(await d.engine.signIn('sachi', 'another horse'), { ok: true });
+    assert.equal(role(d), 'member');
+    await d.engine.stop();
+    assert.equal(role(await device({ stores: d.stores })), 'member');
+  });
+});
+
+describe('a fresh server', () => {
+  it('needsSetup asks /healthz and is true only when it says setup: true', async () => {
+    const d = await device();
+    d.server.health = { ok: true, version: 'test', sqlite: 'test', setup: true };
+    assert.equal(await d.engine.needsSetup(), true);
+    // A GET with no body, to the server's own /healthz, with a way to give up on it.
+    assert.deepEqual(d.server.calls.map((call) => [call.path, call.body, call.signal instanceof AbortSignal]), [['GET https://heirloom.test/healthz', undefined, true]]);
+    d.server.health = { ok: true, version: 'test', sqlite: 'test' };
+    assert.equal(await d.engine.needsSetup(), false);
+    for (const said of [{ setup: 'true' }, { setup: 1 }, null, 'true']) {
+      d.server.health = said;
+      assert.equal(await d.engine.needsSetup(), false, JSON.stringify(said));
+    }
+  });
+
+  it('needsSetup is false when the server cannot be asked, and gives up on one that does not answer', async () => {
+    const d = await device();
+    d.server.health = { ok: true, version: 'test', setup: true };
+    d.server.reachable = false;
+    assert.equal(await d.engine.needsSetup(), false);
+    d.server.reachable = true;
+    d.server.health = 'hangs';
+    const asked = d.engine.needsSetup();
+    await settle();
+    d.time.advance(HEALTH_MS);
+    assert.equal(await asked, false);
+    assert.equal(d.server.calls.at(-1)!.signal!.aborted, true);
+  });
+
+  it('the first account registers with an empty invite: it is sent as it is, and the server decides', async () => {
+    const d = await device();
+    assert.deepEqual(await d.engine.register('', 'ravi', 'correct horse'), { ok: true });
+    assert.deepEqual(d.server.calls, [{ path: '/api/register', body: { invite: '', username: 'ravi', password: 'correct horse', device: d.engine.device }, signal: d.server.calls[0]!.signal }]);
+    assert.equal(d.engine.account.value?.username, 'ravi');
+    // And when the server says no (somebody was first), that is the answer.
+    const late = await device();
+    late.server.fail = { status: 403, error: 'invite' };
+    assert.deepEqual(await late.engine.register('', 'sachi', 'another horse'), { ok: false, error: 'invite' });
   });
 });
 

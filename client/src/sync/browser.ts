@@ -2,16 +2,22 @@
 // a global, so the engine itself runs in Node unchanged.
 
 import { idbStores } from '../store/idb.ts';
+import { createAdmins } from './admins.ts';
+import type { Admins } from './admins.ts';
 import { createEngine } from './engine.ts';
 import type { Engine, Env } from './engine.ts';
 import { createFocus } from './focus.ts';
 import type { Focus } from './focus.ts';
 import { createHabits } from './habits.ts';
 import type { Habits } from './habits.ts';
+import { createInvites } from './invites.ts';
+import type { Invites } from './invites.ts';
 import { createProgress } from './progress.ts';
 import type { Progress } from './progress.ts';
 import { createRooms } from './rooms.ts';
 import type { Rooms } from './rooms.ts';
+import { createServerChoice } from './server.ts';
+import type { ServerChoice } from './server.ts';
 import { createSettings } from './settings.ts';
 import type { Settings } from './settings.ts';
 import { createToday } from './today.ts';
@@ -38,11 +44,19 @@ export function browserEnv(url: string = location.origin): Env {
 }
 
 /**
+ * Which server the phone app keeps step with, read from this install's storage before anything
+ * else is made. `first` is the address the build was made with, if it has one. A browser does not
+ * call this: its server is the page's own origin.
+ */
+export const serverChoice = (first?: string): Promise<ServerChoice> =>
+  createServerChoice({ ...browserEnv(''), first, reload: () => location.reload() });
+
+/**
  * The app's engine and its Focus, made together: Focus is what closes a run another device
  * replaces, so it must be listening before the first message arrives.
  * `url` is the server when it is not the page's own origin, as in the phone app.
  */
-export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings }> {
+export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins }> {
   const env = browserEnv(url);
   // The wire is made here, so the browser's own word that the network is gone can reach it.
   let wire: Transport | undefined;
@@ -74,5 +88,5 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   addEventListener('offline', () => wire?.offline());
   // And a laptop that slept over midnight must not go on showing yesterday until a late timer fires.
   document.addEventListener('visibilitychange', () => document.hidden || wake());
-  return { engine, focus, today: made, progress, habits, rooms, settings };
+  return { engine, focus, today: made, progress, habits, rooms, settings, invites: createInvites(engine), admins: createAdmins(engine) };
 }

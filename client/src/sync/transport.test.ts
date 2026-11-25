@@ -386,10 +386,36 @@ describe('without a socket', () => {
     const cell = { stamp: '2026-11-24T04:30:00.000Z-0000-b2c3d4e5f6071829', dataset: 'task', row: 't', field: 'title', value: 'x' };
     await r.answer({ status: 200, body: { server_time: T0 + 3100 + 40, head: 1043, from: 1042, to: 1043, cells: [cell] } });
     assert.deepEqual(r.samples, [40]);
+    // A POST reply does not say the role, and its welcome says so with null: "not said", where a
+    // socket's welcome without one would mean "member".
     assert.deepEqual(r.seen, [
-      { type: 'welcome', server_time: T0 + 3140, head: 1043 },
+      { type: 'welcome', server_time: T0 + 3140, head: 1043, role: null },
       { type: 'cells', from: 1042, to: 1043, cells: [cell] },
     ]);
+  });
+
+  it('a POST reply that does say the role has it passed on: in its welcome, and after that as a role message, before the cells', async () => {
+    const r = rig();
+    blocked(r);
+    const reply = (role?: string) => ({ status: 200, body: { server_time: r.time.now(), head: 0, from: 0, to: 0, cells: [], ...(role && { role }) } });
+    await r.answer(reply('admin'));
+    assert.deepEqual(r.seen, [{ type: 'welcome', server_time: r.time.now(), head: 0, role: 'admin' }, { type: 'cells', from: 0, to: 0, cells: [] }]);
+    // No socket is open for a role message to arrive on, so the next reply is where a change is heard.
+    r.seen.length = 0;
+    r.time.advance(POLL_MS);
+    await r.answer(reply('member'));
+    assert.deepEqual(r.seen, [{ type: 'role', role: 'member' }, { type: 'cells', from: 0, to: 0, cells: [] }]);
+    r.seen.length = 0;
+    r.time.advance(POLL_MS);
+    await r.answer(reply());
+    assert.deepEqual(r.seen, [{ type: 'cells', from: 0, to: 0, cells: [] }]);
+  });
+
+  it('a role message on a socket is handed on as it came', () => {
+    const r = rig();
+    welcomed(r);
+    r.sockets.last().say({ type: 'role', role: 'admin' });
+    assert.deepEqual(r.seen.at(-1), { type: 'role', role: 'admin' });
   });
 
   it('a push rides the next POST, and its ack comes back after the cells', async () => {

@@ -6,11 +6,15 @@
 import type { Cell } from '../core/merge.ts';
 
 export type ServerMessage =
-  | { type: 'welcome'; server_time: number; head: number; rooms?: string[] }
+  // `role` left out is an older server, whose accounts are all members. Null is not on the wire:
+  // it is a POST reply standing in for a welcome, which does not say.
+  | { type: 'welcome'; server_time: number; head: number; rooms?: string[]; role?: string | null }
   | { type: 'cells'; from: number; to: number; cells: Cell[] }
   | { type: 'ack'; batch: string; from: number; cursor: number }
   | { type: 'nack'; batch: string; reason: string; server_time: number }
   | { type: 'bye'; reason: string }
+  // The owner has just changed the account's role. Also what a POST reply's role becomes, after the first.
+  | { type: 'role'; role: string }
   // One room as the server sees it now: protocol section 15. sync/rooms.ts reads the rest of it.
   | ({ type: 'room'; room: string } & Record<string, unknown>)
   // Not on the wire: every room the account is in, as a welcome or a POST reply named them.
@@ -119,13 +123,25 @@ const never = () => {};
  * not just forgotten: a browser keeps six connections to a host, and six requests left hanging
  * would hold every later one in a queue behind them. Rejects when there is no answer.
  */
-export async function postJson(wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, body: object, ms: number) {
+export const postJson = (wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, body: object, ms: number) =>
+  askJson(wire, url, { ...JSON_POST, body: JSON.stringify(body) }, ms);
+
+/** How long a server has to say who it is. Short: someone is waiting on an address they just typed. */
+export const HEALTH_MS = 5000;
+
+/** `GET <server>/healthz`: what the server says of itself, or null when what answered was not JSON. Throws when nothing answered in time. */
+export const health = async (wire: Pick<Wire, 'fetch' | 'schedule'>, server: string): Promise<any> =>
+  // ponytail: Fetch says every call has a body and a GET has none. Widening the type would stop
+  // the fakes of other lanes compiling; they all read the body only on the paths they know.
+  (await askJson(wire, server + '/healthz', { method: 'GET', headers: {} } as Parameters<Fetch>[1], HEALTH_MS)).data;
+
+async function askJson(wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, init: Parameters<Fetch>[1], ms: number) {
   // A browser's fetch must not be called as a method of another object.
-  const post = wire.fetch;
+  const ask = wire.fetch;
   const abort = new AbortController();
   let cancel = never;
   const answered = (async () => {
-    const res = await post(url, { ...JSON_POST, body: JSON.stringify(body), signal: abort.signal });
+    const res = await ask(url, { ...init, signal: abort.signal });
     return { ok: res.ok, status: res.status, headers: res.headers, data: await res.json().catch(() => null) };
   })();
   // If the limit wins, whatever this request does later is nobody's business.
@@ -297,7 +313,9 @@ export function connect(wire: Wire, on: Handlers): Transport {
     on.time(reply.server_time - (sent + wire.now()) / 2);
     const steps: ServerMessage[] = [{ type: 'cells', from: reply.from, to: reply.to, cells: reply.cells ?? [] }];
     // The engine pushes its outbox again on every welcome, so it gets one per stretch of working polls, not one per poll.
-    if (!pollUp) steps.unshift({ type: 'welcome', server_time: reply.server_time, head: reply.head });
+    if (!pollUp) steps.unshift({ type: 'welcome', server_time: reply.server_time, head: reply.head, role: reply.role ?? null });
+    // No socket is open for the server to say a changed role on, so every reply says it.
+    else if (typeof reply.role === 'string') steps.unshift({ type: 'role', role: reply.role });
     // The rooms ride in the reply as they would arrive on a socket: one message each.
     for (const room of reply.rooms ?? []) steps.push({ ...room, type: 'room' });
     // The array is the whole set, so it also says which rooms are no more. No array says nothing.

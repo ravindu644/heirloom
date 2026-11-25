@@ -15,7 +15,7 @@ import { IDLE, act, asTimer } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
 import { StoreGone } from '../store/store.ts';
 import type { OpenStore, Store, Write } from '../store/store.ts';
-import { connect, postJson, smoothOffset } from './transport.ts';
+import { connect, health, postJson, smoothOffset } from './transport.ts';
 import type { Connect, Handlers, Push, ServerMessage, Transport, Wire } from './transport.ts';
 
 export interface Env extends Wire {
@@ -51,6 +51,9 @@ export interface Account {
   username: string;
 }
 
+/** What the account may do on its server beyond using the app (protocol section 10). */
+export type Role = 'member' | 'admin' | 'owner';
+
 /**
  * `error` is a code from protocol section 10, or one of ours: `offline` (the server could not be
  * reached), `unsent` (sign out refused: edits are waiting and cannot be sent now), `unsaved` (sign
@@ -63,6 +66,18 @@ export interface Engine {
   readonly sync: ReadonlySignal<SyncState>;
   /** Who is signed in on this device. Stays set when the server refuses the token: the data is still theirs. */
   readonly account: ReadonlySignal<Account | null>;
+  /**
+   * The signed-in account's role, as the server said it in its last `welcome`, kept on this device
+   * between connections. `member` until the server has said otherwise, and when nobody is signed
+   * in. It only chooses what to show: the server checks every call.
+   */
+  readonly role: ReadonlySignal<Role>;
+  /**
+   * Counts each time the server says the role: in a `welcome`, a POST reply or a `role` message.
+   * It moves when the role said is the one already held too, which `role` cannot show: whatever
+   * was refused for the role before may be asked again.
+   */
+  readonly roleSaid: ReadonlySignal<number>;
   /** How many edits are waiting to be sent. */
   readonly unsent: ReadonlySignal<number>;
   /** True while the store refuses writes: edits are held in memory and still sent, but closing the app now could lose them. */
@@ -95,7 +110,10 @@ export interface Engine {
   stamp(dataset: string, row: string, field: string): Stamp | undefined;
   /** Applies a timer action at `now()` and writes the timer cell if it changed anything. */
   act(action: TimerAction): void;
+  /** With an empty `invite`: the first account of a server that has none, its owner. */
   register(invite: string, username: string, password: string): Promise<AccountResult>;
+  /** Whether the server has no account yet and the next one made owns it (`setup` in /healthz). False when it cannot be asked. */
+  needsSetup(): Promise<boolean>;
   signIn(username: string, password: string): Promise<AccountResult>;
   signOut(): Promise<AccountResult>;
   /** Reconnect now: call it when the network returns or the app comes to the front. */
@@ -171,7 +189,7 @@ const LOGOUT_MS = 5000;
 // A `slow_down` asking for this many seconds or fewer is waited out; a longer one is the lock, and is answered.
 const SLOW_WAIT_S = 2;
 const SLOW_TRIES = 3;
-const INSTALL_DB = 'heirloom';
+export const INSTALL_DB = 'heirloom';
 // What `keep` stores sits in the meta beside the clock and the cursor, under this prefix.
 const LOCAL = 'local.';
 
@@ -185,6 +203,9 @@ const join = (first: Write | null, then: Write): Write => ({
   outbox: [...(first?.outbox ?? []), ...(then.outbox ?? [])],
   meta: { ...first?.meta, ...then.meta },
 });
+
+// Anything this build does not know is a member: it only chooses what to show.
+const asRole = (said: unknown): Role => (said === 'admin' || said === 'owner' ? said : 'member');
 
 const fold = (rows: Map<string, Row>, cell: Cell) =>
   rows.set(cell.row, { ...rows.get(cell.row), [cell.field]: cell.value, id: cell.row });
@@ -208,6 +229,19 @@ export async function createEngine(env: Env): Promise<Engine> {
   let turn: Promise<unknown> = Promise.resolve();
 
   const account = signal<Account | null>(null);
+  // What the server last said of the open account. Nobody signed in is a member, whatever is held.
+  const said = signal<Role>('member');
+  const role = computed<Role>(() => (account.value ? said.value : 'member'));
+  const roleSaid = signal(0);
+  // The server names the open account's role.
+  const hear = (named: unknown) =>
+    batch(() => {
+      roleSaid.value++;
+      if (asRole(named) === said.peek()) return;
+      said.value = asRole(named);
+      // Kept, so the right things are on screen at the next start, before any connection.
+      install.write({ meta: { role: said.peek() } }).catch(() => {});
+    });
   const connected = signal(false);
   const caughtUp = signal(false);
   const refused = signal(false);
@@ -389,6 +423,7 @@ export async function createEngine(env: Env): Promise<Engine> {
           const rooms = msg.rooms.filter((id) => typeof id === 'string');
           roomListeners.forEach((listener) => listener({ type: 'rooms', rooms }));
         }
+        if (msg.role !== null) hear(msg.role);
         batch(() => {
           connected.value = true;
           tried.value = true;
@@ -453,6 +488,9 @@ export async function createEngine(env: Env): Promise<Engine> {
         return pump();
       }
 
+      case 'role':
+        return hear(msg.role);
+
       case 'room':
       case 'rooms':
         return roomListeners.forEach((listener) => listener(msg));
@@ -467,7 +505,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     }
   }
 
-  async function open(session: Session) {
+  async function open(session: Session, held: Role = 'member') {
     const store = await env.openStore(`${INSTALL_DB}-${session.account}`);
     const snap = await store.load();
     const cells: Cells = new Map();
@@ -515,6 +553,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     batch(() => {
       for (const [dataset, set] of sets) set.value = build(dataset);
       account.value = { account: session.account, username: session.username };
+      said.value = held;
       refused.value = false;
       // A device that says it has no network is offline now, not after a socket has failed to say so.
       tried.value = env.online?.() === false;
@@ -571,7 +610,8 @@ export async function createEngine(env: Env): Promise<Engine> {
       // Unsent work of whoever was here stays in their own database until they sign in again.
       await close();
       const session: Session = { token, account: id, username };
-      await install.write({ meta: { session } });
+      // The role goes with the session it was said of: this one is a member until its own welcome.
+      await install.write({ meta: { session, role: null } });
       await open(session);
       return { ok: true };
     });
@@ -595,6 +635,8 @@ export async function createEngine(env: Env): Promise<Engine> {
     sync,
     account,
     unsent,
+    role,
+    roleSaid,
     unsaved,
     timer,
     device: me,
@@ -643,6 +685,7 @@ export async function createEngine(env: Env): Promise<Engine> {
 
     register: (invite, username, password) => enter('/api/register', { invite, username, password }),
     signIn: (username, password) => enter('/api/login', { username, password }),
+    needsSetup: () => health(env, env.url).then((answer) => answer?.setup === true, () => false),
 
     signOut: () =>
       inTurn<AccountResult>(async () => {
@@ -741,6 +784,6 @@ export async function createEngine(env: Env): Promise<Engine> {
       }),
   };
 
-  if (saved.session) await open(saved.session as Session);
+  if (saved.session) await open(saved.session as Session, asRole(saved.role));
   return engine;
 }
