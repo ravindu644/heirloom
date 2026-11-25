@@ -3,6 +3,7 @@
 
 import { computed } from '@preact/signals-core';
 import { stampMs } from '../core/hlc.ts';
+import { isMoment } from '../core/real.ts';
 import { focusOf, localDay, race } from '../core/stats.ts';
 import type { Race, Session } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
@@ -23,9 +24,14 @@ export function lapLengths(settings: Row | undefined): typeof LENGTHS {
 }
 
 // A row still arriving cell by cell, or one from a build that writes something else, is not counted yet.
+// Its times must be real ones too: every count walks the days from the first session, and a row
+// stamped by a dead clock, or holding a number no date can be, would bury or break them all.
 const isSession = (row: Record<string, unknown>) =>
-  ['started', 'ended', 'paused_ms'].every((field) => typeof row[field] === 'number') &&
-  ['kind', 'outcome', 'device'].every((field) => typeof row[field] === 'string');
+  isMoment(row.started) &&
+  isMoment(row.ended) &&
+  ['paused_ms', 'planned_ms'].every((field) => typeof row[field] === 'number' && Number.isFinite(row[field]) && (row[field] as number) >= 0) &&
+  ['kind', 'outcome', 'device'].every((field) => typeof row[field] === 'string') &&
+  (row.task === null || row.task === undefined || typeof row.task === 'string');
 
 export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'stamp'>, utcOffsetMin: () => number) {
   const state = engine.timer;

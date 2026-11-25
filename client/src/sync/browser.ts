@@ -33,6 +33,7 @@ export function browserEnv(url: string = location.origin): Env {
     openStore: idbStores(),
     // getTimezoneOffset counts minutes west of UTC; the contract counts east.
     utcOffsetMin: () => -new Date().getTimezoneOffset(),
+    online: () => navigator.onLine,
   };
 }
 

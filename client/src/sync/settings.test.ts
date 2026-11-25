@@ -262,14 +262,55 @@ describe('marks', () => {
     assert.deepEqual(Object.keys(shown(d)!), [`estimate-${fresh}`]);
   });
 
-  it('keys of marks shown long ago are dropped when the next is written, so the one cell stays small', async () => {
+  it('a key is kept as long as its mark could come up again: a lap tier\'s always, a week\'s while it is this week or last, and the newest hundred of the rest', async () => {
     const { w, d, s } = await one();
-    d.engine.write('settings', 'current', { marks: { 'laps-1': T0 - 40 * DAY, 'estimate-old': T0 - 3 * DAY, 'week-2026-11-23': T0 - HOUR } });
+    const estimates = Object.fromEntries(Array.from({ length: 101 }, (_, n) => [`estimate-t${n}`, T0 - (n + 1) * DAY]));
+    d.engine.write('settings', 'current', {
+      marks: { 'laps-1': T0 - 400 * DAY, 'week-2026-11-23': T0 - HOUR, 'week-2026-11-16': T0 - 6 * DAY, 'week-2026-11-09': T0 - 13 * DAY, ...estimates },
+    });
     for (let n = 0; n < 3; n++) theirLap(d, T0 - 5 * DAY + n * HOUR);
     d.focus.start();
     w.time.advance(LAP);
     assert.deepEqual(s.marks.value, [{ key: 'laps-4', kind: 'laps', tier: 4 }]);
-    assert.deepEqual(Object.keys(shown(d)!).toSorted(), ['laps-4', 'week-2026-11-23']);
+    const keys = Object.keys(shown(d)!);
+    assert.deepEqual(keys.filter((key) => !key.startsWith('estimate-')).toSorted(), ['laps-1', 'laps-4', 'week-2026-11-16', 'week-2026-11-23']);
+    assert.equal(keys.filter((key) => key.startsWith('estimate-')).length, 100);
+    assert.equal(keys.includes('estimate-t100'), false, 'the oldest of the hundred and one');
+    // However many there are, the cell is far under what one cell may be.
+    assert.ok(JSON.stringify(shown(d)).length < 8 * 1024);
+  });
+
+  it('the best-week mark is shown once in its week, however many other marks are written after it', async () => {
+    const { w, d, s } = await one();
+    // The best week so far: one lap, as in each week before it. On Tuesday this week passes it.
+    for (const day of ['2026-10-20', '2026-10-27', '2026-11-03']) theirLap(d, at(day, 9));
+    theirLap(d, at('2026-11-17', 9));
+    theirLap(d, at('2026-11-23', 9));
+    d.focus.start();
+    w.time.advance(LAP);
+    assert.deepEqual(s.marks.value.map((mark) => mark.key), ['week-2026-11-23']);
+    s.seen();
+    // Friday: a task is done within its estimate. Its key is written, three days after the week's.
+    w.time.advance(3 * DAY);
+    const task = d.today.add('quick ~2')!;
+    d.focus.start(task);
+    w.time.advance(LAP);
+    d.today.setDone(task, true);
+    assert.deepEqual(s.marks.value.map((mark) => mark.key), [`estimate-${task}`], 'the week is not marked a second time');
+    assert.ok('week-2026-11-23' in shown(d)!);
+  });
+
+  it('whatever sits in settings.marks, the marks go on: a text or a list there is no set of keys', async () => {
+    const { w, d, s } = await one();
+    for (const odd of ['x', ['laps-1'], 7, null]) {
+      d.engine.write('settings', 'current', { marks: odd });
+      assert.deepEqual(s.marks.value, [], JSON.stringify(odd));
+    }
+    d.engine.write('settings', 'current', { marks: 'x' });
+    d.focus.start();
+    w.time.advance(LAP);
+    assert.deepEqual(s.marks.value.map((mark) => mark.key), ['laps-1']);
+    assert.deepEqual(Object.keys(shown(d)!), ['laps-1']);
   });
 });
 

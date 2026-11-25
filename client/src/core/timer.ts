@@ -2,6 +2,8 @@
 // The cell is written only when the user acts. Everything on screen comes from view(state, now),
 // so a phone that slept through the bell shows the right thing the moment it wakes.
 
+import { isMoment } from './real.ts';
+
 export type Phase = 'work' | 'short' | 'long';
 
 /** The value of the timer's `state` cell: contracts/schemas/timer.schema.json. */
@@ -27,6 +29,22 @@ export const IDLE: Readonly<TimerState> = Object.freeze({
   planned_ms: 0,
   set_index: 0,
 });
+
+const count = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+
+/** A timer state as the schema has it, or null: a cell from a newer build or an imported copy may hold anything. */
+export function asTimer(v: unknown): TimerState | null {
+  if (v === null || typeof v !== 'object') return null;
+  const s = v as Record<keyof TimerState, unknown>;
+  const fits =
+    ['idle', 'work', 'short', 'long'].includes(s.phase as string) &&
+    [s.run, s.task].every((id) => id === null || typeof id === 'string') &&
+    [s.started, s.paused_at].every((at) => at === null || isMoment(at)) &&
+    count(s.paused_ms) &&
+    count(s.planned_ms) &&
+    [0, 1, 2, 3].includes(s.set_index as number);
+  return fits ? (v as TimerState) : null;
+}
 
 export type TimerAction =
   // new_set: this lap is lap one whatever came before. Asked for on the first lap of a new day.

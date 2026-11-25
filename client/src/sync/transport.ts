@@ -62,6 +62,8 @@ export interface Handlers {
   /** `welcome` means a path to the server is open; after `down` nothing arrives until the next one. */
   message(msg: ServerMessage): void;
   down(): void;
+  /** An attempt to reach the server has ended without a welcome: a socket that failed or never answered, a POST that failed, or the device saying it is offline. */
+  failed(): void;
   /** One measurement of server time minus device time, in ms. */
   time(sample: number): void;
 }
@@ -244,6 +246,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
     if (!running) return;
     failures += 1;
     if (wasLive) on.down();
+    else on.failed();
     if (failures >= SOCKET_TRIES && !polling) {
       polling = true;
       poll();
@@ -284,6 +287,7 @@ export function connect(wire: Wire, on: Handlers): Transport {
       posting = false;
       pollFailures += 1;
       if (pollUp) on.down();
+      else on.failed();
       pollUp = false;
       cancelPoll = wire.schedule(poll, backoffMs(pollFailures, wire.random()));
       return;
@@ -358,6 +362,8 @@ export function connect(wire: Wire, on: Handlers): Transport {
       if (live) return lost();
       // On the POST path there is no socket to drop. The next poll that works says welcome again.
       if (pollUp) on.down();
+      // And if nothing was up yet, the question "is there a connection" has its answer all the same.
+      else on.failed();
       pollUp = false;
     },
   };

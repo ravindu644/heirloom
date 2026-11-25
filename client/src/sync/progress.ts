@@ -6,6 +6,7 @@ import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { addDays, bests, estimates, outcomeOf, projectShares, since, streakView, weekRace } from '../core/progress.ts';
 import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
+import { isDay } from '../core/real.ts';
 import { focusOf, localDay, stats } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { asTask } from '../core/today.ts';
@@ -97,7 +98,6 @@ export interface ProgressEnv {
 }
 
 const DAY_MS = 86400000;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const NOTE_MAX = 280;
 
 /**
@@ -265,7 +265,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     },
 
     setNote(day, text) {
-      if (DAY.test(day)) engine.write('day', day, { note: text.trim().slice(0, NOTE_MAX) });
+      if (isDay(day)) engine.write('day', day, { note: text.trim().slice(0, NOTE_MAX) });
     },
 
     wake: clock.wake,

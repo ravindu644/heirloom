@@ -73,6 +73,8 @@ function fakeAccounts() {
 
 interface Options {
   stores?: OpenStore;
+  /** What the device itself says about having a network: the browser's navigator.onLine. Left out, it has no say. */
+  online?: () => boolean;
   /** Wraps every store this device opens: to watch writes, or to break them. */
   wrap?: (open: OpenStore) => OpenStore;
   startAt?: number;
@@ -92,6 +94,7 @@ async function device(options: Options = {}) {
     WebSocket: fakeSockets().FakeSocket,
     fetch: accounts.fetch,
     openStore: options.wrap ? options.wrap(stores) : stores,
+    ...(options.online && { online: options.online }),
     connect: (handlers) => {
       const wire = fakeWire(handlers);
       wires.push(wire);
@@ -846,11 +849,55 @@ describe('a server restored from an older copy', () => {
 });
 
 describe('what the UI reads', () => {
-  it('sync state: signed out, offline, syncing, in step', async () => {
+  it('a first load with a server there: never offline on the way to in step, so nothing false is announced', async () => {
+    const d = await signedIn({ head: null });
+    await d.engine.stop();
+    // The app opens again, signed in. Every state it passes through is kept.
+    const again = await device({ stores: d.stores });
+    const states: string[] = [];
+    again.engine.sync.subscribe((state) => states.push(state));
+    // Nothing has come back yet: it is finding out, and says so by saying nothing.
+    assert.equal(again.engine.sync.value, 'syncing');
+    again.wire().welcome(0);
+    assert.deepEqual(states, ['syncing', 'in-step']);
+  });
+
+  it('a first load with no server to be had: offline as soon as the first attempt has failed, not before', async () => {
+    const d = await signedIn({ head: null });
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.engine.sync.value, 'syncing');
+    again.wire().handlers.failed();
+    assert.equal(again.engine.sync.value, 'offline');
+    // And it stays offline through the attempts that follow, until one is welcomed.
+    again.wire().handlers.failed();
+    assert.equal(again.engine.sync.value, 'offline');
+    again.wire().welcome(0);
+    assert.equal(again.engine.sync.value, 'in-step');
+  });
+
+  it('a first load with the network off by the device\'s own word: offline at once, before any attempt', async () => {
+    const d = await signedIn({ head: null });
+    await d.engine.stop();
+    const network = { on: false };
+    const again = await device({ stores: d.stores, online: () => network.on });
+    assert.equal(again.engine.sync.value, 'offline');
+    // When the device says the network is back, the next attempt is what decides.
+    network.on = true;
+    again.wire().welcome(0);
+    assert.equal(again.engine.sync.value, 'in-step');
+    // Signing in on a device that says it is offline: offline from the moment the account opens.
+    const fresh = await device({ online: () => false });
+    assert.equal(fresh.engine.sync.value, 'signed-out');
+    await fresh.engine.signIn('ravi', 'correct horse');
+    assert.equal(fresh.engine.sync.value, 'offline');
+  });
+
+  it('sync state: signed out, finding out, syncing, in step, offline', async () => {
     const d = await device();
     assert.equal(d.engine.sync.value, 'signed-out');
     await d.engine.register('invite-code', 'ravi', 'correct horse');
-    assert.equal(d.engine.sync.value, 'offline');
+    assert.equal(d.engine.sync.value, 'syncing', 'not yet tried is not offline');
     d.wire().welcome(3);
     assert.equal(d.engine.sync.value, 'syncing');
     d.wire().cells(0, 3, []);
@@ -894,6 +941,17 @@ describe('what the UI reads', () => {
     await d.engine.stop();
     const again = await device({ stores: d.stores });
     assert.equal(again.engine.cells().length, 3);
+  });
+
+  it('a timer cell that is not a timer state reads as idle: an imported copy or a newer build may hold anything there', async () => {
+    const d = await signedIn();
+    const good = { phase: 'work', run: 'run-1', task: null, started: T0, paused_at: null, paused_ms: 0, planned_ms: 1500000, set_index: 0 };
+    for (const odd of [['work'], 'running', { phase: 'work' }, { ...good, phase: 'sprint' }, { ...good, started: 1e20 }, { ...good, set_index: 4 }, { ...good, planned_ms: -1 }, { ...good, run: 7 }]) {
+      d.engine.write('timer', 'current', { state: odd });
+      assert.equal(d.engine.timer.value.phase, 'idle', JSON.stringify(odd));
+    }
+    d.engine.write('timer', 'current', { state: good });
+    assert.deepEqual(d.engine.timer.value, good);
   });
 
   it('the timer: idle until there is a cell, an action writes the whole state as one cell, a no-op writes nothing', async () => {
@@ -1196,7 +1254,7 @@ describe('accounts', () => {
     assert.deepEqual(await d.engine.signOut(), { ok: false, error: 'unsent' });
 
     assert.deepEqual(await d.engine.signIn('ravi', 'correct horse'), { ok: true });
-    assert.equal(d.engine.sync.value, 'offline');
+    assert.equal(d.engine.sync.value, 'syncing', 'signed in again and finding out: no longer signed out, not known to be offline');
     assert.equal(d.engine.unsent.value, 2);
     d.wire().welcome();
     assert.deepEqual(d.wire().sent[0]!.cells.map((c) => c.value), ['unsent when the token died', 'made while signed out']);
@@ -1301,6 +1359,27 @@ describe('the engine over the real transport', () => {
     await engine.stop();
   });
 
+  it('a first socket that opens and never answers: still finding out until the hello\'s ten seconds are up, then offline', async () => {
+    const time = fakeTime();
+    const sockets = fakeSockets();
+    const engine = await createEngine({
+      url: 'https://heirloom.test',
+      now: time.now,
+      schedule: time.schedule,
+      random: () => 1,
+      WebSocket: sockets.FakeSocket,
+      fetch: tinyServer().fetch,
+      openStore: memoryStores(),
+    });
+    await engine.register('invite-code', 'ravi', 'correct horse');
+    sockets.last().accept();
+    time.advance(9999);
+    assert.equal(engine.sync.value, 'syncing');
+    time.advance(1);
+    assert.equal(engine.sync.value, 'offline');
+    await engine.stop();
+  });
+
   it('when no socket gets through, an edit still reaches the server by POST and comes back acked', async () => {
     const server = tinyServer();
     const time = fakeTime();
@@ -1317,8 +1396,10 @@ describe('the engine over the real transport', () => {
     await engine.register('invite-code', 'ravi', 'correct horse');
     engine.write('task', 't1', { title: 'through the proxy' });
     await engine.saved();
-    assert.equal(engine.sync.value, 'offline');
-    for (const wait of [0, 1000, 2000]) {
+    assert.equal(engine.sync.value, 'syncing', 'the first socket has not said yes or no');
+    sockets.last().fail();
+    assert.equal(engine.sync.value, 'offline', 'now it has');
+    for (const wait of [1000, 2000]) {
       time.advance(wait);
       sockets.last().fail();
     }

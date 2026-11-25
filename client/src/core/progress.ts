@@ -155,7 +155,6 @@ export function since(days: Days, today: string): Since {
   };
 }
 
-/** The day and the Monday to Sunday week with the most focus. The earlier one wins a tie. */
 /** Focus per Monday to Sunday week, by its Monday, oldest first. */
 export function weekTotals(days: Days): Map<string, number> {
   const weeks = new Map<string, number>();
@@ -163,6 +162,7 @@ export function weekTotals(days: Days): Map<string, number> {
   return weeks;
 }
 
+/** The day and the Monday to Sunday week with the most focus. The earlier one wins a tie. */
 export function bests(days: Days): Bests {
   let day: Bests['day'] = null;
   for (const d of Object.keys(days).sort()) {

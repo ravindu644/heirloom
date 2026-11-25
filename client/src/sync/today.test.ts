@@ -191,6 +191,23 @@ describe('the lists', () => {
     assert.equal(d.today.next.value?.estimate, 2);
   });
 
+  it('a day that is not on the calendar, or a time no clock could show, reads as unset: nothing walks off into it', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.engine.write('task', 't1', { title: 'the 45th of the 13th month', due: '2026-13-45', repeat: { every: 'day' }, order: 'V' });
+    d.engine.write('task', 't2', { title: 'the 31st of February', due: '2026-02-31', order: 'W' });
+    d.engine.write('task', 't3', { title: 'done in the year three billion', done: 1e20, order: 'X' });
+    d.engine.write('task', 't4', { title: 'deleted in 1970', deleted: 5, order: 'Y' });
+    assert.deepEqual(open(d), ['the 45th of the 13th month', 'the 31st of February', 'done in the year three billion', 'deleted in 1970']);
+    assert.deepEqual(d.today.list.value.map((t) => [t.due, t.done, t.deleted]), Array(4).fill([null, false, null]));
+    assert.deepEqual(d.today.done.value, []);
+    // Marking the repeating one done makes its next from today, not from the day that was never real.
+    d.today.setDone('t1', true);
+    assert.equal(d.today.upcoming.value[0]?.due, TOMORROW);
+    d.today.edit('t2', { due: '2026-02-31' });
+    assert.equal(d.engine.rows('task').value.get('t2')?.due, '2026-02-31', 'and such a day is never written from here');
+  });
+
   it('fields a newer build wrote differently read as unset, never as something to trip on', async () => {
     const w = world();
     const d = await w.device('a');

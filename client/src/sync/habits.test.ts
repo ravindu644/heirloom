@@ -310,6 +310,22 @@ describe('the list', () => {
     assert.deepEqual(titles(h.list.value), ['Read', 'Odd']);
   });
 
+  it('a check-in for a day that is not on the calendar, or from a clock that died, is not read: the record neither breaks nor runs back to 1970', async () => {
+    const { d, h } = await one();
+    const id = h.add('Read', EVERY_DAY, 1)!;
+    on(d, id, ['22', '23']);
+    d.engine.write('checkin', 'bad-month', { habit: id, day: '2026-13-45', at: T0 });
+    d.engine.write('checkin', 'bad-day', { habit: id, day: '2026-02-31', at: T0 });
+    d.engine.write('checkin', 'dead-clock', { habit: id, day: '1970-01-01', at: 0 });
+    d.engine.write('checkin', 'no-such-time', { habit: id, day: TODAY, at: 1e20 });
+    const habit = view(d, id);
+    assert.deepEqual(habit.record.map((day) => [day.day.slice(8), day.count]), [['22', 1], ['23', 1], ['24', 0]]);
+    assert.deepEqual([habit.streak, habit.kept, habit.of], [2, 2, 2]);
+    assert.deepEqual(h.week(), { now: 1, before: 0 });
+    // The rows are still held and sent on: only not counted.
+    assert.equal(d.engine.rows('checkin').value.size, 6);
+  });
+
   it('a row with no title yet is not a habit; a target or days that is missing or malformed reads as 1 and every day', async () => {
     const { d, h } = await one();
     d.engine.write('habit', 'half', { days: WEEKDAYS, order: 'V' });

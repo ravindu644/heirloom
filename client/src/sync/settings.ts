@@ -5,7 +5,7 @@
 import { computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { stampDevice } from '../core/hlc.ts';
-import { lapMarks, taskMarks } from '../core/marks.ts';
+import { keysKept, lapMarks, taskMarks } from '../core/marks.ts';
 import type { Mark } from '../core/marks.ts';
 import { localDay, stats } from '../core/stats.ts';
 import { asTask } from '../core/today.ts';
@@ -59,9 +59,6 @@ export interface SettingsEnv {
 }
 
 const DAY_MS = 86400000;
-// How long a shown mark's key is kept in `settings.marks`. A mark older than a day is never
-// shown, so a key older than this guards nothing, and the one cell must not grow for ever.
-const KEYS_KEPT_MS = 2 * DAY_MS;
 const FLAGS = ['auto_break', 'auto_work', 'celebrate', 'share_task', 'rooms_hidden'] as const;
 const LENGTHS = ['work_ms', 'short_ms', 'long_ms'] as const;
 const whole = (v: unknown, least: number, most = Infinity) => typeof v === 'number' && Number.isInteger(v) && v >= least && v <= most;
@@ -124,7 +121,9 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
   const stopMarks = effect(() => {
     // With celebrations off nothing is shown and nothing is written.
     if (!all.value.celebrate) return;
-    const shown = (row.value?.marks ?? {}) as Record<string, unknown>;
+    // An imported copy, or a newer build, may have put anything there: only an object is a set of keys.
+    const held = row.value?.marks;
+    const shown = (held !== null && typeof held === 'object' && !Array.isArray(held) ? held : {}) as Record<string, unknown>;
     const earned = [...fromLaps.value, ...fromTasks.value];
     untracked(() => {
       const now = engine.now();
@@ -136,8 +135,8 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
         .sort((a, b) => a.at - b.at);
       if (!fresh.length) return;
       marks.value = [...marks.peek(), ...fresh.map((e) => e.mark)];
-      const kept = Object.entries(shown).filter(([, at]) => typeof at === 'number' && now - at < KEYS_KEPT_MS);
-      engine.write('settings', 'current', { marks: Object.fromEntries([...kept, ...fresh.map((e) => [e.key, now])]) });
+      const next = { ...shown, ...Object.fromEntries(fresh.map((e) => [e.key, now])) };
+      engine.write('settings', 'current', { marks: Object.fromEntries(keysKept(next, localDay(now, env.utcOffsetMin()))) });
     });
   });
 

@@ -3,6 +3,7 @@
 // as the mask and its done days as the kept days.
 
 import { addDays, mondayOf } from './progress.ts';
+import { isDay, isMoment } from './real.ts';
 import { streakWindow, weekday } from './streak.ts';
 
 /** A habit row with every field in its place: what is missing or malformed reads as its default. */
@@ -39,10 +40,9 @@ export interface HabitDay {
   rest: boolean;
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const whole = (v: unknown, least: number, most = Infinity): v is number => typeof v === 'number' && Number.isInteger(v) && v >= least && v <= most;
-const time = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+const time = (v: unknown): number | null => (isMoment(v) ? v : null);
 
 /** A weekday mask a habit can have, or null. */
 export const asDays = (v: unknown): number | null => (whole(v, 1, 127) ? v : null);
@@ -69,7 +69,9 @@ export function asHabit(id: string, row: Readonly<Record<string, unknown>>): Hab
 /** A live check-in, or null: a row still arriving, or one that was taken back. */
 export function asCheckIn(id: string, row: Readonly<Record<string, unknown>>): CheckIn | null {
   const { habit, day, at } = row;
-  if (typeof habit !== 'string' || typeof day !== 'string' || !DAY.test(day) || typeof at !== 'number' || typeof row.deleted === 'number') return null;
+  // The day must be a real one: the record walks from the first check-in day by day, and a day
+  // that is not on the calendar, or decades back, would break or bury it.
+  if (typeof habit !== 'string' || !isDay(day) || !isMoment(at) || typeof row.deleted === 'number') return null;
   return { id, habit, day, at };
 }
 

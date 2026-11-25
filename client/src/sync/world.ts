@@ -159,6 +159,8 @@ export function world() {
       sessions: () => [...engine.rows('session').value.keys()],
     };
     if (options.online !== false) await d.connect();
+    // A device that starts with no server to be had: its first attempt has failed, so it knows it is offline.
+    else wire().handlers.failed();
     return d;
   }
   type Device = Awaited<ReturnType<typeof device>>;

@@ -1,6 +1,7 @@
 // The rules behind the Today screen: contracts/protocol.md section 12.
 
 import type { Session } from './stats.ts';
+import { isDay, isMoment } from './real.ts';
 import { localDay } from './stats.ts';
 import { weekday } from './streak.ts';
 import { view } from './timer.ts';
@@ -27,10 +28,9 @@ export interface Task {
 
 const DAY_MS = 86400000;
 const KEPT_MS = 30 * DAY_MS;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
-const time = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+const time = (v: unknown): number | null => (isMoment(v) ? v : null);
 
 /** A repeat rule as the schema has it, or null for anything else. */
 export function asRepeat(v: unknown): Repeat {
@@ -57,7 +57,7 @@ export function asTask(id: string, row: Readonly<Record<string, unknown>>): Task
     project: text(row.project),
     estimate: typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1 ? estimate : null,
     parent: text(row.parent),
-    due: due !== null && DAY.test(due) ? due : null,
+    due: isDay(due) ? due : null,
     repeat: asRepeat(row.repeat),
     when: text(row.when) || null,
     done: time(row.done),

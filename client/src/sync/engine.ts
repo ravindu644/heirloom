@@ -11,7 +11,7 @@ import { ZERO, eventStamp, isStamp, see, stamp } from '../core/hlc.ts';
 import type { Clock, Stamp } from '../core/hlc.ts';
 import { applyCell, cellKey, restamp } from '../core/merge.ts';
 import type { Cell, Cells } from '../core/merge.ts';
-import { IDLE, act } from '../core/timer.ts';
+import { IDLE, act, asTimer } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
 import { StoreGone } from '../store/store.ts';
 import type { OpenStore, Store, Write } from '../store/store.ts';
@@ -27,10 +27,18 @@ export interface Env extends Wire {
    * so it knows this person's "today" for rooms. Left out, it is told 0.
    */
   utcOffsetMin?: () => number;
+  /**
+   * The device's own word on whether it has a network at all (the browser's `navigator.onLine`).
+   * False at a start means offline at once, without waiting for an attempt to fail. Left out, the
+   * engine finds out by trying.
+   */
+  online?: () => boolean;
 }
 
 /**
- * offline: no path to the server. syncing: connected, still catching up or with edits to send.
+ * offline: no path to the server, and that is known: an attempt has failed, or the device says
+ * it has no network. syncing: connected and still catching up or with edits to send; or, for the
+ * first moments after a start, still finding out whether there is a connection at all.
  * in-step: connected, nothing waiting either way. signed-out: no account, or the server refused the token.
  */
 export type SyncState = 'offline' | 'syncing' | 'in-step' | 'signed-out';
@@ -203,6 +211,8 @@ export async function createEngine(env: Env): Promise<Engine> {
   const connected = signal(false);
   const caughtUp = signal(false);
   const refused = signal(false);
+  // An attempt to reach the server has ended, either way, since this account was opened.
+  const tried = signal(false);
   const unsent = signal(0);
   const unsaved = signal(false);
   const sets = new Map<string, Signal<ReadonlyMap<string, Row>>>();
@@ -211,7 +221,9 @@ export async function createEngine(env: Env): Promise<Engine> {
 
   const sync = computed<SyncState>(() => {
     if (!account.value || refused.value) return 'signed-out';
-    if (!connected.value) return 'offline';
+    // Not yet tried is not offline: nothing is said that is not so. The first attempt ends within
+    // the hello's time limit at the latest, and then it is one or the other.
+    if (!connected.value) return tried.value ? 'offline' : 'syncing';
     return caughtUp.value && unsent.value === 0 ? 'in-step' : 'syncing';
   });
 
@@ -247,8 +259,7 @@ export async function createEngine(env: Env): Promise<Engine> {
   }
 
   const timer = computed<TimerState>(() => {
-    const state = rows('timer').value.get('current')?.state;
-    return state && typeof state === 'object' ? (state as TimerState) : IDLE;
+    return asTimer(rows('timer').value.get('current')?.state) ?? IDLE;
   });
 
   // Writes made while one is being saved ride together in the next. That is the batching, and it
@@ -380,6 +391,7 @@ export async function createEngine(env: Env): Promise<Engine> {
         }
         batch(() => {
           connected.value = true;
+          tried.value = true;
           caughtUp.value = r.cursor >= r.head;
         });
         return pump();
@@ -467,8 +479,12 @@ export async function createEngine(env: Env): Promise<Engine> {
         if (db !== r) return;
         batch(() => {
           connected.value = false;
+          tried.value = true;
           caughtUp.value = false;
         });
+      },
+      failed: () => {
+        if (db === r) tried.value = true;
       },
       time: (sample) => {
         offset = smoothOffset(offset, sample);
@@ -500,6 +516,8 @@ export async function createEngine(env: Env): Promise<Engine> {
       for (const [dataset, set] of sets) set.value = build(dataset);
       account.value = { account: session.account, username: session.username };
       refused.value = false;
+      // A device that says it has no network is offline now, not after a socket has failed to say so.
+      tried.value = env.online?.() === false;
       unsent.value = r.outbox.size;
     });
     r.transport.start();

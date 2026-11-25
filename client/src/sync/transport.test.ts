@@ -11,6 +11,8 @@ function rig(random = 1) {
   const sockets = fakeSockets();
   const seen: (ServerMessage | 'down')[] = [];
   const samples: number[] = [];
+  // How many attempts have ended without a welcome.
+  const failed = { count: 0 };
   const posts: any[] = [];
   // The abort signal each POST was given, in the same order.
   const signals: (AbortSignal | undefined)[] = [];
@@ -41,9 +43,9 @@ function rig(random = 1) {
   };
   const transport = connect(
     { url: 'https://heirloom.test', now: time.now, schedule: time.schedule, random: () => random, WebSocket: sockets.FakeSocket, fetch },
-    { hello: () => ({ ...hello }), message: (msg) => (seen.push(msg), react.to?.(msg)), down: () => seen.push('down'), time: (s) => samples.push(s) },
+    { hello: () => ({ ...hello }), message: (msg) => (seen.push(msg), react.to?.(msg)), down: () => seen.push('down'), failed: () => void failed.count++, time: (s) => samples.push(s) },
   );
-  return { time, sockets, seen, samples, posts, signals, hello, answer, transport, react };
+  return { time, sockets, seen, samples, posts, signals, hello, answer, transport, react, failed };
 }
 
 // Opens the socket and gets it welcomed.
@@ -231,6 +233,30 @@ describe('the socket', () => {
     assert.equal(r.sockets.all.length, 4);
   });
 
+  it('every attempt that ends without a welcome is reported; a welcome, and the drop of a live socket, are not', () => {
+    const r = rig();
+    r.transport.start();
+    assert.equal(r.failed.count, 0, 'not before anything has come back');
+    r.sockets.last().fail();
+    assert.equal(r.failed.count, 1);
+    r.time.advance(1000);
+    r.sockets.last().accept();
+    r.sockets.last().say({ type: 'welcome', server_time: r.time.now(), head: 0 });
+    assert.equal(r.failed.count, 1);
+    // A live socket dropping is `down`, which says more.
+    r.sockets.last().fail();
+    assert.equal(r.failed.count, 1);
+    assert.equal(r.seen.at(-1), 'down');
+  });
+
+  it('offline() before anything has connected still ends the question: the device has said there is no network', () => {
+    const r = rig();
+    r.transport.start();
+    r.transport.offline();
+    assert.equal(r.failed.count, 1);
+    assert.deepEqual(r.seen, []);
+  });
+
   it('jitter spreads the reconnects', () => {
     const r = rig(0);
     welcomed(r);
@@ -283,7 +309,9 @@ describe('the socket', () => {
     r.sockets.last().accept();
     r.time.advance(HELLO_MS - 1);
     assert.equal(r.sockets.last().closed, false);
+    assert.equal(r.failed.count, 0);
     r.time.advance(1);
+    assert.equal(r.failed.count, 1, 'the engine is told the attempt has ended');
     assert.equal(r.sockets.all[0]!.closed, true);
     // It was never up, so the engine is not told it went down.
     assert.deepEqual(r.seen, []);
@@ -437,6 +465,15 @@ describe('without a socket', () => {
     assert.equal(r.posts.length, 2);
     r.time.advance(1);
     assert.equal(r.posts.length, 3);
+  });
+
+  it('a first POST that fails is reported as an attempt that ended, like a socket that failed', async () => {
+    const r = rig();
+    blocked(r);
+    assert.equal(r.failed.count, 3, 'the three sockets');
+    await r.answer('unreachable');
+    assert.equal(r.failed.count, 4);
+    assert.deepEqual(r.seen, []);
   });
 
   it('a POST that fails means down, a backoff, and a fresh welcome when it works again', async () => {

@@ -178,6 +178,22 @@ describe('the year and since the first lap', () => {
     assert.deepEqual([p.since.value.kept, p.since.value.of], [3, 5]);
   });
 
+  it('a session from a clock that died, or with a time no date can be, is not read: the year does not start in 1970 and nothing throws', async () => {
+    const { d, p } = await one();
+    laps(d, '2026-11-23', 1);
+    const row = { kind: 'work', task: null, planned_ms: LAP, paused_ms: 0, outcome: 'rang', device: d.engine.device };
+    d.engine.write('session', 'dead-clock', { ...row, started: 0, ended: LAP });
+    d.engine.write('session', 'no-such-time', { ...row, started: 1e20, ended: 1e20 + LAP });
+    d.engine.write('session', 'not-a-number', { ...row, started: 'yesterday', ended: T0 });
+    assert.equal(p.since.value.first, '2026-11-23');
+    assert.equal(p.since.value.cells.length, 2);
+    assert.equal(p.since.value.laps, 1);
+    assert.equal(p.week().you_ms, LAP);
+    assert.equal(d.focus.race().you_ms, 0);
+    assert.equal(p.timeline('1970-01-01').length, 0);
+    assert.equal(d.engine.rows('session').value.size, 4, 'kept and sent on, only not counted');
+  });
+
   it('before any session there is nothing: no first day, no cells, no steadiest weekday', async () => {
     const { p } = await one();
     assert.deepEqual(p.since.value, { first: null, focus_ms: 0, laps: 0, kept: 0, of: 0, steadiest: null, cells: [] });

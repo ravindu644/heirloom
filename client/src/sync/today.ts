@@ -4,6 +4,7 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { isDay } from '../core/real.ts';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
 import { asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
@@ -127,7 +128,6 @@ export interface TodayEnv {
 }
 
 const COLORS: readonly ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
 const PULSE_MS = 15000;
 
@@ -283,7 +283,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       if (fields.project !== undefined) write.project = fields.project;
       const { estimate, due, when, repeat } = fields;
       if (estimate === null || (typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1)) write.estimate = estimate;
-      if (due === null || (typeof due === 'string' && DAY.test(due))) write.due = due;
+      if (due === null || isDay(due)) write.due = due;
       if (when !== undefined) write.when = when?.trim().slice(0, 80) || null;
       if (repeat !== undefined) write.repeat = asRepeat(repeat);
       if (Object.keys(write).length) engine.write('task', id, write);
