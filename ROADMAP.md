@@ -161,7 +161,7 @@ lesson in `skills/taste-gate` and a test.
 - [x] [ui] A time on a task; twelve project colours and the picker
 - [ ] [android] A task's reminder; the keyboard on sign-in; no long-press callout; the time and
       colour pickers in the WebView (built and unit tested; each still to be seen on the phone)
-- [ ] [qa] `staysPut` on every tap that changes the page; the bar; errors; Add; the target; a
+- [x] [qa] `staysPut` on every tap that changes the page; the bar; errors; Add; the target; a
       task's time; a colour on two devices; the welcome; nothing selects; reduced motion
 - [x] [design-review] Every changed screen at 412, 471 and 1440, light and dark, and the motion
 - [x] [lead] Every point in `skills/taste-gate` with its check
