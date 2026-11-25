@@ -6,6 +6,9 @@
     "allowMixedContent": true
   },
   "plugins": {
+    "SystemBars": {
+      "initialViewportFitValueHint": "cover"
+    },
     "LocalNotifications": {
       "smallIcon": "ic_stat_heirloom",
       "iconColor": "#C4321A"

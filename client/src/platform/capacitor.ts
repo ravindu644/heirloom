@@ -28,7 +28,7 @@ const otherId = (id: number) => (id === RING_ID ? RING_ID + 1 : RING_ID);
 export interface Channels {
   ring: string;
   countdown: string;
-  /** Habit reminders. Until it is named, the phone schedules none. */
+  /** Reminders, a habit's and a task's. Until it is named, the phone schedules none. */
   remind?: string;
 }
 
@@ -86,7 +86,9 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     // makes its sound; the countdown is low so it never makes one.
     alarms.createChannel({ id: 'ring', name: channels.ring, importance: 4, visibility: 1, vibration: true }),
     alarms.createChannel({ id: 'countdown', name: channels.countdown, importance: 2, visibility: 1, vibration: false }),
-    // Between the two: the default sound, no heads-up over whatever the person is doing.
+    // Between the two: the default sound, no heads-up over whatever the person is doing. Creating a
+    // channel that exists already updates its name (Android's createNotificationChannel), so a
+    // renamed channel reaches phones that have the old name at the next start.
     channels.remind && alarms.createChannel({ id: 'remind', name: channels.remind, importance: 3, visibility: 1, vibration: true }),
   ]).catch(warn);
   const run = (step: () => Promise<unknown>) => {
@@ -150,8 +152,9 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
       const planned = pending();
       if (JSON.stringify(planned) !== live) await apply(planned);
     });
-  // Habit reminders: one-shots for the next fourteen days, rebuilt on every change and every time
-  // the app is in front, so today's is left out once the habit is done. Exact alarms: as inexact
+  // Reminders, a habit's and a task's: one-shots for the next fourteen days, rebuilt on every change
+  // and every time the app is in front, so today's is left out once the habit is done, and a task
+  // done or deleted, which leaves the set, loses its alarm and leaves the shade. Exact alarms: as inexact
   // ones the Samsung delivered them at the very end of their window, up to an hour late. A few a
   // day are nothing beside the exact allowance. Without the exact permission the plugin falls back
   // to inexact by itself.

@@ -478,6 +478,23 @@ describe('habit reminders, on the phone', () => {
     assert.equal(reminders(held).length, 13);
   });
 
+  it('a task reminder: scheduled once, and when the task is done or deleted, cancelled and out of the shade', async () => {
+    const { time, notifier, done, held, calls } = rig({ remind: 'Reminders' });
+    const task = { habit: 'task-1', title: 'Write the intro', body: '', time: '10:30', days: 127, doneToday: false, day: '2026-11-24' };
+    notifier.reminders([habit('walk', '18:00'), task]);
+    await done();
+    const ours = [...held.values()].filter((n) => n.id >= 200_000);
+    assert.deepEqual(ours.map((n) => [n.title, new Date(n.schedule.at).toString().slice(0, 21)]), [['Write the intro', 'Tue Nov 24 2026 10:30']]);
+    assert.notEqual(ours[0].isExactNotification, false);
+    // 10:31: it has fired and sits in the shade; the task is done, so it leaves the set.
+    time.jump(31 * MIN);
+    const before = calls.length;
+    notifier.reminders([habit('walk', '18:00')]);
+    await done();
+    assert.deepEqual(calls.slice(before), ['cancel', `remove ${ours[0].id}`]);
+    assert.equal(reminders(held).filter(([, t]) => t === 'walk?').length, 14);
+  });
+
   it('ten habits planned every day fit, far under the 500 alarms Android allows an app', async () => {
     const { notifier, done, held } = rig({ remind: 'Habits' });
     notifier.reminders(Array.from({ length: 10 }, (_, i) => habit(`habit${i}`, `0${i}:30`)));

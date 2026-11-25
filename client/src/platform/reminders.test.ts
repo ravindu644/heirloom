@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { FIRST_ID, LAST_ID, MAX_DUE, upcoming } from './reminders.ts';
+import { FIRST_ID, FIRST_TASK_ID, LAST_ID, LAST_TASK_ID, MAX_DUE, isReminderId, upcoming } from './reminders.ts';
 
 const habit = (id: string, time: string, days = 0b1111111, doneToday = false) => ({ habit: id, title: id, body: '', time, days, doneToday });
 const local = (ms: number) => new Date(ms).toString().slice(0, 21);
@@ -54,5 +54,44 @@ describe('upcoming reminders', () => {
     } finally {
       process.env.TZ = 'Asia/Colombo';
     }
+  });
+
+  describe('a task', () => {
+    const task = (id: string, time: string, day: string) => ({ habit: id, title: id, body: '', time, days: 127, doneToday: false, day });
+
+    it('is reminded once, at its time on its day, whatever its days say', () => {
+      assert.deepEqual(upcoming([task('t1', '15:30', '2026-11-26')], now).map((d) => local(d.at)), ['Thu Nov 26 2026 15:30']);
+      assert.deepEqual(upcoming([{ ...task('t1', '15:30', '2026-11-26'), days: 0 }], now).length, 1);
+    });
+
+    it('never for a moment already past', () => {
+      assert.deepEqual(upcoming([task('t1', '09:00', '2026-11-24')], now), []);
+      assert.deepEqual(upcoming([task('t1', '11:00', '2026-11-24')], now).map((d) => local(d.at)), ['Tue Nov 24 2026 11:00']);
+      assert.deepEqual(upcoming([task('t1', '15:30', '2026-11-23')], now), []);
+    });
+
+    it('a day beyond the window waits until it comes in', () => {
+      assert.deepEqual(upcoming([task('t1', '08:00', '2026-12-08')], now), []);
+      assert.equal(upcoming([task('t1', '08:00', '2026-12-07')], now).length, 1);
+      // A week on, the 8th is inside.
+      assert.equal(upcoming([task('t1', '08:00', '2026-12-08')], now + 7 * 86_400_000).length, 1);
+    });
+
+    it('a day that is not a day, or a time that is not a time, gives nothing', () => {
+      assert.deepEqual(upcoming([task('a', '15:30', '2026-02-30'), task('b', '15:30', 'tomorrow'), task('c', '3pm', '2026-11-26')], now), []);
+    });
+
+    it('takes ids of its own: never a habit\'s, even with the same id string, and the same id next time', () => {
+      const set = [habit('x', '15:30'), task('x', '15:30', '2026-11-26'), ...Array.from({ length: 50 }, (_, i) => task(`t${i}`, '16:00', '2026-11-27'))];
+      const due = upcoming(set, now);
+      const tasks = due.filter((d) => d.id >= FIRST_TASK_ID);
+      const habits = due.filter((d) => d.id < FIRST_TASK_ID);
+      assert.equal(tasks.length, 51);
+      assert.ok(tasks.every((d) => d.id <= LAST_TASK_ID && isReminderId(d.id)));
+      assert.ok(habits.every((d) => d.id >= FIRST_ID && d.id <= LAST_ID));
+      assert.equal(new Set(due.map((d) => d.id)).size, due.length);
+      const again = upcoming(set, now + 3_600_000);
+      assert.deepEqual(again.filter((d) => d.id >= FIRST_TASK_ID).map((d) => d.id).sort(), tasks.map((d) => d.id).sort());
+    });
   });
 });
