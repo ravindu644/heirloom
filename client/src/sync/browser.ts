@@ -65,11 +65,8 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   const utcOffsetMin = env.utcOffsetMin!;
   // Not randomUUID: that exists only on https and localhost, and the app must start over plain http on a LAN address too.
   const id = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  // Focus asks for the top of today's list when a lap starts by itself; Today is made after it,
-  // so the question is put through a function and neither knows the other.
-  let today: Today | undefined;
-  const focus = createFocus(engine, { utcOffsetMin, runId: id, schedule: env.schedule, topTask: () => today?.list.peek()[0]?.id ?? null });
-  const made = (today = createToday(engine, { utcOffsetMin, id, schedule: env.schedule, focus }));
+  const focus = createFocus(engine, { utcOffsetMin, runId: id, schedule: env.schedule });
+  const made = createToday(engine, { utcOffsetMin, id, schedule: env.schedule, focus });
   const progress = createProgress(engine, { utcOffsetMin, schedule: env.schedule });
   const habits = createHabits(engine, { utcOffsetMin, id, schedule: env.schedule });
   const rooms = createRooms(engine, { schedule: env.schedule });

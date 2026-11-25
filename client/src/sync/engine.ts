@@ -9,7 +9,7 @@ import { batch, computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal, Signal } from '@preact/signals-core';
 import { ZERO, eventStamp, isStamp, see, stamp } from '../core/hlc.ts';
 import type { Clock, Stamp } from '../core/hlc.ts';
-import { applyCell, cellKey, restamp } from '../core/merge.ts';
+import { applyCell, cellKey, newer, restamp } from '../core/merge.ts';
 import type { Cell, Cells } from '../core/merge.ts';
 import { IDLE, act, asTimer } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
@@ -385,7 +385,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     const waiting = [...r.outbox]
       .filter((key) => !r.parked.has(key))
       .map((key) => r.cells.get(key)!)
-      .sort((a, b) => (a.stamp < b.stamp ? -1 : 1));
+      .sort((a, b) => (newer(b.stamp, a.stamp) ? -1 : 1));
     const cells: Cell[] = [];
     let size = 0;
     for (const cell of waiting) {

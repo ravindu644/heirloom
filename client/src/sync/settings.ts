@@ -9,7 +9,7 @@ import { keysKept, lapMarks, taskMarks } from '../core/marks.ts';
 import type { Mark } from '../core/marks.ts';
 import { localDay, stats } from '../core/stats.ts';
 import { asTask } from '../core/today.ts';
-import { createCounts, lapLengths } from './counts.ts';
+import { LAP_MAX_MS, createCounts, lapLengths } from './counts.ts';
 import type { Engine } from './engine.ts';
 
 export type { Mark } from '../core/marks.ts';
@@ -63,9 +63,11 @@ const FLAGS = ['auto_break', 'auto_work', 'celebrate', 'share_task', 'rooms_hidd
 const LENGTHS = ['work_ms', 'short_ms', 'long_ms'] as const;
 const whole = (v: unknown, least: number, most = Infinity) => typeof v === 'number' && Number.isInteger(v) && v >= least && v <= most;
 
+export { LAP_MAX_MS };
+
 // Whether a value may be written to a field: the schema's types and ranges.
 const fits: Record<keyof SettingsView, (v: unknown) => boolean> = {
-  work_ms: (v) => whole(v, 1000, DAY_MS),
+  work_ms: (v) => whole(v, 1000, LAP_MAX_MS),
   short_ms: (v) => whole(v, 1000, DAY_MS),
   long_ms: (v) => whole(v, 1000, DAY_MS),
   auto_break: (v) => typeof v === 'boolean',

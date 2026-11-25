@@ -375,6 +375,162 @@ describe('the list', () => {
     assert.deepEqual(h.archived.value, []);
   });
 
+  it('reminder times: the list is written whole with its first time beside it, sorted, none twice, one for each check-in of the day at most', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.habits.add('brush teeth', EVERY_DAY, 2)!;
+    assert.deepEqual([view(d, id).reminds, view(d, id).remind], [[], null]);
+    await d.engine.saved();
+    log.length = 0;
+    d.habits.edit(id, { reminds: ['22:00', '06:00', '22:00'] });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    // `remind` before `reminds`: the list is the newer cell of the pair.
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['remind', '06:00'], ['reminds', ['06:00', '22:00']]]);
+    assert.deepEqual([view(d, id).reminds, view(d, id).remind], [['06:00', '22:00'], '06:00']);
+    // Three times for a habit done twice a day: the first two.
+    d.habits.edit(id, { reminds: ['12:00', '22:00', '06:00'] });
+    assert.deepEqual(view(d, id).reminds, ['06:00', '12:00']);
+    assert.deepEqual(d.engine.rows('habit').value.get(id)?.reminds, ['06:00', '12:00']);
+    // Fewer is fine, and none clears both.
+    d.habits.edit(id, { reminds: ['21:30'] });
+    assert.deepEqual([view(d, id).reminds, d.engine.rows('habit').value.get(id)?.remind], [['21:30'], '21:30']);
+    d.habits.edit(id, { reminds: [] });
+    assert.deepEqual([view(d, id).reminds, view(d, id).remind, d.engine.rows('habit').value.get(id)?.remind], [[], null, null]);
+    // What is not a list of times of day is ignored, as other bad input is.
+    d.habits.edit(id, { reminds: ['06:00', '22:00'] });
+    const cells = d.engine.cells();
+    for (const bad of [['06:00', '25:00'], ['6:00'], '06:00', [600], [null]]) d.habits.edit(id, { reminds: bad as never });
+    assert.deepEqual(d.engine.cells(), cells);
+    // One time through the older call is a list of one, and null a list of none.
+    d.habits.edit(id, { remind: '07:30' });
+    assert.deepEqual([view(d, id).reminds, d.engine.rows('habit').value.get(id)?.reminds], [['07:30'], ['07:30']]);
+    d.habits.edit(id, { remind: null });
+    assert.deepEqual(view(d, id).reminds, []);
+  });
+
+  it('lowering the target cuts the list, in the same write; raising it leaves the list as it is', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.habits.add('drink water', EVERY_DAY, 3)!;
+    // The same time twice is one time: it does not take the place of another.
+    d.habits.edit(id, { reminds: ['17:00', '09:00', '09:00', '13:00'] });
+    assert.deepEqual(view(d, id).reminds, ['09:00', '13:00', '17:00']);
+    await d.engine.saved();
+    log.length = 0;
+    d.habits.edit(id, { target: 2 });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['target', 2], ['remind', '09:00'], ['reminds', ['09:00', '13:00']]]);
+    assert.deepEqual(view(d, id).reminds, ['09:00', '13:00']);
+    log.length = 0;
+    d.habits.edit(id, { target: 5 });
+    await d.engine.saved();
+    assert.deepEqual(log[0]!.cells!.map((c) => c.field), ['target']);
+    assert.deepEqual(view(d, id).reminds, ['09:00', '13:00']);
+    // A target and a list in one edit: the list is cut at the new target.
+    d.habits.edit(id, { target: 1, reminds: ['20:00', '08:00'] });
+    assert.deepEqual(view(d, id).reminds, ['08:00']);
+    // A target lowered on another device, which did not know of the list: what is read is cut, the cell is not.
+    d.habits.edit(id, { target: 3, reminds: ['09:00', '13:00', '17:00'] });
+    d.receive([{ stamp: `${new Date(d.engine.now() + 1000).toISOString()}-0000-b2c3d4e5f6071829`, dataset: 'habit', row: id, field: 'target', value: 1 }]);
+    assert.deepEqual(view(d, id).reminds, ['09:00']);
+    assert.deepEqual(d.engine.rows('habit').value.get(id)?.reminds, ['09:00', '13:00', '17:00']);
+  });
+
+  it('a row from before there was a list reads its one time as a list of one; a list with an entry that is no time of day reads as empty, and the cell is left', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.habits.add('read', EVERY_DAY, 2)!;
+    d.engine.write('habit', id, { remind: '21:30' });
+    assert.deepEqual([view(d, id).reminds, view(d, id).remind], [['21:30'], '21:30']);
+    d.engine.write('habit', id, { reminds: ['06:00', 'teatime'] });
+    assert.deepEqual([view(d, id).reminds, view(d, id).remind], [[], null]);
+    d.habits.edit(id, { title: 'read more' });
+    assert.deepEqual(d.engine.rows('habit').value.get(id)?.reminds, ['06:00', 'teatime'], 'not rewritten by an edit of something else');
+    // A list another build wrote unsorted is read sorted.
+    d.engine.write('habit', id, { reminds: ['22:00', '06:00'] });
+    assert.deepEqual(view(d, id).reminds, ['06:00', '22:00']);
+    // What is not a list at all is no list: the one time stands.
+    d.engine.write('habit', id, { reminds: '22:00' });
+    assert.deepEqual(view(d, id).reminds, ['21:30']);
+  });
+
+  it('place k is for the k-th check-in: the view has today\'s count beside the times', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.habits.add('brush teeth', EVERY_DAY, 2)!;
+    d.habits.edit(id, { reminds: ['06:00', '22:00'] });
+    // Which places are still to be shown today, as main.tsx works it out.
+    const due = () => view(d, id).reminds.filter((_, place) => view(d, id).today.count < place + 1);
+    assert.deepEqual(due(), ['06:00', '22:00']);
+    d.habits.checkIn(id);
+    assert.deepEqual([view(d, id).today.count, due()], [1, ['22:00']]);
+    d.habits.checkIn(id);
+    assert.deepEqual([view(d, id).today.count, due()], [2, []]);
+    d.habits.undo(id);
+    assert.deepEqual(due(), ['22:00']);
+  });
+
+  // A build that knows only `remind`: it writes that one cell, and reads nothing else.
+  const oldEdit = (d: Device, id: string, time: string | null) => d.engine.write('habit', id, { remind: time });
+  const oldRead = (d: Device, id: string) => d.engine.rows('habit').value.get(id)?.remind;
+
+  it('an older build sets its one time, then this build sets the list: the list stands on both, and the older build reminds once, at its first time', async () => {
+    const w = world();
+    const old = await w.device('a');
+    const now = await w.device('b');
+    const id = now.habits.add('brush teeth', EVERY_DAY, 2)!;
+    w.exchange(old, now);
+    old.disconnect();
+    now.disconnect();
+    oldEdit(old, id, '08:00');
+    w.time.advance(5000);
+    now.habits.edit(id, { reminds: ['06:00', '22:00'] });
+    w.exchange(old, now);
+    for (const d of [old, now]) {
+      assert.deepEqual(view(d, id).reminds, ['06:00', '22:00'], d.name);
+      assert.equal(oldRead(d, id), '06:00');
+    }
+    assert.deepEqual(w.sorted(old.engine), w.sorted(now.engine));
+  });
+
+  it('this build sets the list, then an older build changes its one time: that later edit is what every device reminds at, and clearing it clears', async () => {
+    const w = world();
+    const old = await w.device('a');
+    const now = await w.device('b');
+    const id = now.habits.add('brush teeth', EVERY_DAY, 2)!;
+    w.exchange(old, now);
+    old.disconnect();
+    now.disconnect();
+    now.habits.edit(id, { reminds: ['06:00', '22:00'] });
+    w.time.advance(5000);
+    oldEdit(old, id, '08:00');
+    w.exchange(old, now);
+    for (const d of [old, now]) {
+      assert.equal(oldRead(d, id), '08:00', d.name);
+      assert.deepEqual([view(d, id).reminds, view(d, id).remind], [['08:00'], '08:00'], d.name);
+      // Nothing is thrown away: the list is still in its cell.
+      assert.deepEqual(d.engine.rows('habit').value.get(id)?.reminds, ['06:00', '22:00']);
+    }
+    assert.deepEqual(w.sorted(old.engine), w.sorted(now.engine));
+    w.time.advance(5000);
+    oldEdit(old, id, null);
+    w.exchange(old, now);
+    assert.deepEqual(view(now, id).reminds, []);
+    // This build sets the list again: it is the newer of the two again, on both, and after a restart.
+    w.time.advance(5000);
+    now.habits.edit(id, { reminds: ['07:00', '21:00'] });
+    w.exchange(old, now);
+    for (const d of [old, now]) assert.deepEqual(view(d, id).reminds, ['07:00', '21:00']);
+    assert.equal(oldRead(old, id), '07:00');
+    await now.connect();
+    const again = await w.restart(now);
+    assert.deepEqual(view(again, id).reminds, ['07:00', '21:00']);
+  });
+
   it('purge deletes for good a habit that is on the shelf: one cell, on no list again, and its check-ins are not written', async () => {
     const w = world();
     const log: Write[] = [];

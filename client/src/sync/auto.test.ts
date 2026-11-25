@@ -88,35 +88,107 @@ describe('an automatic lap', () => {
     assert.equal(d.focus.lapsToday(), 4);
   });
 
-  it('goes on with the task at the top of today\'s list when the lap before the break was on it', async () => {
+  it('goes on with the task of the lap that rang before the break, wherever that task is on today\'s list', async () => {
     const w = world();
     const d = await w.device('a');
     auto(d, { auto_break: true, auto_work: true });
-    const top = d.today.add('pointers ~4')!;
-    d.today.add('arrays');
-    d.focus.start(top);
+    const [, , third] = ['pointers ~4', 'arrays', 'structs'].map((line) => d.today.add(line)!);
+    d.focus.start(third);
     w.time.advance(LAP + SHORT);
-    assert.equal(d.focus.state.value.phase, 'work');
-    assert.equal(d.focus.state.value.task, top);
+    assert.equal(d.focus.state.peek().phase, 'work');
+    assert.equal(d.focus.state.peek().task, third, 'the third task, not the top one and not none');
+    // And on through the next break, still with it.
+    w.time.advance(LAP + SHORT);
+    assert.deepEqual([d.focus.state.peek().run, d.focus.state.peek().task], ['run-1____', third]);
+    // A task due another day, in Upcoming: it is open, so the lap goes on with it too.
+    d.focus.stop();
+    d.today.edit(third!, { due: '2026-11-30' });
+    d.engine.write('timer', 'current', { state: { ...d.focus.state.peek(), set_index: 0 } });
+    d.focus.start(third);
+    w.time.advance(LAP + SHORT);
+    assert.equal(d.focus.state.peek().task, third);
   });
 
-  it('is for no task when the lap before the break was on another task, or the top of the list has changed', async () => {
+  it('is for no task once that task is not open: ticked done during the break, deleted during it, or a lap that was for nothing', async () => {
     const w = world();
     const d = await w.device('a');
     auto(d, { auto_break: true, auto_work: true });
-    const top = d.today.add('pointers')!;
-    const second = d.today.add('arrays')!;
-    d.focus.start(second);
-    w.time.advance(LAP + SHORT);
-    assert.equal(d.focus.state.value.task, null, 'it was on the second task: which next is the person\'s to say');
-    d.focus.stop();
-    // On the top task this time, but it is done during the break.
-    d.focus.start(top);
+    const [done, gone] = ['pointers', 'arrays'].map((line) => d.today.add(line)!);
+    const after = () => [d.focus.state.peek().phase, d.focus.state.peek().task];
+    const fresh = () => {
+      d.focus.stop();
+      d.engine.write('timer', 'current', { state: { ...d.focus.state.peek(), set_index: 0 } });
+    };
+    // Ticked done in the break. The lap had rung, so the tick ends nothing: the break runs out and the lap starts for no task.
+    d.focus.start(done);
     w.time.advance(LAP + MIN);
-    d.today.setDone(top, true);
+    d.today.setDone(done!, true);
     w.time.advance(SHORT);
-    assert.equal(d.focus.state.value.phase, 'work');
-    assert.equal(d.focus.state.value.task, null);
+    assert.deepEqual(after(), ['work', null]);
+    // Opened again, the next one goes on with it.
+    fresh();
+    d.today.setDone(done!, false);
+    d.focus.start(done);
+    w.time.advance(LAP + SHORT);
+    assert.deepEqual(after(), ['work', done]);
+    // Deleted in the break.
+    fresh();
+    d.focus.start(gone);
+    w.time.advance(LAP + MIN);
+    d.today.remove(gone!);
+    w.time.advance(SHORT);
+    assert.deepEqual(after(), ['work', null]);
+    // A lap for nothing in particular is followed by one for nothing.
+    fresh();
+    d.focus.start();
+    w.time.advance(LAP + SHORT);
+    assert.deepEqual(after(), ['work', null]);
+  });
+
+  it('is for no task when this device does not hold the task: one it never heard of, or a row still without its title', async () => {
+    const w = world();
+    const d = await w.device('a');
+    auto(d, { auto_break: true, auto_work: true });
+    d.focus.start('a-task-this-device-never-heard-of');
+    w.time.advance(LAP + SHORT);
+    assert.deepEqual([d.focus.state.peek().phase, d.focus.state.peek().task], ['work', null]);
+    d.focus.stop();
+    d.engine.write('timer', 'current', { state: { ...d.focus.state.peek(), set_index: 0 } });
+    // Its cells are still arriving: an estimate, and no title yet.
+    d.engine.write('task', 'half', { estimate: 2 });
+    d.focus.start('half');
+    w.time.advance(LAP + SHORT);
+    assert.deepEqual([d.focus.state.peek().phase, d.focus.state.peek().task], ['work', null]);
+  });
+
+  it('two devices at the break\'s bell, one not having heard the task was ticked done: each starts the lap it knows, and when they meet there is one state on both', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    auto(a, { auto_break: true, auto_work: true });
+    const id = a.today.add('pointers')!;
+    await a.settle();
+    w.exchange(a, b);
+    // b starts the lap and keeps the timer; it rings on both, and the break begins on both.
+    b.focus.start(id);
+    await b.settle();
+    w.exchange(a, b);
+    w.time.advance(LAP);
+    w.exchange(a, b);
+    b.disconnect();
+    // In the break the task is ticked on a. b, offline with its own timer, does not hear.
+    w.time.advance(MIN);
+    a.today.setDone(id, true);
+    await a.settle();
+    w.time.advance(SHORT - MIN);
+    assert.deepEqual([a.focus.state.peek().run, a.focus.state.peek().task], ['run-1__', null]);
+    assert.deepEqual([b.focus.state.peek().run, b.focus.state.peek().task], ['run-1__', id]);
+    w.exchange(a, b);
+    await b.connect();
+    assert.deepEqual(a.focus.state.peek(), b.focus.state.peek());
+    // The same cell, stamped at the same moment by each: the device id in the stamp decides, the same way everywhere.
+    assert.equal(a.focus.state.peek().task, a.engine.device > b.engine.device ? null : id);
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 });
 

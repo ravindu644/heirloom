@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import type { Cell } from '../core/merge.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
+import { LAP_MAX_MS } from './settings.ts';
 import { LAP, MIN, OFFSET, world } from './world.ts';
 
 const HOUR = 60 * MIN;
@@ -71,6 +72,8 @@ describe('settings', () => {
     for (const bad of [
       { work_ms: 999 },
       { work_ms: 86400001 },
+      { work_ms: LAP_MAX_MS + 1 },
+      { work_ms: 100 * MIN },
       { short_ms: 86400001 },
       { long_ms: 86400001 },
       { long_ms: 900000.5 },
@@ -84,8 +87,14 @@ describe('settings', () => {
       assert.equal(s.set(bad as never), false, JSON.stringify(bad));
     }
     assert.deepEqual(d.engine.cells(), cells);
-    // A day is the longest a length may be, and a second the shortest.
-    assert.equal(s.set({ work_ms: 86400000, short_ms: 1000 }), true);
+    // A lap is 99 minutes at most, a break a day, and a second is the shortest of any.
+    assert.equal(LAP_MAX_MS, 99 * MIN);
+    assert.equal(s.set({ work_ms: LAP_MAX_MS, short_ms: 1000, long_ms: 86400000 }), true);
+    assert.equal(s.set({ work_ms: 1000 }), true);
+    // A longer lap another build wrote is read and run as it is.
+    d.engine.write('settings', 'current', { work_ms: 120 * MIN });
+    assert.equal(s.all.value.work_ms, 120 * MIN);
+    assert.equal(d.focus.lengths.value.work_ms, 120 * MIN);
   });
 
   it('a row with something this build cannot use still reads: each such field as its default', async () => {

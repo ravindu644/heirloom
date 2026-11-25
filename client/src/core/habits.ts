@@ -14,7 +14,10 @@ export interface Habit {
   days: number;
   /** Check-ins that make a day done. 1 when the row has none it can use. */
   target: number;
+  /** The one time an older build knows, as the row holds it. */
   remind: string | null;
+  /** The reminder times, sorted, one for each check-in of the day at most: place k is for the k-th. */
+  reminds: string[];
   order: string;
   archived: number | null;
   deleted: number | null;
@@ -49,16 +52,25 @@ export const asDays = (v: unknown): number | null => (whole(v, 1, 127) ? v : nul
 export const asTarget = (v: unknown): number | null => (whole(v, 1) ? v : null);
 /** A reminder time, `07:30`, or null. */
 export const asRemind = (v: unknown): string | null => (isTime(v) ? v : null);
+/** A list of reminder times, sorted and none twice, or null when it is not a list of times of day. */
+export const asReminds = (v: unknown): string[] | null => (Array.isArray(v) && v.every(isTime) ? [...new Set(v as string[])].sort() : null);
 
 /** A row is a habit when it has a title, as a task is. */
 export function asHabit(id: string, row: Readonly<Record<string, unknown>>): Habit | null {
   if (typeof row.title !== 'string') return null;
+  const target = asTarget(row.target) ?? 1;
+  const remind = asRemind(row.remind);
+  // The list when the row has one, and a list with one entry that is no time of day reads as
+  // empty; else the one time an older build wrote. Never more than the day's check-ins: a
+  // target lowered elsewhere cuts what is read, whatever the cell still holds.
+  const reminds = Array.isArray(row.reminds) ? (asReminds(row.reminds) ?? []) : remind === null ? [] : [remind];
   return {
     id,
     title: row.title,
     days: asDays(row.days) ?? 127,
-    target: asTarget(row.target) ?? 1,
-    remind: asRemind(row.remind),
+    target,
+    remind,
+    reminds: reminds.slice(0, target),
     order: typeof row.order === 'string' ? row.order : '',
     archived: time(row.archived),
     deleted: asDeleted(row.deleted),

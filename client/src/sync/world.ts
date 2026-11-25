@@ -97,8 +97,6 @@ export function world() {
       utcOffsetMin: () => OFFSET,
       runId: () => `run-${++runs}`,
       schedule: (run, ms) => (waits.push(ms), time.schedule(run, ms)),
-      // As startApp wires it: the top of today's list, asked for when a lap starts by itself.
-      topTask: () => today?.list.peek()[0]?.id ?? null,
     });
 
     let progress: ReturnType<typeof createProgress> | undefined;

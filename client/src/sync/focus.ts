@@ -13,6 +13,7 @@ import { closeRun, mayWriteBell } from '../core/session.ts';
 import type { End } from '../core/session.ts';
 import type { Race } from '../core/stats.ts';
 import { act, view } from '../core/timer.ts';
+import { asTask } from '../core/today.ts';
 import type { TimerAction, TimerState, TimerView } from '../core/timer.ts';
 import { createCounts, lapLengths } from './counts.ts';
 import type { Engine } from './engine.ts';
@@ -22,8 +23,13 @@ export type { Race } from '../core/stats.ts';
 export interface Focus {
   /** The timer cell. Changes only when someone acts, on any device. */
   readonly state: ReadonlySignal<TimerState>;
-  /** The lengths a new lap, short break and long break get, from settings or their defaults. */
+  /** The account's lengths for a lap, a short break and a long break, from settings or their defaults. */
   readonly lengths: ReadonlySignal<{ work_ms: number; short_ms: number; long_ms: number }>;
+  /**
+   * What a run begun now for that task would get: the task's own lengths, each falling back by
+   * itself to the account's. For no task, or one this device does not hold, the account's.
+   */
+  lengthsFor(task: string | null): { work_ms: number; short_ms: number; long_ms: number };
   /** Time left, the end, over, paused, what comes next: worked out at the engine's now. Call it on every tick. */
   view(): TimerView;
   /** Running time of the current run in ms, pauses left out. */
@@ -68,11 +74,6 @@ export interface FocusEnv {
   runId(): string;
   /** Runs `run` once after `ms`. Returns a function that cancels it. */
   schedule(run: () => void, ms: number): () => void;
-  /**
-   * The task at the top of today's list, if there is one. A lap that starts by itself after a
-   * break goes on with it when the lap before the break was on it. Left out, such a lap is for no task.
-   */
-  topTask?(): string | null;
 }
 
 /** What Focus uses of the engine. */
@@ -103,6 +104,10 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
   const counts = createCounts(engine, env.utcOffsetMin);
   const { rows, timerStamp, today, current, covered, rangOnce } = counts;
   const lengths = computed(() => lapLengths(engine.rows('settings').value.get('current')));
+  // Read when a run begins, by the device that begins it: the timer cell carries the length from
+  // there, so a task edited mid-lap changes the next run and not this one.
+  const taskRows = engine.rows('task');
+  const lengthsFor = (task: string | null) => lapLengths(task === null ? undefined : taskRows.value.get(task), lengths.value);
 
   // The timer last did something on an earlier local day: its bell if it rang, else the last
   // time someone touched it. Then the next lap is lap one, and yesterday's half set earns no break.
@@ -149,6 +154,8 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     const v = look(s, now);
     const phase = lap ? 'work' : v.next.phase;
     const fresh = phase === 'work' && newDay(s, v, now);
+    // A lap is as long as its task says. A break is as long as the task of the lap it follows says.
+    const of = phase === 'work' ? (task ?? null) : s.task;
     batch(() => {
       keep(s, 'stop', now, written());
       const start: TimerAction = {
@@ -156,7 +163,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
         phase,
         run: env.runId(),
         task: phase === 'work' ? (task ?? null) : null,
-        planned_ms: lengths.peek()[`${phase}_ms`],
+        planned_ms: untracked(() => lengthsFor(of))[`${phase}_ms`],
         ...(fresh && { new_set: true }),
       };
       put(act(s, start, now));
@@ -212,7 +219,9 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     const { phase } = view(s, bell).next;
     // Everything is worked out as of the bell, not of the moment of writing, so a second device
     // that sees the same bell a little later writes the very same state.
-    const start: TimerAction = { do: 'start', phase, run: s.run + AUTO_SUFFIX, task: phase === 'work' ? taskAfter(s) : null, planned_ms: lengths.peek()[`${phase}_ms`] };
+    // The break is for the lap that has just rung, the lap for the task it goes on with: each takes that task's lengths.
+    const task = phase === 'work' ? taskAfter(s) : null;
+    const start: TimerAction = { do: 'start', phase, run: s.run + AUTO_SUFFIX, task, planned_ms: lengthsFor(phase === 'work' ? task : s.task)[`${phase}_ms`] };
     const next = act(s, start, bell);
     // Stamped just after the cell it follows, as a rang row is stamped at it: anything a person
     // does afterwards is newer, and a stop made elsewhere before the bell is too.
@@ -220,16 +229,19 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     own = { state: next, written: stampMs(stamp) };
   }
 
-  // The task a lap begun by itself after this break is for: the one at the top of today's list,
-  // if the lap that rang before the break was on it. Otherwise none: starting on something else
+  // The task a lap begun by itself after this break is for: the task of the lap that rang
+  // before the break, while it is open. The person chose it, and nothing has been said since.
+  // Done or deleted in the break, or a task this device does not hold: no task, and which next
   // is the person's to say.
   function taskAfter(rest: TimerState): string | null {
     const before = counts.sessions
       .peek()
       .filter((row) => row.kind === 'work' && row.outcome === 'rang' && row.ended <= (rest.started ?? 0))
       .sort((a, b) => b.ended - a.ended)[0];
-    const top = env.topTask?.() ?? null;
-    return before?.task && before.task === top ? top : null;
+    const id = before?.task ?? null;
+    const row = id === null ? undefined : taskRows.peek().get(id);
+    const task = row && asTask(row.id, row);
+    return task && task.done === null && task.deleted === null ? task.id : null;
   }
 
   // The watch. It runs when the timer cell, the sync state or the session rows change, and when
@@ -272,6 +284,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
   return {
     state,
     lengths,
+    lengthsFor,
     view: () => look(state.value, engine.now()),
     ran: () => state.value.planned_ms - view(state.value, engine.now()).left_ms,
 

@@ -4,12 +4,12 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { GONE, isDay, isTime } from '../core/real.ts';
+import { GONE, isDay, isLength, isTime } from '../core/real.ts';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
-import { ESTIMATE_MAX, asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
+import { ESTIMATE_MAX, asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, plannedLeftMs, quickAdd, squares, upNext } from '../core/today.ts';
 import type { Repeat, Task } from '../core/today.ts';
-import { createCounts, lapLengths } from './counts.ts';
+import { LAP_MAX_MS, createCounts, lapLengths } from './counts.ts';
 import { createDay } from './day.ts';
 import type { Engine, Row } from './engine.ts';
 import type { Focus } from './focus.ts';
@@ -59,6 +59,8 @@ export interface TaskView {
   /** The time of day on `due`, `15:30`. Null when none is set, and while there is no `due` for it to be on (another device may have cleared the day as this one set the time). */
   time: string | null;
   repeat: Repeat;
+  /** The task's own lengths for a lap and for the breaks after a lap on it, in ms. Null: the account's. */
+  lengths: { work_ms: number | null; short_ms: number | null; long_ms: number | null };
   done: boolean;
   /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after, or at once by `purge`. */
   deleted: number | null;
@@ -72,7 +74,7 @@ export interface DayFigures {
   laps: number;
   /** One fill per lap of today, oldest first, for the day target's bar: 1 for a lap that rang, less for one stopped. As many as `laps`. */
   fills: number[];
-  /** Laps still planned on today's list, and how long they would take at the current lap length. */
+  /** Laps still planned on today's list, and how long they would take, each task's at its own lap length. */
   left_laps: number;
   left_ms: number;
   /** The day target in laps, 0 when none is set. */
@@ -91,6 +93,11 @@ export interface TaskEdit {
   /** `15:30`, or null for none. On a task with no day it sets the day to today as well. */
   time?: string | null;
   repeat?: Repeat;
+  /** The task's own lap length in ms, a second to `LAP_MAX_MS`, or null for the account's. */
+  work_ms?: number | null;
+  /** Its own break lengths in ms, a second to a day as in settings, or null for the account's. */
+  short_ms?: number | null;
+  long_ms?: number | null;
 }
 
 export interface Today {
@@ -263,6 +270,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       // A time is a time on a day. One with no day is what two devices can leave between them: it shows as none.
       time: t.due === null ? null : t.time,
       repeat: t.repeat,
+      lengths: { work_ms: t.work_ms, short_ms: t.short_ms, long_ms: t.long_ms },
       done: t.done !== null,
       deleted: t.deleted,
       subtasks: (lists.subtasks.get(t.id) ?? []).map((sub) => ({ id: sub.id, title: sub.title, done: sub.done !== null })),
@@ -296,7 +304,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   // moved it, broken it down, or run a lap on it. Only then is it ours to take away or bring back.
   function untouched(next: Task, of: Task, due: string): boolean {
     const copied = next.project === of.project && next.title === of.title && next.notes === of.notes && next.estimate === of.estimate;
-    const placed = next.when === of.when && next.time === of.time && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
+    const lengths = next.work_ms === of.work_ms && next.short_ms === of.short_ms && next.long_ms === of.long_ms;
+    const placed = lengths && next.when === of.when && next.time === of.time && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
     const used = next.done !== null || model.peek().lists.subtasks.has(next.id) || engine.timer.peek().task === next.id;
     return copied && placed && !used && !counts.sessions.peek().some((s) => s.task === next.id);
   }
@@ -320,7 +329,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     timed,
 
     figures() {
-      const { left } = model.value;
+      const { left, todays } = model.value;
       const { you_ms, ghost } = counts.race();
       const target = settings()?.day_target;
       const fills = counts.fillsToday();
@@ -329,7 +338,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         laps: fills.length,
         fills,
         left_laps: left,
-        left_ms: left * lapLengths(settings()).work_ms,
+        left_ms: plannedLeftMs(todays, lapLengths(settings()).work_ms),
         target: typeof target === 'number' && Number.isInteger(target) && target > 0 ? target : 0,
         ghost: ghost && { day: ghost.day, total_ms: ghost.total_ms, laps: counts.lapsOn(ghost.day) },
       };
@@ -372,6 +381,11 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       // all, on whatever day is picked next week. Only a time this build reads: another value is not ours to rewrite.
       if (write.due === null && t.time !== null) write.time = null;
       if (repeat !== undefined) write.repeat = asRepeat(repeat);
+      // A lap no longer than the longest there is, a break as settings takes one; null gives the length back to the account.
+      for (const name of ['work_ms', 'short_ms', 'long_ms'] as const) {
+        const length = fields[name];
+        if (length === null || (isLength(length) && (name !== 'work_ms' || length <= LAP_MAX_MS))) write[name] = length;
+      }
       if (Object.keys(write).length) engine.write('task', id, write);
     },
 
@@ -399,8 +413,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         const held = tasks.get(next.id);
         if (!held) {
           if (!done) return;
-          const { project, title, notes, estimate, repeat, when, time, order } = t;
-          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, time, order, due: next.due });
+          const { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms, order } = t;
+          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms, order, due: next.due });
         } else if ((held.deleted === null) !== done && untouched(held, t, next.due)) {
           engine.write('task', next.id, { deleted: done ? null : now });
         }

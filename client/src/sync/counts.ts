@@ -3,7 +3,7 @@
 
 import { computed } from '@preact/signals-core';
 import { stampMs } from '../core/hlc.ts';
-import { isMoment } from '../core/real.ts';
+import { isLength, isMoment } from '../core/real.ts';
 import { fill, focusOf, localDay, race, setFills } from '../core/stats.ts';
 import type { Race, Session } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
@@ -13,13 +13,19 @@ import type { Engine, Row } from './engine.ts';
 const DAY_MS = 86400000;
 const LENGTHS = { work_ms: 1500000, short_ms: 300000, long_ms: 900000 };
 
-/** The lengths a lap and the breaks get: the settings row's, or the default where it has none a timer could use. */
-export function lapLengths(settings: Row | undefined): typeof LENGTHS {
-  const length = (name: keyof typeof LENGTHS) => {
-    const value = settings?.[name];
-    // A day is the schema's maximum.
-    return typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= DAY_MS ? value : LENGTHS[name];
-  };
+/**
+ * The longest lap that is offered: 99 minutes, the most the clock face draws. A longer one that
+ * a row already holds (an earlier build, another client) is read and run as it is.
+ */
+export const LAP_MAX_MS = 99 * 60000;
+
+/**
+ * The lengths a lap and the breaks get from a row, each by itself: the row's where it holds a
+ * length a timer could use, else `otherwise`. A settings row falls back to the defaults, a task
+ * row to the account's.
+ */
+export function lapLengths(row: Row | undefined, otherwise: typeof LENGTHS = LENGTHS): typeof LENGTHS {
+  const length = (name: keyof typeof LENGTHS) => (isLength(row?.[name]) ? (row![name] as number) : otherwise[name]);
   return { work_ms: length('work_ms'), short_ms: length('short_ms'), long_ms: length('long_ms') };
 }
 

@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { GONE, isMoment } from '../core/real.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
+import { LAP_MAX_MS } from './settings.ts';
 import { COLORS, ESTIMATE_MAX, PROJECT_NAME_MAX, isColor } from './today.ts';
 import { LAP, MIN, world } from './world.ts';
 
@@ -43,7 +44,7 @@ describe('adding', () => {
     const next = d.today.next.value!;
     assert.deepEqual(next, {
       id, title: 'pointers chapter 3', notes: '', project: null, estimate: 4, laps: 0, squares: [], running: false,
-      due: TODAY, when: null, time: null, repeat: null, done: false, deleted: null, subtasks: [],
+      due: TODAY, when: null, time: null, repeat: null, lengths: { work_ms: null, short_ms: null, long_ms: null }, done: false, deleted: null, subtasks: [],
     });
   });
 
@@ -335,10 +336,10 @@ describe('the lists', () => {
   it('fields a newer build wrote differently read as unset, never as something to trip on', async () => {
     const w = world();
     const d = await w.device('a');
-    d.engine.write('task', 't1', { title: 'odd fields', estimate: 'four', due: 'next week', repeat: { every: 'month' }, when: 9, time: 1530, notes: null, order: 3, project: 'gone' });
+    d.engine.write('task', 't1', { title: 'odd fields', estimate: 'four', due: 'next week', repeat: { every: 'month' }, when: 9, time: 1530, notes: null, order: 3, project: 'gone', work_ms: '25m', short_ms: 999, long_ms: 86400001 });
     assert.deepEqual(d.today.next.value, {
       id: 't1', title: 'odd fields', notes: '', project: null, estimate: null, laps: 0, squares: [], running: false,
-      due: null, when: null, time: null, repeat: null, done: false, deleted: null, subtasks: [],
+      due: null, when: null, time: null, repeat: null, lengths: { work_ms: null, short_ms: null, long_ms: null }, done: false, deleted: null, subtasks: [],
     });
   });
 });
@@ -697,7 +698,7 @@ describe('repeating tasks', () => {
     assert.equal(log.length, 1);
     const next = `${id}-20261125`;
     assert.deepEqual(row(d, next), {
-      id: next, project: null, title: 'read', notes: 'K&R', estimate: 2, repeat: { every: 'day' }, when: 'after dinner', time: null, order: 'V', due: TOMORROW,
+      id: next, project: null, title: 'read', notes: 'K&R', estimate: 2, repeat: { every: 'day' }, when: 'after dinner', time: null, work_ms: null, short_ms: null, long_ms: null, order: 'V', due: TOMORROW,
     });
     assert.deepEqual(titles(d.today.done.value), ['read']);
     assert.deepEqual(titles(d.today.upcoming.value), ['read']);
@@ -1169,19 +1170,20 @@ describe('editing', () => {
 });
 
 describe('an estimate', () => {
-  it('stops at eight laps: a larger one typed or set is taken as eight, and a row that already holds more is read as it is until its estimate is next edited', async () => {
+  it('stops at thirty-two laps: a larger one typed or set is taken as thirty-two, and a row that already holds more is read as it is until its estimate is next edited', async () => {
     const w = world();
     const d = await w.device('a');
-    assert.equal(ESTIMATE_MAX, 8);
+    assert.equal(ESTIMATE_MAX, 32);
     const typed = d.today.add('the whole book ~40')!;
-    assert.equal(row(d, typed)?.estimate, 8);
-    assert.equal(row(d, d.today.add('a chapter ~8')!)?.estimate, 8);
-    d.today.edit(typed, { estimate: 7 });
-    assert.equal(row(d, typed)?.estimate, 7);
-    d.today.edit(typed, { estimate: 9 });
-    assert.equal(row(d, typed)?.estimate, 8);
+    assert.equal(row(d, typed)?.estimate, 32);
+    assert.equal(row(d, d.today.add('a chapter ~32')!)?.estimate, 32);
+    assert.equal(row(d, d.today.add('a section ~12')!)?.estimate, 12);
+    d.today.edit(typed, { estimate: 31 });
+    assert.equal(row(d, typed)?.estimate, 31);
+    d.today.edit(typed, { estimate: 33 });
+    assert.equal(row(d, typed)?.estimate, 32);
     d.today.edit(typed, { estimate: 1000 });
-    assert.equal(row(d, typed)?.estimate, 8);
+    assert.equal(row(d, typed)?.estimate, 32);
     // From an older build: forty laps guessed.
     d.engine.write('task', typed, { estimate: 40 });
     const stamp = d.engine.stamp('task', typed, 'estimate');
@@ -1189,9 +1191,257 @@ describe('an estimate', () => {
     d.today.edit(typed, { title: 'the whole book, slowly' });
     assert.equal(d.engine.stamp('task', typed, 'estimate'), stamp, 'an edit of something else leaves it');
     d.today.edit(typed, { estimate: 40 });
-    assert.equal(row(d, typed)?.estimate, 8);
+    assert.equal(row(d, typed)?.estimate, 32);
     d.today.edit(typed, { estimate: null });
     assert.equal(row(d, typed)?.estimate, null);
+  });
+});
+
+describe('a task\'s own lengths', () => {
+  const lengths = (d: Device, id: string) => [d.today.list, d.today.upcoming].flatMap((list) => list.value).find((t) => t.id === id)!.lengths;
+
+  it('are none until set; each is set and cleared by itself, in one write, held to what settings holds a length to', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('read the chapter ~3')!;
+    assert.deepEqual(lengths(d, id), { work_ms: null, short_ms: null, long_ms: null });
+    await d.engine.saved();
+    log.length = 0;
+    d.today.edit(id, { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['work_ms', 60 * MIN], ['short_ms', 10 * MIN], ['long_ms', 30 * MIN]]);
+    assert.deepEqual(lengths(d, id), { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN });
+    d.today.edit(id, { short_ms: null });
+    assert.deepEqual(lengths(d, id), { work_ms: 60 * MIN, short_ms: null, long_ms: 30 * MIN });
+    assert.equal(row(d, id)?.short_ms, null);
+    // A lap of 99 minutes at most; a break up to a day, as in settings; a second at least.
+    d.today.edit(id, { work_ms: LAP_MAX_MS, short_ms: 1000, long_ms: 86400000 });
+    assert.deepEqual(lengths(d, id), { work_ms: 99 * MIN, short_ms: 1000, long_ms: 86400000 });
+    const cells = d.engine.cells();
+    for (const bad of [{ work_ms: LAP_MAX_MS + 1 }, { work_ms: 100 * MIN }, { work_ms: 999 }, { work_ms: 1500000.5 }, { work_ms: '25' }, { short_ms: 0 }, { short_ms: -1 }, { long_ms: 86400001 }, { long_ms: NaN }, {}]) {
+      d.today.edit(id, bad as never);
+    }
+    assert.deepEqual(d.engine.cells(), cells, 'what is no length is ignored, as other bad input is');
+  });
+
+  it('a stored value that is no length reads as none and is left as it is; a longer lap another build wrote is read as it is', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('read')!;
+    d.engine.write('task', id, { work_ms: 'an hour', short_ms: 5, long_ms: 120 * MIN });
+    assert.deepEqual(lengths(d, id), { work_ms: null, short_ms: null, long_ms: 120 * MIN });
+    for (const odd of [500, 86400001, 1500000.5]) {
+      d.engine.write('task', id, { work_ms: odd });
+      assert.equal(lengths(d, id).work_ms, null, String(odd));
+      assert.equal(d.focus.lengthsFor(id).work_ms, LAP);
+    }
+    d.engine.write('task', id, { work_ms: 120 * MIN });
+    assert.equal(lengths(d, id).work_ms, 120 * MIN);
+    assert.deepEqual(d.focus.lengthsFor(id), { work_ms: 120 * MIN, short_ms: 5 * MIN, long_ms: 120 * MIN });
+    d.today.edit(id, { title: 'read on' });
+    assert.equal(row(d, id)?.short_ms, 5, 'not rewritten by an edit of something else');
+  });
+
+  it('lengthsFor is what a run begun now for the task would get: its own, each falling back by itself to the account\'s', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('read')!;
+    const account = { work_ms: LAP, short_ms: 5 * MIN, long_ms: 15 * MIN };
+    assert.deepEqual(d.focus.lengthsFor(id), account);
+    assert.deepEqual(d.focus.lengthsFor(null), account);
+    assert.deepEqual(d.focus.lengthsFor('a task this device never heard of'), account);
+    d.today.edit(id, { work_ms: 60 * MIN });
+    assert.deepEqual(d.focus.lengthsFor(id), { ...account, work_ms: 60 * MIN });
+    d.today.edit(id, { long_ms: 30 * MIN });
+    d.settings.set({ work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 20 * MIN });
+    assert.deepEqual(d.focus.lengthsFor(id), { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN });
+    assert.deepEqual(d.focus.lengthsFor(null), { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 20 * MIN });
+    assert.deepEqual(d.focus.lengths.value, { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 20 * MIN }, 'lengths stays the account\'s');
+  });
+
+  it('a lap begun on the task takes its lap length, and the break after a lap on it its break length; a lap for nothing takes the account\'s', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('read')!;
+    d.today.edit(id, { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN });
+    d.focus.start(id);
+    assert.equal(d.focus.state.value.planned_ms, 60 * MIN);
+    w.time.advance(60 * MIN);
+    assert.equal(d.session('run-1')?.planned_ms, 60 * MIN);
+    d.focus.start();
+    assert.deepEqual([d.focus.state.value.phase, d.focus.state.value.planned_ms], ['short', 10 * MIN]);
+    w.time.advance(10 * MIN);
+    // The next lap is for nothing in particular: the account's length, and its break the account's too.
+    d.focus.start();
+    assert.deepEqual([d.focus.state.value.task, d.focus.state.value.planned_ms], [null, LAP]);
+    w.time.advance(LAP);
+    d.focus.start();
+    assert.deepEqual([d.focus.state.value.phase, d.focus.state.value.planned_ms], ['short', 5 * MIN]);
+    // Skipping a break, straight onto the task again; then lap four on it, and its long break.
+    d.focus.skipBreak(id);
+    assert.equal(d.focus.state.value.planned_ms, 60 * MIN);
+    w.time.advance(60 * MIN);
+    d.focus.skipBreak(id);
+    assert.equal(d.focus.state.value.set_index, 3);
+    w.time.advance(60 * MIN);
+    d.focus.start();
+    assert.deepEqual([d.focus.state.value.phase, d.focus.state.value.planned_ms], ['long', 30 * MIN]);
+  });
+
+  it('a length is read once, when the run begins: a task edited mid-lap changes the next run and not this one', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('read')!;
+    d.focus.start(id);
+    w.time.advance(5 * MIN);
+    d.today.edit(id, { work_ms: 60 * MIN, short_ms: 10 * MIN });
+    assert.equal(d.focus.state.value.planned_ms, LAP);
+    assert.equal(d.focus.view().left_ms, 20 * MIN);
+    w.time.advance(20 * MIN);
+    d.focus.start();
+    assert.equal(d.focus.state.value.planned_ms, 10 * MIN, 'the break is the next run');
+    d.today.edit(id, { short_ms: 15 * MIN });
+    assert.equal(d.focus.state.value.planned_ms, 10 * MIN);
+    w.time.advance(10 * MIN);
+    d.focus.start(id);
+    assert.equal(d.focus.state.value.planned_ms, 60 * MIN);
+  });
+
+  it('breaks and laps that start by themselves take the task\'s lengths too: the break of the lap that rang, the lap of the task it goes on with', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.engine.write('settings', 'current', { auto_break: true, auto_work: true });
+    const id = d.today.add('read')!;
+    d.today.add('something else');
+    d.today.edit(id, { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN });
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(50 * MIN);
+    assert.deepEqual(d.focus.state.value, { phase: 'short', run: 'run-1_', task: null, started: T0 + 50 * MIN, paused_at: null, paused_ms: 0, planned_ms: 10 * MIN, set_index: 0 });
+    await d.settle();
+    w.time.advance(10 * MIN);
+    // It goes on with the task at the top of the list, the one the lap before the break was on: at that task's length.
+    assert.deepEqual(d.focus.state.value, { phase: 'work', run: 'run-1__', task: id, started: T0 + 60 * MIN, paused_at: null, paused_ms: 0, planned_ms: 50 * MIN, set_index: 1 });
+    // A lap for nothing, and the break and the lap after it, are the account's.
+    d.focus.stop();
+    d.focus.start();
+    await d.settle();
+    w.time.advance(LAP);
+    assert.deepEqual([d.focus.state.peek().phase, d.focus.state.peek().planned_ms], ['short', 5 * MIN]);
+    await d.settle();
+    w.time.advance(5 * MIN);
+    assert.deepEqual([d.focus.state.peek().phase, d.focus.state.peek().task, d.focus.state.peek().planned_ms], ['work', null, LAP]);
+  });
+
+  it('planned, left counts each task\'s laps at that task\'s lap length, and the account\'s where it has none', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [long, plain, none] = ['an hour each ~3', 'plain ~2', 'no estimate'].map((t) => d.today.add(t)!);
+    d.today.edit(long!, { work_ms: 60 * MIN });
+    d.today.edit(none!, { work_ms: 90 * MIN });
+    assert.deepEqual([d.today.figures().left_laps, d.today.figures().left_ms], [5, 3 * 60 * MIN + 2 * LAP]);
+    lap(d, 'lap-a', long!, T0 - 2 * HOUR, { planned_ms: 60 * MIN, ended: T0 - HOUR });
+    assert.deepEqual([d.today.figures().left_laps, d.today.figures().left_ms], [4, 2 * 60 * MIN + 2 * LAP]);
+    d.settings.set({ work_ms: 50 * MIN });
+    assert.equal(d.today.figures().left_ms, 2 * 60 * MIN + 2 * 50 * MIN);
+    d.today.edit(long!, { work_ms: null });
+    assert.equal(d.today.figures().left_ms, 4 * 50 * MIN);
+  });
+
+  it('the next of a repeating task copies all three, and one whose lengths were changed is the person\'s', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('read ~2')!;
+    d.today.edit(id, { repeat: { every: 'day' }, work_ms: 60 * MIN, long_ms: 30 * MIN });
+    d.today.setDone(id, true);
+    const next = `${id}-20261125`;
+    assert.deepEqual([row(d, next)?.work_ms, row(d, next)?.short_ms, row(d, next)?.long_ms], [60 * MIN, null, 30 * MIN]);
+    assert.deepEqual(lengths(d, next), { work_ms: 60 * MIN, short_ms: null, long_ms: 30 * MIN });
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), [], 'untouched, it goes with the done');
+    d.today.setDone(id, true);
+    d.today.edit(next, { short_ms: 10 * MIN });
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), ['read']);
+  });
+
+  it('set on one device: a lap started on the other before it hears is the account\'s length, and after it hears the task\'s', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.today.add('read')!;
+    w.exchange(a, b);
+    a.today.edit(id, { work_ms: 60 * MIN, short_ms: 10 * MIN });
+    b.focus.start(id);
+    assert.equal(b.focus.state.value.planned_ms, LAP, 'b has not heard');
+    w.exchange(a, b);
+    // Hearing of the edit changes nothing of the lap that is running, on either device.
+    assert.equal(b.focus.state.value.planned_ms, LAP);
+    assert.equal(a.focus.state.value.planned_ms, LAP);
+    assert.deepEqual(b.focus.lengthsFor(id), { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: 15 * MIN });
+    w.time.advance(LAP);
+    b.focus.start();
+    assert.deepEqual([b.focus.state.value.phase, b.focus.state.value.planned_ms], ['short', 10 * MIN]);
+    w.time.advance(10 * MIN);
+    b.focus.start(id);
+    assert.equal(b.focus.state.value.planned_ms, 60 * MIN);
+    w.exchange(a, b);
+    assert.deepEqual(a.focus.state.value, b.focus.state.value);
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+  });
+
+  it('two devices set the same task\'s lengths offline, one the lap and one the break: both are kept', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.today.add('read')!;
+    w.exchange(a, b);
+    a.today.edit(id, { work_ms: 60 * MIN });
+    w.time.advance(1000);
+    b.today.edit(id, { short_ms: 10 * MIN });
+    w.exchange(a, b);
+    for (const d of [a, b]) assert.deepEqual(lengths(d, id), { work_ms: 60 * MIN, short_ms: 10 * MIN, long_ms: null });
+  });
+
+  it('both see a bell and one has not heard of the task\'s new break length: each starts the break it knows, and when they meet there is one state on both, one run, and no stray row', async () => {
+    for (const heardFirst of ['a', 'b'] as const) {
+      const w = world();
+      const a = await w.device('a');
+      const b = await w.device('b');
+      a.engine.write('settings', 'current', { auto_break: true });
+      const id = a.today.add('read')!;
+      await a.settle();
+      w.exchange(a, b);
+      // b starts the lap and goes offline with it: the timer is its own, so it will write the bell.
+      b.focus.start(id);
+      await b.settle();
+      w.exchange(a, b);
+      b.disconnect();
+      // On a, the task's break becomes ten minutes. b does not hear.
+      w.time.advance(MIN);
+      a.today.edit(id, { short_ms: 10 * MIN });
+      await a.settle();
+      w.time.advance(LAP - MIN);
+      assert.deepEqual([a.focus.state.value.run, a.focus.state.value.planned_ms], ['run-1_', 10 * MIN]);
+      assert.deepEqual([b.focus.state.value.run, b.focus.state.value.planned_ms], ['run-1_', 5 * MIN]);
+      const [fromA, fromB] = [a.engine.cells(), b.engine.cells()];
+      if (heardFirst === 'a') (b.receive(fromA), a.receive(fromB));
+      else (a.receive(fromB), b.receive(fromA));
+      await b.connect();
+      assert.deepEqual(a.focus.state.value, b.focus.state.value, 'one state, whichever cell arrived first');
+      // The same cell, stamped at the same moment by each: the device id in the stamp decides, the same way everywhere.
+      const winner = a.engine.device > b.engine.device ? 10 * MIN : 5 * MIN;
+      assert.deepEqual([a.focus.state.value.run, a.focus.state.value.planned_ms], ['run-1_', winner]);
+      assert.deepEqual(a.sessions(), ['run-1'], 'the lap, once; the break is still running');
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+      // And the break rings as the one it is on both.
+      w.time.advance(10 * MIN);
+      assert.deepEqual(a.session('run-1_')?.planned_ms, winner);
+      w.exchange(a, b);
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    }
   });
 });
 

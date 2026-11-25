@@ -1,7 +1,7 @@
 // The rules behind the Today screen: contracts/protocol.md section 12.
 
 import type { Session } from './stats.ts';
-import { KEPT_MS, asDeleted, isDay, isMoment, isTime } from './real.ts';
+import { KEPT_MS, asDeleted, isDay, isLength, isMoment, isTime } from './real.ts';
 import { fill, localDay } from './stats.ts';
 import { weekday } from './streak.ts';
 import { view } from './timer.ts';
@@ -22,6 +22,10 @@ export interface Task {
   when: string | null;
   /** `15:30` on its due day. A stored value that is no time of day reads as null. */
   time: string | null;
+  /** The task's own lengths for a lap and the breaks after one. Null: the account's. */
+  work_ms: number | null;
+  short_ms: number | null;
+  long_ms: number | null;
   done: number | null;
   /** '' when the row has none yet: it sorts first. */
   order: string;
@@ -62,14 +66,17 @@ export function asTask(id: string, row: Readonly<Record<string, unknown>>): Task
     repeat: asRepeat(row.repeat),
     when: text(row.when) || null,
     time: isTime(row.time) ? row.time : null,
+    work_ms: isLength(row.work_ms) ? row.work_ms : null,
+    short_ms: isLength(row.short_ms) ? row.short_ms : null,
+    long_ms: isLength(row.long_ms) ? row.long_ms : null,
     done: time(row.done),
     order: text(row.order) ?? '',
     deleted: asDeleted(row.deleted),
   };
 }
 
-/** The most laps an estimate is offered: past that a task is several tasks. A row that holds more is read as it is. */
-export const ESTIMATE_MAX = 8;
+/** The most laps an estimate is offered: four rows of eight squares, which is what a row can draw. A row that holds more is read as it is. */
+export const ESTIMATE_MAX = 32;
 
 /** One line of text as one task: "pointers chapter 3 ~4". A larger estimate than the top is taken as the top. Null when there is no title in it. */
 export function quickAdd(line: string): { title: string; estimate: number | null } | null {
@@ -216,6 +223,10 @@ export function upNext<T extends { id: string }>(today: readonly T[], timerTask:
 /** Laps still planned: each task's estimate less the laps it has, never under 0. No estimate adds nothing. */
 export const plannedLeft = (tasks: readonly { estimate: number | null; laps: number }[]): number =>
   tasks.reduce((left, t) => left + Math.max(0, (t.estimate ?? 0) - t.laps), 0);
+
+/** How long those laps would take: each task's at its own lap length, or at `work_ms`, the account's, where it has none. */
+export const plannedLeftMs = (tasks: readonly { estimate: number | null; laps: number; lengths: { work_ms: number | null } }[], work_ms: number): number =>
+  tasks.reduce((left, t) => left + plannedLeft([t]) * (t.lengths.work_ms ?? work_ms), 0);
 
 /**
  * The laps and squares of one task, oldest first: a lap that rang is a lap and a whole square,

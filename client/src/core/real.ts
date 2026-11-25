@@ -28,6 +28,9 @@ export const KEPT_MS = 30 * 86400000;
  */
 export const GONE = EARLIEST_MS;
 
+/** A length a timer could run, in ms: a second to a day, as the schemas have it. Anything else is no length, and the next one in line is used. */
+export const isLength = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1000 && v <= 86400000;
+
 /** A time of day a clock could show, `15:30`, 24 hour. */
 export const isTime = (v: unknown): v is string => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 

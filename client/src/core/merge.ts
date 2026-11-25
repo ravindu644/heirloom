@@ -21,13 +21,20 @@ export const cellKey = (cell: Pick<Cell, 'dataset' | 'row' | 'field'>): string =
   `${cell.dataset}/${cell.row}/${cell.field}`;
 
 /**
+ * Whether stamp `a` is newer than `b`: the one order of two stamps, as plain strings (protocol
+ * section 2). Whoever asks which of two cells was written later asks here, so a change to the
+ * order can leave no reader on the old one.
+ */
+export const newer = (a: Stamp, b: Stamp): boolean => a > b;
+
+/**
  * Keeps `cell` if it is newer than the one held for its field. True when it was kept: that is when
  * the caller saves it, tells the UI, and drops a beaten unsent edit from the outbox.
  */
 export function applyCell(cells: Cells, cell: Cell): boolean {
   const key = cellKey(cell);
   const held = cells.get(key);
-  if (held && held.stamp >= cell.stamp) return false;
+  if (held && !newer(cell.stamp, held.stamp)) return false;
   cells.set(key, cell);
   return true;
 }
@@ -52,7 +59,7 @@ export function restamp(
     else clock = see(clock, cell.stamp);
   }
   // One device made them all, so stamp order is the order they were made.
-  waiting.sort((a, b) => (a.stamp < b.stamp ? -1 : 1));
+  waiting.sort((a, b) => (newer(b.stamp, a.stamp) ? -1 : 1));
   const replaced = waiting.map((old) => {
     const made = stamp(clock, now, device);
     clock = made.clock;

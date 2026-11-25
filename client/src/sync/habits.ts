@@ -4,8 +4,9 @@
 
 import { batch, computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { asCheckIn, asDays, asHabit, asRemind, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
+import { asCheckIn, asDays, asHabit, asRemind, asReminds, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
 import type { CheckIn, Habit, HabitDay } from '../core/habits.ts';
+import { newer } from '../core/merge.ts';
 import { GONE, KEPT_MS } from '../core/real.ts';
 import { addDays } from '../core/progress.ts';
 import { byOrder, keyBetween, moveKeys } from '../core/today.ts';
@@ -21,9 +22,15 @@ export interface HabitView {
   days: number;
   /** Check-ins that make a day done. */
   target: number;
-  /** Local time of day for the reminder, `07:30`, or null. */
+  /**
+   * The reminder times, `07:30`, sorted, at most `target` of them. Place k (the first is 1) is
+   * for the k-th check-in of the day: it is shown on a planned day only while `today.count` is
+   * under k.
+   */
+  reminds: string[];
+  /** The first of `reminds`, or null. Kept for what still reads one time: `main.tsx` and the habit sheet. */
   remind: string | null;
-  /** Today's check-ins and whether today is planned and done. */
+  /** Today's check-ins (`count`) and whether today is planned and done. */
   today: HabitDay;
   /** This week, Monday first. Days after today have count 0 and are not done. */
   week: HabitDay[];
@@ -43,6 +50,9 @@ export interface HabitEdit {
   title?: string;
   days?: number;
   target?: number;
+  /** The whole list of reminder times. Sorted and cut at the target here; a list with an entry that is no time of day is ignored. */
+  reminds?: string[];
+  /** One time, or null for none: the same as a list of one or of none. `reminds` wins when both are given. */
   remind?: string | null;
   archived?: boolean;
 }
@@ -128,6 +138,15 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
   });
   const empty: ReadonlyMap<string, number> = new Map();
 
+  // A build that knows only `remind` leaves the list alone when its person changes the time. So
+  // a `remind` cell stamped after the `reminds` cell is that later edit, and is read in the
+  // list's place: the last thing a person set is what every device reminds at. A device that
+  // writes the list writes `remind` first, so its own pair never reads this way.
+  function reminds(habit: Habit): string[] {
+    const [one, list] = [engine.stamp('habit', habit.id, 'remind'), engine.stamp('habit', habit.id, 'reminds')];
+    return one !== undefined && list !== undefined && newer(one, list) ? (habit.remind === null ? [] : [habit.remind]) : habit.reminds;
+  }
+
   const model = computed(() => {
     const today = clock.day.value;
     const now = engine.now();
@@ -136,7 +155,8 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       title: habit.title,
       days: habit.days,
       target: habit.target,
-      remind: habit.remind,
+      reminds: reminds(habit),
+      remind: reminds(habit)[0] ?? null,
       deleted: habit.deleted,
       ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today),
     });
@@ -195,7 +215,18 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       if (title) write.title = title;
       if (asDays(fields.days) !== null) write.days = fields.days;
       if (asTarget(fields.target) !== null) write.target = fields.target;
-      if (fields.remind === null || asRemind(fields.remind) !== null) write.remind = fields.remind;
+      const target = (write.target as number | undefined) ?? held.target;
+      // The list as given, or the one time as a list of one or none. With neither, the list
+      // there is, when a lowered target has made it too long.
+      let times = fields.reminds === undefined ? undefined : (asReminds(fields.reminds) ?? undefined);
+      const one = asRemind(fields.remind);
+      if (fields.reminds === undefined && (fields.remind === null || one !== null)) times = one === null ? [] : [one];
+      if (times === undefined && reminds(held).length > target) times = reminds(held);
+      if (times !== undefined) {
+        // `remind` first, so the list is the newer cell of the two (see `reminds` above). An older build still reminds once, at the first time.
+        write.remind = times[0] ?? null;
+        write.reminds = times.slice(0, target);
+      }
       if (fields.archived !== undefined && fields.archived !== (held.archived !== null)) write.archived = fields.archived ? engine.now() : null;
       if (Object.keys(write).length) engine.write('habit', id, write);
     },
