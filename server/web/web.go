@@ -28,12 +28,13 @@ var dist embed.FS
 //	style-src 'self'                 our own stylesheet
 //	style-src-attr 'unsafe-inline'   the bars set their width in a style attribute
 //	font-src 'self'                  the Barlow files in /assets
+//	img-src 'self'                   the tab's icon, one of our own files; no data: and no other host
 //	connect-src 'self'               fetch and the socket, to this server (http to ws, https to wss)
 //	base-uri 'none'                  an injected <base> cannot repoint our relative paths
 //	form-action 'none'               the app posts no forms, so nothing can be made to
 //	frame-ancestors 'none'           nobody frames the app to trick a tap out of someone
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; " +
-	"font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	"font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // Missing is what / answers when the binary was built without the web app.
 const Missing = "This heirloomd was built without the web app: build it with make server."
