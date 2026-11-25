@@ -79,7 +79,8 @@ Times are ms since the epoch.
 | Dir | Message | Meaning |
 |---|---|---|
 | device to server | `{"type":"hello","token":"...","device":"a1b2c3d4e5f60718","cursor":1042,"client_time":1795494600000,"utc_offset_min":330}` | First frame. `utc_offset_min` is the device's offset from UTC, east positive; the server keeps the latest one per account to know that person's "today" for rooms. A device that does not send it changes nothing: the last one known stands, and before any is known it is 0. `cursor` is the last sequence number this device has applied, 0 on a fresh install. `token` is the device's token from login (pinned in roadmap section 1). |
-| server to device | `{"type":"welcome","server_time":1795494600150,"head":1049,"rooms":["r_8f3a"]}` | `head` is the account's newest sequence number. `rooms` is the ids of every room the account is in, so a device that was away when its account left a room drops it now (section 15). |
+| server to device | `{"type":"welcome","server_time":1795494600150,"head":1049,"rooms":["r_8f3a"],"role":"member"}` | `role` is the account's role now (section 10); an older server says none, which is `member`. `head` is the account's newest sequence number. `rooms` is the ids of every room the account is in, so a device that was away when its account left a room drops it now (section 15). |
+| server to device | `{"type":"role","role":"admin"}` | The account's role has just been changed by the owner (section 10). Sent to every open socket of that account. |
 | server to device | `{"type":"cells","from":1042,"to":1049,"cells":[...]}` | Cells with sequence numbers after `from` up to `to`, oldest first, at most 500 a frame. After `welcome` the server sends these until the device has everything, then the same message carries other devices' pushes live. |
 | device to server | `{"type":"push","batch":"k3v9","cells":[...]}` | At most 500 cells. `batch` is any id the device picks. Sending a batch twice is harmless: a cell is its stamp. |
 | server to device | `{"type":"ack","batch":"k3v9","from":1049,"cursor":1054}` | Every cell is stored or was already beaten by a newer one. `from` is the newest sequence number before this batch and `cursor` the newest after it: the numbers between them are this batch's own cells. |
@@ -134,6 +135,8 @@ Rules:
 
 `ack` or `nack` is there when a push was sent, and the cursor rules are the same as on a socket.
 One page of cells a reply; the device asks again until `to` equals `head`, then every few seconds.
+The reply also carries `"role"`, the account's role now, as a socket's `welcome` does (section 10),
+so a device that only ever reaches the server by POST hears it too.
 
 ## 6. The timer
 
@@ -231,9 +234,10 @@ schemas. A fixture lists under `unknown` the fields it uses on purpose that no s
 
 ## 10. Accounts
 
-Plain HTTP with JSON bodies, beside the socket. Registration is by invite only. There are no
+Plain HTTP with JSON bodies, beside the socket. Registration is by invite only, but for the first
+account on a server. There are no
 cookies: the token travels in the body or the `hello`, so nothing rides along with a request by
-itself. That is why every `/api/` route, the socket included, answers any origin (the phone app's
+itself. That is why every `/api/` route, the socket included, and `/healthz` answer any origin (the phone app's
 WebView is a different origin from the server) and answers the browser's `OPTIONS` preflight.
 
 | Request | Body | 200 reply |
@@ -242,8 +246,21 @@ WebView is a different origin from the server) and answers the browser's `OPTION
 | `POST /api/login` | `{"username":"ravi","password":"...","device":"a1b2c3d4e5f60718"}` | the same |
 | `POST /api/logout` | `{"token":"..."}` | `{}`. The token stops working at once, on an open socket too |
 
-- An invite is made on the server by its owner: `heirloomd -data <dir> -invite` prints one code and
-  exits. It works while the server is running. A code registers one account, once.
+- An invite is a link, `<server>/#/join/<invite>`, and `invite` in `register` is its last part.
+  It registers one account, once, as a member, and is good for 7 days. One that has run out is
+  kept 30 days more, so it can be renewed, and then removed. Invites made before roles existed
+  were kept only as hashes and do not work after the update. An admin or the owner makes
+  it in the app (below); `heirloomd -data <dir> -invite` prints one and exits, and works while the
+  server is running.
+- **A fresh server.** `GET /healthz` answers `{"ok":true,"version":"...","sqlite":"...","setup":true}`
+  while the server has no account, and leaves `setup` out after. While it is so, `register` with no
+  `invite` (absent or empty) makes the first account. Two at once: one wins; the other gets
+  `invite` if it arrived before the winner had finished and `bad_request` after, and a device
+  reads either as "somebody else has set this server up". The first account on a server is its
+  **owner** however it was made, by an invite from the command line too.
+- **Roles.** `member`, `admin`, `owner`. The server holds the role and checks it on every call
+  below; a device hears it in each `welcome` and keeps it only to choose what to show. There is one
+  owner, the first account, and no call changes the owner's role.
 - `username`: 3 to 32 of `a-z 0-9 _`. The server lowercases it. `password`: 8 to 256 characters,
   hashed with argon2id.
 - `token`: an opaque string for this device, stored hashed. It works only with the device id it
@@ -255,12 +272,43 @@ WebView is a different origin from the server) and answers the browser's `OPTION
 | Status | Code | When |
 |---|---|---|
 | 400 | `bad_request` | A field is missing or breaks a rule above |
-| 403 | `invite` | The invite is unknown or used |
+| 403 | `invite` | The invite is unknown, used, taken back or run out; or a second first account |
 | 409 | `taken` | The username exists |
 | 401 | `credentials` | Wrong username or password; the reply does not say which |
 | 429 | `slow_down` | After 5 failed sign-ins for a username inside 15 minutes, every sign-in for it until the 15 minutes pass, right password or not. Also when the server has a line of sign-ins waiting (it checks one password at a time): then nothing was wrong and the wait is a second. `Retry-After` carries the seconds, and tells the two apart |
 | 401 | `token` | `logout` or `/api/sync` with a token that is unknown or signed out |
 | 500 | `server` | The server's own fault. Nothing was stored; the device tries again |
+
+Invites and admins. Each call is a `POST` whose body carries the caller's `token` and `device`
+beside what is listed, as the room calls do (section 15).
+
+| Request | Body | 200 reply | Who |
+|---|---|---|---|
+| `/api/invites/create` | | `{"invite":{"invite":"k3J9...","created":1795494600150,"expires":1796099400150}}` | admin, owner |
+| `/api/invites/list` | | `{"invites":[...]}`: every invite not used and not run out, oldest first | admin, owner |
+| `/api/invites/renew` | `{"invite":"k3J9..."}` | `{"invite":{...}}`: 7 days from now. One that had run out comes back with a new `invite`, so its old link stays dead | admin, owner |
+| `/api/invites/revoke` | `{"invite":"k3J9..."}` | `{}`. An invite that is not there is `{}` too | admin, owner |
+| `/api/admins/list` | | `{"admins":[{"username":"ravi","role":"owner"},{"username":"sam","role":"admin"}]}`: the owner first, then admins by name | owner |
+| `/api/admins/set` | `{"username":"sam","role":"admin"}` (or `"member"`) | `{}`. Already so is `{}` too | owner |
+
+| Status | Code | When |
+|---|---|---|
+| 403 | `forbidden` | The caller's role does not allow the call |
+| 409 | `full` | `create` with 50 invites on the server, the command line's included |
+| 404 | `unknown` | `renew` of an invite that was used, taken back or removed; `set` for a username the server does not have, or that could not be one |
+| 400 | `bad_request` | `set` naming the owner, with no username, or with a role that is not `admin` or `member` |
+
+Every admin sees, renews and takes back every open invite, whoever made it. Who made one is kept
+on the server and not sent. Before sign-in the server says nothing about its accounts but `setup`:
+no call lists a username to anyone but the owner, and `taken` is answered only to a real invite.
+
+A role changed by `set` is checked by the server from that moment. The other person's devices
+with a socket open are told at once, by a `role` message; the rest hear it in their next `welcome`
+or POST reply. A call a device may no longer make is `forbidden`, and the device then asks nothing
+more of that kind until it next hears from the server which role it has.
+
+`renew` is held to the same two limits as `create`: an invite that ran out more than 30 days ago
+is `unknown`, and bringing one that had run out back while 50 are open is `full`.
 
 A device signs out only after its outbox is empty, and refuses, with the reason, while it is
 offline with unsent work. Otherwise signing out would be a way to lose a lap.
