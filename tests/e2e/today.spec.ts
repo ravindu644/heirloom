@@ -284,7 +284,7 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
   await sheet.getByLabel('Title').fill('thesis draft, part one');
 
   // Past seven laps the sheet suggests breaking it down, and its button goes straight to the subtask field.
-  for (let i = 0; i < 6; i++) await sheet.getByRole('button', { name: 'One lap more' }).click();
+  for (let i = 0; i < 6; i++) await sheet.getByRole('button', { name: 'One lap more', exact: true }).click();
   // The legend's group holds the stepper's group of the same name: the stepper is the inner one.
   await expect(sheet.getByRole('group', { name: 'Estimate' }).last()).toContainText('8 laps');
   const nudge = sheet.locator('p').filter({ hasText: '8 laps is a lot to hold in one task. Break it down and each piece is easier to start.' });
@@ -376,7 +376,7 @@ test('the day target: set it, the bar fills as a lap rings, clear it', async ({ 
   // Set, it takes the laps planned on today's list.
   await target.getByRole('button', { name: 'Set a target' }).click();
   await expect(target).toContainText('0 of 3 laps today');
-  await target.getByRole('button', { name: 'One lap more' }).click();
+  await target.getByRole('button', { name: 'One lap more', exact: true }).click();
   await expect(target).toContainText('0 of 4 laps today');
   await target.getByRole('button', { name: 'Keep it' }).click();
   const bar = () => target.locator('i[style*="--share"]').evaluateAll((els) => els.map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
@@ -495,4 +495,19 @@ test('a removed subtask says so, and Undo brings it back', async ({ deviceA: a }
   await expect(box).toBeVisible();
   const rows = await waitRows(name, (all) => [...all.values()].some((row) => row.title === 'find sources' && row.deleted === null));
   expect([...rows.values()].filter((row) => row.parent)).toHaveLength(1);
+});
+
+test('at 412 wide, a row that ends in a control keeps its count and hides its squares; a row with nothing at its end keeps both', async ({ deviceA: a }) => {
+  await onToday([a], 'narrow');
+  await a.page.setViewportSize({ width: 412, height: 915 });
+  await quickAdd(a.page, 'essay ~4');
+  await quickAdd(a.page, 'flashcards ~3');
+  const next = taskRow(a.page, 'essay');
+  await expect(next.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+  expect((await next.boundingBox())!.width).toBeLessThan(400);
+  await expect(next).toContainText('0 of 4');
+  await expect(next.locator('[aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--share"]') })).toBeHidden();
+  const later = taskRow(a.page, 'flashcards');
+  await expect(later).toContainText('0 of 3');
+  await expect(later.locator('i[style*="--share"]').first()).toBeVisible();
 });

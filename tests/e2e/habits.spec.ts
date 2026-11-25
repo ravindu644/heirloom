@@ -3,13 +3,14 @@ import type { Page } from '@playwright/test';
 import { streakWindow } from '../../client/src/core/streak.ts';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
-import { accountWith, go, ready, server, signIn, statusLine, username } from './app.ts';
+import { accountWith, go, onDisk, ready, server, signIn, statusLine, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
 const OFF = -new Date().getTimezoneOffset();
 const DAY = 86400000;
 const today = () => localDay(Date.now(), OFF);
+const longDay = () => new Date(`${today()}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).replace(',', '');
 
 async function onHabits(devices: Device[], tag: string) {
   const name = username(tag);
@@ -19,6 +20,8 @@ async function onHabits(devices: Device[], tag: string) {
     await ready(d.page);
     await go(d.page, 'Habits');
     await expect(d.page.getByLabel('Add a habit', { exact: true })).toBeVisible();
+    // The eyebrow names the day, with habits or without.
+    await expect(d.page.getByText(`Habits, ${longDay()}`, { exact: true })).toBeVisible();
   }
   return { name, node };
 }
@@ -61,7 +64,7 @@ test('a target of 3 counts up one tap at a time; on a done day the box takes the
   await onHabits([a], 'htarget');
   await add(a.page, 'water');
   const sheet = await open(a.page, 'water');
-  for (let i = 0; i < 2; i++) await sheet.getByRole('button', { name: 'One time more' }).click();
+  for (let i = 0; i < 2; i++) await sheet.getByRole('button', { name: 'One time more', exact: true }).click();
   await expect(sheet).toContainText('3 times a day');
   await sheet.getByRole('button', { name: 'Close' }).click();
 
@@ -79,7 +82,7 @@ test('two laptops offline check in the same habit: both kept, and together they 
   const { name } = await onHabits([a, b], 'hoffline');
   await add(a.page, 'stretch');
   const sheet = await open(a.page, 'stretch');
-  await sheet.getByRole('button', { name: 'One time more' }).click();
+  await sheet.getByRole('button', { name: 'One time more', exact: true }).click();
   await sheet.getByRole('button', { name: 'Close' }).click();
   await expect(row(b.page, 'stretch')).toContainText('0 of 2');
 
@@ -113,6 +116,7 @@ test('a weekdays-only habit shows the weekend as not planned, and its run is a r
   await signIn(a.page, name);
   await ready(a.page);
   await go(a.page, 'Habits');
+  await expect(a.page.getByText(`Habits, ${longDay()}`, { exact: true })).toBeVisible();
 
   const rule = streakWindow(today(), kept, 31);
   expect(rule.missed).toBe(false);
@@ -170,7 +174,7 @@ test('the sheet saves as typed, B shows it, and a reload with no connection keep
   await onHabits([a, b], 'hsheet');
   await add(a.page, 'piano');
   let sheet = await open(a.page, 'piano');
-  const title = sheet.getByLabel('Habit', { exact: true });
+  const title = sheet.getByLabel('Its name', { exact: true });
   await title.press('ControlOrMeta+a');
   await title.pressSequentially('  piano scales  ');
   await expect(title).toHaveValue('  piano scales  ');
@@ -182,13 +186,15 @@ test('the sheet saves as typed, B shows it, and a reload with no connection keep
   await expect(row(a.page, 'piano scales')).toContainText('Weekdays');
   await expect(row(b.page, 'piano scales')).toContainText('Weekdays');
   sheet = await open(b.page, 'piano scales');
-  await expect(sheet.getByLabel('Habit', { exact: true })).toHaveValue('piano scales');
+  await expect(sheet.getByLabel('Its name', { exact: true })).toHaveValue('piano scales');
   await expect(sheet.getByLabel('Reminder')).toHaveValue('07:30');
   for (const day of ['Mon', 'Fri']) await expect(sheet.getByRole('button', { name: day, exact: true })).toHaveAttribute('aria-pressed', 'true');
   for (const day of ['Sat', 'Sun']) await expect(sheet.getByRole('button', { name: day, exact: true })).toHaveAttribute('aria-pressed', 'false');
   await sheet.getByRole('button', { name: 'Close' }).click();
 
   await box_(a.page, 'piano scales').click();
+  // The check-in is safe once its transaction commits; a reload before that is a tab closed mid-write.
+  await onDisk(a.page, 'checkin/', 3);
   await a.setOffline(true);
   await a.page.reload();
   await expect(box_(a.page, 'piano scales')).toHaveAttribute('aria-checked', 'true');

@@ -2,8 +2,8 @@
 // timer", the real IndexedDB across a reload, and what the screen says meanwhile.
 import { stats } from '../../client/src/core/stats.ts';
 import type { Session } from '../../client/src/core/stats.ts';
-import { serverRows } from '../sync/harness.ts';
-import { accountWith, digits, ready, server, sessionsWhen, signIn, statusLine, timerOnDisk, username } from './app.ts';
+import { serverRows, until } from '../sync/harness.ts';
+import { accountWith, digits, go, onDisk, ready, server, sessionsWhen, signIn, statusLine, taskRow, timerOnDisk, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const offlineWords = /^No connection\. .* safe on this laptop\.$/;
@@ -166,4 +166,32 @@ test('a socket that goes silent with no offline event is noticed within 35 s', a
   // And it comes back by itself when frames flow again.
   a.silence(false);
   await expect(statusLine(a.page)).toHaveText('', { timeout: 35000 });
+});
+
+test('work done offline is still there after an offline reload once it is on disk: a task done, a rung lap, a check-in', async ({ deviceA: a }) => {
+  const name = username('offwork');
+  const node = await accountWith(name, { work_ms: 3000, short_ms: 60000 });
+  node.engine.write('task', 't1', { title: 'chapter 5', estimate: 2, order: 'V' });
+  node.engine.write('habit', 'read', { title: 'read 20 pages', days: 127, target: 1, order: 'V' });
+  await until(() => node.engine.unsent.value === 0, 10000, 'not sent');
+  await signIn(a.page, name);
+  await ready(a.page);
+  await a.setOffline(true);
+  // A lap that rings with no connection: its row is written here.
+  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await expect(a.page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: 8000 });
+  await onDisk(a.page, 'session/', 1);
+  await go(a.page, 'Today');
+  await a.page.getByRole('checkbox', { name: 'Done: chapter 5' }).click();
+  await onDisk(a.page, 'task/t1/done');
+  await go(a.page, 'Habits');
+  await a.page.getByRole('checkbox', { name: 'Check in: read 20 pages', exact: true }).click();
+  await onDisk(a.page, 'checkin/', 3);
+
+  await a.page.reload();
+  await expect(a.page.getByRole('checkbox', { name: 'Check in: read 20 pages', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await go(a.page, 'Today');
+  await expect(a.page.getByRole('checkbox', { name: 'Done: chapter 5' })).toHaveAttribute('aria-checked', 'true');
+  await expect(taskRow(a.page, 'chapter 5')).toContainText('1 of 2');
+  await expect(statusLine(a.page)).toHaveText(/^No connection\. \d+ changes are safe on this laptop\.$/);
 });

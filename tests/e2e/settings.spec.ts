@@ -23,18 +23,41 @@ const openSettings = async (page: Page, name: string) => {
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 };
 
-test('lengths changed on A are the next lap\'s on B; the day target shows on Today', async ({ deviceA: a, deviceB: b }) => {
+test('lengths: typed, refused when not a whole number in bounds, nudged by minus and plus, and the next lap\'s on B; the day target shows on Today', async ({ deviceA: a, deviceB: b }) => {
   const name = await signedInto([a, b], 'slengths');
   await openSettings(a.page, name);
-  const lap = a.page.getByRole('group', { name: 'A lap' });
-  await expect(lap).toContainText('25 minutes');
-  await lap.getByRole('button', { name: 'One minute less' }).click();
-  await expect(lap).toContainText('24 minutes');
-  await expect(digits(b.page)).toHaveText('24:00', { timeout: 2000 });
+  const lap = a.page.getByRole('spinbutton', { name: 'A lap' });
+  await expect(lap).toHaveValue('25');
+  // Typed, and kept on Enter.
+  await lap.fill('30');
+  await lap.press('Enter');
+  await expect(digits(b.page)).toHaveText('30:00', { timeout: 2000 });
+  // Each refusal puts the last value back: a fraction, nothing, past the bounds.
+  for (const wrong of ['2.5', '', '0', '181']) {
+    await lap.fill(wrong);
+    await lap.press('Enter');
+    await expect(lap, `"${wrong}" was kept`).toHaveValue('30');
+  }
+  await expect(digits(b.page)).toHaveText('30:00');
+  // Minus and plus still nudge.
+  await a.page.getByRole('button', { name: 'A lap, one minute less', exact: true }).click();
+  await expect(lap).toHaveValue('29');
+  await expect(digits(b.page)).toHaveText('29:00', { timeout: 2000 });
+  // A break is 1 to 60, kept when the field is left.
+  const short = a.page.getByRole('spinbutton', { name: 'A short break' });
+  await short.fill('7');
+  await short.press('Tab');
+  await expect(short).toHaveValue('7');
+  await short.fill('61');
+  await short.press('Tab');
+  await expect(short).toHaveValue('7');
+  await a.page.getByRole('button', { name: 'A short break, one minute more', exact: true }).click();
+  await expect(short).toHaveValue('8');
+  await expect(a.page.getByRole('spinbutton', { name: 'The long break, after four laps' })).toHaveValue('15');
 
   const target = panel(a.page, 'Day target');
   await expect(target).toContainText('No target');
-  await target.getByRole('button', { name: 'One lap more' }).click();
+  await target.getByRole('button', { name: 'One lap more', exact: true }).click();
   await expect(target).toContainText('1 lap a day');
   await go(b.page, 'Today');
   await expect(b.page.getByText('0 of 1 lap today')).toBeVisible({ timeout: 2000 });

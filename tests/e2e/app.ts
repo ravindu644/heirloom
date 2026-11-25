@@ -59,11 +59,40 @@ export async function sessionsWhen(name: string, ok: (rows: Record<string, unkno
 export const digits = (page: Page) => page.getByText(/^\d\d:\d\d$/);
 
 /**
- * The app's own status line. Screens have status regions of their own above it (the result, the
- * Undo bar); this one comes last. Hidden is included: on a screen that does not keep its space,
- * the line is hidden while it has nothing to say, and "nothing to say" is what a test checks.
+ * The app's own status line: the shell's, beside the screen, not one of the screens' own status
+ * regions (the result, the Undo bar, the marks), whatever order the shell writes them in. Hidden
+ * counts: on a screen that does not keep its space the line is hidden while it has nothing to say.
  */
-export const statusLine = (page: Page) => page.getByRole('status', { includeHidden: true }).last();
+export const statusLine = (page: Page) => page.locator('main').locator('xpath=../p[@role="status"]');
+
+/**
+ * Waits until at least `n` cells whose key starts with `prefix` (`checkin/`, `task/t1/done`) are
+ * committed to this account's IndexedDB, read from the page. A reload sooner than that is a tab
+ * closed mid-write, which no store survives.
+ */
+export async function onDisk(page: Page, prefix: string, n = 1) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (prefix) => {
+          const name = (await indexedDB.databases()).map((d) => d.name).find((x) => x?.startsWith('heirloom-'));
+          if (!name) return 0;
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const req = indexedDB.open(name);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          const keys = await new Promise<string[]>((resolve) => {
+            const get = db.transaction('cells').objectStore('cells').getAllKeys();
+            get.onsuccess = () => resolve(get.result.map(String));
+          });
+          db.close();
+          return keys.filter((k) => k.startsWith(prefix)).length;
+        }, prefix),
+      { message: `${prefix} never reached IndexedDB`, timeout: 2000, intervals: [5, 10, 20] },
+    )
+    .toBeGreaterThanOrEqual(n);
+}
 
 /**
  * Call before the tap that starts a lap. Resolves with the ms from that tap until the running

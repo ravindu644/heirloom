@@ -84,7 +84,7 @@ test('presence: a lap on A shows on B and C within a second with the same time l
   await outside.close();
 });
 
-test('totals after short laps, a cheer once and shown as Cheered, never on your own lane, named on the Focus result; ranked order', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
+test('totals after short laps, a cheer once and then only a sentence, never on your own lane, named on the Focus result; ranked order', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
   const { names } = await trio(a, b, c, { work_ms: 3000, short_ms: 60000 });
   const [nameA, nameB, nameC] = names as [string, string, string];
   // The lanes top to bottom, as the names they show ("You" on one's own). Joined order, before any ranking.
@@ -113,7 +113,9 @@ test('totals after short laps, a cheer once and shown as Cheered, never on your 
   const cheer = lane(b.page, nameA).getByRole('button', { name: /^Cheer / });
   await expect(cheer).toHaveAccessibleName(/^Cheer .* for the lap that rang at \d\d:\d\d$/);
   await cheer.click();
-  await expect(lane(b.page, nameA).getByRole('button', { name: 'Cheered' })).toBeDisabled();
+  // Given, the cheer is a sentence, and nothing more to press.
+  await expect(lane(b.page, nameA)).toContainText('You cheered this lap.');
+  await expect(lane(b.page, nameA).getByRole('button', { name: /^Cheer/ })).toHaveCount(0);
   await expect(lane(c.page, nameA)).toContainText(`${nameB} cheered this lap.`, { timeout: 2000 });
   await expect(lane(b.page, 'You').getByRole('button', { name: /Cheer/ })).toHaveCount(0);
   // A's own Focus result names who cheered.
@@ -165,22 +167,48 @@ test('privacy: the task title only while A shares it, gone at once when A stops;
 });
 
 test('rename and a target; leaving takes a second tap, and the last one out ends the room; no connection: the stale line, and making or joining needs a connection', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
-  await trio(a, b, c);
+  const { names } = await trio(a, b, c);
   await button(a.page, 'Code and settings').click();
   let sheet = a.page.getByRole('dialog', { name: 'This room' });
   await sheet.getByLabel('Its name').fill('night owls');
   await button(sheet as never, 'Rename').click();
-  await sheet.getByRole('button', { name: 'One hour more' }).click();
-  await expect(sheet).toContainText('1 hour');
+  // The target: plus nudges it, a whole number is typed, anything else is put back.
+  const target = sheet.getByRole('spinbutton', { name: 'Together in a week' });
+  await sheet.getByRole('button', { name: 'One hour more', exact: true }).click();
+  await expect(target).toHaveValue('1');
+  await expect(b.page.getByText('0m of 1h together this week.')).toBeVisible({ timeout: 2000 });
+  await target.fill('20');
+  await target.press('Enter');
+  await expect(b.page.getByText('0m of 20h together this week.')).toBeVisible({ timeout: 2000 });
+  for (const wrong of ['2.5', '201', '-1']) {
+    await target.fill(wrong);
+    await target.press('Enter');
+    await expect(target, `"${wrong}" was kept`).toHaveValue('20');
+  }
+  // An emptied field is put back too: it must not wipe the room's target for everyone.
+  await target.fill('');
+  await target.press('Enter');
+  await b.page.waitForTimeout(1000);
+  await expect(b.page.getByText('0m of 20h together this week.'), 'an emptied field set the room\'s target to none').toBeVisible();
+  await expect(target).toHaveValue('20');
   await button(sheet as never, 'Close').click();
   await expect(b.page.getByText('Room: night owls')).toBeVisible({ timeout: 2000 });
-  await expect(b.page.getByText('0m of 1h together this week.')).toBeVisible();
+  await expect(b.page.getByText('0m of 20h together this week.')).toBeVisible();
 
-  // B without a connection: the last word, said to be the last word.
+  // A and B on laps; then B without a connection: old news is said in the past, and only B's own time left shows.
+  for (const d of [a, b]) {
+    await go(d.page, 'Focus');
+    await button(d.page, 'Start lap 1').click();
+    await go(d.page, 'Room');
+  }
+  await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 focusing now.', { timeout: 2000 });
   await b.setOffline(true);
-  await expect(b.page.getByText('This is the room as it was last heard from.')).toBeVisible({ timeout: 3000 });
+  await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 were focusing when the room was last heard from.', { timeout: 3000 });
+  await expect(lane(b.page, 'You').locator('b')).toHaveCount(1);
+  await expect(lane(b.page, names[0]!).locator('b')).toHaveCount(0);
   await b.setOffline(false);
-  await expect(b.page.getByText('This is the room as it was last heard from.')).toHaveCount(0, { timeout: 5000 });
+  await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 focusing now.', { timeout: 5000 });
+  await expect(lane(b.page, names[0]!).locator('b')).toHaveCount(1);
 
   // Everyone leaves; C is last, and is told leaving ends the room.
   for (const d of [a, c]) {
