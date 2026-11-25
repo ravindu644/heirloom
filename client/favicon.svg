@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="176 80 160 344">
+  <style>
+    .you { fill: #C4321A }
+    .ghost { stroke: #8A9089 }
+    @media (prefers-color-scheme: dark) { .you { fill: #FF6A4D } .ghost { stroke: #7C827B } }
+  </style>
+  <circle class="you" cx="256" cy="160" r="70"/>
+  <circle class="ghost" cx="256" cy="344" r="56" fill="none" stroke-width="28" stroke-dasharray="35.2 23.4" transform="rotate(-18 256 344)"/>
+</svg>
