@@ -60,7 +60,8 @@ and the longest string it can hold. Open every picture.
 | A floating action button for "add" | Quick add in the list, where the eye already is |
 | Icons without labels in the navigation | Five labelled destinations |
 | A spinner or skeleton for data already on the device | Render it; it is local |
-| Animations on everything, easing that bounces, anything looping | The motion table in DESIGN.md, nothing more |
+| Animations on everything, easing that bounces, anything looping | The motion table in DESIGN.md, nothing more, and nothing less: see section 8 |
+| Nothing moves at all: rows pop in, editors snap open, screens swap between two frames | Every row of the motion table, built into the kit |
 | A modal asking "Are you sure?" | Do it and offer Undo |
 | Inter or the system font | Barlow and Barlow Condensed, from `design/fonts/` |
 | A leaderboard of friends | Lanes side by side, a cheer, "Together today" |
@@ -128,3 +129,37 @@ Written 2026-11-25, after the first review done with a ruler (the audit tool, th
   data: ahead, behind, level, empty, and with one value near the floor.
 - **Check PRODUCT.md row by row.** Two rows of Progress were half built and nothing looked
   missing. A screen that looks finished is compared with the list, not with the eye.
+
+## 8. Lessons from the user's first hour with the app
+
+Written 2026-11-25. Ten sections of pictures, audits and tests had passed. Then the user held
+the app for an hour and sent twelve points. None could be seen in a still picture, which is the
+lesson: **a screen is reviewed by using it**, at phone size, scrolled part way down, with the
+keyboard up, with a thumb. Each point is a check now.
+
+| What the user met | The check, before any screen ships |
+|---|---|
+| "The entire UI does not have any kind of animations" | Record a tap on every kind of thing: a row added and removed, an editor opened, a sheet, a screen change, the bar. Anything that appears or goes between two frames is a FAIL. "Short, and only when it matters" had been read as "none" |
+| The page scrolled when they pressed "Count again", and they had to scroll back | `staysPut` in the e2e suite on every tap that changes the page; by hand, scroll half way down and tap. The four causes are listed in DESIGN.md, Motion |
+| The sign-in page "glitches, shifts up, then resets" when the keyboard opens | Grep for `scrollIntoView`, `scrollBy`, `scrollTo` and any `resize` listener in `client/src/ui/`. A script that scrolls on resize is a FAIL. Open the real keyboard on the real phone |
+| An error replaced the sentence that was there | Trigger every error on a screen and read what is left: the hint, the intro and the labels must all still be there. One slot never holds two things |
+| "Keep it" and "No target" looked the same and both closed the editor | Two controls side by side must differ in what they do **and** in how they look. Read each button and say what it does without knowing the code; if you cannot, the user cannot |
+| "Set aside", "counts nowhere", "Count again": "in what?" | A word the method's inventor used is not a word the user knows. Give each string to someone outside the project in your head: would they ask "what does that mean?" A button says what it does ("Don't count this lap") |
+| The bar sat in the middle of the screen and stayed | Look at every floating or sticking thing with a short list and a long one. Check when it goes, with a clock, without touching anything |
+| Adding a task needed Enter and nothing said so | Every field that makes something has a visible button. A phone keyboard's Enter key is not a control anyone can see |
+| Stop looked heavier than Pause, in dark only | Every pair of buttons is looked at side by side in light **and** dark, on the ground and on a panel. Weight is checked per theme, never assumed from the token's name |
+| All text could be selected like a web page | Long-press a heading and a row on the phone; drag across a sentence on the laptop. Only fields and things meant to be copied may select |
+| "No landing page, mentioning what this even is" | Open the app as someone who was only handed a link. The first screen must say what it is before it asks for anything |
+| No time on a task, five colours | When PRODUCT.md and the user disagree about what "the whole point" is, the user is right: ask early which rows they will use first, and let them use those before polishing the rest |
+
+Two things about process, for the lead:
+
+- **The user's hour beats the tenth review.** Get a build into their hands at the end of every
+  section, not after ten. The gate says "the user tries it"; a section whose gate was skipped
+  carries its bugs into the next.
+- **Dev is not the build.** The hold and every glide passed on the dev server and lasted 0.16 ms
+  in the built app, because the minifier rewrote the duration tokens. Motion, and anything else
+  code reads back from CSS, is proven on `make web`'s output; the e2e suite runs against it.
+- **A rule read as a ban hides a hole.** "No animation on a loop, the timer never animates" grew
+  into "nothing animates". When a rule says what not to do, the review still asks what should
+  be there instead.

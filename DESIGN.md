@@ -18,6 +18,16 @@ colors:
   heat-2: "#E4A398"
   heat-3: "#D56B5A"
   rest: "#23704E"
+  key: "#E4E7E2"
+  key-edge: "#121412"
+  key-quiet: "#E4E7E2"
+  amber: "#A86A00"
+  olive: "#6B7A1E"
+  teal: "#0F7B7F"
+  sky: "#1F6FB5"
+  indigo: "#4B4FC2"
+  plum: "#8E3A9C"
+  clay: "#8A5A3C"
   dark-ground: "#0E100E"
   dark-surface: "#181A18"
   dark-raised: "#232623"
@@ -33,6 +43,16 @@ colors:
   dark-heat-2: "#803E30"
   dark-heat-3: "#BE543E"
   dark-rest: "#5DBE8D"
+  dark-key: "#343934"
+  dark-key-edge: "#343934"
+  dark-key-quiet: "#232623"
+  dark-amber: "#E3A63A"
+  dark-olive: "#B3C255"
+  dark-teal: "#4FC3C0"
+  dark-sky: "#6FB3EE"
+  dark-indigo: "#9A9DF5"
+  dark-plum: "#D48AE0"
+  dark-clay: "#C99873"
 typography:
   figure-xxl:
     fontFamily: Barlow Condensed
@@ -122,7 +142,7 @@ components:
     rounded: "{rounded.sm}"
     height: 48px
   button-secondary:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.key}"
     textColor: "{colors.ink}"
     rounded: "{rounded.sm}"
     height: 48px
@@ -205,6 +225,7 @@ motion:
   press: 100ms
   fill: 160ms
   sheet: 200ms
+  rise: 8px
   lap-done: 700ms
   set-done: 1200ms
   ease: cubic-bezier(0.2, 0, 0, 1)
@@ -248,11 +269,16 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **on-you:** text on a you-filled button.
 - **ghost:** past you. Hollow blocks, dashed lines, grey labels. Never filled, never in a hue.
 - **rest:** breaks and rest days only, the calyx green of the tomato.
-- **A project's colour** is one of five roles this palette already has: `you`, `rest`, `ink`,
-  `ghost`, `heat-2`. It shows as a small square before the project's name, never alone and never
-  as a fill behind text. This square is the one place `rest` is not a break, `ghost` is filled and
-  `you` is not your own mark; it never sits beside lap squares, which would read as one more lap. A second hue family would break the one rule the look stands on: red
-  means you. Five tones tell five projects apart; beyond that the name does the work.
+- **A project's colour** is the one place another hue lives (the user's choice, 2026-11-25:
+  five tones could not tell a term's subjects apart). Twelve are offered by name: `you`, `rest`,
+  `ink`, `ghost`, `heat-2`, and `amber`, `olive`, `teal`, `sky`, `indigo`, `plum`, `clay`, each
+  with a dark twin at 3:1 or more on `surface`. A thirteenth choice, "Another colour", opens the
+  device's own colour picker; what is picked is shown as picked on both grounds, inside a `hair`
+  line of `edge` so a pale one still shows on a pale ground. Whatever the colour, it is a small
+  square before the project's name and nothing else: never alone, never a fill behind text, never
+  a bar or a line (a project's bar stays `ink`), and never beside lap squares, which would read
+  as one more lap. Red still means you everywhere else.
+- **key, key-edge, key-quiet:** the secondary button's fill and its line, and the quiet button's fill. See Buttons.
 - **heat-1 to heat-3, then you:** the four steps of the heatmap, you mixed into the surface at 22,
   45 and 72 percent, so the scale is one hue getting darker. Zero is `raised`.
 
@@ -370,9 +396,6 @@ Built once in `client/src/ui/kit/` and reused.
   the task, and one button drawn as an outline in `ground`. When the lap has rung, its button to
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
   to secondary.
-- **What the last tap did:** an `ink` bar as wide as the list, one line, with a quiet underlined
-  Undo. It never covers the row it speaks of. The title gives way last; the sentence after it
-  shows whole or not at all, never cut mid-word.
 - **Habit row:** the task row's box at the left (the same job, so the same control: on a day
   already done it takes the latest check-in back), the title, under it the plan and the run in
   `label` ("Every day, 9 days running"), a count on its way in `figure-sm` beside the words
@@ -431,10 +454,49 @@ Built once in `client/src/ui/kit/` and reused.
   so a row's buttons share one line. The room's own settings are an underlined link at the right
   end of the line that names the room, never a button between the finding and the week.
 - **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
-  `on-you` text, one per screen at most; secondary is `surface` with a 1px `line` border; quiet is
-  `raised` with no border, for the lesser choice beside another button ("Skip break", "I have an
-  invite", "Stop and log 6 min"). All 48px tall, `body-strong`, `rounded.sm`. A bare word is never
+  `on-you` text, one per screen at most; secondary is `key` with a `hair` line of `key-edge`;
+  quiet is `key-quiet` with no line, for the lesser choice beside another button ("Skip break",
+  "I have an invite", "Stop and log 6 min"). **Secondary always outweighs quiet,** in both themes
+  and on whatever it stands. In dark the weight is a fill: `key` is one step lighter than
+  `key-quiet`, and its edge is its own colour. In light there is no room above the ground for a
+  second lighter step and a darker grey reads as switched off, so the weight is a line: the same
+  grey fill as quiet, inside a hair of ink. How this was found: the two were `surface` and
+  `raised` in both themes and Stop outweighed Pause in dark (the user); then two greys, and
+  "Start" beside the break button looked disabled in light (the review). A pair of buttons is
+  looked at side by side in light and in dark, on the ground and on a panel, before it ships. A
+  secondary is never mistaken for a choice, which is `surface` with a grey `edge`. All 48px tall, `body-strong`, `rounded.sm`. A bare word is never
   a button. On an `ink` bar the bar is the fill, and its button is an outline in `ground`. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
+- **The button in a field:** where one field alone makes something on Enter (quick add, a
+  subtask), a secondary button stands at its right end with the word "Add", inside the field's
+  box, from the first character typed until the field is empty again. Enter does the same. A
+  field never depends on a key the phone's keyboard may not show. A form of more than one thing
+  (a new project: its name and its square) keeps its button after its last field, as every form does.
+- **What the last tap did** (the `ink` bar: "Added: Hello."), one line with a quiet underlined
+  Undo when the tap can be taken back; a long title gives way last, and the sentence after it
+  shows whole or not at all, never cut mid-word. It is as wide as the column
+  it stands in and stands at the bottom of the screen: over the
+  bottom bar's upper edge on a phone, at the foot of the content column on a laptop, `md` from
+  the edges. It is not part of the list, so a short list does not leave it in the middle of the
+  screen, and it never scrolls the page to make room for itself; the list keeps a bar's height
+  free at its end instead, and for its few seconds the bar may lie over the last rows in view,
+  the one it speaks of among them. It rises in, and goes by itself: after four seconds when it only
+  reports, after ten when it carries an Undo.
+- **An error has its own line.** It appears directly above the buttons it answers, in ink, with
+  `role="alert"`, and opens in place, moving those buttons down by its own height, in time: the
+  one case where the thing just pressed moves, because the answer has to be where the eye is. It
+  is not cleared and opened again on the next try, which would move the buttons twice. It never takes the place of a hint, an intro or a label:
+  what was readable before the mistake is readable after it. (The server step's refusal, which
+  took the intro's place, follows this rule too.)
+- **The day target's editor** opens in place under the bar: a label ("Laps to run today"), the
+  stepper, "Done" as a secondary button, and, apart from them at the row's end,
+  the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
+  Two links side by side that both close an editor are never offered.
+- **The welcome:** what heirloom is, for someone who has never seen it. The mark and name, one
+  headline, four short lines (a lap, the day's plan, habits, a room), one line on where it lives
+  (a server you or a friend runs), and in the phone app one primary button to the server step.
+  The phone app shows it once, before the server step; the browser shows the same lines beside
+  the sign-in form from 720px and under it below. No pictures of screens, no pages to swipe, no
+  feature grid: it is one screen of sentences in the app's own voice.
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
   "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
   and an equal negative margin, so the line it sits in keeps its height.
@@ -471,23 +533,56 @@ Built once in `client/src/ui/kit/` and reused.
   of links stands under them. What cannot be undone (taking a link back) takes a second tap; what
   can (back to member) is done at once and leaves an Undo. The field that makes an admin follows the list, its button
   after it.
-- **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
+- **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow. On a
+  phone a sheet in which something can open (a task, a habit, a room's settings) is 90 percent of
+  the screen tall whatever it holds, so that what opens inside moves only what is under it; a
+  sheet that cannot grow is as tall as its content.
 
 ## Motion
 
-Tokens under `motion:`. Short, and only when state changes.
+Tokens under `motion:`. Short, and whenever state changes: a thing that appears, goes, opens,
+closes or moves does so in time, never between two frames. The user's first hour with the app
+found none of this and called it the one thing that makes the rest feel finished.
 
 | Event | Token | Rule |
 |---|---|---|
 | Hover, press | `press` 100ms | Colour only |
-| A lap segment filling, a row arriving | `fill` 160ms | Transform and opacity only, ease-out |
-| A sheet or menu | `sheet` 200ms | Transform and opacity |
+| A screen is changed | `fill` 160ms | The new screen fades in and rises `rise`; the old one is gone at once |
+| A row arrives, goes, is done or is moved | `fill` 160ms | It fades and its height opens or closes, so the rows under it glide to their place |
+| Something opens in place (an editor, a form, a panel's extra lines, an error) | `fill` 160ms | Its height opens; what is under it glides |
+| A box ticked, a switch thrown, a figure stepped, a lap segment filling | `fill` 160ms | The mark draws, the knob slides, the fill runs |
+| A sheet or menu | `sheet` 200ms | It slides `rise` and more from the bottom on a phone, fades and rises on a laptop; its scrim fades |
+| What the last tap did | `sheet` 200ms | Rises `rise` in, fades out |
 | The timer | none | Digits change; nothing animates |
 | A lap done | `lap-done` 700ms | Your bar runs to meet the ghost's line, the split chip turns over, then the words. Tap anywhere to skip |
 | A set of four done | `set-done` 1200ms | The four segments light in turn and the long break is offered. Skippable, once per set |
 
-Under `prefers-reduced-motion` every moment shows its final state at once. No animation runs on a
-loop, ever.
+Code that needs a duration reads it through the kit's one function, in milliseconds: the built
+CSS writes `200ms` as `.2s`, and a bare `parseFloat` of a token made every glide last 0.16 ms in
+the built app while the dev server looked right.
+
+All with `ease`. Under `prefers-reduced-motion` every moment shows its final state at once. No
+animation runs on a loop, ever. Motion is built into the kit (a row, a sheet, an opening, the
+bar), so a screen gets it by using the kit and never writes its own.
+
+**What you tapped stays under your finger.** After a tap, the control tapped is where it was on
+the screen, to the pixel, unless the tap was a move to another place. (At the very top of a
+page, where nothing can scroll, a thing closing above the control carries it up, in time.) The four ways a page
+jumps, each seen by the user:
+
+1. Something above the control changes height (a total, a panel that appears or goes). The
+   scroll is corrected in the same frame so the control does not move.
+2. One slot shows two things of different size (a hint and an error, a link and an editor). Each
+   gets its own place, or the slot keeps the larger one's size.
+3. Code scrolls the page (`scrollIntoView`, `scrollBy`, a focus moved by script) on a resize or
+   after a redraw. Script scrolls only as the direct answer to a tap that asks for it.
+4. A list sorts itself under the finger. The row tapped keeps its place until the pointer has
+   left it.
+
+**A keyboard is the phone's business.** A screen with a field does nothing when the window
+resizes: no script scrolling, no height recomputed in code (the shell hiding the bottom bar while
+a keyboard is up is the one thing a resize may do). The field the person is typing in is
+brought into view once, by the browser, with `scroll-margin` giving it room for its button.
 
 An Undo is offered for ten seconds, everywhere, and then goes without a word.
 
@@ -507,7 +602,9 @@ A running partner who counts for you. Plain, specific, warm, never a coach shout
 2. **Say what happened, then what is next.** "Level with last Tuesday. Take five."
 3. **Behind is a fact with a way back.** "One lap behind last week. The lap you are in now draws you
    level." Never "you missed", never "you failed".
-4. **A void pomodoro is set aside,** not lost or failed. A missed day is not mentioned the day after.
+4. **A void pomodoro is "not counted",** not lost or failed, and the button says what it does:
+   "Don't count this lap", "Count it again". (It was "set aside" until the user read "It counts
+   nowhere" and asked: in what?) A missed day is not mentioned the day after.
 5. **No exclamation marks** except in the one big moment of a set, and then one.
 6. **Short sentences, one idea each.** Sentence case everywhere, including buttons.
 7. **Name the thing, not the feature.** "Who is focusing now", not "Live presence".
@@ -524,8 +621,8 @@ Sample strings, the register to match:
 - **Old news is never said in the present.** When a screen shows what it last heard (a room with
   no connection), the finding says so ("2 of 4 were focusing when the room was last heard
   from.") and nothing counts down for anyone but you.
-- **The app writes times as 16:40.** The platform's own time field speaks as the device is set
-  (it may say 4:40 PM); that is the device's voice and is left alone.
+- **The app writes times as 16:40.** The platform's own time and date fields speak as the device
+  is set (4:40 PM, 11/24/2026); that is the device's voice and is left alone.
 
 - **Plain http is said once, where the address is typed and under the account in Settings,** as
   a fact and not an alarm: "This address is plain http. Anyone on the same network can read what
@@ -549,6 +646,14 @@ Sample strings, the register to match:
 - **Nothing is announced that is not so.** A status line speaks only of what has happened: no
   "No connection" in the moment before the first connection is made.
 
+## It is an app, not a page
+
+- **Nothing selects.** Words on a screen are not text to drag over: `user-select: none` on
+  everything, in the browser as in the phone app, with no long-press callout and no tap
+  highlight. Two exceptions, by name: what is typed into (every field), and what is there to be
+  copied (an invite link, a room's code, the server's address).
+- **A word that can be pressed looks pressable.** See Buttons and Links in a line.
+
 ## Consistency
 
 One rule decides every case: if two things do the same job they look the same, on every screen,
@@ -571,3 +676,5 @@ everything that can be pressed must be 48px to touch. It runs in `make check`.
 - Don't colour "behind" red, and don't put the ghost in any hue.
 - Don't use gradients, blur, glass, or more than one shadow.
 - Don't show a spinner for data that is already on the device.
+- Don't let anything appear, go or move between two frames, and don't let a tap move the page.
+- Don't let words be selected, or an error take the place of a hint.

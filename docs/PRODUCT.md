@@ -44,9 +44,10 @@ Each of these is something a competitor does well. Leaving them out is why this 
 |---|---|
 | Tasks with an estimate in whole pomodoros, and done vs estimate shown on each. Done may pass the estimate ("6 of 5"), with no warning colour | Cirillo's estimate loop; Focus To-Do's best planning feature; the overrun feeds estimate accuracy |
 | A gentle nudge when an estimate is over 7 ("break it down?") | Cirillo: "If It Takes More Than 5-7 Pomodoros, Break It Down" |
-| Projects with a colour, used to tag what the time went to (C, React, Next.js) | The record reads as a learning log ([motivation.md](research/motivation.md) §7) |
+| Projects with a colour, used to tag what the time went to (C, React, Next.js): twelve to choose from, or any colour from the device's picker | The record reads as a learning log ([motivation.md](research/motivation.md) §7); five tones were too few for the user |
 | Subtasks, one level | Enough to break a task down; deeper trees are project management |
 | Due date and repeat (daily, chosen weekdays, weekly) | Free in v1; locked repeats were a Focus To-Do complaint |
+| A time of day on a task's due day ("15:30"), shown on its row; the phone app reminds at that minute if the task is not done. The browser shows the time and does not remind | Asked for by the user on first use: "giving a task a time is the whole point" |
 | A day target in pomodoros with a bar that fills toward it | Goal-gradient: effort rises as the goal nears |
 | Optional "when" on a planned task ("after dinner") | Implementation intentions, d = .65 |
 | Quick add with the estimate typed inline ("pointers chapter 3 ~4") | Capture in one line |
@@ -106,6 +107,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | Light and dark, following the system | Comfort at night |
 | Export everything as JSON; import it back | Your data is yours; Focus To-Do users lost theirs |
 | Invite-only accounts on the user's own server | Free, private |
+| A welcome that says what heirloom is, in a few sentences: the phone app's first screen, and beside the sign-in form in the browser | Someone handed the app or an address by a friend has never heard of it; the user's own first question |
 | The phone app asks which server: an address or a pasted invite link, typed once, changed only while signed out. Plain `http` is allowed and said plainly | Anyone can run a server; one app serves them all, on a home network too |
 | A fresh server is set up from the app: the first account needs no invite and is the owner | Nobody should need a terminal to start |
 | Three roles. A member uses the app. An admin also recruits: makes invite links, renews them, takes them back. The owner, the first account, also decides who the admins are | The person who runs the server stays in charge of it; friends can help it grow |
@@ -134,4 +136,5 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-24 | A pomodoro ends one of three ways: rang (minutes and a lap), stopped (minutes, no lap), set aside (neither). A stop under 60 s is not recorded |
 | 2026-11-24 | Two rest days a week, counted Monday to Sunday; the streak's day needs one pomodoro that rang |
 | 2026-11-25 | The app asks for its server and allows plain http; a fresh server is set up from the app; owner, admin and member, on Docmost's invitation flow written fresh (links good for 7 days, used once, renewed, taken back). No members list, no removing an account, no password reset: the user's words |
+| 2026-11-25 | From the user's first hour with the app: a welcome that says what heirloom is (the phone app's first screen, and beside the browser's sign-in); a clock time on a task with a reminder on the phone; twelve project colours and a picker; "set aside" becomes "not counted" in every word the app says; nothing on a screen selects; things move when they change, and a tap never moves the page |
 | 2026-11-25 | Today's tasks can be put in order by hand (the lead's reading: "Next" needs an order, and ARCHITECTURE section 4 already rules on two devices reordering). Notes on a task are not in v1: the field exists in the data, no screen shows it, until the user says so |

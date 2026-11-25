@@ -146,7 +146,28 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [lead] The S10 listens on the home network; the APK that asks
 - [ ] Gate (the user sets up the S10 from the phone, makes a link, a second device joins with it)
 
-## 11. Release 1.0
+## 11. What the first hands found
+
+The user's first hour with the app, twelve points. Each becomes a fix, a rule in DESIGN.md, a
+lesson in `skills/taste-gate` and a test.
+
+- [x] [lead] PRODUCT rows, protocol (a task's `time`, a project's colour), DESIGN.md (motion, what
+      you tapped stays, nothing selects, an error's own line, the bar, button weights), the words
+- [x] [core] A task's `time`; project colours by name or picked; how long the bar stays
+- [x] [ui] The kit moves: rows, openings, sheets, screens, the bar. What you tapped stays under
+      your finger, on every screen
+- [x] [ui] The welcome; an error beside its hint; the Add button in a field; the day target's
+      editor; Pause outweighs Stop; nothing selects; "not counted" for "set aside"
+- [x] [ui] A time on a task; twelve project colours and the picker
+- [ ] [android] A task's reminder; the keyboard on sign-in; no long-press callout; the time and
+      colour pickers in the WebView (built and unit tested; each still to be seen on the phone)
+- [ ] [qa] `staysPut` on every tap that changes the page; the bar; errors; Add; the target; a
+      task's time; a colour on two devices; the welcome; nothing selects; reduced motion
+- [x] [design-review] Every changed screen at 412, 471 and 1440, light and dark, and the motion
+- [x] [lead] Every point in `skills/taste-gate` with its check
+- [ ] Gate (the user goes through the twelve points again on the phone and the laptop)
+
+## 12. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

@@ -48,8 +48,8 @@ A lane that needs a change outside its folder asks the lead in its report; it ne
 4. **Gate a section.**
    - Re-run every check yourself: `make check`. An agent's report is a lead, not proof.
    - Read every diff before merging.
-   - UI changed: `design-reviewer` on screenshots at 412x915 and 1440x900, light and dark; fix
-     what it marks as a FAIL.
+   - UI changed: `design-reviewer` on screenshots at 412x915 and 1440x900, light and dark, and
+     on frames of everything that moves; fix what it marks as a FAIL.
    - Run the `code-review` skill at `medium`. Fix real bugs and regressions in normal use,
      re-review at most once, send the rest to `findings.md`, one line each.
    - **The user tries it** on the phone and the laptop, as the section's gate says. Tests passing
@@ -138,6 +138,8 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 - `npx @google/design.md lint DESIGN.md` must show 0 errors. Its warnings `orphaned-tokens` (UI reads
   tokens through tokens.css), `missing-primary` (roles are named for their job) and
   `token-like-ignored` on our own keys (`motion`, `layout`, `state`, `shadow`, read by tools/tokens.mjs) are expected.
+- The build minifies `200ms` to `.2s`: never `parseFloat` a `--motion-*` token, and prove motion
+  on `make web`'s output, not on the dev server.
 - A visually hidden element placed `absolute` needs a positioned ancestor, or it makes the whole page scroll.
 - Playwright's `getByRole(..., { name: 'Back' })` also matches "Bring a copy back": pass `exact: true`.
 - Chromium's `elementFromPoint` snaps x.5 to the next pixel: sample whole pixels when measuring a target.
