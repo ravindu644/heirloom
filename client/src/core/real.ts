@@ -11,6 +11,23 @@ const LATEST_MS = Date.UTC(2200, 0, 1);
 /** A moment a row could really hold, in ms. */
 export const isMoment = (v: unknown): v is number => typeof v === 'number' && v >= EARLIEST_MS && v < LATEST_MS;
 
+/**
+ * When a row was deleted, in ms, or null while it is alive. Not held to `isMoment`, as other
+ * times in a row are: any number here says a person deleted the row, and read as "never deleted"
+ * it would bring back what they asked to be gone.
+ */
+export const asDeleted = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** How long a deleted row can be brought back. After it, and for one deleted for good, the row is on no screen. */
+export const KEPT_MS = 30 * 86400000;
+
+/**
+ * What `deleted` is written as to delete for good (protocol section 12): the first moment every
+ * build takes for a real one, and long past every shelf. Not 1: builds before this one read a
+ * time under the floor as "never deleted", and would have shown the row alive again.
+ */
+export const GONE = EARLIEST_MS;
+
 /** A time of day a clock could show, `15:30`, 24 hour. */
 export const isTime = (v: unknown): v is string => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 

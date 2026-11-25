@@ -1,8 +1,8 @@
 // The rules behind the Today screen: contracts/protocol.md section 12.
 
 import type { Session } from './stats.ts';
-import { isDay, isMoment, isTime } from './real.ts';
-import { localDay } from './stats.ts';
+import { KEPT_MS, asDeleted, isDay, isMoment, isTime } from './real.ts';
+import { fill, localDay } from './stats.ts';
 import { weekday } from './streak.ts';
 import { view } from './timer.ts';
 import type { TimerState } from './timer.ts';
@@ -29,7 +29,6 @@ export interface Task {
 }
 
 const DAY_MS = 86400000;
-const KEPT_MS = 30 * DAY_MS;
 
 const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 const time = (v: unknown): number | null => (isMoment(v) ? v : null);
@@ -65,16 +64,19 @@ export function asTask(id: string, row: Readonly<Record<string, unknown>>): Task
     time: isTime(row.time) ? row.time : null,
     done: time(row.done),
     order: text(row.order) ?? '',
-    deleted: time(row.deleted),
+    deleted: asDeleted(row.deleted),
   };
 }
 
-/** One line of text as one task: "pointers chapter 3 ~4". Null when there is no title in it. */
+/** The most laps an estimate is offered: past that a task is several tasks. A row that holds more is read as it is. */
+export const ESTIMATE_MAX = 8;
+
+/** One line of text as one task: "pointers chapter 3 ~4". A larger estimate than the top is taken as the top. Null when there is no title in it. */
 export function quickAdd(line: string): { title: string; estimate: number | null } | null {
   const trimmed = line.trim();
   const found = /(?:^|\s)~([1-9]\d?)$/.exec(trimmed);
   const title = found ? trimmed.slice(0, found.index).trim() : trimmed;
-  return title ? { title, estimate: found ? Number(found[1]) : null } : null;
+  return title ? { title, estimate: found ? Math.min(ESTIMATE_MAX, Number(found[1])) : null } : null;
 }
 
 /** The first day strictly after `day` that the rule allows. */
@@ -216,16 +218,17 @@ export const plannedLeft = (tasks: readonly { estimate: number | null; laps: num
   tasks.reduce((left, t) => left + Math.max(0, (t.estimate ?? 0) - t.laps), 0);
 
 /**
- * The laps and squares of one task, oldest first: a lap that rang is 1, a stopped one the share
- * of its plan it ran, one set aside nothing. The lap in progress on the task is a share that
- * grows, until its row is there; once its bell has gone it is a lap and a whole square, row or
- * no row, so a task never shows a full square beside a count that has not moved.
+ * The laps and squares of one task, oldest first: a lap that rang is a lap and a whole square,
+ * a stopped one a lap and a square as full as it ran, one set aside nothing. The lap in progress
+ * on the task is a square that fills and no lap yet, until its row is there; once its bell has
+ * gone it is a lap and a whole square, row or no row, so a task never shows a full square beside
+ * a count that has not moved.
  */
 export function squares(sessions: readonly Session[], state: TimerState, now: number, task: string): { laps: number; squares: number[] } {
   const share = (ran: number, planned: number) => (planned > 0 ? Math.min(1, Math.max(0, ran / planned)) : 0);
   const mine = sessions.filter((s) => s.kind === 'work' && s.task === task && s.outcome !== 'void').toSorted((a, b) => a.started - b.started);
-  const out = mine.map((s) => (s.outcome === 'rang' ? 1 : share(s.ended - s.started - s.paused_ms, s.planned_ms)));
-  let laps = mine.filter((s) => s.outcome === 'rang').length;
+  const out = mine.map(fill);
+  let laps = mine.length;
   if (state.phase === 'work' && state.task === task && !sessions.some((s) => s.id === state.run)) {
     const { over, left_ms } = view(state, now);
     if (over) laps += 1;

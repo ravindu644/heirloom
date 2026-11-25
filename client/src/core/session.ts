@@ -7,7 +7,7 @@ import { view } from './timer.ts';
 import type { TimerState } from './timer.ts';
 
 /** What ended the run. `replaced`: another device's run took the timer while this one was open. */
-export type End = 'bell' | 'stop' | 'void' | 'replaced';
+export type End = 'bell' | 'stop' | 'replaced';
 
 export interface Closed {
   /** The run id, which is the row id. */
@@ -39,12 +39,13 @@ export function closeRun(state: TimerState, end: End, { now, device, written, ra
   const { over, ends_at } = view(state, now);
   if (end === 'bell' && !over) return null;
   const ended = over && ends_at !== null ? ends_at : (state.paused_at ?? now);
-  // The floor is for runs someone cut short. A run that reached a bell is kept, however short.
-  if (!over && !rang && ended - state.started - state.paused_ms < FLOOR_MS) return null;
+  // The floor is for breaks someone cut short. A lap always leaves a row: it had its place in the
+  // set, and the row is what shows it. A run that reached a bell is kept too, however short.
+  if (state.phase !== 'work' && !over && !rang && ended - state.started - state.paused_ms < FLOOR_MS) return null;
   return {
     id: state.run,
     // Only the row of a bell that has just gone is the bell's own. A stop during an extension is a person's edit.
-    stamp_at: over && end !== 'void' ? written : null,
+    stamp_at: over ? written : null,
     row: {
       kind: state.phase,
       task: state.task,
@@ -52,8 +53,8 @@ export function closeRun(state: TimerState, end: End, { now, device, written, ra
       ended,
       planned_ms: state.planned_ms,
       paused_ms: state.paused_ms,
-      // A stop after a bell is not a stop: the lap rang, and stays a lap. Only setting it aside changes that.
-      outcome: end === 'void' ? 'void' : over || rang ? 'rang' : 'stopped',
+      // A stop after a bell is not a stop: the lap rang, and stays one that did.
+      outcome: over || rang ? 'rang' : 'stopped',
       device,
     },
   };

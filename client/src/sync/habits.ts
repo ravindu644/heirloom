@@ -6,6 +6,7 @@ import { batch, computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { asCheckIn, asDays, asHabit, asRemind, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
 import type { CheckIn, Habit, HabitDay } from '../core/habits.ts';
+import { GONE, KEPT_MS } from '../core/real.ts';
 import { addDays } from '../core/progress.ts';
 import { byOrder, keyBetween, moveKeys } from '../core/today.ts';
 import { createDay } from './day.ts';
@@ -67,8 +68,11 @@ export interface Habits {
   checkIn(id: string): string | null;
   /** Takes back the latest check-in of today for this habit. */
   undo(id: string): void;
+  /** To `deleted`, the shelf, for 30 days. */
   remove(id: string): void;
   restore(id: string): void;
+  /** Deletes for good a habit that is on the shelf (`deleted`): on no screen again, and no way back. Anything else is left alone. */
+  purge(id: string): void;
   move(id: string, before: string | null): void;
   /** Re-checks the day now: call it when the app comes back to the front. */
   wake(): void;
@@ -83,7 +87,6 @@ export interface HabitsEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
-const KEPT_MS = 30 * 86400000;
 
 /**
  * `close()` stops the midnight timer. `recomputed()` says how many times every check-in has been
@@ -219,6 +222,10 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
     restore(id) {
       const held = habit(id);
       if (held && held.deleted !== null) engine.write('habit', id, { deleted: null });
+    },
+
+    purge(id) {
+      if (model.peek().deleted.some((held) => held.id === id)) engine.write('habit', id, { deleted: GONE });
     },
 
     move(id, before) {

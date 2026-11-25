@@ -6,7 +6,7 @@ import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { addDays, bests, estimates, outcomeOf, projectShares, since, streakView, weekRace } from '../core/progress.ts';
 import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
-import { isDay } from '../core/real.ts';
+import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOf, localDay, stats } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { asTask } from '../core/today.ts';
@@ -121,8 +121,12 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const { days, overlaps } = stats(sessions, offset());
     const taskLaps = new Map<string, number>();
     const ofTask = new Map<string | null, Session[]>();
+    // The days a streak keeps: what is earned needs the bell, so a day of stopped laps has laps and is not kept.
+    const kept = new Set<string>();
     for (const session of sessions) {
-      if (session.task !== null && session.kind === 'work' && session.outcome === 'rang') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
+      if (session.kind === 'work' && session.outcome === 'rang') kept.add(localDay(session.started, offset()));
+      // A task's laps are counted as the task shows them: rang or stopped.
+      if (session.task !== null && session.kind === 'work' && session.outcome !== 'void') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
       const list = ofTask.get(session.task);
       if (list) list.push(session);
       else ofTask.set(session.task, [session]);
@@ -133,7 +137,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     for (const [task, list] of ofTask) {
       taskFocus.set(task, Object.values(stats(list, offset()).days).reduce((sum, day) => sum + day.focus_ms, 0));
     }
-    return { days, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps, taskFocus };
+    return { days, kept, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps, taskFocus };
   });
 
   const tasks = computed(() => {
@@ -193,6 +197,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
         ({ project, ...sums }) => ({
           project: (project !== null && projects.value.get(project)) || null,
           ...sums,
+          // The lap in progress gives its minutes and is no lap yet: it becomes one at its bell or when it is stopped.
+          laps: sums.laps - (open?.outcome === 'stopped' && project === runningFor ? 1 : 0),
           all_ms: (allTime.value.get(project) ?? 0) + (project === runningFor ? Math.max(0, running) : 0),
         }),
       );
@@ -215,8 +221,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       };
     },
 
-    streak: computed(() => streakView(history.value.days, clock.day.value)),
-    since: computed(() => since(history.value.days, clock.day.value)),
+    streak: computed(() => streakView(history.value.kept, clock.day.value)),
+    since: computed(() => since(history.value.days, history.value.kept, clock.day.value)),
     bests: computed(() => bests(history.value.days)),
     estimates: computed(() => estimates([...tasks.value.values()], (id) => history.value.taskLaps.get(id) ?? 0, clock.day.value, offset())),
 
@@ -235,7 +241,9 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       return (byDay.get(day) ?? [])
         .toSorted((a, b) => a.started - b.started)
         .map((session) => {
-          const task = session.task === null ? undefined : tasks.value.get(session.task);
+          const held = session.task === null ? undefined : tasks.value.get(session.task);
+          // The lap stays in the day. The task it was for is named only while the task can still be seen somewhere.
+          const task = held && (held.deleted === null || engine.now() - held.deleted < KEPT_MS) ? held : undefined;
           const overlap = overlapping.has(session.id);
           const row = overlap && session.started < upper ? 1 : 0;
           if (overlap && row === 0) upper = session.ended;

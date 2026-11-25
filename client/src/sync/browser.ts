@@ -69,7 +69,7 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   // so the question is put through a function and neither knows the other.
   let today: Today | undefined;
   const focus = createFocus(engine, { utcOffsetMin, runId: id, schedule: env.schedule, topTask: () => today?.list.peek()[0]?.id ?? null });
-  const made = (today = createToday(engine, { utcOffsetMin, id, schedule: env.schedule }));
+  const made = (today = createToday(engine, { utcOffsetMin, id, schedule: env.schedule, focus }));
   const progress = createProgress(engine, { utcOffsetMin, schedule: env.schedule });
   const habits = createHabits(engine, { utcOffsetMin, id, schedule: env.schedule });
   const rooms = createRooms(engine, { schedule: env.schedule });

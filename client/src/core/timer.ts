@@ -64,11 +64,11 @@ export interface TimerView {
   next: { phase: Phase; set_index: number };
 }
 
-// The index of the lap a tap on start begins: the one rule start, stop and next share.
-const nextLap = (state: TimerState, over: boolean): number => {
+// The index of the lap a tap on start begins: the one rule start, stop and next share. A lap
+// has had its place in the set whether it reached its bell or was stopped before it.
+const nextLap = (state: TimerState): number => {
   if (state.phase === 'idle') return state.set_index;
-  if (state.phase === 'long') return 0;
-  return state.phase === 'short' || over ? (state.set_index + 1) % 4 : state.set_index;
+  return state.phase === 'long' ? 0 : (state.set_index + 1) % 4;
 };
 
 /** The state after an action at `now` (server time). An action with nothing to act on returns the state it got. */
@@ -84,7 +84,7 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
         paused_at: null,
         paused_ms: 0,
         planned_ms: action.planned_ms,
-        set_index: action.phase !== 'work' ? state.set_index : action.new_set ? 0 : nextLap(state, over),
+        set_index: action.phase !== 'work' ? state.set_index : action.new_set ? 0 : nextLap(state),
       };
     case 'pause':
       return state.phase === 'idle' || paused || over ? state : { ...state, paused_at: now };
@@ -99,7 +99,7 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
       return over && view(longer, now).over ? state : longer;
     }
     case 'stop':
-      return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state, over) };
+      return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state) };
   }
 }
 
@@ -113,6 +113,6 @@ export function view(state: TimerState, now: number): TimerView {
   const next: TimerView['next'] =
     state.phase === 'work'
       ? { phase: state.set_index === 3 ? 'long' : 'short', set_index: state.set_index }
-      : { phase: 'work', set_index: nextLap(state, false) };
+      : { phase: 'work', set_index: nextLap(state) };
   return { left_ms: Math.max(0, state.planned_ms - ran), ends_at, over: ends_at !== null && now >= ends_at, paused, next };
 }

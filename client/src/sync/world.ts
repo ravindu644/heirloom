@@ -113,7 +113,7 @@ export function world() {
       engine,
       focus,
       get today() {
-        return (today ??= createToday(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule }));
+        return (today ??= createToday(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule, focus }));
       },
       get progress() {
         return (progress ??= createProgress(engine, { utcOffsetMin: () => OFFSET, schedule: time.schedule }));

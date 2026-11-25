@@ -108,13 +108,18 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
     return lapMarks(sessions, stats(sessions, env.utcOffsetMin()).days, localDay(engine.now(), env.utcOffsetMin()), env.utcOffsetMin());
   });
   const taskLaps = computed(() => {
-    const laps = new Map<string, number>();
-    for (const s of counts.sessions.value) if (s.task !== null && s.kind === 'work' && s.outcome === 'rang') laps.set(s.task, (laps.get(s.task) ?? 0) + 1);
+    // A task's laps as the task shows them, rang or stopped, and how many of them rang.
+    const laps = new Map<string, { laps: number; rang: number }>();
+    for (const s of counts.sessions.value) {
+      if (s.task === null || s.kind !== 'work' || s.outcome === 'void') continue;
+      const held = laps.get(s.task) ?? { laps: 0, rang: 0 };
+      laps.set(s.task, { laps: held.laps + 1, rang: held.rang + (s.outcome === 'rang' ? 1 : 0) });
+    }
     return laps;
   });
   const fromTasks = computed(() => {
     const tasks = [...engine.rows('task').value].flatMap(([id, task]) => asTask(id, task) ?? []);
-    return taskMarks(tasks, (id) => taskLaps.value.get(id) ?? 0);
+    return taskMarks(tasks, (id) => taskLaps.value.get(id) ?? { laps: 0, rang: 0 });
   });
 
   const marks = signal<Mark[]>([]);

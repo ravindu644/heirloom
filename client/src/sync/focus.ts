@@ -1,5 +1,5 @@
 // What the Focus screen is given, and the one place session rows are written: at the bell when
-// this device may, and when a run is stopped, set aside or replaced.
+// this device may, and when a run is stopped or replaced.
 // Rules: contracts/protocol.md sections 6 (timer), 7 (the race) and 11 (sessions).
 //
 // Create it once, right after the engine and before anything else runs: a run that another
@@ -26,12 +26,17 @@ export interface Focus {
   readonly lengths: ReadonlySignal<{ work_ms: number; short_ms: number; long_ms: number }>;
   /** Time left, the end, over, paused, what comes next: worked out at the engine's now. Call it on every tick. */
   view(): TimerView;
-  /** Running time of the current run in ms, pauses left out. "Stop and log 6 min" reads this. */
+  /** Running time of the current run in ms, pauses left out. */
   ran(): number;
   /** You against the ghost at the engine's now, the lap in progress included. */
   race(): Race;
-  /** Laps that rang today (local day). */
+  /** Today's laps (local day): those that rang and those that were stopped. One not counted is not in it. */
   lapsToday(): number;
+  /**
+   * The laps of this set that have ended, oldest first, each as full as it ran: 1 for one that
+   * rang, less for one stopped, 0 for one not counted. Not the lap in progress. Call it on every tick.
+   */
+  fills(): number[];
 
   /** Starts what `view().next` names: the next lap, or the break a finished lap has earned. */
   start(task?: string | null): void;
@@ -41,12 +46,14 @@ export interface Focus {
   resume(): void;
   /** Five more minutes on the current run. */
   extend(): void;
-  /** Ends the run and keeps its minutes: rang if the bell has gone, stopped if not. Under 60 s nothing is kept. */
-  stop(): void;
-  /** Ends the run and sets it aside: kept in the timeline, counted nowhere. */
-  setAside(): void;
   /**
-   * True for ten seconds after `stop()` or `setAside()` on this device, while the timer cell is
+   * Ends the run where it is. A lap stopped before its bell is a lap that ended early: it keeps
+   * its minutes and its place in the set, however short, and the next start is the next lap.
+   * After the bell it rang. A break under 60 s leaves nothing.
+   */
+  stop(): void;
+  /**
+   * True for ten seconds after `stop()` on this device, while the timer cell is
    * still the idle state that stop wrote. Any other write to the timer, here or elsewhere, ends it.
    */
   readonly undoable: ReadonlySignal<boolean>;
@@ -120,16 +127,6 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
   }
 
-  // The idle state a run leaves behind. A run that holds a rang row reached its bell once, so for
-  // the set of four it is done, even when an extension has reopened it: the pure rule only sees a
-  // lap that is not over and would hand out the same lap again, five laps before the long break.
-  // So for such a run the rule is asked at a moment the run is over.
-  function after(s: TimerState, now: number): TimerState {
-    if (!rangOnce(s)) return act(s, { do: 'stop' }, now);
-    const running = act(s, { do: 'resume' }, now);
-    return act(running, { do: 'stop' }, Math.max(now, view(running, now).ends_at ?? now));
-  }
-
   // The run this device wrote last and has not seen end, and when it wrote it. If another
   // device's run takes the timer, this is all that is left of ours, and what its row is made from.
   let own: { state: TimerState; written: number } | null = null;
@@ -152,8 +149,6 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     const v = look(s, now);
     const phase = lap ? 'work' : v.next.phase;
     const fresh = phase === 'work' && newDay(s, v, now);
-    // A lap begun over a run that rang once is the next lap: it starts from what that run leaves behind.
-    const from = phase === 'work' && rangOnce(s) ? after(s, now) : s;
     batch(() => {
       keep(s, 'stop', now, written());
       const start: TimerAction = {
@@ -164,7 +159,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
         planned_ms: lengths.peek()[`${phase}_ms`],
         ...(fresh && { new_set: true }),
       };
-      put(act(from, start, now));
+      put(act(s, start, now));
     });
   }
 
@@ -180,14 +175,14 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     undoable.value = false;
   }
 
-  function end(how: 'stop' | 'void') {
+  function stop() {
     const s = state.peek();
     if (s.phase === 'idle') return;
     const now = engine.now();
-    const idle = after(s, now);
+    // One turn, so one store transaction: the row of the lap that ends here and the timer cell that ends it.
     batch(() => {
-      keep(s, how, now, written());
-      put(idle);
+      keep(s, 'stop', now, written());
+      put(act(s, { do: 'stop' }, now));
     });
     undone = { before: s, stamp: timerStamp() };
     undoable.value = true;
@@ -282,14 +277,19 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
     race: counts.race,
     lapsToday: counts.lapsToday,
+    fills() {
+      const s = state.value;
+      const now = engine.now();
+      // A set left over from an earlier day is not this day's: the next lap is lap one, and none have ended.
+      return newDay(s, view(s, now), now) ? [] : counts.setFills(s, now);
+    },
 
     start: (task) => begin(false, task),
     skipBreak: (task) => begin(true, task),
     pause: () => change({ do: 'pause' }),
     resume: () => change({ do: 'resume' }),
     extend: () => change({ do: 'extend', ms: EXTEND_MS }),
-    stop: () => end('stop'),
-    setAside: () => end('void'),
+    stop,
     undoable,
     undo,
 

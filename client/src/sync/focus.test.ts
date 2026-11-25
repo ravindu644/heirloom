@@ -130,29 +130,59 @@ describe('ending a run', () => {
     assert.ok(d.engine.cells().filter((c) => c.dataset === 'session').every((c) => c.stamp.startsWith('2026-11-24T04:36:00.000Z-')));
   });
 
-  it('stop under 60 s writes no row, and the next start is the same lap again', async () => {
+  it('a lap stopped in its first seconds is a lap that ended early: it leaves its row, and the next start is the next lap', async () => {
     const w = world();
     const d = await w.device('a');
-    d.focus.start();
-    w.time.advance(59999);
+    d.focus.start('task-pointers');
+    w.time.advance(5000);
     d.focus.stop();
-    assert.deepEqual(d.sessions(), []);
-    assert.equal(d.focus.state.value.phase, 'idle');
+    assert.deepEqual(d.session('run-1'), lapRow(d.engine.device, { task: 'task-pointers', ended: T0 + 5000, outcome: 'stopped' }));
+    assert.deepEqual(d.focus.state.value, { phase: 'idle', run: null, task: null, started: null, paused_at: null, paused_ms: 0, planned_ms: 0, set_index: 1 });
+    assert.equal(d.focus.lapsToday(), 1);
+    assert.equal(d.focus.race().you_ms, 5000);
     d.focus.start();
-    assert.equal(d.focus.state.value.set_index, 0);
+    assert.equal(d.focus.state.value.set_index, 1);
   });
 
-  it('a run cut off under 60 s by the next start leaves no row, even as the clock ticks on while the start is written', async () => {
+  it('a lap stopped the instant it began leaves a row too: it had its place', async () => {
     const w = world();
     const d = await w.device('a');
     d.focus.start();
-    w.time.advance(59998);
-    w.drift.ms = 1;
+    d.focus.stop();
+    assert.deepEqual(d.session('run-1'), lapRow(d.engine.device, { ended: T0, outcome: 'stopped' }));
+    assert.equal(d.focus.lapsToday(), 1);
+    assert.deepEqual(d.focus.fills(), [0]);
+  });
+
+  it('a lap cut off in its first seconds by the next start leaves its row as well, and the new lap is the next', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.focus.start();
+    w.time.advance(20000);
     d.focus.skipBreak();
-    w.drift.ms = 0;
     assert.equal(d.focus.state.value.run, 'run-2');
+    assert.equal(d.focus.state.value.set_index, 1);
+    assert.deepEqual(d.session('run-1'), lapRow(d.engine.device, { ended: T0 + 20000, outcome: 'stopped' }));
+  });
+
+  it('a break stopped under 60 s leaves nothing, and one stopped at 60 s leaves its row: the floor is for breaks', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.focus.start();
+    w.time.advance(LAP);
+    d.focus.start();
+    assert.equal(d.focus.state.value.phase, 'short');
+    w.time.advance(59999);
+    d.focus.stop();
+    assert.deepEqual(d.sessions(), ['run-1']);
+    d.engine.write('timer', 'current', { state: { ...d.focus.state.value, set_index: 0 } });
+    d.focus.start();
+    w.time.advance(LAP);
+    d.focus.start();
     w.time.advance(MIN);
-    assert.deepEqual(d.sessions(), []);
+    d.focus.stop();
+    assert.equal(d.session('run-4')?.kind, 'short');
+    assert.equal(d.session('run-4')?.outcome, 'stopped');
   });
 
   it('stop while paused ends the row where the pause began', async () => {
@@ -179,20 +209,80 @@ describe('ending a run', () => {
     assert.equal(d.session('run-1')?.outcome, 'stopped');
     assert.equal(d.session('run-1')?.ended, T0 + 8 * MIN);
     assert.equal(d.focus.state.value.run, 'run-2');
-    assert.equal(d.focus.state.value.set_index, 0, 'a lap restarted before the bell keeps its place');
+    assert.equal(d.focus.state.value.set_index, 1, 'the lap that was cut off had its place');
     assert.equal(log.length, 1);
   });
 
-  it('set aside writes a void row, which counts nowhere', async () => {
+  it('a stopped lap taken out of the count from the timeline counts nowhere, and keeps its place in the set, drawn empty', async () => {
     const w = world();
     const d = await w.device('a');
     d.focus.start();
     w.time.advance(12 * MIN);
-    d.focus.setAside();
+    d.focus.stop();
+    assert.deepEqual([d.focus.lapsToday(), d.focus.fills()], [1, [0.48]]);
+    d.progress.setAside('run-1');
     assert.equal(d.session('run-1')?.outcome, 'void');
     assert.equal(d.session('run-1')?.ended, T0 + 12 * MIN);
     assert.equal(d.focus.race().you_ms, 0);
     assert.equal(d.focus.lapsToday(), 0);
+    assert.deepEqual(d.focus.fills(), [0]);
+    assert.equal(d.focus.view().next.set_index, 1, 'the set does not move back');
+    d.progress.countAgain('run-1');
+    assert.deepEqual([d.focus.lapsToday(), d.focus.fills()], [1, [0.48]]);
+  });
+
+  it('stop ends whatever is on: a break, running or over, and a lap that rang and waits for its break. Idle after, and next is the lap that would have followed the break', async () => {
+    const idle = (set_index: number) => ({ phase: 'idle', run: null, task: null, started: null, paused_at: null, paused_ms: 0, planned_ms: 0, set_index });
+    // A device with one lap rung, at this place in the set.
+    async function rung(setIndex: number) {
+      const w = world();
+      const d = await w.device('a');
+      d.engine.write('timer', 'current', { state: { ...d.focus.state.value, set_index: setIndex } });
+      d.focus.start();
+      await d.settle();
+      w.time.advance(LAP + MIN);
+      return { w, d };
+    }
+    // The lap rang and its break was not begun: "Done for now".
+    const waiting = await rung(1);
+    waiting.d.focus.stop();
+    assert.deepEqual(waiting.d.focus.state.value, idle(2));
+    assert.deepEqual(waiting.d.focus.view().next, { phase: 'work', set_index: 2 });
+    assert.deepEqual(waiting.d.sessions(), ['run-1'], 'the lap rang; the stop writes nothing more for it');
+    assert.equal(waiting.d.session('run-1')?.outcome, 'rang');
+    assert.equal(waiting.d.focus.undoable.value, true);
+
+    // In the break, two minutes in: the break leaves its row, and next is the lap after it.
+    const resting = await rung(1);
+    resting.d.focus.start();
+    resting.w.time.advance(2 * MIN);
+    resting.d.focus.stop();
+    assert.deepEqual(resting.d.focus.state.value, idle(2));
+    assert.deepEqual([resting.d.session('run-2')?.kind, resting.d.session('run-2')?.outcome], ['short', 'stopped']);
+
+    // The break over and nothing begun after it.
+    const rested = await rung(1);
+    rested.d.focus.start();
+    await rested.d.settle();
+    rested.w.time.advance(10 * MIN);
+    rested.d.focus.stop();
+    assert.deepEqual(rested.d.focus.state.value, idle(2));
+    assert.equal(rested.d.session('run-2')?.outcome, 'rang');
+
+    // After the fourth bell, and in the long break: the next lap is lap one.
+    const fourth = await rung(3);
+    fourth.d.focus.stop();
+    assert.deepEqual(fourth.d.focus.state.value, idle(0));
+    const long = await rung(3);
+    long.d.focus.start();
+    assert.equal(long.d.focus.state.value.phase, 'long');
+    long.w.time.advance(MIN);
+    long.d.focus.stop();
+    assert.deepEqual(long.d.focus.state.value, idle(0));
+    // And with nothing on, stop does nothing.
+    const cells = long.d.engine.cells();
+    long.d.focus.stop();
+    assert.deepEqual(long.d.engine.cells(), cells);
   });
 
   it('stop after the bell: the lap rang, and the set moves on', async () => {
@@ -385,7 +475,8 @@ describe('the bell', () => {
     assert.deepEqual(phone.session('run-1'), stopped);
     assert.deepEqual(laptop.session('run-1'), stopped);
     assert.deepEqual(w.sorted(phone.engine), w.sorted(laptop.engine));
-    assert.equal(laptop.focus.lapsToday(), 0);
+    assert.equal(laptop.focus.lapsToday(), 1, 'the stopped lap, once');
+    assert.equal(phone.focus.lapsToday(), 1);
     assert.equal(laptop.focus.race().you_ms, 10 * MIN);
   });
 
@@ -396,12 +487,12 @@ describe('the bell', () => {
     a.focus.start();
     await a.settle();
     w.exchange(a, b);
-    // b goes to sleep with the lap running. a hears the bell, then sets the lap aside.
+    // b goes to sleep with the lap running. a hears the bell, then takes the lap out of the count, from the timeline.
     b.disconnect();
     w.time.advance(LAP);
     assert.equal(a.session('run-1')?.outcome, 'rang');
     w.time.advance(MIN);
-    a.focus.setAside();
+    a.progress.setAside('run-1');
     assert.equal(a.session('run-1')?.outcome, 'void');
     // b wakes an hour later, in step by its own lights for a moment, and writes the row it never saw.
     w.time.advance(60 * MIN);
@@ -498,17 +589,32 @@ describe('the bell', () => {
     assert.deepEqual(d.focus.view().next, { phase: 'work', set_index: 2 });
   });
 
-  it('a lap stopped before any bell does not move the set on', async () => {
+  it('a lap stopped before its bell has had its place: the set moves on, paused or not, and lap four stopped begins a new set', async () => {
     const w = world();
     const d = await w.device('a');
     d.focus.start();
     w.time.advance(10 * MIN);
     d.focus.stop();
     assert.equal(d.session('run-1')?.outcome, 'stopped');
-    assert.deepEqual(d.focus.view().next, { phase: 'work', set_index: 0 });
+    assert.deepEqual(d.focus.view().next, { phase: 'work', set_index: 1 });
+    d.focus.start();
+    w.time.advance(MIN);
+    d.focus.pause();
+    w.time.advance(30 * MIN);
+    d.focus.stop();
+    assert.deepEqual(d.focus.view().next, { phase: 'work', set_index: 2 });
+    d.focus.start();
+    w.time.advance(LAP);
+    d.focus.skipBreak();
+    assert.equal(d.focus.state.value.set_index, 3);
+    w.time.advance(2 * MIN);
+    d.focus.stop();
+    // No long break is owed for a set whose last lap was stopped: the next start is lap one.
+    assert.deepEqual(d.focus.state.value, { phase: 'idle', run: null, task: null, started: null, paused_at: null, paused_ms: 0, planned_ms: 0, set_index: 0 });
+    assert.equal(d.focus.lapsToday(), 4);
   });
 
-  it('extended after the bell, then set aside: set aside wins', async () => {
+  it('extended after the bell, stopped, then taken out of the count from the timeline: not counted', async () => {
     const w = world();
     const d = await w.device('a');
     d.focus.start();
@@ -516,9 +622,14 @@ describe('the bell', () => {
     w.time.advance(LAP + MIN);
     d.focus.extend();
     w.time.advance(MIN);
-    d.focus.setAside();
+    d.focus.stop();
+    assert.equal(d.session('run-1')?.outcome, 'rang');
+    d.progress.setAside('run-1');
     assert.equal(d.session('run-1')?.outcome, 'void');
     assert.equal(d.focus.lapsToday(), 0);
+    // And counted again it is what its row says it ran: 27 of 30 minutes.
+    d.progress.countAgain('run-1');
+    assert.equal(d.session('run-1')?.outcome, 'stopped');
   });
 
   it('extend long after the bell does nothing: no minutes nobody worked, and no second row', async () => {
@@ -599,25 +710,43 @@ describe('undo', () => {
     assert.equal(d.focus.race().you_ms, LAP);
   });
 
-  it('set aside, undo, then the bell: rang, not void', async () => {
-    const { w, d } = await sixMinutesIn();
-    d.focus.setAside();
-    assert.equal(d.session('run-1')?.outcome, 'void');
-    w.time.advance(2000);
+  it('undo puts the same run back in the same place of the set: the stop moved the set on, the undo moves it back', async () => {
+    const { w, d, before } = await sixMinutesIn();
+    d.focus.stop();
+    assert.equal(d.focus.state.value.set_index, 1);
+    assert.deepEqual([d.focus.lapsToday(), d.focus.fills()], [1, [0.24]]);
+    w.time.advance(3000);
     d.focus.undo();
-    w.time.advance(LAP);
-    assert.equal(d.session('run-1')?.outcome, 'rang');
-    assert.equal(d.session('run-1')?.ended, T0 + LAP);
-    assert.equal(d.focus.lapsToday(), 1);
+    assert.deepEqual(d.focus.state.value, before);
+    assert.equal(d.focus.state.value.run, 'run-1');
+    assert.equal(d.focus.view().next.phase, 'short');
+    // The row of the stop is still held, and the lap is open again: not a lap yet, and not one of the set that has ended.
+    assert.equal(d.session('run-1')?.outcome, 'stopped');
+    assert.deepEqual([d.focus.lapsToday(), d.focus.fills()], [0, []]);
   });
 
-  it('set aside after the bell, then undo: the lap is a lap again at once', async () => {
+  it('stop while paused, then undo: the lap is paused again where it was, and is not counted as a lap while it is open', async () => {
+    const { w, d } = await sixMinutesIn();
+    d.focus.pause();
+    const paused = d.focus.state.value;
+    w.time.advance(MIN);
+    d.focus.stop();
+    assert.equal(d.session('run-1')?.ended, T0 + 6 * MIN);
+    assert.equal(d.focus.lapsToday(), 1);
+    w.time.advance(2000);
+    d.focus.undo();
+    assert.deepEqual(d.focus.state.value, paused);
+    // The row ends exactly where the pause holds the lap, and still it is not this lap's last word.
+    assert.equal(d.focus.lapsToday(), 0);
+    assert.deepEqual(d.focus.fills(), []);
+  });
+
+  it('stop after the bell, then undo: the timer is over again, the rang row stands, and the lap is one lap', async () => {
     const { w, d } = await sixMinutesIn();
     w.time.advance(LAP);
     assert.equal(d.session('run-1')?.outcome, 'rang');
-    d.focus.setAside();
-    assert.equal(d.session('run-1')?.outcome, 'void');
-    assert.equal(d.focus.lapsToday(), 0);
+    d.focus.stop();
+    assert.deepEqual([d.focus.state.value.set_index, d.focus.lapsToday()], [1, 1]);
     w.time.advance(1000);
     d.focus.undo();
     assert.equal(d.focus.view().over, true);
@@ -639,7 +768,7 @@ describe('undo', () => {
     assert.equal(d.focus.undoable.value, true);
   });
 
-  it('a stop that left no row: undo just puts the timer back, and the lap rings as if nothing happened', async () => {
+  it('a lap stopped after thirty seconds, then undone: the timer is back, and the lap rings as one row with all of it', async () => {
     const w = world();
     const d = await w.device('a');
     d.focus.start();
@@ -647,12 +776,15 @@ describe('undo', () => {
     w.time.advance(30000);
     const before = d.focus.state.value;
     d.focus.stop();
-    assert.deepEqual(d.sessions(), []);
+    assert.equal(d.session('run-1')?.outcome, 'stopped');
+    w.time.advance(2000);
     d.focus.undo();
     assert.deepEqual(d.focus.state.value, before);
-    assert.deepEqual(d.sessions(), []);
+    await d.settle();
     w.time.advance(LAP);
+    assert.deepEqual(d.sessions(), ['run-1']);
     assert.deepEqual(d.session('run-1'), lapRow(d.engine.device));
+    assert.equal(d.focus.lapsToday(), 1);
   });
 
   it('is offered for ten seconds and no longer', async () => {
@@ -818,19 +950,20 @@ describe('replaced by another device\'s run', () => {
     await a.settle();
     w.exchange(a, b);
     a.disconnect();
-    // On b: set our run aside, then start another. a learns of both at once.
+    // On b: our run is stopped, then another started. a learns of both at once.
     w.time.advance(10 * MIN);
-    b.focus.setAside();
+    b.focus.stop();
     w.time.advance(MIN);
     b.focus.start();
     w.time.advance(5 * MIN);
     a.receive(b.engine.cells());
-    assert.equal(a.session('run-1')?.outcome, 'void');
+    assert.equal(a.session('run-1')?.outcome, 'stopped');
+    assert.equal(a.session('run-1')?.ended, T0 + 10 * MIN, 'where b stopped it, not where a heard of it');
     assert.equal(a.session('run-1')?.device, b.engine.device);
     assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 
-  it('stopped on another device is not replaced: whoever stopped it wrote the row, or meant there to be none', async () => {
+  it('stopped on another device is not replaced: whoever stopped it wrote the row, and this device writes none of its own', async () => {
     const w = world();
     const a = await w.device('a');
     const b = await w.device('b');
@@ -842,7 +975,8 @@ describe('replaced by another device\'s run', () => {
     w.time.advance(5 * MIN);
     a.receive(b.engine.cells());
     assert.equal(a.focus.state.value.phase, 'idle');
-    assert.deepEqual(a.sessions(), []);
+    assert.deepEqual(a.session('run-1'), lapRow(b.engine.device, { ended: T0 + 30000, outcome: 'stopped' }));
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 
   it('a run another device wrote last is not ours to close', async () => {
@@ -866,6 +1000,179 @@ describe('replaced by another device\'s run', () => {
     assert.deepEqual(a.sessions(), []);
     assert.equal(b.session('run-1')?.outcome, 'stopped');
     assert.equal(b.session('run-1')?.ended, T0 + 5 * MIN, 'where its pause began');
+  });
+});
+
+describe('the set on screen', () => {
+  it('fills are the laps of this set that have ended, each as full as it ran: through a set of four and into the next', async () => {
+    const w = world();
+    const d = await w.device('a');
+    assert.deepEqual(d.focus.fills(), []);
+    d.focus.start();
+    w.time.advance(10 * MIN);
+    assert.deepEqual(d.focus.fills(), [], 'the lap in progress is the screen\'s to draw from view()');
+    w.time.advance(15 * MIN - 1);
+    assert.deepEqual(d.focus.fills(), [], 'a millisecond before its bell');
+    w.time.advance(1);
+    assert.deepEqual(d.focus.fills(), [1], 'its bell has gone: the lap has ended, and is the last of them');
+    d.focus.start();
+    assert.equal(d.focus.state.value.phase, 'short');
+    assert.deepEqual(d.focus.fills(), [1], 'in its break, the same');
+    w.time.advance(5 * MIN);
+    d.focus.start();
+    w.time.advance(15 * MIN);
+    assert.deepEqual(d.focus.fills(), [1]);
+    d.focus.stop();
+    assert.deepEqual(d.focus.fills(), [1, 0.6], 'idle after a stop: the stopped lap, as full as it ran');
+    d.focus.start();
+    assert.equal(d.focus.state.value.set_index, 2);
+    w.time.advance(LAP);
+    d.focus.skipBreak();
+    w.time.advance(5 * MIN);
+    assert.deepEqual(d.focus.fills(), [1, 0.6, 1]);
+    w.time.advance(20 * MIN);
+    assert.deepEqual(d.focus.fills(), [1, 0.6, 1, 1], 'lap four has rung: all four, before the long break is begun');
+    d.focus.start();
+    assert.equal(d.focus.state.value.phase, 'long');
+    assert.deepEqual(d.focus.fills(), [1, 0.6, 1, 1]);
+    w.time.advance(15 * MIN);
+    assert.deepEqual(d.focus.fills(), [1, 0.6, 1, 1], 'the long break over, until the next lap starts');
+    d.focus.start();
+    assert.deepEqual(d.focus.fills(), [], 'lap one of the next set');
+    w.time.advance(MIN);
+    d.focus.stop();
+    assert.deepEqual(d.focus.fills(), [0.04]);
+  });
+
+  it('a lap that has just rung, on a device that may not write its bell: full, and the last of the set, after a stopped one', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.focus.start();
+    w.time.advance(15 * MIN);
+    a.focus.stop();
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    b.disconnect();
+    w.time.advance(LAP + MIN);
+    assert.equal(b.focus.view().over, true);
+    assert.deepEqual(b.sessions(), ['run-1'], 'offline with another device\'s timer, b writes no bell');
+    assert.deepEqual(b.focus.fills(), [0.6, 1]);
+    // Extended past its bell, the lap is open again: it is the screen's to draw, and not one that has ended.
+    a.focus.extend();
+    assert.deepEqual(a.focus.fills(), [0.6]);
+    // Taken out of the count before its break is begun: empty, in its place.
+    w.time.advance(5 * MIN);
+    assert.deepEqual(a.focus.fills(), [0.6, 1]);
+    a.progress.setAside('run-2');
+    assert.deepEqual(a.focus.fills(), [0.6, 0]);
+  });
+
+  it('a bell this device may not write yet: the lap it heard is drawn full all the same', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    b.disconnect();
+    w.time.advance(LAP + MIN);
+    a.focus.start();
+    // The break reaches b, the row of the bell does not.
+    b.receive(a.engine.cells().filter((c) => c.dataset === 'timer'));
+    assert.equal(b.focus.state.value.phase, 'short');
+    assert.deepEqual(b.sessions(), []);
+    assert.deepEqual(b.focus.fills(), [1]);
+  });
+
+  it('a set left over from yesterday is not on screen today: the next lap is lap one, and none have ended', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.focus.start();
+    w.time.advance(10 * MIN);
+    d.focus.stop();
+    assert.deepEqual(d.focus.fills(), [0.4]);
+    w.time.advance(24 * 60 * MIN);
+    assert.equal(d.focus.state.value.set_index, 1);
+    assert.deepEqual(d.focus.fills(), []);
+    d.focus.start();
+    assert.equal(d.focus.state.value.set_index, 0);
+    assert.deepEqual(d.focus.fills(), []);
+  });
+});
+
+describe('no lap is lost to a stop', () => {
+  it('a lap stopped in its first seconds on one device, offline, is a row on the other after they meet, and a lap on both', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.disconnect();
+    a.focus.start('task-pointers');
+    w.time.advance(4000);
+    a.focus.stop();
+    await a.engine.saved();
+    assert.equal(a.engine.unsent.value, 9, 'the eight cells of the row and the timer, waiting');
+    // And through a restart of the app before it has a network again.
+    const again = await w.restart(a, { online: false });
+    assert.equal(again.session('run-1')?.outcome, 'stopped');
+    w.exchange(again, b);
+    await again.connect();
+    const row = lapRow(a.engine.device, { task: 'task-pointers', ended: T0 + 4000, outcome: 'stopped' });
+    assert.deepEqual(b.session('run-1'), row);
+    assert.deepEqual(again.session('run-1'), row);
+    assert.deepEqual([b.focus.lapsToday(), b.focus.fills(), b.focus.state.value.set_index], [1, [4000 / LAP], 1]);
+    assert.deepEqual(w.sorted(again.engine), w.sorted(b.engine));
+    assert.equal(again.engine.unsent.value, 0);
+  });
+
+  for (const first of ['a', 'b']) {
+    it(`two devices stop the same lap, each offline: one row, the later stop's, the same on both (${first}'s cells arrive first)`, async () => {
+      const w = world();
+      const a = await w.device('a');
+      const b = await w.device('b');
+      a.focus.start();
+      await a.settle();
+      w.exchange(a, b);
+      a.disconnect();
+      b.disconnect();
+      w.time.advance(20000);
+      a.focus.stop();
+      w.time.advance(15000);
+      b.focus.stop();
+      const [fromA, fromB] = [a.engine.cells(), b.engine.cells()];
+      if (first === 'a') (b.receive(fromA), a.receive(fromB));
+      else (a.receive(fromB), b.receive(fromA));
+      for (const d of [a, b]) {
+        assert.deepEqual(d.sessions(), ['run-1']);
+        assert.deepEqual(d.session('run-1'), lapRow(b.engine.device, { ended: T0 + 35000, outcome: 'stopped' }));
+        assert.equal(d.focus.lapsToday(), 1);
+        assert.deepEqual(d.focus.state.value.set_index, 1, 'the set moved on once, not twice');
+      }
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    });
+  }
+
+  it('a lap stopped on one device and still running, offline, on another that then hears its bell: the stop stands, one row', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    a.disconnect();
+    w.time.advance(10000);
+    b.focus.stop();
+    await b.settle();
+    // a wrote the timer last as far as it knows, so offline it writes the bell of its own lap.
+    w.time.advance(LAP);
+    assert.equal(a.session('run-1')?.outcome, 'rang');
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.deepEqual(d.sessions(), ['run-1']);
+      assert.deepEqual(d.session('run-1'), lapRow(b.engine.device, { ended: T0 + 10000, outcome: 'stopped' }));
+    }
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 });
 
@@ -948,6 +1255,23 @@ describe('the race and the counts', () => {
     assert.equal(d.focus.lapsToday(), 1);
   });
 
+  it('today\'s laps are the laps that rang and the laps that were stopped; one in progress is not one yet', async () => {
+    const w = world();
+    const d = await w.device('a');
+    d.focus.start();
+    w.time.advance(LAP);
+    d.focus.skipBreak();
+    w.time.advance(10 * MIN);
+    assert.equal(d.focus.lapsToday(), 1);
+    d.focus.stop();
+    assert.equal(d.focus.lapsToday(), 2);
+    d.focus.start();
+    w.time.advance(MIN);
+    assert.equal(d.focus.lapsToday(), 2);
+    assert.deepEqual(d.today.figures().fills, [1, 0.4]);
+    assert.equal(d.today.figures().laps, 2);
+  });
+
   it('a lap whose bell has gone counts as a lap before its row is written, as it does in the race, and once when the row comes', async () => {
     const w = world();
     const a = await w.device('a');
@@ -968,7 +1292,7 @@ describe('the race and the counts', () => {
     assert.equal(b.focus.lapsToday(), 1);
   });
 
-  it('a break whose bell has gone is not a lap, and neither is a lap set aside', async () => {
+  it('a break whose bell has gone is not a lap, and neither is a lap taken out of the count', async () => {
     const w = world();
     const a = await w.device('a');
     const b = await w.device('b');
@@ -986,10 +1310,10 @@ describe('the race and the counts', () => {
     w.exchange(a, b);
     w.time.advance(LAP + MIN);
     assert.equal(b.focus.lapsToday(), 2);
-    a.focus.setAside();
+    a.progress.setAside(a.focus.state.value.run!);
     w.time.advance(MIN);
     assert.equal(a.focus.lapsToday(), 1);
-    // The row reaches b a moment before the timer cell does: the lap is already not a lap there.
+    // The row reaches b while its timer still shows the lap over: the row has the last word, and it is not a lap there.
     b.receive(a.engine.cells().filter((c) => c.dataset === 'session'));
     assert.equal(b.focus.view().over, true);
     assert.equal(b.focus.lapsToday(), 1);

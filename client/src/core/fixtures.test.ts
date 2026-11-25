@@ -10,7 +10,7 @@ import { applyCell } from './merge.ts';
 import type { Cell, Cells } from './merge.ts';
 import { closeRun, mayWriteBell } from './session.ts';
 import type { Closed, End } from './session.ts';
-import { race, stats } from './stats.ts';
+import { fill, race, setFills, stats } from './stats.ts';
 import type { Race, Session, Stats } from './stats.ts';
 import { streak } from './streak.ts';
 import type { Streak } from './streak.ts';
@@ -40,6 +40,8 @@ const timer: {
 const statsCases: {
   cases: { name: string; utc_offset_min: number; sessions: Session[]; expect: Stats }[];
   race: { name: string; utc_offset_min: number; now: number; state: TimerState; sessions: Session[]; expect: Race }[];
+  fill: { name: string; sessions: Session[]; expect: number[] }[];
+  set: { name: string; utc_offset_min: number; now: number; state: TimerState; sessions: Session[]; expect: number[] }[];
 } = load('stats.json');
 
 const session: {
@@ -129,6 +131,18 @@ describe('stats.json cases', () => {
 describe('stats.json race', () => {
   for (const c of statsCases.race) {
     it(c.name, () => assert.deepEqual(race(c.sessions, c.state, c.now, c.utc_offset_min), c.expect));
+  }
+});
+
+describe('stats.json fill', () => {
+  for (const c of statsCases.fill) {
+    it(c.name, () => assert.deepEqual(c.sessions.map(fill), c.expect));
+  }
+});
+
+describe('stats.json set', () => {
+  for (const c of statsCases.set) {
+    it(c.name, () => assert.deepEqual(setFills(c.sessions, c.state, c.now, c.utc_offset_min), c.expect));
   }
 });
 

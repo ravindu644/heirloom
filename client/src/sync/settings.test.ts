@@ -157,6 +157,51 @@ describe('marks', () => {
     assert.deepEqual(Object.keys(shown(d)!).toSorted(), [`estimate-${level}`, `estimate-${under}`].toSorted());
   });
 
+  it('the estimate is kept or not by the laps the task shows: a stopped lap is one of them', async () => {
+    const { d, s } = await one();
+    const [within, past] = ['within ~2', 'past ~2'].map((line) => d.today.add(line)!);
+    const stopped = (started: number, task: string) => theirLap(d, started, { task, ended: started + 10 * MIN, outcome: 'stopped' });
+    // One that rang and one stopped: 2 of 2. Two that rang and one stopped: 3 of 2.
+    theirLap(d, T0 - 3 * DAY, { task: within });
+    stopped(T0 - 3 * DAY + HOUR, within!);
+    theirLap(d, T0 - 2 * DAY, { task: past });
+    theirLap(d, T0 - 2 * DAY + HOUR, { task: past });
+    stopped(T0 - 2 * DAY + 2 * HOUR, past!);
+    for (const task of [within, past]) d.today.setDone(task!, true);
+    assert.deepEqual(s.marks.value, [{ key: `estimate-${within}`, kind: 'estimate', task: within, title: 'within', estimate: 2, laps: 2 }]);
+  });
+
+  it('keeping an estimate needs a bell: a task ticked done seconds into its only lap earns nothing, and one whose lap rang does', async () => {
+    const { w, d, s } = await one();
+    const [quick, real] = ['quick ~1', 'real ~2'].map((line) => d.today.add(line)!);
+    // Four laps from another day and another device, so no lap tier is in the way here.
+    for (let n = 0; n < 4; n++) theirLap(d, T0 - 3 * DAY + n * HOUR);
+    d.focus.start(quick);
+    w.time.advance(5000);
+    d.today.setDone(quick!, true);
+    assert.equal(d.today.done.value[0]?.laps, 1, 'a lap, 1 of 1 on the task');
+    assert.deepEqual(s.marks.value, []);
+    // One lap that rang and one stopped, 2 of 2: the bell is there.
+    d.focus.start(real);
+    w.time.advance(LAP);
+    d.focus.skipBreak(real);
+    w.time.advance(5000);
+    d.today.setDone(real!, true);
+    assert.deepEqual(s.marks.value, [{ key: `estimate-${real}`, kind: 'estimate', task: real, title: 'real', estimate: 2, laps: 2 }]);
+  });
+
+  it('a mark for a number of laps needs the bell: a lap that was stopped is a lap, and earns none', async () => {
+    const { w, d, s } = await one();
+    d.focus.start();
+    w.time.advance(20 * MIN);
+    d.focus.stop();
+    assert.equal(d.focus.lapsToday(), 1);
+    assert.deepEqual(s.marks.value, []);
+    d.focus.start();
+    w.time.advance(LAP);
+    assert.deepEqual(s.marks.value, [{ key: 'laps-1', kind: 'laps', tier: 1 }]);
+  });
+
   it('this week passing the best week before it is a mark, once there is a week before it', async () => {
     const { w, d, s } = await one();
     // The best week so far: two laps, three weeks ago. Last week: one.

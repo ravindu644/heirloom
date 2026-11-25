@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Cell } from '../core/merge.ts';
 import { eventStamp } from '../core/hlc.ts';
+import { GONE } from '../core/real.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
 import { MIN, OFFSET, world } from './world.ts';
@@ -372,6 +373,53 @@ describe('the list', () => {
     h.edit(id, { archived: false });
     assert.deepEqual(titles(h.list.value), ['Read', 'Stretch']);
     assert.deepEqual(h.archived.value, []);
+  });
+
+  it('purge deletes for good a habit that is on the shelf: one cell, on no list again, and its check-ins are not written', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const [id, alive, shelved] = ['stretch', 'read', 'walk'].map((title) => d.habits.add(title, EVERY_DAY, 1)!);
+    d.habits.edit(id!, { remind: '07:30' });
+    d.habits.checkIn(id!);
+    d.habits.remove(id!);
+    d.habits.edit(shelved!, { archived: true });
+    assert.deepEqual(d.habits.deleted.value.map((h) => h.title), ['stretch']);
+    await d.engine.saved();
+    log.length = 0;
+    d.habits.purge(id!);
+    await d.engine.saved();
+    assert.deepEqual(log.flatMap((write) => write.cells!.map((c) => [c.dataset, c.row, c.field, c.value])), [['habit', id, 'deleted', GONE]]);
+    assert.deepEqual([d.habits.list.value, d.habits.archived.value, d.habits.deleted.value].map((list) => list.map((h) => h.title)), [['read'], ['walk'], []]);
+    // Its reminder is made from `list`, so it rings on no phone. And waiting, or a restart, does not bring it back.
+    w.time.advance(31 * DAY);
+    const again = await w.restart(d);
+    assert.deepEqual([again.habits.list.value, again.habits.archived.value, again.habits.deleted.value].map((list) => list.length), [1, 1, 0]);
+    // Only what is on the shelf: a habit still alive, an archived one, one already gone, nobody.
+    const cells = again.engine.cells();
+    for (const other of [alive, shelved, id, 'nobody']) again.habits.purge(other!);
+    assert.deepEqual(again.engine.cells(), cells);
+  });
+
+  it('one device restores a habit while another deletes it for good: the later of the two stands on both', async () => {
+    for (const later of ['purge', 'restore'] as const) {
+      const w = world();
+      const a = await w.device('a');
+      const id = a.habits.add('stretch', EVERY_DAY, 1)!;
+      a.habits.remove(id);
+      const b = await w.device('b');
+      w.exchange(a, b);
+      const act = { restore: () => a.habits.restore(id), purge: () => b.habits.purge(id) };
+      act[later === 'purge' ? 'restore' : 'purge']();
+      w.time.advance(5000);
+      act[later]();
+      w.exchange(a, b);
+      for (const d of [a, b]) {
+        assert.deepEqual(d.habits.list.value.map((h) => h.title), later === 'purge' ? [] : ['stretch'], `${later} later, on ${d.name}`);
+        assert.deepEqual(d.habits.deleted.value, []);
+      }
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    }
   });
 
   it('delete and restore: thirty days in Recently deleted, the check-ins kept, and edits made on another device in between kept too', async () => {

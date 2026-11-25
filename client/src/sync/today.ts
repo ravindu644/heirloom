@@ -4,16 +4,18 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { isDay, isTime } from '../core/real.ts';
+import { GONE, isDay, isTime } from '../core/real.ts';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
-import { asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
+import { ESTIMATE_MAX, asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
 import type { Repeat, Task } from '../core/today.ts';
 import { createCounts, lapLengths } from './counts.ts';
 import { createDay } from './day.ts';
 import type { Engine, Row } from './engine.ts';
+import type { Focus } from './focus.ts';
 
 export type { Repeat } from '../core/today.ts';
+export { ESTIMATE_MAX } from '../core/today.ts';
 
 /** DESIGN.md's twelve project colours by name, in its order. */
 export const COLORS = ['you', 'rest', 'ink', 'ghost', 'heat-2', 'amber', 'olive', 'teal', 'sky', 'indigo', 'plum', 'clay'] as const;
@@ -42,11 +44,11 @@ export interface TaskView {
   title: string;
   notes: string;
   project: ProjectView | null;
-  /** Whole laps, or null when the person gave none. */
+  /** Whole laps, or null when the person gave none. A row from an older build may hold more than `ESTIMATE_MAX`. */
   estimate: number | null;
-  /** Laps that rang on this task. The "2" of "2 of 4". It may pass the estimate. */
+  /** The laps on this task: those that rang and those that were stopped. The "2" of "2 of 4". It may pass the estimate. */
   laps: number;
-  /** One number per square, oldest first: 1 for a lap that rang, a share for one stopped or in progress. */
+  /** One number per square, oldest first: 1 for a lap that rang, as full as it ran for one stopped or in progress. One more than `laps` while a lap is in progress on it. */
   squares: number[];
   /** The timer is on this task right now, running or paused. */
   running: boolean;
@@ -58,7 +60,7 @@ export interface TaskView {
   time: string | null;
   repeat: Repeat;
   done: boolean;
-  /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after. */
+  /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after, or at once by `purge`. */
   deleted: number | null;
   subtasks: SubtaskView[];
 }
@@ -66,7 +68,10 @@ export interface TaskView {
 /** The three figures at the top of Today, and the day target. Times in ms. */
 export interface DayFigures {
   done_ms: number;
+  /** Today's laps, rang or stopped. */
   laps: number;
+  /** One fill per lap of today, oldest first, for the day target's bar: 1 for a lap that rang, less for one stopped. As many as `laps`. */
+  fills: number[];
   /** Laps still planned on today's list, and how long they would take at the current lap length. */
   left_laps: number;
   left_ms: number;
@@ -120,18 +125,31 @@ export interface Today {
   /** Quick add: "pointers chapter 3 ~4". Due today, at the end of the list. Returns the new id, or null for an empty title. */
   add(text: string): string | null;
   edit(id: string, fields: TaskEdit): void;
-  /** Done or not done. A repeating task done makes the next one of its series. */
+  /**
+   * Done or not done. A repeating task done makes the next one of its series. Done while a lap
+   * is running or paused on the task ends that lap as Focus's stop does, in the same write; a
+   * lap whose bell has gone is left alone. Not done again within the ten seconds of that stop,
+   * with the timer untouched since, puts the lap back too. A subtask ends nothing.
+   */
   setDone(id: string, done: boolean): void;
   /** To Recently deleted, for 30 days. */
   remove(id: string): void;
   restore(id: string): void;
+  /** Deletes for good a task that is in Recently deleted, its subtasks with it: on no screen again, and no way back. Anything else is left alone. */
+  purge(id: string): void;
   /** Puts a task just before another in its list, or at the end with null. */
   move(id: string, before: string | null): void;
   addSubtask(parent: string, title: string): string | null;
   /** A subtask's title, or done. Removing one is `remove`. */
   editSubtask(id: string, fields: { title?: string; done?: boolean }): void;
+  /** The name is trimmed and cut at `PROJECT_NAME_MAX`; an empty one makes nothing. */
   addProject(name: string, color: ProjectColor): string | null;
+  /** A name is trimmed and cut as in `addProject`; an empty one is ignored. */
   editProject(id: string, fields: { name?: string; color?: ProjectColor; archived?: boolean }): void;
+  /** Deletes the project. Its tasks keep it and show none, so `restoreProject` gives each its project back. There is no shelf. */
+  removeProject(id: string): void;
+  /** The Undo of `removeProject`, here or on another device. */
+  restoreProject(id: string): void;
   /** The day target in laps. 0 clears it. */
   setTarget(laps: number): void;
 }
@@ -143,8 +161,18 @@ export interface TodayEnv {
   id(): string;
   /** Runs `run` once after `ms`. Returns a function that cancels it. */
   schedule(run: () => void, ms: number): () => void;
+  /**
+   * The one place a lap is ended and put back. A task marked done while its lap runs ends the
+   * lap through it, and the done taken back in time puts the lap back through it. The app always
+   * hands it over. Left out (the lists alone, with no Focus beside them), a done ends no lap.
+   */
+  focus?: Pick<Focus, 'stop' | 'undo'>;
 }
 
+/** The most characters a project's name holds: it is a label on a task's row, not a sentence. */
+export const PROJECT_NAME_MAX = 24;
+// Trimmed, and cut by whole characters: half of an emoji is not a character.
+const projectName = (typed: string | undefined): string => [...(typed ?? '').trim()].slice(0, PROJECT_NAME_MAX).join('').trim();
 // How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
 const PULSE_MS = 15000;
 
@@ -273,6 +301,12 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     return copied && placed && !used && !counts.sessions.peek().some((s) => s.task === next.id);
   }
 
+  // The idle timer cell written by the stop that the last done made, and the task it was for.
+  // While that cell stands, taking the done back asks Focus to take the stop back, and Focus
+  // does for as long as it offers an undo: the ten seconds are its to count.
+  let ended: { task: string; stamp: string | undefined } | null = null;
+  const timerStamp = () => engine.stamp('timer', 'current', 'state');
+
   const today: Today & { close(): void } = {
     day,
     next: computed(() => model.value.next),
@@ -289,9 +323,11 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       const { left } = model.value;
       const { you_ms, ghost } = counts.race();
       const target = settings()?.day_target;
+      const fills = counts.fillsToday();
       return {
         done_ms: you_ms,
-        laps: counts.lapsToday(),
+        laps: fills.length,
+        fills,
         left_laps: left,
         left_ms: left * lapLengths(settings()).work_ms,
         target: typeof target === 'number' && Number.isInteger(target) && target > 0 ? target : 0,
@@ -320,7 +356,9 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       if (fields.notes !== undefined) write.notes = fields.notes;
       if (fields.project !== undefined) write.project = fields.project;
       const { estimate, due, when, time, repeat } = fields;
-      if (estimate === null || (typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1)) write.estimate = estimate;
+      // An estimate stops at the top. A row that held more is brought to it by the first edit of its estimate.
+      if (estimate === null) write.estimate = null;
+      else if (typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1) write.estimate = Math.min(ESTIMATE_MAX, estimate);
       if (due === null || isDay(due)) write.due = due;
       if (when !== undefined) write.when = when?.trim().slice(0, 80) || null;
       if (time === null || isTime(time)) write.time = time;
@@ -342,9 +380,19 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       if (!t || (t.done !== null) === done) return;
       const now = engine.now();
       const { tasks } = model.peek();
-      // One turn, so one store transaction: the task done and the whole next one of its series.
+      const state = engine.timer.peek();
+      // The work is finished, so the lap on it is: left counting, it read as a lap for nothing.
+      // Not once its bell has gone: that lap rang, and its break is still offered.
+      const lapOn = done && t.parent === null && state.phase === 'work' && state.task === id && !view(state, now).over;
+      const lapBack = !done && ended?.task === id && ended.stamp === timerStamp();
+      // One turn, so one store transaction: the task done, the lap it ends, and the whole next one of its series.
       batch(() => {
         engine.write('task', id, { done: done ? now : null });
+        if (lapOn && env.focus) {
+          env.focus.stop();
+          ended = { task: id, stamp: timerStamp() };
+        }
+        if (lapBack) env.focus?.undo();
         if (!t.repeat || t.parent !== null) return;
         // Undoing finds the row by the day the task was done on, which may not be today any more.
         const next = nextTask(id, t.due, done ? dayNow() : localDay(t.done!, env.utcOffsetMin()), t.repeat);
@@ -366,6 +414,11 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     restore(id) {
       const t = task(id);
       if (t && t.deleted !== null) engine.write('task', id, { deleted: null });
+    },
+
+    purge(id) {
+      // Only what is in Recently deleted: nothing goes for good that was not first deleted, and seen there.
+      if (model.peek().lists.deleted.some((t) => t.id === id)) engine.write('task', id, { deleted: GONE });
     },
 
     move(id, before) {
@@ -398,7 +451,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     },
 
     addProject(name, color) {
-      const title = name.trim();
+      const title = projectName(name);
       const hue = asColor(color);
       if (!title || !hue) return null;
       const id = env.id();
@@ -411,12 +464,21 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       const held = projectRows.peek().get(id);
       if (typeof held?.name !== 'string') return;
       const write: Record<string, unknown> = {};
-      const name = fields.name?.trim();
+      const name = projectName(fields.name);
       if (name) write.name = name;
       const hue = asColor(fields.color);
       if (hue) write.color = hue;
       if (fields.archived !== undefined && fields.archived !== (typeof held.archived === 'number')) write.archived = fields.archived ? engine.now() : null;
       if (Object.keys(write).length) engine.write('project', id, write);
+    },
+
+    removeProject(id) {
+      const held = projectRows.peek().get(id);
+      if (typeof held?.name === 'string' && typeof held.deleted !== 'number') engine.write('project', id, { deleted: engine.now() });
+    },
+
+    restoreProject(id) {
+      if (typeof projectRows.peek().get(id)?.deleted === 'number') engine.write('project', id, { deleted: null });
     },
 
     setTarget(laps) {

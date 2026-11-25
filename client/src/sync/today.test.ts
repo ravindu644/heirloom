@@ -3,9 +3,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { GONE, isMoment } from '../core/real.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
-import { COLORS, isColor } from './today.ts';
+import { COLORS, ESTIMATE_MAX, PROJECT_NAME_MAX, isColor } from './today.ts';
 import { LAP, MIN, world } from './world.ts';
 
 const HOUR = 60 * MIN;
@@ -176,6 +177,129 @@ describe('the lists', () => {
     assert.deepEqual(open(d), ['two']);
   });
 
+  it('purge deletes for good what is in Recently deleted: one cell, and the task is on no list, its subtasks with it, and in no reminder', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('call the bank ~2')!;
+    const sub = d.today.addSubtask(id, 'find the number')!;
+    d.today.edit(id, { time: '15:30' });
+    d.today.edit(sub, { due: TODAY, time: '15:00' });
+    d.today.remove(id);
+    assert.deepEqual(titles(d.today.deleted.value), ['call the bank']);
+    await d.engine.saved();
+    log.length = 0;
+    d.today.purge(id);
+    await d.engine.saved();
+    assert.deepEqual(log.flatMap((write) => write.cells!.map((c) => [c.row, c.field, c.value])), [[id, 'deleted', GONE]]);
+    const everywhere = () => [d.today.list, d.today.later, d.today.upcoming, d.today.done, d.today.deleted].flatMap((list) => titles(list.value));
+    assert.deepEqual(everywhere(), []);
+    assert.equal(d.today.next.value, null);
+    assert.deepEqual(d.today.timed.value, []);
+    assert.equal(d.today.figures().left_laps, 0);
+    // Not after thirty days either, nor after a restart: it does not come back by waiting.
+    w.time.advance(31 * DAY);
+    assert.deepEqual(everywhere(), []);
+    const again = await w.restart(d);
+    assert.deepEqual([again.today.list, again.today.deleted].flatMap((list) => titles(list.value)), []);
+    assert.equal(row(again, id)?.deleted, GONE);
+    assert.equal(row(again, sub)?.deleted, undefined, 'the subtask is not written: it goes with its parent, as for a delete');
+  });
+
+  it('purge is only for what is in Recently deleted: a task still alive, a subtask, one whose thirty days ran out, one already gone, nobody', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [alive, parent, old, gone] = ['alive', 'parent', 'old', 'gone'].map((t) => d.today.add(t)!);
+    const sub = d.today.addSubtask(parent!, 'a step')!;
+    d.today.remove(sub);
+    d.today.remove(old!);
+    w.time.advance(30 * DAY);
+    d.today.remove(gone!);
+    d.today.purge(gone!);
+    const cells = d.engine.cells();
+    for (const id of [alive, sub, old, gone, 'nobody']) d.today.purge(id!);
+    assert.deepEqual(d.engine.cells(), cells);
+    assert.deepEqual(open(d), ['alive', 'parent']);
+  });
+
+  it('what purge writes is a time every build takes for a real one, long past the thirty days: a build that reads `deleted` through the 2020 floor hides the row too', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.today.remove(id);
+    d.today.purge(id);
+    const written = row(d, id)?.deleted as number;
+    assert.equal(written, Date.UTC(2020, 0, 1));
+    // The reader as it was before this build: a time under the floor read as "never deleted".
+    const oldReader = (v: unknown): number | null => (isMoment(v) ? v : null);
+    const read = oldReader(written);
+    assert.equal(read, written, 'deleted, to that reader');
+    assert.ok(read !== null && d.engine.now() - read >= 30 * DAY, 'and off its shelf');
+    assert.equal(oldReader(1), null, 'where 1 would have read as alive');
+  });
+
+  it('a deleted time no clock could show is deleted long ago, not "never deleted": the task is on no screen', async () => {
+    const w = world();
+    const d = await w.device('a');
+    for (const [i, deleted] of [1, 5, 0, -1, 86400000].entries()) d.engine.write('task', `t${i}`, { title: `deleted at ${deleted}`, deleted, order: 'V' });
+    // And what is not a time at all says nothing: that task is alive.
+    d.engine.write('task', 'odd', { title: 'deleted: yes', deleted: 'yes', order: 'W' });
+    assert.deepEqual(open(d), ['deleted: yes']);
+    assert.deepEqual(d.today.deleted.value, []);
+  });
+
+  it('one device restores a task while another deletes it for good: the later of the two stands on both, whichever arrives first', async () => {
+    for (const later of ['purge', 'restore'] as const) {
+      for (const first of ['a', 'b'] as const) {
+        const w = world();
+        const a = await w.device('a');
+        const id = a.today.add('call the bank')!;
+        a.today.remove(id);
+        const b = await w.device('b');
+        w.exchange(a, b);
+        a.disconnect();
+        b.disconnect();
+        const act = { restore: () => a.today.restore(id), purge: () => b.today.purge(id) };
+        act[later === 'purge' ? 'restore' : 'purge']();
+        w.time.advance(5000);
+        act[later]();
+        const [fromA, fromB] = [a.engine.cells(), b.engine.cells()];
+        if (first === 'a') (b.receive(fromA), a.receive(fromB));
+        else (a.receive(fromB), b.receive(fromA));
+        for (const d of [a, b]) {
+          const where = `${later} later, ${first}'s cells first, on ${d.name}`;
+          assert.equal(row(d, id)?.deleted, later === 'purge' ? GONE : null, where);
+          assert.deepEqual(open(d), later === 'purge' ? [] : ['call the bank'], where);
+          assert.deepEqual(d.today.deleted.value, [], where);
+        }
+        assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+      }
+    }
+  });
+
+  it('deleted for good survives the copy a person saves and brings back: it is gone on the device that reads it too', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [gone, kept] = ['gone for good', 'kept'].map((t) => d.today.add(t)!);
+    const habit = d.habits.add('stretch', 127, 1)!;
+    const project = d.today.addProject('Dropped', 'you')!;
+    d.today.remove(gone!);
+    d.today.purge(gone!);
+    d.habits.remove(habit);
+    d.habits.purge(habit);
+    d.today.removeProject(project);
+    d.engine.write('project', project, { deleted: GONE });
+    const text = d.settings.exportAll();
+    const b = await w.device('b');
+    assert.equal(b.settings.importAll(text).ok, true);
+    assert.deepEqual(open(b), ['kept']);
+    assert.deepEqual([b.today.deleted.value, b.today.projects.value, b.habits.list.value, b.habits.archived.value, b.habits.deleted.value], [[], [], [], [], []]);
+    assert.deepEqual([row(b, gone!)?.deleted, b.engine.rows('habit').value.get(habit)?.deleted, b.engine.rows('project').value.get(project)?.deleted], [GONE, GONE, GONE]);
+    // And the copy is not what brings it back on the device that made it.
+    assert.deepEqual(d.settings.importAll(text), { ok: true, cells: 0 });
+    assert.deepEqual(open(d), ['kept']);
+  });
+
   it('a row with no title yet is not a task: it is kept, shown nowhere, and shown when its title comes', async () => {
     const w = world();
     const d = await w.device('a');
@@ -198,9 +322,8 @@ describe('the lists', () => {
     d.engine.write('task', 't1', { title: 'the 45th of the 13th month', due: '2026-13-45', repeat: { every: 'day' }, order: 'V' });
     d.engine.write('task', 't2', { title: 'the 31st of February', due: '2026-02-31', order: 'W' });
     d.engine.write('task', 't3', { title: 'done in the year three billion', done: 1e20, order: 'X' });
-    d.engine.write('task', 't4', { title: 'deleted in 1970', deleted: 5, order: 'Y' });
-    assert.deepEqual(open(d), ['the 45th of the 13th month', 'the 31st of February', 'done in the year three billion', 'deleted in 1970']);
-    assert.deepEqual(d.today.list.value.map((t) => [t.due, t.done, t.deleted]), Array(4).fill([null, false, null]));
+    assert.deepEqual(open(d), ['the 45th of the 13th month', 'the 31st of February', 'done in the year three billion']);
+    assert.deepEqual(d.today.list.value.map((t) => [t.due, t.done, t.deleted]), Array(3).fill([null, false, null]));
     assert.deepEqual(d.today.done.value, []);
     // Marking the repeating one done makes its next from today, not from the day that was never real.
     d.today.setDone('t1', true);
@@ -320,7 +443,7 @@ describe('laps and squares', () => {
     assert.equal(d.today.figures().left_laps, 0, 'over the estimate leaves nothing planned, not less than nothing');
   });
 
-  it('a stopped lap is a part square, a lap set aside none, and the lap in progress fills as it runs without anyone writing', async () => {
+  it('a stopped lap is a lap and a part square, a lap set aside neither, and the lap in progress fills as it runs without anyone writing', async () => {
     const w = world();
     const d = await w.device('a');
     const id = d.today.add('pointers ~4')!;
@@ -328,7 +451,7 @@ describe('laps and squares', () => {
     lap(d, 'lap-b', id, T0 - 90 * MIN, { ended: T0 - 90 * MIN + 15 * MIN, outcome: 'stopped' });
     lap(d, 'lap-c', id, T0 - 60 * MIN, { outcome: 'void' });
     assert.deepEqual(d.today.next.value?.squares, [1, 0.6]);
-    assert.equal(d.today.next.value?.laps, 1);
+    assert.equal(d.today.next.value?.laps, 2);
 
     d.focus.start(id);
     await d.settle();
@@ -336,11 +459,49 @@ describe('laps and squares', () => {
     assert.deepEqual(d.today.running.value?.squares, [1, 0.6, 0]);
     w.time.advance(10 * MIN);
     assert.deepEqual(d.today.running.value?.squares, [1, 0.6, 0.4]);
+    assert.equal(d.today.running.value?.laps, 2, 'the lap in progress is a square that fills, and no lap yet');
     assert.deepEqual(d.engine.cells(), cells, 'the square moved and nothing was written');
     // At the bell the square is whole and the lap counts.
     w.time.advance(15 * MIN);
     assert.deepEqual(next(d)?.squares, [1, 0.6, 1]);
-    assert.equal(next(d)?.laps, 2);
+    assert.equal(next(d)?.laps, 3);
+  });
+
+  it('a lap taken out of the count while the timer still shows it over is no lap of its task: the row has the last word', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('pointers ~4')!;
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(LAP + MIN);
+    assert.deepEqual([next(d)?.laps, next(d)?.squares], [1, [1]]);
+    // "Don't count it", from the timeline, before the break is begun.
+    d.progress.setAside('run-1');
+    assert.equal(d.focus.view().over, true);
+    assert.deepEqual([next(d)?.laps, next(d)?.squares], [0, []]);
+    assert.equal(d.today.figures().laps, 0);
+    d.progress.countAgain('run-1');
+    assert.deepEqual([next(d)?.laps, next(d)?.squares], [1, [1]]);
+  });
+
+  it('a lap stopped on a task is one of its laps at once, and one less is left on the plan', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('pointers ~4')!;
+    d.focus.start(id);
+    w.time.advance(10 * MIN);
+    assert.equal(d.today.figures().left_laps, 4);
+    d.focus.stop();
+    assert.deepEqual([next(d)?.laps, next(d)?.squares], [1, [0.4]]);
+    assert.equal(d.today.figures().left_laps, 3);
+    // Taken back: the task has no lap again, and its square goes on filling.
+    w.time.advance(2000);
+    d.focus.undo();
+    w.time.advance(5 * MIN);
+    const running = d.today.running.value!;
+    assert.equal(running.laps, 0);
+    assert.equal(running.squares.length, 1);
+    assert.ok(running.squares[0]! > 0.6 && running.squares[0]! < 0.61);
   });
 
   it('a lap on the top task rings with no row yet: the task shows the lap and the whole square, and is next again; its row then changes nothing', async () => {
@@ -433,17 +594,62 @@ describe('figures', () => {
     assert.deepEqual(d.today.figures(), {
       done_ms: 35 * MIN,
       laps: 1,
+      fills: [1],
       left_laps: 3 + 2,
       left_ms: 5 * LAP,
       target: 8,
-      ghost: { day: '2026-11-17', total_ms: 60 * MIN, laps: 2 },
+      // The ghost's stopped lap is a lap.
+      ghost: { day: '2026-11-17', total_ms: 60 * MIN, laps: 3 },
     });
     // The bell: the lap counts at once, and one less is left on its task.
     w.time.advance(15 * MIN);
     const after = d.today.figures();
     assert.equal(after.laps, 2);
+    assert.deepEqual(after.fills, [1, 1]);
     assert.equal(after.done_ms, 50 * MIN);
     assert.equal(after.left_laps, 3 + 1);
+  });
+
+  it('a lap that rang stays a lap while its extension runs: in the day\'s laps, in the target bar and on its task, and once when it is stopped', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('pointers ~4')!;
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(LAP + MIN);
+    const rung = () => [d.today.figures().laps, d.today.figures().fills, d.focus.lapsToday(), d.today.list.value[0]!.laps, d.today.list.value[0]!.squares];
+    assert.deepEqual(rung(), [1, [1], 1, 1, [1]]);
+    d.focus.extend();
+    assert.equal(d.focus.view().over, false);
+    w.time.advance(2 * MIN);
+    assert.deepEqual(rung(), [1, [1], 1, 1, [1]], 'two minutes into the extension');
+    assert.equal(d.today.figures().left_laps, 3);
+    assert.equal(d.today.figures().done_ms, 28 * MIN, 'and its minutes go on counting');
+    d.focus.pause();
+    w.time.advance(10 * MIN);
+    assert.deepEqual(rung(), [1, [1], 1, 1, [1]], 'paused in the extension');
+    d.focus.stop();
+    assert.deepEqual(rung(), [1, [1], 1, 1, [1]], 'stopped: the one lap it always was');
+    assert.equal(d.session('run-1')?.outcome, 'rang');
+    // The same through a second bell, on a device that holds only the first bell's row.
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(LAP + MIN);
+    d.focus.extend();
+    w.time.advance(MIN);
+    assert.deepEqual(rung(), [2, [1, 1], 2, 2, [1, 1]]);
+  });
+
+  it('fills are today\'s laps, oldest first, each as full as it ran: a lap not counted is not among them', async () => {
+    const w = world();
+    const d = await w.device('a');
+    lap(d, 'lap-c', 'whatever', T0 - HOUR, { ended: T0 - HOUR + 5 * MIN, outcome: 'stopped' });
+    lap(d, 'lap-a', 'whatever', T0 - 3 * HOUR);
+    lap(d, 'lap-b', 'whatever', T0 - 2 * HOUR, { outcome: 'void' });
+    lap(d, 'yesterday', 'whatever', T0 - DAY);
+    d.engine.write('session', 'rest', { kind: 'short', task: null, started: T0 - 30 * MIN, ended: T0 - 25 * MIN, planned_ms: 5 * MIN, paused_ms: 0, outcome: 'rang', device: d.engine.device });
+    assert.deepEqual(d.today.figures().fills, [1, 0.2]);
+    assert.equal(d.today.figures().laps, 2);
   });
 
   it('on a first day there is no ghost, no target reads as 0, and what is left follows the lap length in settings', async () => {
@@ -451,7 +657,7 @@ describe('figures', () => {
     const d = await w.device('a');
     d.today.add('pointers ~3');
     d.engine.write('settings', 'current', { work_ms: 50 * MIN });
-    assert.deepEqual(d.today.figures(), { done_ms: 0, laps: 0, left_laps: 3, left_ms: 150 * MIN, target: 0, ghost: null });
+    assert.deepEqual(d.today.figures(), { done_ms: 0, laps: 0, fills: [], left_laps: 3, left_ms: 150 * MIN, target: 0, ghost: null });
     d.today.setTarget(6.9);
     assert.equal(d.today.figures().target, 6);
     d.today.setTarget(0);
@@ -627,6 +833,256 @@ describe('repeating tasks', () => {
   });
 });
 
+describe('done while its lap runs', () => {
+  const IDLE = { phase: 'idle', run: null, task: null, started: null, paused_at: null, paused_ms: 0, planned_ms: 0 };
+
+  it('ends the lap as stop does: a stopped row for the task and an idle timer, in the same store transaction as the done, and the same on another device', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const a = await w.device('a', { log });
+    const b = await w.device('b');
+    const id = a.today.add('Q/A session ~2')!;
+    a.focus.start(id);
+    await a.settle();
+    w.time.advance(10 * MIN);
+    log.length = 0;
+    a.today.setDone(id, true);
+    await a.engine.saved();
+    assert.equal(log.length, 1, 'one store transaction');
+    assert.deepEqual(log[0]!.cells!.map((c) => c.dataset).toSorted(), [...Array(8).fill('session'), 'task', 'timer']);
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.deepEqual(d.focus.state.value, { ...IDLE, set_index: 1 }, d.name);
+      assert.deepEqual(d.session('run-1'), { id: 'run-1', kind: 'work', task: id, started: T0, ended: T0 + 10 * MIN, planned_ms: LAP, paused_ms: 0, outcome: 'stopped', device: a.engine.device });
+      assert.deepEqual(titles(d.today.done.value), ['Q/A session']);
+      assert.deepEqual([d.today.done.value[0]!.laps, d.today.done.value[0]!.squares], [1, [0.4]]);
+      assert.equal(d.today.running.value, null);
+      assert.equal(d.focus.lapsToday(), 1);
+    }
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+  });
+
+  it('a paused lap is ended too, where its pause began', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('Q/A session')!;
+    d.focus.start(id);
+    w.time.advance(6 * MIN);
+    d.focus.pause();
+    w.time.advance(20 * MIN);
+    d.today.setDone(id, true);
+    assert.equal(d.focus.state.value.phase, 'idle');
+    assert.deepEqual([d.session('run-1')?.outcome, d.session('run-1')?.ended], ['stopped', T0 + 6 * MIN]);
+  });
+
+  it('a repeating task done mid-lap still makes its next one, in the same transaction, and the lap stays with the one that was done', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('read ~2')!;
+    d.today.edit(id, { repeat: { every: 'day' } });
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(15 * MIN);
+    log.length = 0;
+    d.today.setDone(id, true);
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.equal(d.focus.state.value.phase, 'idle');
+    assert.equal(d.session('run-1')?.task, id);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.id, t.due, t.laps]), [[`${id}-20261125`, TOMORROW, 0]]);
+    assert.equal(d.today.done.value[0]?.laps, 1);
+  });
+
+  it('taken back within ten seconds, with the timer untouched: the same run goes on, in the same place of the set, and the task is open and running', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('Q/A session')!;
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(10 * MIN);
+    const before = d.focus.state.value;
+    d.today.setDone(id, true);
+    assert.equal(d.focus.undoable.value, true);
+    w.time.advance(4000);
+    await d.engine.saved();
+    log.length = 0;
+    d.today.setDone(id, false);
+    await d.engine.saved();
+    assert.equal(log.length, 1, 'the task and the timer, one store transaction');
+    assert.deepEqual(d.focus.state.value, before);
+    assert.equal(d.focus.ran(), 10 * MIN + 4000, 'the seconds in between ran');
+    assert.equal(d.today.running.value?.id, id);
+    assert.deepEqual(titles(d.today.done.value), []);
+    assert.equal(d.focus.lapsToday(), 0, 'open again, it is not a lap yet');
+    // And it rings as the one lap it is.
+    await d.settle();
+    w.time.advance(LAP);
+    assert.deepEqual(d.sessions(), ['run-1']);
+    assert.deepEqual([d.session('run-1')?.outcome, d.session('run-1')?.ended], ['rang', T0 + LAP]);
+  });
+
+  it('taken back after the ten seconds, or once the timer has been written again, or on another device: only the task opens', async () => {
+    // Later.
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.today.add('Q/A session')!;
+    a.focus.start(id);
+    w.time.advance(10 * MIN);
+    a.today.setDone(id, true);
+    w.time.advance(10000);
+    a.today.setDone(id, false);
+    assert.equal(a.focus.state.value.phase, 'idle');
+    assert.deepEqual(open(a), ['Q/A session']);
+
+    // The timer was written since: another lap begun and stopped. That stop is not this done's to take back.
+    a.focus.start(id);
+    w.time.advance(MIN);
+    a.today.setDone(id, true);
+    w.time.advance(1000);
+    a.focus.start();
+    w.time.advance(1000);
+    a.focus.stop();
+    assert.equal(a.focus.undoable.value, true, 'an undo is on offer, for the other stop');
+    const idle = a.focus.state.value;
+    a.today.setDone(id, false);
+    assert.deepEqual(a.focus.state.value, idle);
+    assert.deepEqual(open(a), ['Q/A session']);
+
+    // On another device, a second after.
+    w.time.advance(DAY);
+    a.focus.start(id);
+    w.time.advance(MIN);
+    a.today.setDone(id, true);
+    w.exchange(a, b);
+    w.time.advance(1000);
+    b.today.setDone(id, false);
+    assert.equal(b.focus.state.value.phase, 'idle');
+    assert.deepEqual(open(b), ['Q/A session']);
+    w.exchange(a, b);
+    assert.equal(a.focus.state.value.phase, 'idle');
+  });
+
+  it('the stop is taken back only by the done that made it: not by another task opened again, and not by the same task done a second time', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [mine, other] = ['mine', 'other'].map((title) => d.today.add(title)!);
+    d.today.setDone(other!, true);
+    d.focus.start(mine);
+    w.time.advance(10 * MIN);
+    d.today.setDone(mine!, true);
+    const idle = d.focus.state.value;
+    assert.equal(idle.phase, 'idle');
+    w.time.advance(2000);
+    d.today.setDone(other!, false);
+    assert.deepEqual(d.focus.state.value, idle, 'another task opened again');
+    // Opened on another device a moment later, and done here again: the lap stays ended.
+    d.receive([{ stamp: `${new Date(d.engine.now() + 1000).toISOString()}-0000-b2c3d4e5f6071829`, dataset: 'task', row: mine!, field: 'done', value: null }]);
+    w.time.advance(2000);
+    d.today.setDone(mine!, true);
+    assert.deepEqual(d.focus.state.value, idle, 'done a second time');
+    assert.deepEqual(titles(d.today.done.value), ['mine']);
+  });
+
+  it('a lap whose bell has gone is left alone: it rang, and its break is still offered', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('Q/A session')!;
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(LAP + MIN);
+    const over = d.focus.state.value;
+    d.today.setDone(id, true);
+    assert.deepEqual(d.focus.state.value, over);
+    assert.equal(d.focus.undoable.value, false);
+    assert.deepEqual(d.focus.view().next, { phase: 'short', set_index: 0 });
+    assert.equal(d.session('run-1')?.outcome, 'rang');
+    // And taking that done back touches no timer either.
+    d.today.setDone(id, false);
+    assert.deepEqual(d.focus.state.value, over);
+  });
+
+  it('done from another device than the one the lap was started on: that device writes the stop, and the first writes no row of its own', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.today.add('Q/A session')!;
+    a.focus.start(id);
+    await a.settle();
+    w.exchange(a, b);
+    w.time.advance(12 * MIN);
+    b.today.setDone(id, true);
+    assert.equal(b.focus.state.value.phase, 'idle');
+    assert.equal(b.session('run-1')?.device, b.engine.device);
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.equal(d.focus.state.value.phase, 'idle');
+      assert.deepEqual([d.session('run-1')?.outcome, d.session('run-1')?.ended, d.session('run-1')?.device], ['stopped', T0 + 12 * MIN, b.engine.device]);
+      assert.deepEqual(titles(d.today.done.value), ['Q/A session']);
+    }
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    // Done there while this one was offline, lap still running here: when they meet the stop stands.
+    const c = await w.device('c');
+    w.exchange(a, c);
+    const other = a.today.add('another')!;
+    a.focus.start(other);
+    await a.settle();
+    w.exchange(a, c);
+    a.disconnect();
+    w.time.advance(5 * MIN);
+    c.today.setDone(other, true);
+    w.time.advance(MIN);
+    assert.equal(a.focus.state.value.phase, 'work');
+    w.exchange(a, c);
+    assert.equal(a.focus.state.value.phase, 'idle');
+    assert.equal(a.session(a.sessions().at(-1)!)?.device, c.engine.device);
+  });
+
+  it('a lap on another task, a break, a subtask done, and a task marked not done end nothing', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [mine, other] = ['mine', 'other'].map((t) => d.today.add(t)!);
+    const step = d.today.addSubtask(mine!, 'a step')!;
+    d.focus.start(mine);
+    w.time.advance(MIN);
+    const running = d.focus.state.value;
+    d.today.setDone(other!, true);
+    d.today.setDone(other!, false);
+    d.today.editSubtask(step, { done: true });
+    d.today.setDone(step, false);
+    d.today.setDone(step, true);
+    assert.deepEqual(d.focus.state.value, running);
+    assert.deepEqual(d.sessions(), []);
+    // In the break after a lap on the task, the task done ends no break.
+    w.time.advance(LAP);
+    d.focus.start();
+    const resting = d.focus.state.value;
+    assert.equal(resting.phase, 'short');
+    d.today.setDone(mine!, true);
+    assert.deepEqual(d.focus.state.value, resting);
+    // A break that names a task, as another build might write it, is still a break.
+    d.today.setDone(mine!, false);
+    d.engine.write('timer', 'current', { state: { ...resting, task: mine } });
+    d.today.setDone(mine!, true);
+    assert.equal(d.focus.state.value.phase, 'short');
+    // A lap begun on a task that is already done goes on when the task is opened again.
+    d.focus.skipBreak(mine);
+    w.time.advance(MIN);
+    d.today.setDone(mine!, false);
+    assert.equal(d.focus.state.value.phase, 'work');
+    assert.equal(d.focus.state.value.task, mine);
+    // And a lap begun on a subtask's own id is not ended by ticking the subtask.
+    d.focus.skipBreak(step);
+    d.today.setDone(step, false);
+    w.time.advance(MIN);
+    d.today.setDone(step, true);
+    assert.equal(d.focus.state.value.phase, 'work');
+    assert.equal(d.focus.state.value.task, step);
+  });
+});
+
 describe('removing and restoring', () => {
   it('delete then restore keeps the edits another device made in between', async () => {
     const w = world();
@@ -709,6 +1165,33 @@ describe('editing', () => {
     assert.deepEqual(d.engine.cells(), cells);
     d.today.edit(id, { estimate: null, due: null, when: '', repeat: { every: 'week', days: 0 } });
     assert.deepEqual(row(d, id), { id, title: 'Pointers, chapter 3', estimate: null, due: null, order: 'V', when: null, repeat: null });
+  });
+});
+
+describe('an estimate', () => {
+  it('stops at eight laps: a larger one typed or set is taken as eight, and a row that already holds more is read as it is until its estimate is next edited', async () => {
+    const w = world();
+    const d = await w.device('a');
+    assert.equal(ESTIMATE_MAX, 8);
+    const typed = d.today.add('the whole book ~40')!;
+    assert.equal(row(d, typed)?.estimate, 8);
+    assert.equal(row(d, d.today.add('a chapter ~8')!)?.estimate, 8);
+    d.today.edit(typed, { estimate: 7 });
+    assert.equal(row(d, typed)?.estimate, 7);
+    d.today.edit(typed, { estimate: 9 });
+    assert.equal(row(d, typed)?.estimate, 8);
+    d.today.edit(typed, { estimate: 1000 });
+    assert.equal(row(d, typed)?.estimate, 8);
+    // From an older build: forty laps guessed.
+    d.engine.write('task', typed, { estimate: 40 });
+    const stamp = d.engine.stamp('task', typed, 'estimate');
+    assert.equal(d.today.list.value.find((t) => t.id === typed)?.estimate, 40);
+    d.today.edit(typed, { title: 'the whole book, slowly' });
+    assert.equal(d.engine.stamp('task', typed, 'estimate'), stamp, 'an edit of something else leaves it');
+    d.today.edit(typed, { estimate: 40 });
+    assert.equal(row(d, typed)?.estimate, 8);
+    d.today.edit(typed, { estimate: null });
+    assert.equal(row(d, typed)?.estimate, null);
   });
 });
 
@@ -950,6 +1433,68 @@ describe('projects', () => {
     assert.equal(next(d)?.project, null);
     // The task still says which project it was: that comes back if the project does.
     assert.equal(row(d, task)?.project, c);
+  });
+
+  it('a project is renamed: trimmed, cut at 24 characters by whole characters, and an empty name changes nothing', async () => {
+    const w = world();
+    const d = await w.device('a');
+    assert.equal(PROJECT_NAME_MAX, 24);
+    const id = d.today.addProject('  The C Programming Language, second edition  ', 'teal')!;
+    const name = () => d.today.projects.value.find((p) => p.id === id)?.name;
+    assert.equal(name(), 'The C Programming Langua');
+    d.today.editProject(id, { name: '  K&R ' });
+    assert.equal(name(), 'K&R');
+    const cells = d.engine.cells();
+    d.today.editProject(id, { name: '   ' });
+    d.today.editProject(id, { name: '' });
+    assert.deepEqual(d.engine.cells(), cells);
+    d.today.editProject(id, { name: 'exactly twenty-four long' });
+    assert.equal(name(), 'exactly twenty-four long');
+    d.today.editProject(id, { name: `${'a'.repeat(23)}📚📚` });
+    assert.equal(name(), `${'a'.repeat(23)}📚`, 'the 24th character is the whole book, not half of it');
+    // Cut where a space was the 24th: no name ends in one.
+    d.today.editProject(id, { name: `${'b'.repeat(23)} and more` });
+    assert.equal(name(), 'b'.repeat(23));
+    // A longer name another build wrote is shown as it is.
+    d.engine.write('project', id, { name: 'A name of more than twenty-four characters' });
+    assert.equal(name(), 'A name of more than twenty-four characters');
+  });
+
+  it('a project is deleted and its tasks show none; the Undo, here or on another device, gives each its project back', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.today.addProject('The C book', 'teal')!;
+    const tasks = ['pointers', 'arrays'].map((t) => a.today.add(t)!);
+    for (const task of tasks) a.today.edit(task, { project: id });
+    const shown = (d: Device) => d.today.list.value.map((t) => t.project?.name ?? null);
+    assert.deepEqual(shown(a), ['The C book', 'The C book']);
+    w.time.advance(1000);
+    a.today.removeProject(id);
+    assert.equal(a.engine.rows('project').value.get(id)?.deleted, T0 + 1000);
+    assert.deepEqual(a.today.projects.value, []);
+    assert.deepEqual(shown(a), [null, null]);
+    assert.deepEqual(tasks.map((task) => row(a, task)?.project), [id, id], 'the tasks are not written: each still says which project it was');
+    w.exchange(a, b);
+    assert.deepEqual(shown(b), [null, null]);
+    w.time.advance(1000);
+    b.today.restoreProject(id);
+    assert.equal(b.engine.rows('project').value.get(id)?.deleted, null);
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.deepEqual(shown(d), ['The C book', 'The C book']);
+      assert.deepEqual(d.today.projects.value, [{ id, name: 'The C book', color: 'teal' }]);
+    }
+    // Nothing to delete or bring back: nothing is written.
+    const cells = a.engine.cells();
+    a.today.restoreProject(id);
+    a.today.restoreProject('nobody');
+    a.today.removeProject('nobody');
+    assert.deepEqual(a.engine.cells(), cells);
+    a.today.removeProject(id);
+    const once = a.engine.cells();
+    a.today.removeProject(id);
+    assert.deepEqual(a.engine.cells(), once);
   });
 
   it('a project with a colour this build does not know is shown in ink, and one with no name yet is not shown', async () => {

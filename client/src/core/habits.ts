@@ -3,7 +3,7 @@
 // as the mask and its done days as the kept days.
 
 import { addDays, mondayOf } from './progress.ts';
-import { isDay, isMoment, isTime } from './real.ts';
+import { asDeleted, isDay, isMoment, isTime } from './real.ts';
 import { streakWindow, weekday } from './streak.ts';
 
 /** A habit row with every field in its place: what is missing or malformed reads as its default. */
@@ -61,7 +61,7 @@ export function asHabit(id: string, row: Readonly<Record<string, unknown>>): Hab
     remind: asRemind(row.remind),
     order: typeof row.order === 'string' ? row.order : '',
     archived: time(row.archived),
-    deleted: time(row.deleted),
+    deleted: asDeleted(row.deleted),
   };
 }
 

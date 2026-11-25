@@ -69,11 +69,15 @@ export function lapMarks(sessions: readonly Session[], days: Days, today: string
   return out;
 }
 
-/** Tasks done with their laps at or under the estimate. A task with no lap at all has kept no estimate. */
-export function taskMarks(tasks: readonly Task[], lapsOf: (task: string) => number): Earned[] {
+/**
+ * Tasks done with their laps, as the task shows them, at or under the estimate, at least one of
+ * them a lap that rang: what is earned needs the bell, and a task ticked five seconds into its
+ * only lap has earned nothing. `lapsOf` gives a task's laps and how many of them rang.
+ */
+export function taskMarks(tasks: readonly Task[], lapsOf: (task: string) => { laps: number; rang: number }): Earned[] {
   return tasks.flatMap((task): Earned[] => {
-    const laps = lapsOf(task.id);
-    if (task.done === null || task.estimate === null || task.deleted !== null || laps < 1 || laps > task.estimate) return [];
+    const { laps, rang } = lapsOf(task.id);
+    if (task.done === null || task.estimate === null || task.deleted !== null || rang < 1 || laps > task.estimate) return [];
     const key = `estimate-${task.id}`;
     return [{ key, at: task.done, mark: { key, kind: 'estimate', task: task.id, title: task.title, estimate: task.estimate, laps }, cell: ['task', task.id, 'done'] }];
   });

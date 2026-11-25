@@ -72,8 +72,6 @@ export const addDays = (day: string, n: number): string => new Date(Date.parse(d
 /** The Monday of the week `day` is in. */
 export const mondayOf = (day: string): string => addDays(day, -weekday(Date.parse(day)));
 
-const keptDays = (days: Days) => Object.keys(days).filter((day) => days[day]!.laps > 0);
-
 /**
  * `youToday` is today's focus so far, the lap in progress included; `ghostByNow` is the focus of
  * the same weekday last week up to this time of day. Both come from the race's own counting.
@@ -96,9 +94,11 @@ export function weekRace(days: Days, today: string, youToday: number, ghostByNow
   return { monday, days: out, you_ms: you, ghost_now_ms: ghostNow, ghost_total_ms: ghost, split_ms: ghost > 0 ? you - ghostNow : null };
 }
 
-/** The forgiving streak over the last 45 days, and the last 14 as dots. */
-export function streakView(days: Days, today: string): StreakView {
-  const kept = new Set(keptDays(days));
+/**
+ * The forgiving streak over the last 45 days, and the last 14 as dots. `kept` is the days with a
+ * lap that rang: a day is earned at a bell, so a day of stopped laps has laps and is not kept.
+ */
+export function streakView(kept: ReadonlySet<string>, today: string): StreakView {
   const s = streakWindow(today, [...kept]);
   const rest = new Set(s.rest);
   const recent = Array.from({ length: RECENT_DAYS }, (_, i) => {
@@ -109,21 +109,20 @@ export function streakView(days: Days, today: string): StreakView {
   return { streak: s.streak, kept: s.kept, of: s.of, missed: s.missed, recent };
 }
 
-/** A year cell's level: from the laps that rang, and 1 for a day of minutes with no lap. */
-export const level = (laps: number, focus_ms: number): number => (laps >= 9 ? 4 : laps >= 7 ? 3 : laps >= 4 ? 2 : laps >= 1 || focus_ms > 0 ? 1 : 0);
+/** A year cell's level, from the day's laps. */
+export const level = (laps: number): number => (laps >= 9 ? 4 : laps >= 7 ? 3 : laps >= 4 ? 2 : laps >= 1 ? 1 : 0);
 
-/** Everything since the first counted session, and one cell per day of it. */
-export function since(days: Days, today: string): Since {
+/** Everything since the first counted session, and one cell per day of it. `kept` is the days with a lap that rang. */
+export function since(days: Days, kept: ReadonlySet<string>, today: string): Since {
   const first = Object.keys(days).sort()[0] ?? null;
   if (first === null) return { first, focus_ms: 0, laps: 0, kept: 0, of: 0, steadiest: null, cells: [] };
 
-  const kept = new Set(keptDays(days));
   const s = streak({ today, kept: [...kept], window: Infinity });
   const rest = new Set(s.rest);
   const cells: YearCell[] = [];
   for (let day = first; day <= today; day = addDays(day, 1)) {
     const { focus_ms = 0, laps = 0 } = days[day] ?? {};
-    cells.push({ day, focus_ms, laps, level: level(laps, focus_ms), rest: rest.has(day) });
+    cells.push({ day, focus_ms, laps, level: level(laps), rest: rest.has(day) });
   }
 
   // The steadiest weekday, over the days the streak counts: from the first kept day to today, or

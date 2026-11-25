@@ -4,7 +4,7 @@
 import { computed } from '@preact/signals-core';
 import { stampMs } from '../core/hlc.ts';
 import { isMoment } from '../core/real.ts';
-import { focusOf, localDay, race } from '../core/stats.ts';
+import { fill, focusOf, localDay, race, setFills } from '../core/stats.ts';
 import type { Race, Session } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
 import type { TimerState } from '../core/timer.ts';
@@ -73,11 +73,23 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
 
   const rangOnce = (s: TimerState) => s.run !== null && rows.peek().get(s.run)?.outcome === 'rang';
 
-  // The sessions as the timer's own run would have them read: a row that ends before the run
-  // has got to (see `covered`) would hide the lap in progress.
+  // The row held for the timer's run tells the run up to where it has got to. One that does not
+  // is from a stop that was taken back, or from a bell the lap was extended past: the run is
+  // still open, and that row is not yet a lap of its own.
+  function told(s: TimerState, now: number): boolean {
+    const stamp = timerStamp();
+    return s.run !== null && stamp !== undefined && covered(s.run, s.paused_at ?? Math.min(now, view(s, now).ends_at ?? now), stampMs(stamp));
+  }
+
+  // Whether a row is read while the timer is as it is. The run's own row is, when it tells the
+  // run up to here, and when it rang: a lap that reached its bell stays a lap while an extension
+  // runs on. A stopped row the run has gone on past is not: that lap has not ended.
+  const stands = (row: Session, s: TimerState, tells: boolean) => row.id !== s.run || tells || row.outcome === 'rang';
+
+  // The sessions as the timer's own run would have them read.
   function live(s: TimerState, now: number): Session[] {
-    const end = s.paused_at ?? Math.min(now, view(s, now).ends_at ?? now);
-    return sessions.value.filter((row) => !(row.id === s.run && row.ended < end));
+    const tells = told(s, now);
+    return sessions.value.filter((row) => stands(row, s, tells));
   }
 
   /**
@@ -95,8 +107,29 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     return { id: s.run, kind: 'work', task: s.task, started: s.started, ended, planned_ms: s.planned_ms, paused_ms: s.paused_ms, outcome: over ? 'rang' : 'stopped', device: '' };
   }
 
-  /** Laps that rang on `day`, by rows alone. */
-  const lapsOn = (day: string): number => (byDay.value.get(day) ?? []).filter((row) => row.kind === 'work' && row.outcome === 'rang').length;
+  const counted = (row: Session) => row.kind === 'work' && row.outcome !== 'void';
+  /** The laps of `day`, rang or stopped, by rows alone. */
+  const lapsOn = (day: string): number => (byDay.value.get(day) ?? []).filter(counted).length;
+
+  /**
+   * One fill per lap of today, oldest first: every counted row, and the lap whose bell has gone
+   * before its row is written, which may be a while on a device that is offline with another
+   * device's timer. The lap in progress is not one yet.
+   */
+  function fillsToday(): number[] {
+    const s = state.value;
+    const now = engine.now();
+    const day = today(now);
+    const rowTells = told(s, now);
+    const fills = (byDay.value.get(day) ?? [])
+      .filter((row) => counted(row) && stands(row, s, rowTells))
+      .sort((a, b) => a.started - b.started)
+      .map(fill);
+    // Not twice: a row that tells the run up to this bell has the last word on it, set aside or
+    // not, and a row of an earlier bell of the same lap is this lap already.
+    if (s.phase === 'work' && s.started !== null && view(s, now).over && !rowTells && !rangOnce(s) && today(s.started) === day) fills.push(1);
+    return fills;
+  }
 
   return {
     rows,
@@ -128,20 +161,11 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     },
 
     lapsOn,
+    fillsToday,
+    /** Today's laps: as many as there are fills. */
+    lapsToday: (): number => fillsToday().length,
 
-    /** Laps that rang today, and the lap whose bell has gone but whose row is not written yet. */
-    lapsToday(): number {
-      const s = state.value;
-      const now = engine.now();
-      const day = today(now);
-      const laps = lapsOn(day);
-      // As the race does: a lap whose bell has gone counts before its row is written, which may
-      // be a while on a device that is offline with another device's timer.
-      const { over, ends_at } = view(s, now);
-      const stamp = timerStamp();
-      if (s.phase !== 'work' || !over || s.run === null || s.started === null || ends_at === null || !stamp) return laps;
-      // Not twice: a rang row is in the count already, and a row that covers this bell has the last word on it.
-      return today(s.started) !== day || rangOnce(s) || covered(s.run, ends_at, stampMs(stamp)) ? laps : laps + 1;
-    },
+    /** The set on screen (protocol section 7), from today's rows. */
+    setFills: (s: TimerState, now: number): number[] => setFills(byDay.value.get(today(now)) ?? [], s, now, utcOffsetMin()),
   };
 }

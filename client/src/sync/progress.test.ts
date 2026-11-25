@@ -141,7 +141,7 @@ describe('this week against last week', () => {
 });
 
 describe('the year and since the first lap', () => {
-  it('a cell\'s level at 0, 1, 3, 4, 6, 7, 8 and 9 laps, and a day of minutes with no lap', async () => {
+  it('a cell\'s level at 0, 1, 3, 4, 6, 7, 8 and 9 laps, and a day whose one lap was stopped has a lap', async () => {
     const { d, p } = await one();
     const counts = [1, 0, 3, 4, 6, 7, 8, 9];
     counts.forEach((count, n) => laps(d, `2026-11-${10 + n}`, count));
@@ -150,7 +150,7 @@ describe('the year and since the first lap', () => {
     assert.equal(p.since.value.first, '2026-11-10');
     assert.equal(cells.length, 15, 'one cell a day from the first to today');
     assert.deepEqual(cells.slice(0, 9).map((cell) => [cell.day.slice(8), cell.laps, cell.level]), [
-      ['10', 1, 1], ['11', 0, 0], ['12', 3, 1], ['13', 4, 2], ['14', 6, 2], ['15', 7, 3], ['16', 8, 3], ['17', 9, 4], ['18', 0, 1],
+      ['10', 1, 1], ['11', 0, 0], ['12', 3, 1], ['13', 4, 2], ['14', 6, 2], ['15', 7, 3], ['16', 8, 3], ['17', 9, 4], ['18', 1, 1],
     ]);
     assert.equal(cells[8]!.focus_ms, 12 * MIN);
     assert.equal(cells[14]!.day, '2026-11-24');
@@ -172,8 +172,10 @@ describe('the year and since the first lap', () => {
     laps(d, '2026-11-23', 1);
     const since = p.since.value;
     assert.equal(since.focus_ms, 85 * MIN);
-    assert.equal(since.laps, 3);
-    assert.deepEqual([since.kept, since.of], [2, 4], 'the 20th to the 23rd; the stopped day is not kept');
+    assert.equal(since.laps, 4, 'the stopped lap is a lap');
+    assert.deepEqual([since.kept, since.of], [2, 4], 'the 20th to the 23rd; the stopped day has a lap and is not kept: a day is earned at a bell');
+    // The 20th to today as dots: the 21st, with its stopped lap, is a rest day and not a kept one.
+    assert.deepEqual(p.streak.value.recent.slice(-5).map((dot) => dot.state), ['kept', 'rest', 'rest', 'kept', 'open']);
     laps(d, '2026-11-24', 1);
     assert.deepEqual([p.since.value.kept, p.since.value.of], [3, 5]);
   });
@@ -359,7 +361,8 @@ describe('by project', () => {
 
     assert.deepEqual(p.projects(), [
       { project: null, focus_ms: 75 * MIN, laps: 3, before_ms: 0, all_ms: 75 * MIN },
-      { project: { id: c, name: 'The C book', color: 'you' }, focus_ms: 60 * MIN, laps: 2, before_ms: 25 * MIN, all_ms: 85 * MIN },
+      // Two laps that rang and one stopped after ten minutes: three laps.
+      { project: { id: c, name: 'The C book', color: 'you' }, focus_ms: 60 * MIN, laps: 3, before_ms: 25 * MIN, all_ms: 85 * MIN },
       // All time reaches back past both windows: the lap on the 10th is in it.
       { project: { id: react, name: 'React', color: 'rest' }, focus_ms: 25 * MIN, laps: 1, before_ms: 0, all_ms: 50 * MIN },
       { project: { id: old, name: 'Only last week', color: 'ink' }, focus_ms: 0, laps: 0, before_ms: 50 * MIN, all_ms: 50 * MIN },
@@ -372,9 +375,11 @@ describe('by project', () => {
     w.time.advance(10 * MIN);
     const running = p.projects().find((share) => share.project?.id === react)!;
     assert.deepEqual([running.focus_ms, running.all_ms], [35 * MIN, 60 * MIN], 'in this week and in all time alike');
+    assert.equal(running.laps, 1, 'its minutes count as it runs; it is a lap when it ends');
     // Its row is written at the bell: the figure does not jump or count the lap twice.
     w.time.advance(15 * MIN);
     assert.equal(p.projects().find((share) => share.project?.id === react)!.all_ms, 75 * MIN);
+    assert.equal(p.projects().find((share) => share.project?.id === react)!.laps, 2);
     // Five more minutes on the lap, two of them run: the row of its first bell is not counted on top of the lap itself.
     w.time.advance(MIN);
     d.focus.extend();
@@ -422,6 +427,19 @@ describe('estimates', () => {
       ],
       weeks: [...['10-05', '10-12', '10-19', '10-26', '11-02', '11-09', '11-16'].map((monday) => ({ monday: `2026-${monday}`, ratio: null })), { monday: '2026-11-23', ratio: 5 / 6 }],
     });
+  });
+
+  it('the laps run are the laps the task shows: one stopped early is one of them, one not counted is not', async () => {
+    const { d, p } = await one();
+    const task = d.today.add('pointers ~2')!;
+    lap(d, '2026-11-23', 6, 0, { task });
+    stopped(d, '2026-11-23', 7, 0, 10, { task });
+    stopped(d, '2026-11-23', 8, 0, 1, { task });
+    lap(d, '2026-11-23', 9, 0, { task, outcome: 'void' });
+    d.today.setDone(task, true);
+    assert.equal(p.estimates.value.ratio, 3 / 2);
+    assert.deepEqual(p.estimates.value.tasks, [{ id: task, title: 'pointers', estimate: 2, laps: 3 }]);
+    assert.deepEqual(p.lookBack().done, [{ id: task, title: 'pointers', estimate: 2, laps: 3 }]);
   });
 
   it('no task done with an estimate: no ratio', async () => {
@@ -511,6 +529,25 @@ describe('a day\'s timeline', () => {
     ]);
     assert.equal(p.timeline('2026-11-22').length, 1);
     assert.deepEqual(p.timeline('2026-11-21'), []);
+  });
+
+  it('a lap stays in its day when its task is deleted; the task is named while it is in Recently deleted, and not once it is gone for good', async () => {
+    const { w, d, p } = await one();
+    const task = d.today.add('pointers ~1')!;
+    lap(d, '2026-11-23', 9, 0, { task });
+    const named = () => p.timeline('2026-11-23').map((entry) => entry.task?.title ?? null);
+    d.today.setDone(task, true);
+    assert.deepEqual(named(), ['pointers']);
+    d.today.remove(task);
+    assert.deepEqual(named(), ['pointers'], 'still to be found, and brought back');
+    assert.deepEqual(p.lookBack().done, []);
+    d.today.purge(task);
+    assert.deepEqual(named(), [null]);
+    assert.equal(p.timeline('2026-11-23').length, 1, 'the lap itself is the day\'s, and stays');
+    assert.equal(p.since.value.laps, 1);
+    assert.equal(p.estimates.value.ratio, null);
+    assert.deepEqual(p.lookBack().done, []);
+    void w;
   });
 
   it('a lap that overlaps one two starts further on is still marked: a long lap here, a short one here, and one elsewhere', async () => {
@@ -696,7 +733,7 @@ describe('keeping the work down', () => {
     lap(d, '2026-11-24', 8);
     lap(d, '2026-11-24', 9);
     assert.equal(p.recomputed(), 1);
-    assert.equal(p.since.value.laps, 3002);
+    assert.equal(p.since.value.laps, 3003, 'the two written here, and the lap that was stopped');
     void p.streak.value;
     void p.bests.value;
     assert.equal(p.recomputed(), 2);

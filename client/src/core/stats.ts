@@ -38,6 +38,10 @@ type Span = Pick<Session, 'started' | 'paused_ms' | 'ended'>;
 const from = (s: Span) => s.started + s.paused_ms;
 const counts = (s: Session) => s.kind === 'work' && s.outcome !== 'void';
 
+/** How much of a lap ran: 1 if it rang, else its running time over its plan, never over 1. Wherever laps are drawn, each is drawn this full. */
+export const fill = (s: Pick<Session, 'outcome' | 'started' | 'ended' | 'paused_ms' | 'planned_ms'>): number =>
+  s.outcome === 'rang' ? 1 : s.planned_ms > 0 ? Math.min(1, Math.max(0, (s.ended - s.started - s.paused_ms) / s.planned_ms)) : 0;
+
 /** The local day, `2026-11-24`, that `ms` falls in for someone `utcOffsetMin` minutes east of UTC. */
 export const localDay = (ms: number, utcOffsetMin: number): string =>
   new Date(ms + utcOffsetMin * 60000).toISOString().slice(0, 10);
@@ -71,7 +75,8 @@ export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats
   const counted = sessions.filter(counts);
   const days: Stats['days'] = {};
   for (const [day, list] of byDay(counted, utcOffsetMin)) {
-    days[day] = { focus_ms: focus(list), laps: list.filter((s) => s.outcome === 'rang').length };
+    // A lap that was stopped is a lap, a short one.
+    days[day] = { focus_ms: focus(list), laps: list.length };
   }
 
   // By start, each lap is compared only with those that begin before it ends: a year of laps is
@@ -87,6 +92,28 @@ export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats
     }
   });
   return { days, overlaps: overlaps.sort((x, y) => (x[0] !== y[0] ? (x[0] < y[0] ? -1 : 1) : x[1] < y[1] ? -1 : 1)) };
+}
+
+/**
+ * The set on screen: the fills of the laps of this set that have ended, oldest first. There are
+ * `set_index` of them while a lap runs or the timer is idle, one more once the lap's bell has
+ * gone and during a break: the last that many laps that started today, one set aside drawn
+ * empty. Where fewer rows are held (a bell not yet written), the earliest are drawn full.
+ */
+export function setFills(sessions: readonly Session[], state: TimerState, now: number, utcOffsetMin: number): number[] {
+  const { over, ends_at } = view(state, now);
+  const shown = (s: Session) => (s.outcome === 'void' ? 0 : fill(s));
+  // The lap whose bell has just gone is the last of them, and it is full: unless a row that
+  // reaches the bell says otherwise (it was since set aside). A row from before the bell, left
+  // by a stop that was taken back, says nothing of how it ended.
+  const row = sessions.find((s) => s.id === state.run);
+  const rung = state.phase === 'work' && over && ends_at !== null ? [row && row.ended >= ends_at ? shown(row) : 1] : [];
+  const before = state.set_index + (state.phase === 'short' || state.phase === 'long' ? 1 : 0);
+  const today = localDay(now, utcOffsetMin);
+  // The run the timer is on is not one of those before it.
+  const laps = sessions.filter((s) => s.kind === 'work' && s.id !== state.run && localDay(s.started, utcOffsetMin) === today).toSorted((a, b) => a.started - b.started);
+  const held = before > 0 ? laps.slice(-before).map(shown) : [];
+  return [...Array<number>(before - held.length).fill(1), ...held, ...rung];
 }
 
 /** The focus in these sessions with nothing after `upTo` counted: the counted ones, minutes two ran at once counted once. */
