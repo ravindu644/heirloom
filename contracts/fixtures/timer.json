@@ -560,7 +560,7 @@
    ]
   },
   {
-   "name": "stopped in its first seconds, and while paused: the lap has had its place all the same",
+   "name": "stopped within its first minute of running: a start taken back, and the next start is the same lap",
    "from": {
     "phase": "idle",
     "run": null,
@@ -569,7 +569,7 @@
     "paused_at": null,
     "paused_ms": 0,
     "planned_ms": 0,
-    "set_index": 0
+    "set_index": 1
    },
    "steps": [
     {
@@ -587,6 +587,10 @@
     {
      "at": 1800000005000,
      "expect": {
+      "next": {
+       "phase": "work",
+       "set_index": 1
+      },
       "state": {
        "phase": "idle",
        "run": null,
@@ -608,7 +612,97 @@
      "planned_ms": 1500000
     },
     {
-     "at": 1800000070000,
+     "at": 1800000010000,
+     "expect": {
+      "set_index": 1
+     }
+    },
+    {
+     "at": 1800000069999,
+     "do": "stop"
+    },
+    {
+     "at": 1800000069999,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "stopped at a minute of running: the lap has had its place",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000060000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000060000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "paused in its first minute and stopped long after: the pause is not running time, so it is a start taken back",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000030000,
      "do": "pause"
     },
     {
@@ -617,6 +711,191 @@
     },
     {
      "at": 1800000600000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "paused after a minute of running and stopped: the lap has had its place",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000060000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000600000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000600000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a lap of a few seconds stopped after its bell rang: it has had its place, however short",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 3000
+    },
+    {
+     "at": 1800000005000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000005000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a lap started over one begun under a minute ago takes its place: the first was a start taken back",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000020000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000020000,
+     "expect": {
+      "set_index": 1,
+      "state": {
+       "phase": "work",
+       "run": "run-2",
+       "task": null,
+       "started": 1800000020000,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 1500000,
+       "set_index": 1
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "a break is not a start taken back: stopped in its first seconds, the set still moves on",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800001500000,
+     "do": "start",
+     "phase": "short",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 300000
+    },
+    {
+     "at": 1800001505000,
+     "do": "stop"
+    },
+    {
+     "at": 1800001505000,
      "expect": {
       "state": {
        "phase": "idle",

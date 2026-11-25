@@ -157,11 +157,11 @@ Actions, each a pure function of the state, the action and `now`:
 
 | Action | New state |
 |---|---|
-| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap, over or not, or a short break; 0 after a long break |
+| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. A lap started over a lap begun under 60000 ms of running time ago takes that lap's index, as after a stop: the first was a start taken back. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A run that is counting now belongs to no earlier day, however long ago it began: a six hour lap begun at 20:00 is one sitting at 01:00. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap, over or not, or a short break; 0 after a long break |
 | `pause` | `paused_at = now`. Nothing when idle, paused or over |
 | `resume` | `paused_ms += now - paused_at`, `paused_at = null`. Nothing unless paused |
 | `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap if the new end is still ahead of `now`; if not, nothing: minutes nobody worked are not added |
-| `stop` | Idle, every other field as the schema's idle state, `set_index` the next lap's index by the same rule as `start`. A lap that is stopped has had its place in the set: after lap 1 is stopped, the next start is lap 2. Stopping lap 4 starts a new set at lap 1 and earns no long break: a break is what a bell gives |
+| `stop` | Idle, every other field as the schema's idle state, `set_index` the next lap's index by the same rule as `start`. A lap that is stopped has had its place in the set: after lap 1 is stopped, the next start is lap 2. Except a lap stopped before the bell with under 60000 ms of running time (`now - started - paused_ms`, or to the pause when it is paused): that was a start taken back, it keeps its index for the next start, and section 11 writes no row for it. Stopping lap 4 starts a new set at lap 1 and earns no long break: a break is what a bell gives |
 
 There is one way to end a lap before its bell, and it is `stop`. (Until 2026-11-25 a stopped lap
 gave its place back and a second button set a lap aside; the user's second hour with the app
@@ -188,10 +188,6 @@ From `session` rows and the viewer's offset from UTC in minutes.
 - `overlaps` lists each pair of counted sessions from different devices whose intervals share more
   than an instant: the "ran on two devices" mark. Each pair is sorted by id, and so is the list.
 - A day with nothing counted is not in `days`.
-- **The set on screen.** The laps of the set that have ended are `set_index` of them while a lap
-  runs or the timer is idle, and one more once the lap's bell has gone and during a break. They are the last that many work
-  sessions that started today, oldest first, `void` ones included and drawn empty. Where fewer
-  rows are held (a bell not yet written), the earliest are drawn full.
 - An interval that would end before it begins counts as 0. Two overlapping laps that started on
   different local days each count in their own day; the mark still shows the pair.
 
@@ -239,7 +235,6 @@ Fixture: `streak.json`.
 | `stats.json` `cases` | Computes from `sessions` and `utc_offset_min` and must equal `expect` |
 | `stats.json` `race` | Computes from `sessions`, `state` (the timer), `now` and `utc_offset_min` and must equal `expect` |
 | `stats.json` `fill` | One fill per session row in `sessions`, in order, must equal `expect`. Read by the TS tests only |
-| `stats.json` `set` | The set on screen from `sessions`, `state`, `now` and `utc_offset_min` must equal `expect`. Read by the TS tests only |
 | `streak.json` | Computes from `today`, `kept`, `days_mask` and `window` and must equal `expect` |
 
 `tools/contracts-check.mjs` checks every cell, session and timer state in these files against the
@@ -344,9 +339,11 @@ already held:
 | Stop or replaced, on a run that rang once and was then extended | Still `rang`: a lap that reached its bell stays a lap. `ended` as for stop, an ordinary stamp |
 
 - `kind`, `task`, `started`, `planned_ms` and `paused_ms` are the state's; `device` is the writer.
-- A lap always leaves a row, however short: it had its place in the set, and the row is what
-  shows it. A break that did not reach the bell and had under 60000 ms of running time (`ended -
-  started - paused_ms`) leaves none.
+- A run that did not reach its bell and had under 60000 ms of running time (`ended - started -
+  paused_ms`) leaves no row, a lap as a break: a start taken back within the minute is not a
+  lap of the day, not a lap on its task and not one of the four. Any other lap leaves a row,
+  stopped or rung: it had its place, and the row is what shows it. (Every stopped lap left a
+  row for one build; three slips of the thumb then made "four laps" with one real one.)
 - A stopped row is something a person did, so its cells take ordinary stamps from the clock.
 - Starting a run while another is open closes the open one first, as stop.
 
@@ -388,7 +385,9 @@ first day strictly later that the rule allows.
 own, so each day's laps stay with that day's task:
 
 - its `due` is the day after the later of today and the done task's own `due` (days missed are
-  not owed);
+  not owed); and where the series already has a row for that day (a task carried to an earlier
+  day and done there, or its day edited back), the first allowed day after it that the series
+  has had no row for, so a series never ends because someone was ahead of it;
 - its id is the series id, `-`, and that day as eight digits: `task-read-20261125`. The series id
   is the done task's id without such an ending. Two devices that mark the same task done offline
   therefore make the same row;
@@ -447,9 +446,18 @@ by `order`, then by row id, so two devices that picked the same key still agree.
 | List | Rows |
 |---|---|
 | Today | not done, not deleted, no `parent`, and `due` is unset or today or earlier. By order. A task is "running" while the timer is on a lap for it that has not rung (counting or paused). The first that is not running is "next": so when a lap on the top task rings, that task is next again, and the plan's order decides what a new lap is for |
-| Upcoming | the same, with `due` after today. By `due`, then order |
+| Upcoming | the same, with `due` after today. By order, as Today is: the day is what a row says, not where it stands |
 | Done | `done` falls on today. By when it was done |
 | Recently deleted | `deleted` in the last 30 days. Newest first |
+
+A task whose `due` is set or changed to a day after today is given, in the same write, the
+`order` that puts it by its day among Upcoming's rows: after the last row whose day is not
+later than its own. So Upcoming reads by day until a hand moves a row, and a moved row stays
+where it was put.
+
+A row is moved within its list by writing its `order`. A row moved from Upcoming into Today is
+written `due` as today together with its new `order`, in one transaction; nothing else of it
+changes. Nothing is moved from Today into Upcoming by its place: a day is given in the task.
 
 A subtask shows inside its parent only.
 
@@ -458,6 +466,8 @@ draw (the user, 2026-11-25: 8 was too few). A larger number in a row from an old
 and shown as it is; the first edit of the estimate brings it to 32.
 
 **A task's own lengths.** `work_ms`, `short_ms` and `long_ms` on a task, each a length or `null`.
+A lap's length is offered up to 360 minutes, in settings and on a task; a longer one that a row
+already holds is read and run as it is.
 A lap begun on the task takes its `work_ms` as `planned_ms`; the break begun after a lap on it
 (by a tap or by itself) takes its `short_ms` or `long_ms`. A field that is `null`, absent or not
 a length the settings would take falls back to the account's own (section 16), each field by
