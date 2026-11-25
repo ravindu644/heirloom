@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Focus } from '../../sync/focus.ts';
-import type { HabitDay, HabitView, Habits } from '../../sync/habits.ts';
+import type { HabitView, Habits } from '../../sync/habits.ts';
 import { Button } from '../kit/button.tsx';
 import { Check } from '../kit/check.tsx';
 import links from '../kit/links.module.css';
@@ -10,6 +10,7 @@ import { QuickAdd } from '../kit/quick-add.tsx';
 import { Race } from '../kit/race.tsx';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { hasMoved, useLift } from '../kit/lift.ts';
+import { Week } from '../kit/day-box.tsx';
 import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
@@ -21,15 +22,6 @@ import css from './habits.module.css';
 
 /** Its run, or after a miss the days kept: never the miss itself. */
 const run = (habit: HabitView) => (habit.missed ? s.habits.keptOf(habit.kept, habit.of) : habit.streak > 0 ? s.habits.running(habit.streak) : '');
-
-// A day of the week as a lane: done is filled, a count on its way is filled that far, a rest day
-// carries the ring, and a day the habit is not planned for has no lane at all, only its line.
-function cell(day: HabitDay, target: number) {
-  if (day.done) return <i class={css.done} />;
-  if (day.rest) return <i class={css.rest} />;
-  if (day.count > 0) return <i class={css.part} style={`--share:${Math.min(1, day.count / target)}`} />;
-  return <i class={day.planned ? undefined : css.off} />;
-}
 
 /**
  * The routine. The heading is today's count; each habit is a row with the app's one box to check
@@ -143,18 +135,10 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
                           </span>
                         )}
                       </span>
-                      <span
-                        class={css.week}
-                        role="img"
-                        aria-label={s.habits.weekLabel(habit.week.filter((d) => d.planned && d.done).length, habit.week.filter((d) => d.planned).length)}
-                      >
-                        {habit.week.map((d, i) => (
-                          <span key={d.day} class={cx(d.day === habit.today.day && css.today)}>
-                            {s.habits.days[i]}
-                            {cell(d, habit.target)}
-                          </span>
-                        ))}
-                      </span>
+                      <Week
+                        label={s.habits.weekLabel(habit.week.filter((d) => d.planned && d.done).length, habit.week.filter((d) => d.planned).length)}
+                        days={habit.week.map((d, i) => ({ letter: s.habits.days[i]!, done: d.done, rest: d.rest, share: d.count / habit.target, off: !d.planned, today: d.day === habit.today.day }))}
+                      />
                     </button>
                   </div>
                 ))}

@@ -20,8 +20,9 @@ interface Props {
 /**
  * A number changed one step at a time: minus, the figure, plus. A small count is text. A length
  * is a field, so 25 to 50 is typed once and the buttons are for nudging; it is saved when the
- * field is left or Enter is pressed, and a value that is not a whole number in its bounds is put
- * back. The caller names what is counted in the section it sits in.
+ * field is left or Enter is pressed. A whole number past a bound comes to that bound, and the
+ * field shows it: 400 becomes 360, 0 becomes 1. What is no whole number is put back. The caller
+ * names what is counted in the section it sits in.
  */
 export function Stepper({ text, less, more, onLess, onMore, typed, top = typed ? typed.value >= typed.max : false, floor = typed ? typed.value <= typed.min : false }: Props) {
   // What is being typed, with the value it was typed over: a value that changed elsewhere (a
@@ -35,7 +36,7 @@ export function Stepper({ text, less, more, onLess, onMore, typed, top = typed ?
     // An emptied field is no value: `Number('')` is 0, and where 0 is in bounds (a room's target)
     // it would be taken for one.
     const value = draft?.trim() ? Number(draft) : NaN;
-    if (typed && Number.isInteger(value) && value >= typed.min && value <= typed.max) typed.onSet(value);
+    if (typed && Number.isInteger(value)) typed.onSet(Math.min(typed.max, Math.max(typed.min, value)));
     setDraft(null);
   };
   return (

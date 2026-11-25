@@ -66,7 +66,8 @@ export type DemoLap = () => { share: number; ms: number; over: boolean };
 
 export interface DemoToday extends Today {
   /** A lap ended and is kept: it counts on the day, and on its task if it had one. */
-  credit(task: string | null, share: number, ms: number): void;
+  /** `ms` of null: a lap that is not today's, which only its task counts. */
+  credit(task: string | null, share: number, ms: number | null): void;
   /** The task rows as the engine would hold them, for what the screen reads from there. */
   rows: ReadonlySignal<ReadonlyMap<string, Row>>;
 }
@@ -119,19 +120,23 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     running: computed(() => open.value.find((task) => task.running) ?? null),
     later: computed(() => open.value.filter((task) => task !== next.value)),
     list: open,
-    upcoming: computed(() => top.value.filter((task) => !task.done && task.due && task.due > DAY).sort((a, b) => a.due!.localeCompare(b.due!)).map(view)),
+    // In the person's order, as Today is: not by day.
+    upcoming: computed(() => top.value.filter((task) => !task.done && task.due && task.due > DAY).map(view)),
     done: computed(() => top.value.filter((task) => task.done).map(view)),
     deleted: computed(() => tasks.value.filter((task) => task.deleted && !task.parent).map(view)),
     projects,
     // Nothing in the demo reminds: the platform reads this, not a screen.
     timed: signal([]),
     figures() {
-      const inLap = timer.value.phase === 'work' ? lap() : null;
+      // A lap begun before midnight counts on the day it began: nothing of it is today's, rung or not.
+      const inLap = timer.value.phase === 'work' && new Date(timer.value.started ?? 0).getDate() === new Date(now()).getDate() ? lap() : null;
       const left_laps = open.value.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
       return {
         done_ms: day.ms + (inLap?.ms ?? 0),
         laps: day.fills.length + (inLap?.over ? 1 : 0),
         fills: [...day.fills, ...(inLap?.over ? [1] : [])],
+        // How full the lap in progress is; one whose bell has gone is in `fills` already.
+        open: inLap && !inLap.over ? Math.min(1, inLap.ms / timer.value.planned_ms) : null,
         left_laps,
         left_ms: left_laps * 25 * MIN,
         target: target.value,
@@ -180,6 +185,24 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       const at = before === null ? rest.length : rest.findIndex((task) => task.id === before);
       tasks.value = [...rest.slice(0, at), moved, ...rest.slice(at)];
     },
+    // Out of Upcoming into Today: its day becomes today and it stands before `before`, or at the end.
+    moveToToday(id, before) {
+      const at = tasks.value.findIndex((task) => task.id === id);
+      const moved = tasks.value[at];
+      if (!moved?.due || moved.due <= DAY || moved.done) return null;
+      const rest = tasks.value.filter((task) => task.id !== id);
+      // The end of today's rows is before the first of Upcoming.
+      const edge = rest.findIndex((task) => !task.done && !!task.due && task.due > DAY);
+      const to = before === null ? (edge < 0 ? rest.length : edge) : rest.findIndex((task) => task.id === before);
+      tasks.value = [...rest.slice(0, to), { ...moved, due: DAY }, ...rest.slice(to)];
+      return { due: moved.due, order: String(at) };
+    },
+    moveBack(id, was) {
+      const moved = tasks.value.find((task) => task.id === id);
+      if (!moved) return;
+      const rest = tasks.value.filter((task) => task.id !== id);
+      tasks.value = [...rest.slice(0, Number(was.order)), { ...moved, due: was.due ?? undefined }, ...rest.slice(Number(was.order))];
+    },
     addSubtask(parent, title) {
       if (!title) return null;
       const id = `sub-${++ids}`;
@@ -208,8 +231,10 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     setTarget: (laps) => void (target.value = laps),
 
     credit(id, part, ms) {
-      day.ms += ms;
-      day.fills.push(part);
+      if (ms !== null) {
+        day.ms += ms;
+        day.fills.push(part);
+      }
       if (id) change(id, { squares: [...(tasks.value.find((task) => task.id === id)?.squares ?? []), part] });
     },
     rows: computed(() => new Map(tasks.value.map((task) => [task.id, { id: task.id, title: task.title, deleted: task.deleted ?? null }]))),

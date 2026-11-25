@@ -55,19 +55,36 @@ button.task:hover .change, button.task:active .change { color: var(--ink); }
 
 /* The line under the digits belongs to the digits. */
 .time { display: grid; gap: var(--space-sm); }
+/* The timer's place: it has the timer's size and is one line of it tall whatever stands in it, so
+   nothing under the digits moves when a long lap comes under 100 minutes and its digits grow.
+   It has the size and not the face: it is a box, and the figure in it is what is set on the edge. */
+.dial {
+  display: grid;
+  align-content: end;
+  min-height: 1lh;
+  font: var(--type-figure-xl);
+  font-family: inherit;
+  /* A phone is not always 412 wide. The timer keeps its share of the width: smaller on a narrow
+     phone, so the last digit stays on the screen, larger on a wide one, so it does not sit small
+     at the left. Under 720px it cannot reach the laptop's size. */
+  font-size: calc(100vw * 168 / 412);
+}
 /* The timer never animates: the digits change. Their ink, not their box, sits on the column's
    left edge: Barlow Condensed's digits carry space at their left, and the bearing pulls it back. */
 .digits {
   margin-left: var(--bearing, var(--layout-figure-bearing));
   font: var(--type-figure-xl);
-  /* A phone is not always 412 wide. The timer keeps its share of the width: smaller on a narrow
-     phone, so the last digit stays on the screen, larger on a wide one, so it does not sit small
-     at the left. Under 720px it cannot reach the laptop's size. */
-  font-size: calc(100vw * 168 / 412);
+  /* As large as its place says: the phone's share of the width, or a laptop's size. */
+  font-size: 1em;
   font-feature-settings: var(--feature-figure-xl);
   letter-spacing: var(--tracking-figure-xl);
   white-space: nowrap;
 }
+/* Seven characters where there were five: two thirds of the size, at every width. That keeps
+   "5:59:59" on one line inside the column down to a phone at twice its type size, where the
+   margins do not shrink with the digits; five sevenths, the share of the characters, ran a pixel
+   over there. */
+.digits.hours { font-size: calc(1em * 2 / 3); }
 /* Read from across the desk: ink is a lap running, green is a break, grey is time standing still.
    The lap line says the same in words. */
 .resting { color: var(--rest); }
@@ -139,7 +156,7 @@ button.task:hover .change, button.task:active .change { color: var(--ink); }
   .far { margin-left: 0; }
   .change { margin-left: 0; }
   .upnext { display: block; }
-  .digits { font: var(--type-figure-xl); }
+  .dial { font: var(--type-figure-xl); font-family: inherit; }
   .facts { max-width: 60ch; }
   .title { -webkit-line-clamp: 2; }
   .headline { font: var(--type-headline-lg); letter-spacing: var(--tracking-headline-lg); }
@@ -157,11 +174,7 @@ button.task:hover .change, button.task:active .change { color: var(--ink); }
   .clock { grid-area: clock; }
   .rail { grid-area: rail; }
   .actions { grid-area: actions; }
-  .digits {
-    font: var(--type-figure-xxl);
-    font-feature-settings: var(--feature-figure-xxl);
-    letter-spacing: var(--tracking-figure-xxl);
-  }
+  .dial { font: var(--type-figure-xxl); font-family: inherit; }
   /* The lanes of a result run the whole canvas. Its lap bar keeps the width it had while the lap
      ran, the clock's two thirds, so it does not jump at the bell. */
   .result { display: flex; }

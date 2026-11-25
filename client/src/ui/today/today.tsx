@@ -8,7 +8,8 @@ import type { TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
 import { Fold, Kept } from '../kit/fold.tsx';
-import { hasMoved, useLift } from '../kit/lift.ts';
+import { stopSaid } from '../focus/stopped.ts';
+import { focusRow, hasMoved, useLift } from '../kit/lift.ts';
 import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
 import links from '../kit/links.module.css';
@@ -76,9 +77,12 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   const setDone = (task: TaskView, isDone: boolean) => {
     // Ticking the task a lap is running on ends that lap too: the bar says both, and its one
     // Undo unticks the task, which puts the lap back as well.
-    const lapEnds = isDone && state.phase === 'work' && state.task === task.id && !view.over ? s.today.lapStopped(state.set_index + 1, focus.ran()) : undefined;
+    const onIt = isDone && state.phase === 'work' && state.task === task.id && !view.over;
     today.setDone(task.id, isDone);
     if (!isDone) return say(null);
+    // The stop as the core recorded it, in the words Focus has for it: a lap by the day's count, yesterday's as that, a start taken back as that.
+    const stop = onIt ? focus.lastStop.peek() : null;
+    const lapEnds = !stop ? undefined : stop.phase === 'work' && !stop.counted ? s.today.noLap : stopSaid(stop, today.figures().laps, engine.now());
     // A repeating task has made its next one by now: say when that is, from the row itself.
     const series = task.id.replace(/-\d{8}$/, '');
     const again = task.repeat && today.upcoming.value.find((other) => other.id !== task.id && other.id.startsWith(`${series}-`));
@@ -90,16 +94,39 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     say({ lead: s.today.saidRemoved, title: task.title, tail: s.today.keeps, undo: () => today.restore(task.id) });
   };
 
-  // Today's open tasks in their true order. On the screen the first one that is not running is
-  // the Next card and the rest follow under "Later": a row is put in order by pressing and
-  // holding it, across both, and set down before the row that then follows it.
+  // The open tasks are one list to the hand: today's in their true order (the first that is not
+  // running is the Next card, the rest follow under "Later"), then Upcoming under its heading,
+  // which is the edge between them. A row is set down before the row that then follows it.
   const movable = today.list.value;
   const lists = useRef<HTMLDivElement>(null);
   const [placed, setPlaced] = useState('');
-  useLift(lists, (id, before, at, of) => {
-    today.move(id, before);
-    setPlaced(s.today.nowAt(movable.find((task) => task.id === id)?.title ?? '', at, of));
-  });
+  useLift(
+    lists,
+    (id, before) => {
+    const ahead = upcoming.find((task) => task.id === id);
+    // Set down over the edge, or before one of today's rows: a row out of Upcoming is for today.
+    const intoToday = !!ahead && (before === '' || movable.some((task) => task.id === before));
+    if (intoToday) {
+      const was = today.moveToToday(id, before || null);
+      // The bar says so, to eyes and to a screen reader: the day it has now, the day it had as its row showed it, and the way back.
+      const undo = () => {
+        today.moveBack(id, was!);
+        // The Undo that was pressed goes with the bar: the focus goes back with the row, to its words in Upcoming.
+        (document.activeElement as HTMLElement | null)?.blur();
+        if (lists.current) focusRow(lists.current, id, (controls) => controls.find((one) => one.dataset.task));
+      };
+      if (was) say({ lead: '', title: s.today.nowToday, tail: ahead.due ? s.today.wasDue(s.today.due(ahead.due, day)) : undefined, undo });
+      return;
+    }
+    // Within today's rows the edge is their end; within Upcoming there is no edge under a row.
+    today.move(id, before || null);
+    const list = (ahead ? upcoming : movable).filter((task) => task.id !== id);
+    const at = before ? list.findIndex((task) => task.id === before) : list.length;
+    setPlaced(s.today.nowAt([...movable, ...upcoming].find((task) => task.id === id)?.title ?? '', at + 1, list.length + 1));
+    },
+    // A row of today let go inside Upcoming, or stepped at it with the keys: it stays, and the bar says why.
+    () => say({ lead: '', title: s.today.staysToday }),
+  );
 
   // Recently deleted closes with its last row.
   useEffect(() => {
@@ -138,7 +165,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
       }}
       next={extra.next}
       end={extra.end}
-      lift={list === 'next' || list === 'later'}
+      lift={list !== 'done'}
     />
   );
 
@@ -236,7 +263,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
 
       <div>
       <div class={css.cols} ref={lists}>
-        <Fold gap="md" data-said>
+        {/* The field and the lap's strip stand over the lists, apart from them: on a laptop "Done" starts level with "Next", not with the field. */}
+        <div class={css.left}>
+        <Fold gap="md">
           <QuickAdd key="add" name="task" label={s.today.add} hint={s.today.addHint} example={s.today.addExample} go={s.today.addGo} said onAdd={add} />
 
           {state.phase !== 'idle' && !(isBreak && view.over) && (
@@ -272,7 +301,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
               )}
             </div>
           )}
+        </Fold>
 
+        <Fold gap="md" class={css.open} data-said>
           {next && (
             <section key="next">
               <h2 class={css.sect} id="list-next" tabIndex={-1}>
@@ -301,8 +332,25 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
             </section>
           )}
 
-          {/* How rows are put in order, said once: until this device has moved one. */}
-          {movable.length > 1 && !hasMoved.value && (
+          {!next && later.length === 0 && (
+            <p key="empty" class={css.empty}>
+              {done.length ? s.today.allDone : s.today.empty}
+            </p>
+          )}
+
+          {/* Under today's rows in the same column, so the open tasks are one list to the hand
+              at every width. Its heading is the edge: a row comes up over it, none goes down under it. */}
+          {upcoming.length > 0 && (
+            <section key="upcoming">
+              <h2 class={css.sect} id="list-upcoming" tabIndex={-1} data-lift-edge>
+                {s.today.upcoming}
+              </h2>
+              <Fold gap="sm">{upcoming.map((task) => row(task, 'upcoming'))}</Fold>
+            </section>
+          )}
+
+          {/* How rows are put in order, said once: until this device has moved one, and only where one can be. */}
+          {(movable.length > 1 || upcoming.length > 0) && !hasMoved.value && (
             <p key="hint" class={css.hint}>
               {s.today.holdHint}
             </p>
@@ -317,22 +365,10 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
             </div>
           )}
 
-          {!next && later.length === 0 && (
-            <p key="empty" class={css.empty}>
-              {done.length ? s.today.allDone : s.today.empty}
-            </p>
-          )}
         </Fold>
+        </div>
 
         <Fold gap="md">
-          {upcoming.length > 0 && (
-            <section key="upcoming">
-              <h2 class={css.sect} id="list-upcoming" tabIndex={-1}>
-                {s.today.upcoming}
-              </h2>
-              <Fold gap="sm">{upcoming.map((task) => row(task, 'upcoming'))}</Fold>
-            </section>
-          )}
           {done.length > 0 && (
             <section key="done">
               <h2 class={css.sect} id="list-done" tabIndex={-1}>

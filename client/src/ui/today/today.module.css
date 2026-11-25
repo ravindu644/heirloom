@@ -21,6 +21,7 @@
 
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
+.left { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
 /* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
 .bar {
@@ -69,5 +70,9 @@
 /* Laptop: what is on now beside what is for later and what is done. */
 @media (min-width: 1280px) {
   .today { max-width: none; }
-  .cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .cols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-md) var(--space-lg); }
+  /* The field has the first column's top; the lists and Done start on one line under it. */
+  .left { display: contents; }
+  .left > * { grid-column: 1; }
+  .cols > :last-child { grid-row: 2; grid-column: 2; }
 }

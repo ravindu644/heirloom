@@ -191,6 +191,9 @@ const TODAY: Record<string, Scene> = {
   'today-laps-9': { ...idleAt2, about: 'Squares where a second line begins: 9 laps, 8 and 1, long title and short', day: squaresDay(9) },
   'today-laps-17': { ...idleAt2, about: 'Squares where a third line begins: 17 laps, 16 and 1, the short title first', day: squaresDay(17, true) },
   'today-laps-32': { ...idleAt2, about: 'The most squares a row draws: 32 laps, 31 and 1', day: squaresDay(32) },
+  'today-one': { ...idleAt2, about: 'One open task and nothing else: it has nowhere to go, does not lift, and no hint says it could', day: { tasks: [{ id: 'only', title: 'Exercise 5-3: strcat with pointers', project: 'c', estimate: 2, due: DAY }], target: 8, laps: 5, done_ms: 125 * MIN } },
+  'today-ahead': { ...idleAt2, about: 'Upcoming of three days under today, in the same column: one list to the hand', day: day([...TASKS, { id: 'up1', title: 'Hand in the lab report', project: 'uni', estimate: 3, due: '2026-11-25', time: '17:00' }, { id: 'up2', title: 'Read chapter 6', project: 'c', estimate: 2, due: '2026-11-27' }, { id: 'up3', title: 'Book the exam slot', due: '2026-12-01' }]) },
+  'today-one-ahead': { ...idleAt2, about: 'One task today and one ahead: the row of today stays, the one ahead can be brought up', day: { tasks: [{ id: 'only', title: 'Exercise 5-3: strcat with pointers', project: 'c', estimate: 2, due: DAY }, { id: 'up1', title: 'Hand in the lab report', project: 'uni', estimate: 3, due: '2026-11-25' }], target: 8, laps: 5, done_ms: 125 * MIN } },
   'today-zoom': { about: 'The smallest row there is: one task with a project and an estimate, for a phone at twice its type size (206 wide)', next: 0, at: [9, 5], day: { tasks: [{ id: 'draft', title: 'chapter 2 draft', project: 'thesis', estimate: 4, due: DAY }], projects: [{ id: 'thesis', name: 'Thesis', color: 'plum' }] } },
   'today-no-target': { ...idleAt2, about: 'No day target set', day: day(TASKS, { target: 0 }) },
   'today-adding': { ...idleAt2, about: 'The quick add in use: the shorthand as an example, under the field', day: day(), tap: 'focus:task' },
@@ -213,7 +216,8 @@ const TODAY: Record<string, Scene> = {
     about: 'A task with subtasks says so on its row',
     day: day([...TASKS, { id: 'sub1', title: 'Write it with array indexes first', parent: 'ex', done: true }, { id: 'sub2', title: 'Rewrite with two pointers', parent: 'ex' }, { id: 'sub3', title: 'Test with an empty string', parent: 'ex' }]),
   },
-  'today-99': { about: 'Today with the longest lap there is on its strip', run: { ...onKr, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-360': { about: 'Today with a six hour lap on its strip: hours on the strip too', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-99': { about: 'Today with a lap of 99 minutes on its strip: the widest the clock is without hours', run: { ...onKr, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-deleted': {
     ...idleAt2,
     about: 'Recently deleted, with Restore',
@@ -264,6 +268,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-run': { ...week, about: 'A streak with no rest day in its last fortnight', record: { fill: ['2026-11-11', '2026-11-19'] } },
   'progress-miss': { ...week, about: 'A miss inside the last 45 days: days kept of days, not the run', record: { empty: ['2026-11-12'] } },
   'progress-day': { ...week, about: 'A day chosen in the year: its timeline, and the way back to today', record: {}, tap: 'demo:day' },
+  'progress-earlier': { about: 'The twelve sessions of today opened from the five latest', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {}, tap: '7 earlier today' },
   'progress-aside': { ...week, about: 'Just after a lap is set aside in the timeline: Undo', record: {}, tap: 'Set aside' },
   'progress-note': { ...week, about: 'The look back with a note at its longest', record: { note: 'Pointers finally clicked once I drew the array as boxes and stopped reading a[i] as magic. The second lap after lunch went on two devices by mistake, the laptop was still running. Tomorrow: exercise 5-3 first, before the lecture, while the picture of the boxes is still in my head.' } },
   'progress-long-project': { ...week, about: 'A long project name, and time under no project', record: { projects: 'long' } },
@@ -315,8 +320,8 @@ const ROOM_SCENES: Record<string, Scene> = {
 const lapOver = { phase: 'work', lap: 1, left: 0 } as const;
 const MORE: Record<string, Scene> = {
   'settings-ring-blocked': { ...idleAt2, about: 'Settings on a device that will not let heirloom notify: the bell says why it cannot ring', settings: true, day: day(), ringBlocked: true },
-  'settings-over': { ...idleAt2, about: 'A lap length kept by an earlier build, over the top there is now: shown and stepped from 99', settings: true, day: day(), prefs: { work_ms: 120 * MIN } },
-  'settings-top': { ...idleAt2, about: 'Settings with every number at its top: each plus is off', settings: true, day: day(), prefs: { work_ms: 99 * MIN, short_ms: 60 * MIN, long_ms: 60 * MIN, day_target: 24 } },
+  'settings-over': { ...idleAt2, about: 'A lap length kept by an earlier build, over the top there is now: shown and stepped from 360', settings: true, day: day(), prefs: { work_ms: 400 * MIN } },
+  'settings-top': { ...idleAt2, about: 'Settings with every number at its top: each plus is off', settings: true, day: day(), prefs: { work_ms: 360 * MIN, short_ms: 60 * MIN, long_ms: 60 * MIN, day_target: 24 } },
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
   'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
@@ -381,10 +386,11 @@ const SCENES: Record<string, Scene> = {
   'lap-ahead': { about: 'Lap 2 just over, 6 minutes ahead', run: { ...lap2, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday },
   'lap-behind': { about: 'Lap 2 just over, 19 minutes behind', run: { ...lap2, left: 0 }, you: 106 * MIN, laps: 4, ghost: tuesday },
   'lap-first-day': { about: 'Lap 1 just over, no ghost yet', run: { phase: 'work', lap: 0, left: 0 } },
-  'set-done': { about: 'The fourth lap just over: a set', run: { phase: 'work', lap: 3, left: 0 }, you: 175 * MIN, laps: 7, ghost: tuesday },
+  'set-done': { about: 'The fourth lap in a row just over: its moment, and the long break', run: { phase: 'work', lap: 3, left: 0 }, you: 175 * MIN, laps: 7, ghost: tuesday },
   'done-for-now': { about: 'After a bell, Done for now: the timer at rest, and the line that says so', run: { ...lap2, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday, tap: 'Done for now' },
   'break-done-for-now': { about: 'In a break, Done for now', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, tap: 'Done for now' },
-  'focus-99': { about: 'The longest lap there is: four wide digits, and no more minutes on offer', run: { ...lap2, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday },
+  'focus-360-top': { about: 'The longest lap there is, running: no more minutes on offer', run: { ...onKr, planned: 360 * MIN, left: 200 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'focus-99': { about: 'A lap of 99 minutes: four wide digits, the widest the clock is without hours', run: { ...lap2, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday },
   break: { about: 'A short break running', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday },
   'focus-task': { ...idleAt2, about: 'Before a start, with tasks: the two lines over the digits are the way to choose, and there is one Start', day: day() },
   'focus-choose': { ...idleAt2, about: 'Choosing what the lap is for: the open tasks of today in order, then nothing in particular', day: day(), tap: 'css:[aria-haspopup=dialog]' },
@@ -395,7 +401,20 @@ const SCENES: Record<string, Scene> = {
   'focus-own': { ...idleAt2, about: 'The next task has its own lengths: the digits, the end and the line that says so', day: day(swap('kr', OWN)) },
   'lap-done-own': { about: 'A lap over on a task with its own lengths: the break offered is the one that task has', run: { ...onKr, planned: 50 * MIN, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', OWN)) },
   'long-break-paused': { about: 'The long break held: the set bar ends in its mark, filled', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000, paused: true }, you: 200 * MIN, laps: 8, ghost: tuesday },
+  'focus-target-reached': { about: 'The lap that reaches the day target has just rung', run: { ...onKr, left: 0 }, you: 150 * MIN, laps: 5, ghost: tuesday, day: day(TASKS, { target: 6 }) },
+  'focus-target-passed': { ...idleAt2, about: 'Past the day target: the line says so with the target, and the bar is full', day: day(TASKS, { target: 5 }) },
+  'focus-no-target': { ...idleAt2, about: 'No day target: the lap by the day, and no bar', day: day(TASKS, { target: 0 }) },
+  'focus-no-target-running': { about: 'No day target, a lap running', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(TASKS, { target: 0 }) },
+  'focus-360': { ...idleAt2, about: 'A lap of 360 minutes, the longest there is, before its start: the timer reads hours', day: day(swap('kr', { work_ms: 360 * MIN })) },
+  'focus-360-running': { about: 'That lap a second in: seven characters, 5:59:59', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'focus-100-running': { about: 'A long lap with 100 minutes left: the last moment it reads hours, 1:40:00', run: { ...onKr, planned: 360 * MIN, left: 100 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'focus-99-running': { about: 'The same lap just under 100 minutes: minutes and seconds again', run: { ...onKr, planned: 360 * MIN, left: 100 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'focus-yesterday': { about: 'A long lap begun before midnight and still running: it counts on the day it began', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
   'focus-choose-started': { ...idleAt2, about: 'A lap started on another device while the chooser was open: the chooser closes and Focus is on that lap', day: day(), tap: ['css:[aria-haspopup=dialog]', 'demo:start'] },
+  'focus-yesterday-done': { about: 'A lap begun before midnight whose bell has gone: it is said as yesterday\'s, and the day\'s count is not said beside it', at: [0, 10], run: { ...onKr, left: 0 }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
+  'focus-yesterday-stopped': { about: 'That long lap stopped: the line names it as yesterday\'s and says how far it ran as the clock would', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }), tap: 'Stop' },
+  'focus-taken-back': { about: 'A lap stopped twenty seconds in: a start taken back, said as that and never numbered', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'Stop' },
+  'today-taken-back': { about: 'The task ticked twenty seconds into its lap: the bar says it is done and that the lap was not counted', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), today: true, tap: 'css:[role=checkbox][aria-label^="Done: K&R"]' },
   'stopped-elsewhere': { about: 'A lap stopped from the notification: Focus says so and offers Undo, as after its own Stop', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'demo:stop' },
   'running-task': { about: 'A lap running on a task: the two lines are words', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'break-task': { about: 'A short break with tasks: the lines name the task the next lap is for', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day() },
@@ -415,6 +434,7 @@ const SCENES: Record<string, Scene> = {
   'settings-refused': { ...idleAt2, about: 'Settings after the server signed this device out', settings: true, sync: 'signed-out', day: day() },
   'settings-unsent': { ...idleAt2, about: 'Settings: a sign out refused, edits unsent', settings: true, sync: 'offline', unsent: 3, day: day(), tap: 'Sign out' },
   'lap-live': { about: 'Three seconds before the bell: watch the lap-done moment', run: { ...lap2, left: 3000 }, you: 106 * MIN, laps: 4, ghost: tuesday },
+  'set-live-past': { about: 'The same bell on a day past its target of five: the last four segments drawn light, not ones the bar does not have', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday, day: day(TASKS, { target: 5, laps: 7 }) },
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
@@ -451,6 +471,8 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   };
   const over = () => view(state.value, now()).over;
   const lapOpen = () => state.value.phase === 'work';
+  // A lap begun before midnight is yesterday's: none of today's focus and none of today's laps, as the real count has it.
+  const mine = () => lapOpen() && new Date(state.value.started ?? 0).getDate() === new Date(now()).getDate();
   // How full each lap of this set that was stopped is, by its place in the set. One that rang is whole.
   const part = new Map<number, number>();
   // What the real one does when a run ends: a lap that rang counts, and a stopped one keeps its
@@ -458,10 +480,14 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const close = () => {
     if (!lapOpen()) return;
     const task = state.value.task;
-    if (over()) laps++;
-    else part.set(state.value.set_index, ran() / state.value.planned_ms);
-    you += ran();
-    today.credit(task, over() ? 1 : ran() / state.value.planned_ms, ran());
+    // One begun before midnight is yesterday's: the task has its square, and today nothing.
+    // And one stopped in its first minute is a start taken back: it leaves nothing anywhere.
+    if (!over() && ran() < MIN) return;
+    const here = mine();
+    if (here && over()) laps++;
+    else if (here) part.set(state.value.set_index, ran() / state.value.planned_ms);
+    if (here) you += ran();
+    today.credit(task, over() ? 1 : ran() / state.value.planned_ms, here ? ran() : null);
   };
   // What a run begun now for that task would get: the task's own lengths where it has them.
   const lengthsFor = (task: string | null) => {
@@ -475,20 +501,27 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     // A new set starts with nothing in it.
     if (phase === 'work' && state.value.set_index === 0) part.clear();
   };
-  const today = demoToday(scene.day ?? { tasks: [] }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: ran(), over: over() }), now);
+  // A scene with no list still has a day: its laps, against the usual target.
+  const today = demoToday(scene.day ?? { tasks: [], laps: scene.laps, target: 8 }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: ran(), over: over() }), now);
 
   // Ten seconds to take a stop back, as the real one gives.
   const undoable = signal(false);
   let before: { state: TimerState; you: number; laps: number } | null = null;
-  // The row a stop leaves: what Focus reads to say a stop it did not make itself.
-  const sessions = signal<ReadonlyMap<string, Row>>(new Map());
+  // The record of that stop, for as long: what Focus and Today read to say what it did.
+  const lastStop = signal<Focus['lastStop']['value']>(null);
+  const forget = () => {
+    undoable.value = false;
+    lastStop.value = null;
+  };
   const end = () => {
-    if (lapOpen() && !over()) sessions.value = new Map([['stopped', { id: 'stopped', kind: 'work', outcome: 'stopped', started: now() - ran(), ended: now(), paused_ms: 0 }]]);
-    before = { state: state.value, you, laps };
+    const was = state.value;
+    if (was.phase === 'idle') return;
+    before = { state: was, you, laps };
+    lastStop.value = { phase: was.phase, task: was.task, started: was.started ?? now(), ran_ms: ran(), counted: lapOpen() && (over() || ran() >= MIN) };
     close();
-    state.value = act(state.value, { do: 'stop' }, now());
+    state.value = act(was, { do: 'stop' }, now());
     undoable.value = true;
-    setTimeout(() => (undoable.value = false), 10000);
+    setTimeout(forget, 10000);
   };
 
   // Ticking the task a lap runs on ends that lap, and unticking it puts the lap back: the real
@@ -512,11 +545,11 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     ran,
     race() {
       // Yesterday's lap is not today's focus.
-      const you_ms = you + (lapOpen() && !(scene.newDay && state.value.run === 'demo-0') ? ran() : 0);
+      const you_ms = you + (mine() && !(scene.newDay && state.value.run === 'demo-0') ? ran() : 0);
       const ghost = scene.ghost ? { day: '2026-11-17', ms: scene.ghost[0], total_ms: scene.ghost[1] } : null;
       return { you_ms, ghost, split_ms: ghost ? you_ms - ghost.ms : null };
     },
-    lapsToday: () => laps + (lapOpen() && over() ? 1 : 0),
+    lapsToday: () => laps + (mine() && over() ? 1 : 0),
     start(task) {
       const next = view(state.value, now()).next.phase;
       close();
@@ -530,18 +563,14 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     resume: () => void (state.value = act(state.value, { do: 'resume' }, now())),
     extend: () => void (state.value = act(state.value, { do: 'extend', ms: EXTEND_MS }, now())),
     stop: () => end(),
-    fills() {
-      // Through the long break the timer still stands on the set's last lap, so its four laps are drawn, as the real one draws them.
-      const ended = lapOpen() ? state.value.set_index + (over() ? 1 : 0) : state.value.phase === 'long' ? state.value.set_index + 1 : view(state.value, now()).next.set_index;
-      return Array.from({ length: ended }, (_, at) => part.get(at) ?? 1);
-    },
     undoable,
+    lastStop,
     undo() {
       if (!before) return;
       ({ you, laps } = before);
       state.value = before.state;
       part.delete(before.state.set_index);
-      undoable.value = false;
+      forget();
     },
   };
 
@@ -570,7 +599,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     device: 'demo',
     now,
     // The old long-title scene has a task with no day around it; every other scene's rows come from its day.
-    rows: (dataset) => (dataset === 'session' ? sessions : dataset !== 'task' ? none : scene.day ? today.rows : long),
+    rows: (dataset) => (dataset !== 'task' ? none : scene.day ? today.rows : long),
     write() {},
     stamp: () => undefined,
     act() {},

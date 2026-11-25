@@ -172,7 +172,9 @@ const phase = (m: MemberView) =>
     : m.phase === 'idle'
       ? s.room.idle
       : m.phase === 'work'
-        ? (m.paused ? s.room.paused : s.room.focusing)(m.lap)
+        ? m.paused
+          ? s.room.paused
+          : s.room.focusing
         : m.paused
           ? s.room.breakPaused
           : m.phase === 'long'

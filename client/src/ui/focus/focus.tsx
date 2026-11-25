@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { localDay } from '../../core/stats.ts';
 import type { TimerState, TimerView } from '../../core/timer.ts';
-import type { Engine, Row } from '../../sync/engine.ts';
+import type { Engine } from '../../sync/engine.ts';
 import { EXTEND_MS } from '../../sync/focus.ts';
 import { LAP_MAX_MS } from '../../sync/settings.ts';
 import type { Focus, Race as RaceNow } from '../../sync/focus.ts';
@@ -21,12 +20,12 @@ import { Race, SplitChip } from '../kit/race.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
 import { followLaps, picked } from './choice.ts';
+import { dayOf, stopSaid } from './stopped.ts';
 import css from './focus.module.css';
 
 // A bell this fresh was seen as it happened. Anything older is news from before the screen opened.
 const LIVE_MS = 2000;
 
-const dayOf = (now: number) => localDay(now, -new Date(now).getTimezoneOffset());
 
 /** The lane lengths and the split, said the same way in the panel and in the result. */
 function lanes(race: RaceNow, workMs: number, now: number) {
@@ -52,6 +51,7 @@ function lanes(race: RaceNow, workMs: number, now: number) {
   };
 }
 
+// `inLap`: a lap of today's is running, so finishing it moves today's race. One from yesterday does not, and nothing is promised of it.
 function RacePanel({ race, inLap, left, workMs, now }: { race: RaceNow; inLap: boolean; left: number; workMs: number; now: number }) {
   const l = lanes(race, workMs, now);
   const say = () => {
@@ -90,9 +90,16 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   const result = state.phase === 'work' && view.over && view.next.phase !== 'work';
   // Ready: nothing is running, and the big digits show the lap a tap would start.
   const ready = view.over ? !result : state.phase === 'idle';
-  const lap = state.set_index + 1;
-  const nextLap = view.next.phase === 'work' ? view.next.set_index + 1 : (lap % 4) + 1;
-  const set = result && lap === 4;
+  // The timer's own set of four is on no screen. What it decides is said in its own terms: the
+  // break this lap will earn, and after the fourth lap in a row the one moment that marks it.
+  const set = result && view.next.phase === 'long';
+  // The lap by the day's count: today's laps, and with them the one starting or running. A lap
+  // whose bell has gone is among today's already, and so is one that rang and runs on.
+  const fig = today.figures();
+  const dayLap = fig.laps + (ready || fig.open !== null ? 1 : 0);
+  // A lap begun before midnight and still running counts on the day it began: it has no number today.
+  // Running, rung or stopped, it is said as that and never as a lap of today.
+  const stale = state.phase === 'work' && !ready && state.started !== null && dayOf(state.started) !== dayOf(now);
 
   // The task this lap is for, and the one the next lap will be for. Starting needs no task: with
   // none next, a lap is for nothing in particular.
@@ -139,64 +146,51 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   }, [live]);
 
   // What the last tap did, said once, until a lap starts, here or on another device.
+  // What the last stop did, from the core's record of it, wherever it was made: here, on Today,
+  // or from the phone's notification with the app opened by that very tap. The record lasts as
+  // long as the stop can be taken back; the line stays until a lap starts.
+  const rang = useRef(false);
+  if (!ready) rang.current = state.phase === 'work' && view.over;
+  const last = focus.lastStop.value;
+  const line = ready && last ? stopSaid(last, fig.laps, now, rang.current) : '';
   const [note, setNote] = useState('');
   useEffect(() => {
-    if (!ready) setNote('');
-  }, [ready]);
-  // A stop made where this screen was not looking (the phone's notification, with the app opened
-  // by that very tap) is said too, for as long as it can be taken back: from the row the stop
-  // left. A lap stopped before its bell says how far it ran; a stop after a bell or in a break
-  // says which lap it came after.
-  const stopLine = () => {
-    const last = [...engine.rows('session').value.values()].reduce<Row | undefined>((a, b) => (a && Number(a.ended) >= Number(b.ended) ? a : b), undefined);
-    const lap = state.set_index || 4;
-    return last?.kind === 'work' && last.outcome === 'stopped' ? s.focus.stopped(lap, Number(last.ended) - Number(last.started) - Number(last.paused_ms)) : s.focus.stoppedAfter(lap);
-  };
-  const said = note || (ready && focus.undoable.value ? stopLine() : '');
+    if (line || !ready) setNote(line);
+  }, [line, ready]);
+  const said = line || (ready ? note : '');
   // A lap that starts while the chooser is open closes it: a tap in it would set the lap after this one.
   useEffect(() => {
     if (!ready) setChoosing(false);
   }, [ready]);
-  // After a bell and in a break both buttons start something: this is the way out for someone
-  // finished for the day. The timer comes to rest after the lap that last ended.
-  const doneForNow = () => {
-    setNote(s.focus.stoppedAfter(((nextLap + 2) % 4) + 1));
-    focus.stop();
-  };
-  // One Stop. It ends the lap where it is, and the line after says what that did.
-  const stop = () => {
-    setNote(s.focus.stopped(state.set_index + 1, focus.ran()));
-    focus.stop();
-  };
 
-  // A break that is over or held says only that at the left.
-  const plainBreak = view.over || view.paused;
+  // The break this lap will earn, by the timer's own count and at the task's own length: the one
+  // thing the set of four decides that a person feels.
+  const longNext = ready ? view.next.set_index === 3 : view.next.phase === 'long';
+  const breakMs = lengths[longNext ? 'long_ms' : 'short_ms'];
   const lapLine = (
     <p class={css.lapline}>
       {isBreak ? (
         <span>
           <i class={css.rest} />
           <b>{state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak}</b>
-          {plainBreak ? (view.over ? s.focus.breakOver : s.focus.lapPaused) : state.phase === 'long' ? s.focus.afterSet : s.focus.afterLap(lap)}
+          {view.over ? s.focus.breakOver : view.paused ? s.focus.lapPaused : ''}
         </span>
       ) : (
         <span>
-          <b>{s.focus.lap(ready ? nextLap : lap)}</b>
+          <b>{stale ? s.focus.lapYesterday : s.focus.lap(dayLap, fig.target)}</b>
           {ready ? s.focus.lapNext : result ? s.focus.lapDone : view.paused ? s.focus.lapPaused : s.focus.lapFocus}
         </span>
       )}
-      {/* What the four lead to, wherever this end has no other job. In a break it says the lap that
-          is next, and names the set when the words at the left do not; after a long break that
-          set is over, and lap 1 is of the next. */}
-      {!set && <span>{isBreak ? (plainBreak && state.phase !== 'long' ? s.focus.lapAheadInSet(nextLap) : s.focus.lapAhead(nextLap)) : s.focus.longBreakAhead(ready ? nextLap : lap)}</span>}
+      {/* The right end: the break this lap will earn, and in a break the lap of the day that follows. */}
+      <span>{isBreak ? s.focus.lapAhead(fig.laps + 1) : s.focus.breakAfter(breakMs, longNext)}</span>
     </p>
   );
-  // Segments filled: the laps of this set that have rung. Ready, that is the index of the lap to come.
-  const share = state.phase === 'work' && !view.over ? 1 - view.left_ms / state.planned_ms : 0;
+  // The bar is the day's target, the one Today has: today's laps as full as each ran, then the
+  // lap in progress. With no target there is no bar.
+  const bar = (more: { big?: boolean; lighting?: boolean } = {}) => fig.target > 0 && <LapBar fills={fig.fills} of={fig.target} share={fig.open ?? 0} {...more} />;
 
   if (result) {
     const l = lanes(race, lengths.work_ms, now);
-    const breakMs = set ? lengths.long_ms : lengths.short_ms;
     const headline = set
       ? s.result.set
       : !l.day
@@ -205,13 +199,13 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           ? s.result.level(l.day)
           : l.chip.tone === 'ahead'
             ? s.result.ahead(l.split, l.day)
-            : s.result.behind(Math.max(1, l.lapsBehind()), nextLap, l.day);
+            : s.result.behind(Math.max(1, l.lapsBehind()), fig.laps + 1, l.day);
     return (
       <div class={cx(css.focus, css.result, live && (set ? css.setMoment : css.lapMoment))}>
         <h1 class="sr">{s.focus.title}</h1>
         <div class={css.laps}>
           {lapLine}
-          <LapBar fills={focus.fills()} big={set} lighting={live && set} longBreak={false} />
+          {bar({ big: set, lighting: live && set })}
         </div>
         <div class={css.told}>
           <p class={cx(css.headline, css.words)} role="status">
@@ -238,12 +232,14 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
               </>
             )}
             <span class={css.words}>
-              {s.result.laps(focus.lapsToday())} {lapTask && `${s.result.task(lapTask.title, lapTask.laps, lapTask.estimate)} `}
+              {/* A lap from yesterday is none of today's: the day's count is not said beside it. */}
+              {!stale && `${s.result.laps(focus.lapsToday())} `}
+              {lapTask && `${s.result.task(lapTask.title, lapTask.laps, lapTask.estimate)} `}
               {rooms.cheered.value.length > 0 && `${s.result.cheered(rooms.cheered.value)} `}
               {s.result.take(breakMs)}
             </span>
           </p>
-            <Button kind="link" class={css.far} onClick={doneForNow}>
+            <Button kind="link" class={css.far} onClick={focus.stop}>
               {s.focus.doneForNow}
             </Button>
           </div>
@@ -311,8 +307,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
       <div class={css.clock}>
         <div>
           {lapLine}
-          {/* Each ended lap as full as it ran: one that was stopped stays part filled. */}
-          <LapBar fills={focus.fills()} share={share} longBreak={state.phase === 'long'} />
+          {bar()}
         </div>
         <div class={css.face}>
           {/* Before a start the two lines are the way to choose what the lap is for; once it runs they are words. */}
@@ -327,12 +322,14 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           <div class={css.time}>
             {/* Each digit sits a little differently in its box. Where DESIGN.md gives the bearing of
                 the digit that leads, the ink lands exactly on the edge; else the one bearing serves. */}
-            <div
-              class={cx(css.digits, !ready && (view.paused ? css.held : isBreak && css.resting))}
-              style={`--bearing:var(--layout-figure-bearing-${s.clock(shown).charAt(0)}, var(--layout-figure-bearing))`}
-              aria-hidden="true"
-            >
-              {s.clock(shown)}
+            {/* From 100 minutes the clock reads hours, seven characters: a size down, in a place that keeps the timer's height. */}
+            <div class={css.dial} aria-hidden="true">
+              <div
+                class={cx(css.digits, s.clock(shown).length > 5 && css.hours, !ready && (view.paused ? css.held : isBreak && css.resting))}
+                style={`--bearing:var(--layout-figure-bearing-${s.clock(shown).charAt(0)}, var(--layout-figure-bearing))`}
+              >
+                {s.clock(shown)}
+              </div>
             </div>
             <p class="sr" role="timer" aria-live="polite">
               {heard}
@@ -347,7 +344,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         </div>
       </div>
       <div class={css.rail}>
-        <RacePanel race={race} inLap={state.phase === 'work' && !ready} left={view.left_ms} workMs={lengths.work_ms} now={now} />
+        <RacePanel race={race} inLap={inLap && !stale} left={view.left_ms} workMs={lengths.work_ms} now={now} />
         {upNext.length > 0 && (
           <div class={css.upnext}>
             <Panel title={s.focus.upNext}>
@@ -379,7 +376,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
             <Button onClick={() => focus.pause()}>{s.focus.pause}</Button>
           )}
           {state.phase === 'work' && !ready && (
-            <Button kind="quiet" onClick={stop}>
+            <Button kind="quiet" onClick={focus.stop}>
               {s.focus.stop}
             </Button>
           )}
@@ -387,7 +384,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         <div class={css.quiet}>
           {ready && <p class={css.why}>{why}</p>}
           {isBreak && !ready && (
-            <Button kind="link" class={css.far} onClick={doneForNow}>
+            <Button kind="link" class={css.far} onClick={focus.stop}>
               {s.focus.doneForNow}
             </Button>
           )}

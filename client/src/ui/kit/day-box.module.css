@@ -1,0 +1,15 @@
+.box { position: relative; display: grid; place-items: center; height: var(--layout-lane-set); background: var(--track, var(--line)); }
+.done { background: var(--you); }
+/* A count on its way: filled as far as it has got, as a lap in progress is. */
+.part::before { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--share) * 100%); background: var(--you); }
+/* A rest day carries the ring, as it does in the row of days. */
+.rest::after { content: ""; box-sizing: border-box; width: var(--layout-dot); height: var(--layout-dot); border: var(--layout-stroke) solid var(--rest); border-radius: var(--radius-full); }
+/* Not planned: no lane, only the line it would stand on. Nothing to do is not a miss. */
+.off { background: none; box-shadow: inset 0 calc(var(--layout-stroke) * -1) 0 var(--line); }
+
+/* Seven days, Monday first: the letter, and under it the day as a short lane. */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-xs); }
+.week span { display: grid; gap: var(--space-xs); font: var(--type-label); color: var(--muted); text-align: center; }
+.week .today { color: var(--ink); }
+/* Today has a line round it, as in the year. */
+.week .today i { outline: var(--layout-hair) solid var(--ink); }

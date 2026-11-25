@@ -16,33 +16,41 @@ export function holdTaps() {
       const tapped = event.target instanceof Element ? (event.target.closest('button, a, label, input, textarea') ?? event.target) : null;
       const scroller = tapped?.closest<HTMLElement>('main, dialog');
       if (!tapped || !scroller || tapped.matches('label, input, textarea') || tapped.closest('[data-moves]')) return;
-      const top = tapped.getBoundingClientRect().top;
-      // At least a sheet's time, in which the redraw and what it starts have begun; then for as
-      // long as something in the scroller still moves, and never past twenty times that.
-      const sheet = motion(scroller, '--motion-sheet');
-      const from = performance.now();
-      // A scroll the person starts is theirs, and so is a window that changes size.
-      // They are listened for only while the hold lasts: left on, each tap would keep its
-      // listeners, and the element tapped, alive for the life of the page.
-      const ended = new AbortController();
-      const free = () => ended.abort();
-      // So is anything pressed next, a key or a pointer: a new press is a new act (Page Down, an
-      // arrow, the scrollbar), and the hold of the last one must not pull its scroll back.
-      for (const type of ['wheel', 'touchmove', 'resize', 'keydown', 'pointerdown']) addEventListener(type, free, { passive: true, capture: true, signal: ended.signal });
-      const off = () => tapped.getBoundingClientRect().top - top;
-      const hold = () => {
-        if (ended.signal.aborted) return;
-        if (!tapped.isConnected) return free();
-        // Held by scrolling and by nothing else: the browser stops the scroll at the page's own
-        // ends, so a page is never scrolled past its content and one that fits is never scrolled.
-        // There the control moves with what opens or closes beside it, in time.
-        scroller.scrollTop += off();
-        const now = performance.now();
-        if (now < from + sheet || (now < from + 20 * sheet && scroller.getAnimations({ subtree: true }).length > 0)) requestAnimationFrame(hold);
-        else free();
-      };
-      requestAnimationFrame(hold);
+      holdStill(() => (tapped.isConnected ? tapped : null), tapped.getBoundingClientRect().top, scroller);
     },
     true,
   );
+}
+
+/**
+ * Holds one thing at `top` while its scroller redraws around it, as a tap holds what was tapped.
+ * `find` gives the thing as it is in the page now: a row set down in another list is drawn anew,
+ * and is looked for again each frame. Not found once the redraw has had its time, it is let go.
+ */
+export function holdStill(find: () => Element | null, top: number, scroller: HTMLElement) {
+  // At least a sheet's time, in which the redraw and what it starts have begun; then for as
+  // long as something in the scroller still moves, and never past twenty times that.
+  const sheet = motion(scroller, '--motion-sheet');
+  const from = performance.now();
+  // A scroll the person starts is theirs, and so is a window that changes size.
+  // They are listened for only while the hold lasts: left on, each tap would keep its
+  // listeners, and the element tapped, alive for the life of the page.
+  const ended = new AbortController();
+  const free = () => ended.abort();
+  // So is anything pressed next, a key or a pointer: a new press is a new act (Page Down, an
+  // arrow, the scrollbar), and the hold of the last one must not pull its scroll back.
+  for (const type of ['wheel', 'touchmove', 'resize', 'keydown', 'pointerdown']) addEventListener(type, free, { passive: true, capture: true, signal: ended.signal });
+  const hold = () => {
+    if (ended.signal.aborted) return;
+    const held = find();
+    const now = performance.now();
+    if (!held) return now < from + sheet ? void requestAnimationFrame(hold) : free();
+    // Held by scrolling and by nothing else: the browser stops the scroll at the page's own
+    // ends, so a page is never scrolled past its content and one that fits is never scrolled.
+    // There the control moves with what opens or closes beside it, in time.
+    scroller.scrollTop += held.getBoundingClientRect().top - top;
+    if (now < from + sheet || (now < from + 20 * sheet && scroller.getAnimations({ subtree: true }).length > 0)) requestAnimationFrame(hold);
+    else free();
+  };
+  requestAnimationFrame(hold);
 }

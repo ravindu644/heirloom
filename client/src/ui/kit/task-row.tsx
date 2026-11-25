@@ -31,11 +31,14 @@ interface Props {
 export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, onOpen, lift }: Props) {
   // The laps as squares, with the count they picture. They sit at the row's right, apart from the
   // project's square: side by side the two would read as one more lap.
-  const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />;
+  // They are drawn in two places, and the row's width says which shows: beside the title in a wide
+  // row, and in a narrow one at the right end of the last line of the words.
+  const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && (() => <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />);
+  const meta = !!(task.project || note);
   const words = (
     <>
       <span class={css.title}>{task.title}</span>
-      {(task.project || note) && (
+      {meta && (
         <span class={css.meta}>
           {task.project && (
             <span class={css.project}>
@@ -47,12 +50,13 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
           {note && <span>{note}</span>}
         </span>
       )}
+      {laps && <span class={css.under}>{laps()}</span>}
     </>
   );
   return (
     // The box round the row is what is measured, so the row itself can be laid out by its width: it wraps where it is very narrow.
     <div class={css.measure}>
-    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked)} data-lift={lift ? task.id : undefined}>
+    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked, meta && css.lined)} data-lift={lift ? task.id : undefined}>
       {/* The box and the words are one piece: a row that breaks never parts them. */}
       <div class={css.lead}>
         {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
@@ -65,8 +69,8 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
         )}
       </div>
       {(laps || end) && (
-        <div class={css.end}>
-          {laps}
+        <div class={cx(css.end, !end && css.solo)}>
+          {laps && <span class={css.beside}>{laps()}</span>}
           {end}
         </div>
       )}

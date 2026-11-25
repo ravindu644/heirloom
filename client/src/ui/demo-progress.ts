@@ -126,6 +126,7 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     lap('i', 15, 30, { overlap: true }),
     lap('j', 15, 40, { overlap: true, row: 1, task: { id: 'react', title: 'Thinking in React, steps 1 to 3' }, project: project('react') }),
     lap('k', 16, 10),
+    rest('l', 16, 35),
   ]);
   // Any other day: its laps from nine, a short break after each.
   const plain = (day: string): TimelineEntry[] =>

@@ -10,8 +10,8 @@ const MIN = 60000;
 const T0 = Date.UTC(2026, 10, 24, 10);
 const lengths = { short_ms: 5 * MIN, long_ms: 15 * MIN };
 const lapOn = (from: TimerState, task: string | null, now = T0) => act(from, { do: 'start', phase: 'work', run: 'w', task, planned_ms: 25 * MIN }, now);
-const plan = (state: TimerState, now: number, on?: { title: string; laps: number; estimate: number | null }, ahead = 0) =>
-  planFor({ state, view: view(state, now), on, lengths, ahead });
+const plan = (state: TimerState, now: number, on?: { title: string; laps: number; estimate: number | null }, ahead = 0, today = 1) =>
+  planFor({ state, view: view(state, now), on, today, lengths, ahead });
 
 test('nothing running plans nothing', () => {
   assert.equal(plan(IDLE, T0), null);
@@ -48,16 +48,22 @@ test('a task with no estimate, and a lap past the estimate, read plainly', () =>
   assert.equal(past?.during, 'Lap 4, 2 estimated: Essay draft');
 });
 
-test('a lap for nothing in particular, or on a task this device does not hold open: the set, with its noun', () => {
-  // The second lap of the set.
+test('a lap for nothing in particular, or on a task this device does not hold open: the lap of the day, and no word of the set', () => {
+  // The second lap of the set, the third of the day.
   const second = lapOn(act(lapOn(IDLE, null), { do: 'stop' }, T0 + MIN), null, T0 + 2 * MIN);
-  const ring = plan(second, T0 + 3 * MIN);
+  const ring = plan(second, T0 + 3 * MIN, undefined, 0, 3);
   assert.ok(ring && !isPaused(ring));
-  assert.equal(ring.during, 'Lap 2 of 4 in this set');
-  assert.equal(ring.title, 'Lap 2 of 4 in this set, done.');
+  assert.equal(ring.during, 'Lap 3 today');
+  assert.equal(ring.title, 'Lap done.');
+  assert.doesNotMatch(JSON.stringify(ring), /set|of 4/);
 });
 
-test('the fourth lap of the set earns the long break, at the length given', () => {
+test('a lap begun before midnight, on no task, is not a lap of today', () => {
+  const ring = plan(lapOn(IDLE, null), T0 + MIN, undefined, 0, 0);
+  assert.equal(ring?.during, 'A lap from yesterday');
+});
+
+test('the fourth lap in a row earns the long break, at the length given', () => {
   const fourth: TimerState = { ...lapOn(IDLE, null), set_index: 3 };
   const ring = plan(fourth, T0);
   assert.ok(ring && !isPaused(ring));
@@ -83,7 +89,7 @@ test('a break: its name, what is next said with its noun, and the way out worded
   assert.ok(ring && !isPaused(ring));
   assert.equal(ring.during, 'Short break');
   assert.equal(ring.title, 'Break over.');
-  assert.equal(ring.body, 'Lap 2 of 4 in this set is next.');
+  assert.equal(ring.body, 'Time for the next lap.');
   assert.equal(ring.actions?.stop, 'Done for now');
 });
 

@@ -13,7 +13,8 @@ const two = (n: number) => String(n).padStart(2, '0');
 /** The timer's face: "18:42". Rounded up, so it reads 00:00 at the bell and not a second before. */
 export function clock(ms: number): string {
   const s = Math.ceil(ms / 1000);
-  return `${two(Math.floor(s / 60))}:${two(s % 60)}`;
+  // From 100 minutes the minutes would need three digits: the clock reads hours, "5:59:59".
+  return s < 100 * 60 ? `${two(Math.floor(s / 60))}:${two(s % 60)}` : `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`;
 }
 
 /** A total on a lane: "2h 11m", "45m". */
@@ -74,21 +75,21 @@ export const nav = {
 export const focus = {
   title: 'Focus',
 
-  // The four are the set that ends in the long break, and the line says so: a count says of what.
-  lap: (n: number) => `Lap ${n} of 4 in this set`,
+  // The lap by the day's count, against the day's target where there is one. The timer's own set
+  // of four is on no screen: nobody chose the four.
+  lap: (n: number, target: number) => (target <= 0 ? `Lap ${n} today` : n > target ? `Lap ${n} today, past your target of ${target}` : `Lap ${n} of ${target} today`),
+  // A lap begun before midnight and still running: it counts on the day it began, so it has no number today.
+  lapYesterday: 'A lap from yesterday',
   lapNext: ', next',
   lapFocus: ', focus',
   lapPaused: ', paused',
   lapDone: ', done',
   shortBreak: 'Short break',
   longBreak: 'Long break',
-  afterLap: (n: number) => `, after lap ${n} of 4 in this set`,
-  afterSet: ', after the set',
   breakOver: ', over',
-  longBreakAhead: (lap: number) => (lap < 4 ? 'long break after lap 4' : 'long break after this lap'),
-  lapAhead: (n: number) => `lap ${n} next`,
-  // Beside a break's line that does not name the set itself ("Short break, over").
-  lapAheadInSet: (n: number) => `lap ${n} of 4 in this set next`,
+  // At the line's right end: the break this lap will earn, and in a break the lap that follows.
+  breakAfter: (ms: number, long: boolean) => `${mins(ms)} min ${long ? 'long break' : 'break'} after`,
+  lapAhead: (n: number) => `lap ${n} today next`,
 
   endsIfStarted: (end: number, own: boolean) => `Start now and it ends at ${wall(end)}.${own ? ` ${focus.ownLengths}` : ''}`,
   endsAt: (planned: number, end: number) => `of ${clock(planned)}, ends at ${wall(end)}`,
@@ -105,12 +106,16 @@ export const focus = {
   startBreak: (ms: number) => `Start ${mins(ms)} min break`,
   // One way out for someone finished for the day, after a bell and in a break: both buttons there start something.
   doneForNow: 'Done for now',
-  // What it did: the timer is at rest after that lap. `lap` is 1 to 4.
-  stoppedAfter: (lap: number) => `Stopped after lap ${lap}. ${lap >= 4 ? 'A new set starts with lap 1.' : `Lap ${lap + 1} is next.`}`,
+  // What it did: the timer is at rest after that lap, counted by the day.
+  // No lap of today: the one that last ended began before midnight, and there is no "lap 0".
+  stoppedAfter: (lap: number) => (lap > 0 ? `Stopped after lap ${lap} today.` : "Stopped after yesterday's lap."),
 
-  // What Stop did: which lap ended and how far it ran, then what comes next. `lap` is 1 to 4.
+  // A lap stopped in its first minute is a start taken back: it is in no count, so it has no number.
+  takenBack: 'Stopped in its first minute. Not counted as a lap.',
+  // What Stop did: which lap of the day ended and how far it ran, as the clock says it: "at 12 min",
+  // and from an hour "at 4h 40m". Lap 0 is one begun before midnight, which has no number today.
   stopped: (lap: number, ran: number) =>
-    `Lap ${lap} stopped ${ran >= MIN ? `at ${Math.floor(ran / MIN)} min` : 'in its first minute'}. ${lap >= 4 ? 'A new set starts with lap 1.' : `Lap ${lap + 1} is next.`}`,
+    `${lap > 0 ? `Lap ${lap} today` : "Yesterday's lap"} stopped ${ran < MIN ? 'in its first minute' : `at ${ran < 60 * MIN ? `${mins(ran)} min` : total(ran)}`}.`,
   undo: 'Undo',
 
   // The line over the digits when the lap is for a task. The lap in progress is counted.
@@ -165,7 +170,7 @@ export const result = {
     laps === 1 ? `Lap ${nextLap} draws you level with ${day}.` : `${laps} laps draw you level with ${day}.`,
   noGhost: (ms: number) => `${cap(length(ms))} today.`,
   // The one exclamation mark.
-  set: 'Four laps. A full set!',
+  set: 'Four laps. The long break is earned!',
   laps: (n: number) => (n <= 1 ? 'First lap of the day.' : `${n} laps today.`),
   take: (ms: number) => (mins(ms) === 5 ? 'Take five.' : `Take ${length(ms)}.`),
   cheered: (who: string[]) => `${names(who)} cheered.`,
@@ -199,9 +204,9 @@ export const status = {
 // The notification when a phase ends, for a tab out of sight or a phone in a pocket. What
 // happened in the title, what is next in the body.
 export const ring = {
-  lapDone: (n: number) => (n === 4 ? result.set : `Lap ${n} of 4 in this set, done.`),
+  lapDone: 'Lap done.',
   breakOver: 'Break over.',
-  lapNext: (n: number) => `Lap ${n} of 4 in this set is next.`,
+  lapNext: 'Time for the next lap.',
   // Beside the countdown in the phone's notification shade, while a phase runs.
   // The notification's own buttons and its word for a lap that is held.
   pause: 'Pause',
@@ -209,7 +214,7 @@ export const ring = {
   stop: 'Stop',
   paused: (ms: number) => `Paused, ${clock(ms)} left`,
   // What the lap is for, with the task's own count: "Lap 1 of 4" alone was read as its estimate.
-  lapOn: (title: string | null, lap: number, estimate: number | null) => (title === null ? focus.lap(lap) : `Lap ${lap}${estimate === null ? '' : `, ${estimate} estimated`}: ${title}`),
+  lapOn: (title: string | null, lap: number, estimate: number | null) => (title === null ? focus.lap(lap, 0) : `Lap ${lap}${estimate === null ? '' : `, ${estimate} estimated`}: ${title}`),
   // The bell's line for a lap on a task. The title stands last, where the phone may cut it.
   lapOnDone: (title: string, lap: number) => `Lap ${lap} done: ${title}`,
   // The way out of a break, from the notification: the words Focus has for it.
@@ -237,12 +242,29 @@ export const savedAsYouGo = 'Changes are saved as you make them.';
 // the sign-in form in a browser. Sentences, in the order a day meets them.
 export const welcome = {
   title: 'Work in laps. Race the you of last week.',
-  lines: [
-    'A lap is one stretch of focus, 25 minutes unless you change it, and then a break. Four make a set.',
-    'Plan the day in laps and tick them off. At the end you see how close your estimates were.',
-    'Habits get a box to tick, and two rest days a week that break nothing.',
-    'In a room, friends see who is on a lap right now and cheer each other on.',
-  ],
+  // What it does, once, briefly. The drawing under it does the rest.
+  what: 'A timer, a task list and a habit tracker that remember your last week, so there is always someone to beat.',
+  // The drawing, for someone who cannot see it.
+  drawn: 'A day drawn as a race in two lanes. Yours: six laps with a break after each, the sixth still running. Under it, you a week ago: five laps. You are a lap ahead.',
+  you: 'You',
+  before: 'Last week',
+  ahead: '+25m',
+  // The key to the race, on a line under it: only what the race draws. Two to five words each.
+  key: {
+    lap: 'a lap of focus',
+    rest: 'a break',
+    ghost: 'you, a week ago',
+  },
+  // Two small drawings under the race, each with one line. A habit's week: five days kept, two of rest.
+  week: 'Habits, with rest days that break nothing.',
+  weekDrawn: 'One habit over a week: five days kept and two rest days.',
+  // A task as its row counts it.
+  tasks: 'Tasks, planned in laps.',
+  tasksDrawn: 'One task: two laps done of three planned.',
+  // A room: three friends as the Room shows them, two on a lap and one on a break.
+  room: 'Rooms, where friends work beside you.',
+  roomDrawn: 'A room of three friends: two on a lap with the time left, one on a break.',
+  friends: ['Ishara', 'Nimal', 'Tharu'],
   where: 'It is free. Everything you do is kept on a server that you or a friend runs, and nowhere else.',
   go: 'Connect to a server',
 };
@@ -286,7 +308,7 @@ export const settings = {
   // Under the three lengths.
   lengthsNote: 'A lap or a break already running keeps its length.',
   // Under the day target: the same number Today edits.
-  targetNote: 'Today shows a bar of this many laps. It can be changed there too.',
+  targetNote: 'Today and Focus show a bar of this many laps. It can be changed on Today too.',
   finish: 'A finished lap',
   celebrate: 'Mark a finished lap',
   celebrateNote: 'A short motion when a lap reaches its bell, and one line at the laps worth it: the first, the 25th, a best week. Off, a finished lap is its numbers and nothing more.',
@@ -409,6 +431,13 @@ export const today = {
   holdHint: 'Press and hold a task to move it.',
   // For a screen reader, after Alt and an arrow key moved the row that has the focus.
   nowAt: (title: string, at: number, of: number) => `${title}: now ${at} of ${of}.`,
+  // A row carried up out of Upcoming: on the bar, with Undo, naming the day it had. The bar adds the first full stop.
+  nowToday: 'Now due today',
+  // After ticking a task whose lap had run under a minute. Short: the bar is one line, and Focus's own sentence did not fit beside a title on a phone.
+  noLap: 'No lap counted.',
+  wasDue: (when: string) => `It was ${when}.`,
+  // A row of today let go inside Upcoming: it went back, and the bar says how to do what was meant.
+  staysToday: 'To plan it for another day, set its day in the task',
   upcoming: 'Upcoming',
   doneToday: 'Done',
 
@@ -448,7 +477,6 @@ export const today = {
   purge: 'Delete for good',
   purgeAsk: 'Delete for good?',
   // A1: the task ticked while its lap ran. Said after "Done: <title>."
-  lapStopped: (lap: number, ran: number) => `Lap ${lap} stopped ${ran >= MIN ? `at ${Math.floor(ran / MIN)} min` : 'in its first minute'}.`,
   // B13: on a row's small line.
   subtasks: (done: number, of: number) => `${done} of ${plural(of, 'subtask', 'subtasks')}`,
   // A3: a project deleted from the sheet.
@@ -600,6 +628,9 @@ export const progress = {
 
   dayTitle: (day: string, today: string) => (day === today ? 'Today, hour by hour' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, hour by hour`),
   toToday: 'Back to today',
+  // Over a day's list of sessions when it holds more than its latest few: how many more, and the way back.
+  earlier: (n: number, isToday: boolean) => `${n} earlier ${isToday ? 'today' : 'that day'}`,
+  latest: (n: number) => `Show the latest ${n}`,
   lap: 'Lap',
   stopped: 'Stopped lap',
   aside: 'Lap, not counted',
@@ -736,9 +767,9 @@ export const room = {
   share: (name: string, ms: number) => `${name} ${total(ms)}`,
   you: 'You',
   members: 'Who is focusing now',
-  // Said of you and of friends alike, so the set is neither "this" nor "their".
-  focusing: (lap: number) => `Focusing, lap ${lap} in a set of 4`,
-  paused: (lap: number) => `Paused, lap ${lap} in a set of 4`,
+  // No lap number: a friend's count is theirs, and the timer's set of four is on no screen.
+  focusing: 'Focusing',
+  paused: 'Paused',
   shortBreak: 'Short break',
   longBreak: 'Long break',
   breakPaused: 'Break paused',

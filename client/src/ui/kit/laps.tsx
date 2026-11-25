@@ -13,8 +13,9 @@ interface Props {
 
 /**
  * Laps as small squares with the count they picture at their right, in `figure-sm`. The two are
- * one thing and never part: where a row has no room for them beside its words, the row puts the
- * pair on a line of its own. Past the estimate nothing changes colour.
+ * one thing and never part: a narrow row stands the pair at the right end of its project's line,
+ * and on a line of its own only where that line is full or absent. Past the estimate nothing
+ * changes colour.
  */
 export function Laps({ laps, squares, estimate, of }: Props) {
   return (

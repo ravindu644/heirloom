@@ -36,7 +36,9 @@
 .main { position: relative; grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
 /* A screen that is changed fades in and rises; the one before it is gone at once. */
 .canvas { max-width: var(--layout-canvas); height: 100%; animation: arrive var(--motion-fill) var(--motion-ease); }
-@keyframes arrive { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+/* While it rises it is shorter by the rise, so its foot is where it will rest: moved down whole,
+   it reached past the page's end and made a screen that fits scroll for as long as it rose. */
+@keyframes arrive { from { height: calc(100% - var(--motion-rise)); opacity: 0; transform: translateY(var(--motion-rise)); } }
 /* What the last tap did lies over the foot of the screen, in the screen's own cell. */
 .over { grid-area: main; }
 

@@ -18,10 +18,20 @@
 .hours .end { transform: translateX(-100%); }
 
 /* The same sessions in words: each a row a thumb can use. */
-.list { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
+/* The link that opens the earlier ones belongs to the list: it stands on the first row, whose own
+   `sm` is all that parts them, and a step further from the hours over it than a list alone is. */
+.sessions { display: grid; grid-template-columns: minmax(0, 1fr); }
+.folded { padding-top: var(--space-sm); }
+/* Its target reaches a little into the first row, over that row's words and never its button. */
+.sessions > .back { position: relative; z-index: 1; }
+/* But for a phone at twice its type size, where the row's button stands under the link: there the two targets keep apart. */
+@media (max-width: 280px) {
+  .sessions { gap: var(--space-md); }
+}
+.list { padding: 0; list-style: none; }
 /* On a phone: when and how long on one line, what on the next, the link beside both. */
-.list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0 var(--space-sm); min-height: var(--layout-touch); padding: var(--space-sm) 0; }
-.list li + li { border-top: 1px solid var(--line); }
+.entry { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0 var(--space-sm); min-height: var(--layout-touch); padding: var(--space-sm) 0; }
+.list > li + li .entry { border-top: 1px solid var(--line); }
 .when, .length { font: var(--type-label); color: var(--muted); }
 .what { display: grid; grid-row: 2; grid-column: 1 / span 2; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 0 var(--space-sm); min-width: 0; }
 /* The kind never wraps: the title beside it is what gives way. */
@@ -40,7 +50,7 @@
 .done li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (min-width: 720px) {
-  .list li { grid-template-columns: 12ch minmax(0, 1fr) auto 10ch; gap: var(--space-md); }
+  .entry { grid-template-columns: 12ch minmax(0, 1fr) auto 10ch; gap: var(--space-md); }
   .when { grid-column: 1; }
   .what { display: flex; grid-row: 1; grid-column: 2; }
   .what b, .what em { flex: none; }

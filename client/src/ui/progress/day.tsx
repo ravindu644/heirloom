@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'preact/hooks';
 import { say } from '../kit/said.tsx';
 import type { Progress, TimelineEntry } from '../../sync/progress.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
 import { LongField } from '../kit/field.tsx';
+import { Fold } from '../kit/fold.tsx';
 import { Laps } from '../kit/laps.tsx';
 import { Panel } from '../kit/panel.tsx';
 import { useTyped } from '../kit/typed.ts';
@@ -13,6 +15,8 @@ const HOUR = 3600000;
 const NOTE_MAX = 280;
 // Under this many characters left, the count shows.
 const NOTE_NEAR = 40;
+// How many of a day's sessions its list shows before it is asked for the rest.
+const LATEST = 5;
 
 const kind = (entry: TimelineEntry) =>
   entry.kind === 'short' ? s.progress.shortBreak : entry.kind === 'long' ? s.progress.longBreak : entry.outcome === 'void' ? s.progress.aside : entry.outcome === 'stopped' ? s.progress.stopped : s.progress.lap;
@@ -26,6 +30,9 @@ const kind = (entry: TimelineEntry) =>
 export function Day({ progress, day, today, onToday }: { progress: Progress; day: string; today: string; onToday: () => void }) {
   const entries = progress.timeline(day);
   const isToday = day === today;
+  // The earlier sessions are open for the day they were asked for, and folded again on another.
+  const [all, setAll] = useState(false);
+  useEffect(() => setAll(false), [day]);
 
 
   // The day's stretch: whole hours around what ran, never fewer than four.
@@ -75,9 +82,17 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               ))}
             </div>
           </div>
-          <ul class={css.list}>
-            {entries.map((entry) => (
-              <li key={entry.id}>
+          {/* A day of many short tries was a wall of rows before the first figure: the five latest
+              stand, in the order of the day, and one link over them opens the earlier ones in place. */}
+          <div class={cx(css.sessions, entries.length > LATEST && css.folded)}>
+          {entries.length > LATEST && (
+            <Button kind="link" class={css.back} aria-expanded={all} onClick={() => setAll(!all)}>
+              {all ? s.progress.latest(LATEST) : s.progress.earlier(entries.length - LATEST, isToday)}
+            </Button>
+          )}
+          <Fold list class={css.list}>
+            {(all ? entries : entries.slice(-LATEST)).map((entry) => (
+              <div key={entry.id} class={css.entry}>
                 <span class={css.when}>{s.progress.span(entry.started, entry.ended)}</span>
                 <span class={css.what}>
                   <b>{kind(entry)}</b>
@@ -103,9 +118,10 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
                     {act(entry)}
                   </Button>
                 )}
-              </li>
+              </div>
             ))}
-          </ul>
+          </Fold>
+          </div>
         </>
       )}
       {look && (
