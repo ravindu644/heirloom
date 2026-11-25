@@ -22,11 +22,14 @@ interface Options {
   worker?: boolean;
   answer?: 'ok' | 'offline';
   memory?: { value: unknown };
-  browser?: { endpoint: string | null; breaks?: boolean };
-  words?: Words;
+  /** The browser's subscription: its endpoint and the key it was made with (the server's, unless said). */
+  browser?: { endpoint: string | null; key?: number[]; breaks?: boolean };
+  words?: { now: Words };
+  /** Whether main has already said "ring here" on and signed in, as it does at every start. */
+  told?: boolean;
 }
 
-function rig({ permission = 'granted', hidden = false, worker = true, answer = 'ok', memory = { value: undefined }, browser = { endpoint: null }, words = WORDS }: Options = {}) {
+function rig({ permission = 'granted', hidden = false, worker = true, answer = 'ok', memory = { value: undefined }, browser = { endpoint: null }, words = { now: WORDS }, told = true }: Options = {}) {
   const time = fakeTime();
   const page = { hidden, show: () => {} };
   const rings: number[] = [];
@@ -37,6 +40,7 @@ function rig({ permission = 'granted', hidden = false, worker = true, answer = '
   const warned: unknown[] = [];
   let hear: (data: unknown) => void = () => {};
   const sub = (endpoint: string): Subscription => ({
+    options: { applicationServerKey: new Uint8Array(browser.key ?? [1, 2, 3]).buffer },
     toJSON: () => ({ endpoint, keys: { p256dh: 'BP', auth: 'au' } }),
     unsubscribe: async () => {
       unsubscribed.push(endpoint);
@@ -50,6 +54,7 @@ function rig({ permission = 'granted', hidden = false, worker = true, answer = '
       if (browser.breaks) throw new DOMException('push service unreachable', 'AbortError');
       asked.push(options);
       browser.endpoint = 'https://push.example/new';
+      browser.key = [...(options.applicationServerKey as Uint8Array)];
       return sub(browser.endpoint);
     },
   };
@@ -78,11 +83,15 @@ function rig({ permission = 'granted', hidden = false, worker = true, answer = '
       },
       remembered: () => memory.value,
       remember: (sent) => void (memory.value = sent),
-      words,
+      words: () => words.now,
       warn: (error) => warned.push(error),
       onMessage: (h) => void (hear = h),
     },
   });
+  if (told) {
+    notifier.ringHere(true);
+    notifier.account('in');
+  }
   const done = async () => {
     for (let i = 0; i < 20; i++) await settle();
   };
@@ -137,7 +146,7 @@ describe('subscribing to push', () => {
     await moved.done();
     assert.equal(moved.subscribes()[0]![1].subscription.endpoint, 'https://push.example/b');
 
-    const reworded = rig({ memory, browser: { endpoint: 'https://push.example/b' }, words: { ...WORDS, break: 'Breather over.' } });
+    const reworded = rig({ memory, browser: { endpoint: 'https://push.example/b' }, words: { now: { ...WORDS, break: 'Breather over.' } } });
     await reworded.done();
     assert.equal(reworded.subscribes()[0]![1].words.break, 'Breather over.');
   });
@@ -304,3 +313,51 @@ describe('ring here, and the account', () => {
     assert.equal(subscribes().length, 2);
   });
 });
+
+describe('what the code review found', () => {
+  it('a subscription made with another server key is replaced, not sent again for ever', async () => {
+    const { done, unsubscribed, asked, subscribes } = rig({ browser: { endpoint: 'https://push.example/old', key: [9, 9, 9] } });
+    await done();
+    assert.deepEqual(unsubscribed, ['https://push.example/old']);
+    assert.equal(asked.length, 1);
+    assert.equal(subscribes()[0]![1].subscription.endpoint, 'https://push.example/new');
+
+    const current = rig({ browser: { endpoint: 'https://push.example/a' } });
+    await current.done();
+    assert.deepEqual([current.unsubscribed, current.asked], [[], []]);
+  });
+
+  it('with ring here off from the start, nothing is subscribed or unsubscribed at load', async () => {
+    const { notifier, done, requests, unsubscribed, asked } = rig({ told: false, browser: { endpoint: null } });
+    await done();
+    notifier.ringHere(false);
+    notifier.account('in');
+    await done();
+    assert.deepEqual([requests, unsubscribed, asked], [[], [], []]);
+  });
+
+  it('nothing is subscribed until both ring here and the account have been said', async () => {
+    const onlyHere = rig({ told: false });
+    onlyHere.notifier.ringHere(true);
+    await onlyHere.done();
+    assert.deepEqual(onlyHere.requests, []);
+    onlyHere.notifier.account('in');
+    await onlyHere.done();
+    assert.equal(onlyHere.subscribes().length, 1);
+  });
+
+  it('words asked for at each subscribe: changed break lengths are sent once, unchanged ones not at all', async () => {
+    const words = { now: WORDS };
+    const { notifier, done, subscribes } = rig({ words });
+    await done();
+    notifier.reword();
+    await done();
+    assert.equal(subscribes().length, 1);
+    words.now = { ...WORDS, take: ['Take ten.', 'Take ten.', 'Take ten.', 'Take thirty.'] };
+    notifier.reword();
+    await done();
+    assert.equal(subscribes().length, 2);
+    assert.deepEqual(subscribes()[1]![1].words.take, ['Take ten.', 'Take ten.', 'Take ten.', 'Take thirty.']);
+  });
+});
+

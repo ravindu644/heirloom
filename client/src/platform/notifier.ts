@@ -26,8 +26,10 @@ export interface Notifier {
   allow(): Promise<boolean>;
   /** The person's "ring here" for this device. Off: nothing is planned, and no push comes here. Starts on. */
   ringHere(on: boolean): void;
-  /** The account changed: `in` after a sign in, `out` at sign out. */
+  /** Who is signed in: `in` or `out`. Push to this browser waits until both this and `ringHere` have been said. */
   account(change: 'in' | 'out'): void;
+  /** The words a push would say may have changed (the break lengths): sent again only if they differ. */
+  reword(): void;
   /** Every habit reminder wanted, whole: what this device holds is made to match it and nothing else. */
   reminders(set: Reminder[]): void;
 }

@@ -12,6 +12,8 @@ export interface Words {
 
 /** The parts of the browser's PushSubscription and PushManager used here. */
 export interface Subscription {
+  /** The key it was made with: a server that made itself a new key cannot push to an old one. */
+  readonly options: { readonly applicationServerKey: ArrayBuffer | null };
   toJSON(): object;
   unsubscribe(): Promise<boolean>;
 }
@@ -30,12 +32,14 @@ export interface PushEnv {
   /** What was last sent, kept with the account, so a sign in to another account sends again. */
   remembered(): unknown;
   remember(sent: string | null): void;
-  words: Words;
+  /** Asked at each subscribe, so the break lengths they state are the ones in force then. */
+  words(): Words;
   warn(error: unknown): void;
 }
 
 // PushManager takes the key as bytes everywhere; not every browser takes the base64url string.
 const bytes = (base64url: string) => Uint8Array.from(atob(base64url.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 export function createPush(env: PushEnv) {
   // One step at a time: "ring here" off and on again quickly must end subscribed, not in between.
@@ -51,10 +55,17 @@ export function createPush(env: PushEnv) {
       run(async () => {
         const manager = await env.manager();
         if (!manager) return;
-        const subscription =
-          (await manager.getSubscription()) ??
-          (await manager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes(await env.key()) }));
-        const body = { subscription: subscription.toJSON(), words: env.words };
+        const key = bytes(await env.key());
+        let subscription = await manager.getSubscription();
+        // Made with another key (the server's data was recreated): its pushes would be refused
+        // with 403 for ever, so it is replaced.
+        const made = subscription?.options.applicationServerKey;
+        if (subscription && !(made && same(new Uint8Array(made), key))) {
+          await subscription.unsubscribe();
+          subscription = null;
+        }
+        subscription ??= await manager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        const body = { subscription: subscription.toJSON(), words: env.words() };
         const sent = JSON.stringify(body);
         if (sent === env.remembered()) return;
         // Offline or signed out: nothing is remembered, so the next start tries again.

@@ -189,6 +189,8 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     },
     // The phone's own alarm needs nothing from the account; a sign out stops the timer, which plans null.
     account() {},
+    // The phone's alarm says its words itself, when it is planned.
+    reword() {},
     async allow() {
       // main.tsx calls this as `void notifier.allow()`: a bridge failure is a no, not an unhandled rejection.
       const ok = await (async () =>

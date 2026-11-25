@@ -68,10 +68,14 @@ export function createWebNotifier(env: WebEnv): Notifier {
   // The last plan given, kept while "ring here" is off, so switching it on plans it again.
   let wanted: Ring | null = null;
   let here = true;
+  // Push waits until main has said both whether this device rings and who is signed in, so a
+  // device with "ring here" off is never subscribed for a moment at load.
+  let told = false;
+  let signedIn = false;
   let cancel = () => {};
   const push = env.push && createPush(env.push);
   const granted = () => env.Notification?.permission === 'granted';
-  const subscribe = () => void (here && granted() && push?.subscribe());
+  const subscribe = () => void (told && here && signedIn && granted() && push?.subscribe());
 
   // Rings the plan now, then forgets it, so each plan rings at most once.
   const ring = () => {
@@ -113,9 +117,6 @@ export function createWebNotifier(env: WebEnv): Notifier {
       cancel();
     } else ring();
   });
-
-  // At start: the browser may hand out a different subscription, or the words may have changed.
-  subscribe();
 
   // Habit reminders. A page cannot schedule a notification for when it is closed, so this is the
   // honest minimum: while a tab is open, a notification at the reminder's time, if permitted and
@@ -174,7 +175,13 @@ export function createWebNotifier(env: WebEnv): Notifier {
       remind();
     },
     ringHere(on) {
-      if (on === here) return;
+      const first = !told;
+      told = true;
+      if (on === here) {
+        // At start: the browser may hand out a different subscription, or the words may have changed.
+        if (first) subscribe();
+        return;
+      }
       here = on;
       remind();
       if (on) {
@@ -184,13 +191,16 @@ export function createWebNotifier(env: WebEnv): Notifier {
         // Not through plan(): a held-back bell must not ring at the moment the person says not here.
         planned = null;
         cancel();
-        void push?.unsubscribe(true);
+        // Off from the start: it was unsubscribed when it was switched off.
+        if (!first) void push?.unsubscribe(true);
       }
     },
     account(change) {
-      if (change === 'in') subscribe();
+      signedIn = change === 'in';
+      if (signedIn) subscribe();
       else void push?.unsubscribe(false);
     },
+    reword: subscribe,
   };
 }
 

@@ -23,18 +23,21 @@ async function start() {
   // In a browser it also asks the server to push at a bell, for a tab that is closed or out of
   // sight, with the words to say: the server holds no copy of its own (protocol.md section 17).
   const laps = [1, 2, 3, 4];
-  const breaks = focus.lengths.peek();
   const notifier = await startPlatform(
     { ring: ring.bellChannel, countdown: ring.countdownChannel, remind: ring.remindChannel },
     {
       request: (path, body) => engine.request(path, body),
       remembered: () => engine.kept('push'),
       remember: (sent) => engine.keep('push', sent),
-      words: {
-        lap: laps.map(ring.lapDone),
-        take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
-        next: laps.map(ring.lapNext),
-        break: ring.breakOver,
+      // Asked for at each subscribe: the break lengths in them change in Settings.
+      words: () => {
+        const breaks = focus.lengths.peek();
+        return {
+          lap: laps.map(ring.lapDone),
+          take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
+          next: laps.map(ring.lapNext),
+          break: ring.breakOver,
+        };
       },
     },
   );
@@ -42,6 +45,12 @@ async function start() {
   // sign out stops this browser being pushed to.
   effect(() => notifier.ringHere(settings.ringHere.value));
   effect(() => notifier.account(engine.account.value ? 'in' : 'out'));
+  // A closed tab's bell is worded by the server from what it was last sent: send again when
+  // the lengths change, or a push would say "Take five" for a ten minute break.
+  effect(() => {
+    void focus.lengths.value;
+    notifier.reword();
+  });
   // A habit with a reminder time is reminded on this device on the days it is planned, until it
   // is checked in. The notifier keeps what the phone holds equal to this list.
   effect(() =>
