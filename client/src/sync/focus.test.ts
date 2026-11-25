@@ -6,7 +6,7 @@ import { eventStamp } from '../core/hlc.ts';
 import type { Cell } from '../core/merge.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
-import { EXTEND_MS } from './focus.ts';
+import { EXTEND_MS, SAID_MS, UNDO_MS } from './focus.ts';
 import { LAP, MIN, world } from './world.ts';
 
 const lapRow = (device: string, over: object = {}) => ({
@@ -100,6 +100,8 @@ describe('starting and the timer', () => {
     d.focus.extend();
     assert.equal(d.focus.state.value.paused_ms, 3 * MIN);
     assert.equal(EXTEND_MS, 5 * MIN);
+    // DESIGN.md: the bar goes after four seconds when it only reports, after ten when it carries an Undo.
+    assert.deepEqual([SAID_MS, UNDO_MS], [4000, 10000]);
     assert.equal(d.focus.state.value.planned_ms, LAP + EXTEND_MS);
     assert.equal(d.focus.view().left_ms, 20 * MIN);
     // Nothing to act on: nothing is written.

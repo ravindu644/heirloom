@@ -3,7 +3,7 @@
 // as the mask and its done days as the kept days.
 
 import { addDays, mondayOf } from './progress.ts';
-import { isDay, isMoment } from './real.ts';
+import { isDay, isMoment, isTime } from './real.ts';
 import { streakWindow, weekday } from './streak.ts';
 
 /** A habit row with every field in its place: what is missing or malformed reads as its default. */
@@ -40,7 +40,6 @@ export interface HabitDay {
   rest: boolean;
 }
 
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const whole = (v: unknown, least: number, most = Infinity): v is number => typeof v === 'number' && Number.isInteger(v) && v >= least && v <= most;
 const time = (v: unknown): number | null => (isMoment(v) ? v : null);
 
@@ -49,7 +48,7 @@ export const asDays = (v: unknown): number | null => (whole(v, 1, 127) ? v : nul
 /** A target a habit can have, or null. */
 export const asTarget = (v: unknown): number | null => (whole(v, 1) ? v : null);
 /** A reminder time, `07:30`, or null. */
-export const asRemind = (v: unknown): string | null => (typeof v === 'string' && TIME.test(v) ? v : null);
+export const asRemind = (v: unknown): string | null => (isTime(v) ? v : null);
 
 /** A row is a habit when it has a title, as a task is. */
 export function asHabit(id: string, row: Readonly<Record<string, unknown>>): Habit | null {

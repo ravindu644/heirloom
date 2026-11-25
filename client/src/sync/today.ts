@@ -4,7 +4,7 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { isDay } from '../core/real.ts';
+import { isDay, isTime } from '../core/real.ts';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
 import { asRepeat, asTask, byOrder, keyBetween, moveKeys, nextTask, plan, plannedLeft, quickAdd, squares, upNext } from '../core/today.ts';
@@ -15,7 +15,15 @@ import type { Engine, Row } from './engine.ts';
 
 export type { Repeat } from '../core/today.ts';
 
-export type ProjectColor = 'you' | 'rest' | 'ink' | 'ghost' | 'heat-2';
+/** DESIGN.md's twelve project colours by name, in its order. */
+export const COLORS = ['you', 'rest', 'ink', 'ghost', 'heat-2', 'amber', 'olive', 'teal', 'sky', 'indigo', 'plum', 'clay'] as const;
+/** One of the twelve, or a colour the person picked: `#` and six hex digits. */
+export type ProjectColor = (typeof COLORS)[number] | `#${string}`;
+/** A hex in capitals is one too; it is written, and shown, in lower case. */
+export const isColor = (value: unknown): value is ProjectColor =>
+  typeof value === 'string' && ((COLORS as readonly string[]).includes(value) || /^#[0-9a-f]{6}$/i.test(value));
+// One spelling of each colour: a name as it is, a hex in lower case.
+const asColor = (value: unknown): ProjectColor | null => (isColor(value) ? (value.toLowerCase() as ProjectColor) : null);
 
 export interface ProjectView {
   id: string;
@@ -46,6 +54,8 @@ export interface TaskView {
   due: string | null;
   /** Free words for when in the day: "after dinner". */
   when: string | null;
+  /** The time of day on `due`, `15:30`. Null when none is set, and while there is no `due` for it to be on (another device may have cleared the day as this one set the time). */
+  time: string | null;
   repeat: Repeat;
   done: boolean;
   /** When it was deleted, in ms, or null while it is alive. It goes for good 30 days after. */
@@ -73,6 +83,8 @@ export interface TaskEdit {
   estimate?: number | null;
   due?: string | null;
   when?: string | null;
+  /** `15:30`, or null for none. On a task with no day it sets the day to today as well. */
+  time?: string | null;
   repeat?: Repeat;
 }
 
@@ -94,6 +106,12 @@ export interface Today {
   /** Deleted in the last 30 days, newest first. */
   readonly deleted: ReadonlySignal<TaskView[]>;
   readonly projects: ReadonlySignal<ProjectView[]>;
+  /**
+   * Every task to remind of, for the phone: open, not deleted, with a day and a time on it,
+   * subtasks too (but not those of a deleted task, which are on no screen). By day and time.
+   * It changes only when a task does, not with the clock.
+   */
+  readonly timed: ReadonlySignal<readonly { id: string; title: string; day: string; time: string }[]>;
   /** Worked out at the engine's now, the lap in progress included. Call it on every tick. */
   figures(): DayFigures;
   /** Looks at the clock now: after the device slept, `day` and the lists are right as soon as this returns. */
@@ -127,15 +145,14 @@ export interface TodayEnv {
   schedule(run: () => void, ms: number): () => void;
 }
 
-const COLORS: readonly ProjectColor[] = ['you', 'rest', 'ink', 'ghost', 'heat-2'];
 // How often the square of the lap in progress is redrawn: a hundred steps in a 25 minute lap.
 const PULSE_MS = 15000;
 
-/** The projects to show, in order: named, and neither deleted nor archived. A colour this build does not know reads as ink. */
+/** The projects to show, in order: named, and neither deleted nor archived. A colour this build does not know reads as ink; the cell is left as it is. */
 export const projectViews = (rows: ReadonlyMap<string, Row>): ProjectView[] =>
   [...rows.values()]
     .filter((p) => typeof p.name === 'string' && typeof p.deleted !== 'number' && typeof p.archived !== 'number')
-    .map((p) => ({ id: p.id, order: typeof p.order === 'string' ? p.order : '', name: p.name as string, color: COLORS.find((c) => c === p.color) ?? 'ink' }))
+    .map((p) => ({ id: p.id, order: typeof p.order === 'string' ? p.order : '', name: p.name as string, color: asColor(p.color) ?? 'ink' }))
     .sort(byOrder)
     .map(({ id, name, color }) => ({ id, name, color }));
 
@@ -167,6 +184,27 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     });
   });
 
+  // Every row that is a task. Apart from the lists, so what depends on the tasks alone does not move with the clock.
+  const held = computed(() => {
+    const tasks = new Map<string, Task>();
+    for (const [id, row] of taskRows.value) {
+      const task = asTask(id, row);
+      if (task) tasks.set(id, task);
+    }
+    return tasks;
+  });
+
+  const timed = computed(() => {
+    const tasks = held.value;
+    return [...tasks.values()]
+      .flatMap((t) => {
+        // A subtask shows inside its parent only: with the parent deleted or not there, it is on no screen.
+        const shown = t.parent === null || tasks.get(t.parent)?.deleted === null;
+        return t.due !== null && t.time !== null && t.done === null && t.deleted === null && shown ? [{ id: t.id, title: t.title, day: t.due, time: t.time }] : [];
+      })
+      .sort((a, b) => (`${a.day} ${a.time} ${a.id}` < `${b.day} ${b.time} ${b.id}` ? -1 : 1));
+  });
+
   const model = computed(() => {
     const today = day.value;
     void pulse.value;
@@ -176,11 +214,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     const projects = projectViews(projectRows.value);
     const project = new Map(projects.map((p) => [p.id, p]));
 
-    const tasks = new Map<string, Task>();
-    for (const [id, row] of taskRows.value) {
-      const task = asTask(id, row);
-      if (task) tasks.set(id, task);
-    }
+    const tasks = held.value;
     const lists = plan([...tasks.values()], today, now, env.utcOffsetMin());
     // The timer is on a lap for a task only until that lap rings. After the bell the task is
     // like any other in the list, so the top of the plan decides what the next lap is for.
@@ -198,6 +232,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       running: t.id === lapOn,
       due: t.due,
       when: t.when,
+      // A time is a time on a day. One with no day is what two devices can leave between them: it shows as none.
+      time: t.due === null ? null : t.time,
       repeat: t.repeat,
       done: t.done !== null,
       deleted: t.deleted,
@@ -232,7 +268,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   // moved it, broken it down, or run a lap on it. Only then is it ours to take away or bring back.
   function untouched(next: Task, of: Task, due: string): boolean {
     const copied = next.project === of.project && next.title === of.title && next.notes === of.notes && next.estimate === of.estimate;
-    const placed = next.when === of.when && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
+    const placed = next.when === of.when && next.time === of.time && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
     const used = next.done !== null || model.peek().lists.subtasks.has(next.id) || engine.timer.peek().task === next.id;
     return copied && placed && !used && !counts.sessions.peek().some((s) => s.task === next.id);
   }
@@ -247,6 +283,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     done: computed(() => model.value.done),
     deleted: computed(() => model.value.deleted),
     projects: computed(() => model.value.projects),
+    timed,
 
     figures() {
       const { left } = model.value;
@@ -275,16 +312,27 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
     },
 
     edit(id, fields) {
-      if (!task(id)) return;
+      const t = task(id);
+      if (!t) return;
       const write: Record<string, unknown> = {};
       const title = fields.title?.trim();
       if (title) write.title = title;
       if (fields.notes !== undefined) write.notes = fields.notes;
       if (fields.project !== undefined) write.project = fields.project;
-      const { estimate, due, when, repeat } = fields;
+      const { estimate, due, when, time, repeat } = fields;
       if (estimate === null || (typeof estimate === 'number' && Number.isInteger(estimate) && estimate >= 1)) write.estimate = estimate;
       if (due === null || isDay(due)) write.due = due;
       if (when !== undefined) write.when = when?.trim().slice(0, 80) || null;
+      if (time === null || isTime(time)) write.time = time;
+      // A time is on a day. With none, it is today's, written with it so no device ever holds one without the other.
+      if (isTime(time) && ('due' in write ? write.due : t.due) === null) {
+        // The day it really is: a list still showing yesterday must not date it then.
+        if (day.peek() !== dayNow()) turn();
+        write.due = dayNow();
+      }
+      // The day cleared takes its time with it: left behind, 15:30 would come back, reminder and
+      // all, on whatever day is picked next week. Only a time this build reads: another value is not ours to rewrite.
+      if (write.due === null && t.time !== null) write.time = null;
       if (repeat !== undefined) write.repeat = asRepeat(repeat);
       if (Object.keys(write).length) engine.write('task', id, write);
     },
@@ -303,8 +351,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         const held = tasks.get(next.id);
         if (!held) {
           if (!done) return;
-          const { project, title, notes, estimate, repeat, when, order } = t;
-          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, order, due: next.due });
+          const { project, title, notes, estimate, repeat, when, time, order } = t;
+          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, time, order, due: next.due });
         } else if ((held.deleted === null) !== done && untouched(held, t, next.due)) {
           engine.write('task', next.id, { deleted: done ? null : now });
         }
@@ -351,10 +399,11 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
 
     addProject(name, color) {
       const title = name.trim();
-      if (!title || !COLORS.includes(color)) return null;
+      const hue = asColor(color);
+      if (!title || !hue) return null;
       const id = env.id();
       const keys = [...projectRows.peek().values()].map((p) => ({ order: typeof p.order === 'string' ? p.order : '' })).sort((a, b) => (a.order < b.order ? -1 : 1));
-      engine.write('project', id, { name: title, color, order: atEnd(keys) });
+      engine.write('project', id, { name: title, color: hue, order: atEnd(keys) });
       return id;
     },
 
@@ -364,7 +413,8 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       const write: Record<string, unknown> = {};
       const name = fields.name?.trim();
       if (name) write.name = name;
-      if (fields.color !== undefined && COLORS.includes(fields.color)) write.color = fields.color;
+      const hue = asColor(fields.color);
+      if (hue) write.color = hue;
       if (fields.archived !== undefined && fields.archived !== (typeof held.archived === 'number')) write.archived = fields.archived ? engine.now() : null;
       if (Object.keys(write).length) engine.write('project', id, write);
     },

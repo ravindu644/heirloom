@@ -75,6 +75,11 @@ export type FocusEngine = Pick<Engine, 'timer' | 'sync' | 'device' | 'now' | 'ro
 export const EXTEND_MS = 300000;
 /** How long a stop can be taken back. */
 export const UNDO_MS = 10000;
+/**
+ * How long the bar that says what the last tap did stays when it only reports. DESIGN.md: it
+ * goes by itself after four seconds when it only reports, after ten (`UNDO_MS`) when it carries an Undo.
+ */
+export const SAID_MS = 4000;
 // A bell older than this starts nothing by itself: someone who comes back the next morning finds
 // the timer idle, not a break that began nine hours ago.
 const AUTO_LATE_MS = 2 * 60 * 60 * 1000;

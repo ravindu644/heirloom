@@ -1,7 +1,7 @@
 // The rules behind the Today screen: contracts/protocol.md section 12.
 
 import type { Session } from './stats.ts';
-import { isDay, isMoment } from './real.ts';
+import { isDay, isMoment, isTime } from './real.ts';
 import { localDay } from './stats.ts';
 import { weekday } from './streak.ts';
 import { view } from './timer.ts';
@@ -20,6 +20,8 @@ export interface Task {
   due: string | null;
   repeat: Repeat;
   when: string | null;
+  /** `15:30` on its due day. A stored value that is no time of day reads as null. */
+  time: string | null;
   done: number | null;
   /** '' when the row has none yet: it sorts first. */
   order: string;
@@ -60,6 +62,7 @@ export function asTask(id: string, row: Readonly<Record<string, unknown>>): Task
     due: isDay(due) ? due : null,
     repeat: asRepeat(row.repeat),
     when: text(row.when) || null,
+    time: isTime(row.time) ? row.time : null,
     done: time(row.done),
     order: text(row.order) ?? '',
     deleted: time(row.deleted),

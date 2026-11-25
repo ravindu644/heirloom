@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
+import { COLORS, isColor } from './today.ts';
 import { LAP, MIN, world } from './world.ts';
 
 const HOUR = 60 * MIN;
@@ -41,7 +42,7 @@ describe('adding', () => {
     const next = d.today.next.value!;
     assert.deepEqual(next, {
       id, title: 'pointers chapter 3', notes: '', project: null, estimate: 4, laps: 0, squares: [], running: false,
-      due: TODAY, when: null, repeat: null, done: false, deleted: null, subtasks: [],
+      due: TODAY, when: null, time: null, repeat: null, done: false, deleted: null, subtasks: [],
     });
   });
 
@@ -211,10 +212,10 @@ describe('the lists', () => {
   it('fields a newer build wrote differently read as unset, never as something to trip on', async () => {
     const w = world();
     const d = await w.device('a');
-    d.engine.write('task', 't1', { title: 'odd fields', estimate: 'four', due: 'next week', repeat: { every: 'month' }, when: 9, notes: null, order: 3, project: 'gone' });
+    d.engine.write('task', 't1', { title: 'odd fields', estimate: 'four', due: 'next week', repeat: { every: 'month' }, when: 9, time: 1530, notes: null, order: 3, project: 'gone' });
     assert.deepEqual(d.today.next.value, {
       id: 't1', title: 'odd fields', notes: '', project: null, estimate: null, laps: 0, squares: [], running: false,
-      due: null, when: null, repeat: null, done: false, deleted: null, subtasks: [],
+      due: null, when: null, time: null, repeat: null, done: false, deleted: null, subtasks: [],
     });
   });
 });
@@ -490,7 +491,7 @@ describe('repeating tasks', () => {
     assert.equal(log.length, 1);
     const next = `${id}-20261125`;
     assert.deepEqual(row(d, next), {
-      id: next, project: null, title: 'read', notes: 'K&R', estimate: 2, repeat: { every: 'day' }, when: 'after dinner', order: 'V', due: TOMORROW,
+      id: next, project: null, title: 'read', notes: 'K&R', estimate: 2, repeat: { every: 'day' }, when: 'after dinner', time: null, order: 'V', due: TOMORROW,
     });
     assert.deepEqual(titles(d.today.done.value), ['read']);
     assert.deepEqual(titles(d.today.upcoming.value), ['read']);
@@ -541,6 +542,26 @@ describe('repeating tasks', () => {
     d.today.setDone(id, false);
     assert.deepEqual(titles(d.today.upcoming.value), ['read chapter 2']);
     assert.equal(row(d, `${id}-20261125`)?.deleted, undefined);
+  });
+
+  it('a repeat carries its time: the next one is at the same time on its own day, and a next one whose time was changed is the person\'s', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    d.today.edit(id, { time: '18:00' });
+    d.today.setDone(id, true);
+    const next = `${id}-20261125`;
+    assert.equal(row(d, next)?.time, '18:00');
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.due, t.time]), [[TOMORROW, '18:00']]);
+    assert.deepEqual(d.today.timed.value, [{ id: next, title: 'read', day: TOMORROW, time: '18:00' }]);
+    // Untouched, it goes when the done is taken back, and comes back with it.
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), []);
+    d.today.setDone(id, true);
+    // Moved to another time, it is the person's own, and stays.
+    d.today.edit(next, { time: '19:30' });
+    d.today.setDone(id, false);
+    assert.deepEqual(d.today.upcoming.value.map((t) => t.time), ['19:30']);
+    assert.equal(row(d, next)?.deleted, null);
   });
 
   it('undone does not take away a next one that has been moved, broken down, or has a lap on it', async () => {
@@ -691,6 +712,219 @@ describe('editing', () => {
   });
 });
 
+describe('a task\'s time', () => {
+  it('is set and cleared by edit; a time on a task with no day lands on today, in the same store transaction', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { due: null });
+    await d.engine.saved();
+    log.length = 0;
+    d.today.edit(id, { time: '15:30' });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['time', '15:30'], ['due', TODAY]]);
+    assert.deepEqual([next(d)?.due, next(d)?.time], [TODAY, '15:30']);
+    // With a day already on it, only the time is written.
+    d.today.edit(id, { due: TOMORROW });
+    await d.engine.saved();
+    log.length = 0;
+    d.today.edit(id, { time: '09:05' });
+    await d.engine.saved();
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['time', '09:05']]);
+    assert.equal(row(d, id)?.due, TOMORROW);
+    d.today.edit(id, { time: null });
+    assert.equal(row(d, id)?.time, null);
+    assert.equal(row(d, id)?.due, TOMORROW, 'clearing the time leaves the day');
+    // A time and a day given together are taken as given; a time with the day cleared in the same edit is today's.
+    d.today.edit(id, { due: '2026-12-01', time: '08:00' });
+    assert.deepEqual([row(d, id)?.due, row(d, id)?.time], ['2026-12-01', '08:00']);
+    d.today.edit(id, { due: null, time: '08:00' });
+    assert.equal(row(d, id)?.due, TODAY);
+  });
+
+  it('anything that is not a time of day is ignored, and writes no day either', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { due: null });
+    const cells = d.engine.cells();
+    for (const time of ['24:00', '15:60', '3:30', '15.30', '15:30:00', ' 15:30', '', 'after dinner', 1530, undefined]) d.today.edit(id, { time: time as never });
+    assert.deepEqual(d.engine.cells(), cells);
+    for (const time of ['00:00', '23:59', '07:05']) {
+      d.today.edit(id, { time });
+      assert.equal(next(d)?.time, time);
+    }
+  });
+
+  it('set after the device slept over midnight, with no day: the day is the real one, not the one the list still showed', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { due: null });
+    w.time.jump(DAY);
+    d.today.edit(id, { time: '15:30' });
+    assert.equal(row(d, id)?.due, TOMORROW);
+    assert.equal(d.today.day.value, TOMORROW);
+  });
+
+  it('clearing the day clears the time with it, in the same store transaction: a day picked later does not bring 15:30 back', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { time: '15:30' });
+    await d.engine.saved();
+    log.length = 0;
+    d.today.edit(id, { due: null });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.field, c.value]), [['due', null], ['time', null]]);
+    assert.deepEqual(d.today.timed.value, []);
+    d.today.edit(id, { due: TOMORROW });
+    assert.equal(d.today.upcoming.value[0]?.time, null);
+    assert.deepEqual(d.today.timed.value, []);
+    // Moving the day keeps the time; only clearing it lets the time go.
+    d.today.edit(id, { time: '15:30' });
+    d.today.edit(id, { due: '2026-11-30' });
+    assert.equal(row(d, id)?.time, '15:30');
+  });
+
+  it('clearing the day of a task with no time writes no time, and a stored value this build cannot read is left as it is', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { due: null });
+    assert.equal('time' in row(d, id)!, false);
+    d.engine.write('task', id, { due: TODAY, time: 'teatime' });
+    const stamp = d.engine.stamp('task', id, 'time');
+    d.today.edit(id, { due: null });
+    assert.equal(row(d, id)?.time, 'teatime');
+    assert.equal(d.engine.stamp('task', id, 'time'), stamp);
+  });
+
+  it('a time with no day, as two devices can leave it, shows as none and reminds of nothing until a day is set', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.receive([{ stamp: `2026-11-24T04:31:00.000Z-0000-b2c3d4e5f6071829`, dataset: 'task', row: id, field: 'due', value: null }]);
+    d.receive([{ stamp: `2026-11-24T04:31:10.000Z-0000-c3d4e5f607182930`, dataset: 'task', row: id, field: 'time', value: '15:30' }]);
+    assert.equal(row(d, id)?.time, '15:30');
+    assert.equal(next(d)?.time, null);
+    assert.deepEqual(d.today.timed.value, []);
+    d.today.edit(id, { due: TOMORROW });
+    assert.equal(d.today.upcoming.value[0]?.time, '15:30');
+  });
+
+  it('a stored value that is no time of day is kept, sent on, and read as none; an edit elsewhere on the task does not touch it', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    await d.settle();
+    for (const odd of ['25:00', 'teatime', 1530, { h: 15 }]) {
+      d.engine.write('task', id, { time: odd });
+      assert.equal(next(d)?.time, null, JSON.stringify(odd));
+      assert.deepEqual(d.today.timed.value, []);
+      await d.engine.saved();
+      assert.deepEqual(d.wire().sent.at(-1)!.cells.map((c) => [c.field, c.value]), [['time', odd]], 'sent on as it is');
+      await d.settle();
+      d.today.edit(id, { title: 'call the bank today' });
+      assert.deepEqual(row(d, id)?.time, odd, 'and not rewritten');
+      await d.settle();
+    }
+  });
+
+  it('two devices offline, one moves the day and the other sets the time: both are kept, in either order of arrival', async () => {
+    for (const order of ['a first', 'b first']) {
+      const w = world();
+      const a = await w.device('a');
+      const id = a.today.add('call the bank')!;
+      const b = await w.device('b');
+      w.exchange(a, b);
+      a.disconnect();
+      b.disconnect();
+      a.today.edit(id, { due: '2026-11-26' });
+      w.time.advance(10000);
+      b.today.edit(id, { time: '18:00' });
+      const [fromA, fromB] = [a.engine.cells(), b.engine.cells()];
+      if (order === 'a first') (b.receive(fromA), a.receive(fromB));
+      else (a.receive(fromB), b.receive(fromA));
+      for (const d of [a, b]) assert.deepEqual([row(d, id)?.due, row(d, id)?.time], ['2026-11-26', '18:00'], `${order}, on ${d.name}`);
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+      assert.deepEqual(a.today.timed.value, [{ id, title: 'call the bank', day: '2026-11-26', time: '18:00' }]);
+    }
+  });
+
+  it('two devices offline, one clears the day and the other sets a time on the day it still sees: nothing is lost, and the time waits for a day', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const id = a.today.add('call the bank')!;
+    const b = await w.device('b');
+    w.exchange(a, b);
+    a.today.edit(id, { due: null });
+    w.time.advance(10000);
+    b.today.edit(id, { time: '18:00' });
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.deepEqual([row(d, id)?.due, row(d, id)?.time], [null, '18:00']);
+      assert.equal(d.today.next.value?.time, null);
+    }
+  });
+});
+
+describe('what the phone reminds of', () => {
+  it('timed is every open task with a day and a time, subtasks too, by day and time; done, deleted and dayless ones are not in it', async () => {
+    const w = world();
+    const d = await w.device('a');
+    assert.deepEqual(d.today.timed.value, []);
+    const bank = d.today.add('call the bank')!;
+    const read = d.today.add('read')!;
+    const page = d.today.addSubtask(read, 'page 40')!;
+    const plain = d.today.add('no time on this one')!;
+    d.today.edit(bank, { time: '15:30' });
+    d.today.edit(read, { due: TOMORROW, time: '07:00' });
+    d.today.edit(page, { time: '09:00' });
+    assert.deepEqual(d.today.timed.value, [
+      { id: page, title: 'page 40', day: TODAY, time: '09:00' },
+      { id: bank, title: 'call the bank', day: TODAY, time: '15:30' },
+      { id: read, title: 'read', day: TOMORROW, time: '07:00' },
+    ]);
+    const ids = () => d.today.timed.value.map((t) => t.id);
+    d.today.setDone(bank, true);
+    assert.deepEqual(ids(), [page, read]);
+    d.today.setDone(bank, false);
+    d.today.remove(bank);
+    assert.deepEqual(ids(), [page, read]);
+    d.today.restore(bank);
+    d.today.editSubtask(page, { done: true });
+    assert.deepEqual(ids(), [bank, read]);
+    d.today.editSubtask(page, { done: false });
+    // A subtask shows inside its parent only: with the parent deleted it is on no screen, and rings on no phone.
+    d.today.remove(read);
+    assert.deepEqual(ids(), [bank]);
+    d.today.restore(read);
+    assert.deepEqual(ids(), [page, bank, read]);
+    d.today.edit(plain, { time: null });
+    assert.deepEqual(ids(), [page, bank, read]);
+  });
+
+  it('timed changes when a task does, and not with the clock: a lap running does not hand the phone a new list every few seconds', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('call the bank')!;
+    d.today.edit(id, { time: '15:30' });
+    const before = d.today.timed.value;
+    d.focus.start(id);
+    void d.today.list.value;
+    w.time.advance(5 * MIN);
+    void d.today.list.value;
+    assert.equal(d.today.timed.value, before);
+    d.today.edit(id, { time: '16:00' });
+    assert.notEqual(d.today.timed.value, before);
+  });
+});
+
 describe('projects', () => {
   it('a task shows its project; one that is archived or deleted shows none, and is offered no more', async () => {
     const w = world();
@@ -724,6 +958,61 @@ describe('projects', () => {
     d.engine.write('project', 'p1', { name: 'From a newer build', color: 'heat-9', order: 'V' });
     d.engine.write('project', 'p2', { color: 'you', order: 'W' });
     assert.deepEqual(d.today.projects.value, [{ id: 'p1', name: 'From a newer build', color: 'ink' }]);
+  });
+
+  it('an unknown colour is never rewritten by a device that only read it: renaming or archiving the project leaves the cell and its stamp', async () => {
+    const w = world();
+    const d = await w.device('a');
+    for (const [i, odd] of ['mauve', '#abc', '#12345g', 7, null].entries()) {
+      const id = `p${i}`;
+      d.engine.write('project', id, { name: 'From a newer build', color: odd, order: 'V' });
+      const stamp = d.engine.stamp('project', id, 'color');
+      const task = d.today.add('in it')!;
+      d.today.edit(task, { project: id });
+      assert.equal(d.today.projects.value.find((p) => p.id === id)?.color, 'ink', 'shown, in ink');
+      assert.equal(d.today.list.value.find((t) => t.id === task)?.project?.color, 'ink');
+      d.today.editProject(id, { name: 'Renamed' });
+      d.today.editProject(id, { archived: true });
+      d.today.editProject(id, { archived: false });
+      assert.deepEqual(d.engine.rows('project').value.get(id)?.color, odd);
+      assert.equal(d.engine.stamp('project', id, 'color'), stamp);
+    }
+  });
+
+  it('the twelve colours by name, and a picked one as a hex, written in lower case', async () => {
+    const w = world();
+    const d = await w.device('a');
+    assert.deepEqual(COLORS, ['you', 'rest', 'ink', 'ghost', 'heat-2', 'amber', 'olive', 'teal', 'sky', 'indigo', 'plum', 'clay']);
+    for (const color of COLORS) {
+      const id = d.today.addProject(color, color)!;
+      assert.equal(d.engine.rows('project').value.get(id)?.color, color);
+    }
+    assert.deepEqual(d.today.projects.value.map((p) => p.color), COLORS);
+    const picked = d.today.addProject('Picked', '#C0FFEE')!;
+    assert.equal(d.engine.rows('project').value.get(picked)?.color, '#c0ffee');
+    assert.equal(d.today.projects.value.at(-1)?.color, '#c0ffee');
+    d.today.editProject(picked, { color: '#AB12cd' });
+    assert.equal(d.engine.rows('project').value.get(picked)?.color, '#ab12cd');
+    d.today.editProject(picked, { color: 'clay' });
+    assert.equal(d.today.projects.value.at(-1)?.color, 'clay');
+    // A hex another device wrote in capitals is the same colour, shown in the one spelling.
+    d.engine.write('project', picked, { color: '#C0FFEE' });
+    assert.equal(d.today.projects.value.at(-1)?.color, '#c0ffee');
+  });
+
+  it('anything else is refused: no project is made of it, and an edit with it writes nothing', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.addProject('The C book', 'teal')!;
+    const cells = d.engine.cells();
+    const refused = ['#abc', '#ABC', 'mauve', 'You', 'heat-9', '#12345g', '#1234567', 'c0ffee', ' #c0ffee', 'rgb(1,2,3)', '', 7, null];
+    for (const color of refused) {
+      assert.equal(isColor(color), false, JSON.stringify(color));
+      assert.equal(d.today.addProject('Another', color as never), null);
+      d.today.editProject(id, { color: color as never });
+    }
+    assert.deepEqual(d.engine.cells(), cells);
+    for (const color of [...COLORS, '#c0ffee', '#C0FFEE', '#000000']) assert.equal(isColor(color), true, color);
   });
 });
 

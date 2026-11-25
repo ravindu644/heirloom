@@ -11,6 +11,9 @@ const LATEST_MS = Date.UTC(2200, 0, 1);
 /** A moment a row could really hold, in ms. */
 export const isMoment = (v: unknown): v is number => typeof v === 'number' && v >= EARLIEST_MS && v < LATEST_MS;
 
+/** A time of day a clock could show, `15:30`, 24 hour. */
+export const isTime = (v: unknown): v is string => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+
 /** A real calendar day, `2026-11-24`: the 31st of February is not one, though it has the shape. */
 export function isDay(v: unknown): v is string {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
