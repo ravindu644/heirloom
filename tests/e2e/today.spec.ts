@@ -371,14 +371,14 @@ test('when a due date moves a task to Upcoming, closing the sheet hands the focu
 test('the day target: set it, the bar fills as a lap rings, clear it', async ({ deviceA: a }) => {
   await onToday([a], 'target', { work_ms: 3000, short_ms: 60000 });
   await quickAdd(a.page, 'drill ~3');
-  const target = a.page.getByRole('region', { name: 'Day target' });
-  await expect(target).toContainText('No target for today.');
+  const target = a.page.getByRole('group', { name: 'Day target' });
+  await expect(target).toContainText('No target today.');
   // Set, it takes the laps planned on today's list.
   await target.getByRole('button', { name: 'Set a target' }).click();
   await expect(target).toContainText('0 of 3 laps today');
   await target.getByRole('button', { name: 'One lap more', exact: true }).click();
   await expect(target).toContainText('0 of 4 laps today');
-  await target.getByRole('button', { name: 'Keep it' }).click();
+  await target.getByRole('button', { name: 'Done', exact: true }).click();
   const bar = () => target.locator('i[style*="--share"]').evaluateAll((els) => els.map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
   expect(await bar()).toEqual([0, 0, 0, 0]);
 
@@ -387,8 +387,8 @@ test('the day target: set it, the bar fills as a lap rings, clear it', async ({ 
   expect(await bar()).toEqual([1, 0, 0, 0]);
 
   await target.getByRole('button', { name: 'Change' }).click();
-  await target.getByRole('button', { name: 'No target' }).click();
-  await expect(target).toContainText('No target for today.');
+  await target.getByRole('button', { name: 'Remove the target' }).click();
+  await expect(target).toContainText('No target today.');
 });
 
 // Opens a task's sheet by its words, as a person taps the row.

@@ -176,6 +176,8 @@ test('work done offline is still there after an offline reload once it is on dis
   await until(() => node.engine.unsent.value === 0, 10000, 'not sent');
   await signIn(a.page, name);
   await ready(a.page);
+  // The lengths arrive with everything else; going offline before they have would make a 25 minute lap.
+  await expect(digits(a.page)).toHaveText('00:03');
   await a.setOffline(true);
   // A lap that rings with no connection: its row is written here.
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();

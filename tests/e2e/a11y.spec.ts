@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import type { Device as Node } from '../sync/harness.ts';
 import { until } from '../sync/harness.ts';
-import { accountWith, go, ready, signIn, username } from './app.ts';
+import { accountWith, go, ready, signIn, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -273,6 +273,7 @@ test('contrast of every text, field edge, box and focus ring, light and dark', a
   for (const scheme of ['light', 'dark'] as const) {
     await a.page.emulateMedia({ colorScheme: scheme });
     await a.page.goto('/');
+    await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
     faults.push(...(await contrast(a.page, `Sign in, ${scheme}`)));
   }
   const name = await seeded(a, 'a11ycontrast');
@@ -381,7 +382,8 @@ test('keyboard only: Tab reaches every control once in page order with a visible
   await expect(opener).toBeFocused();
   await a.page.getByRole('checkbox', { name: 'Done: by keys only' }).focus();
   await a.page.keyboard.press('Space');
-  await expect(a.page.getByRole('checkbox', { name: 'Done: by keys only' })).toHaveAttribute('aria-checked', 'true');
+  // The row moves to Done; the one it left behind stays a moment, inert.
+  await expect(taskRow(a.page, 'by keys only').getByRole('checkbox')).toHaveAttribute('aria-checked', 'true');
   await states.Progress!(a.page, name);
   const year = a.page.getByRole('slider');
   await year.focus();

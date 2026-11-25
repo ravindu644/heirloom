@@ -5,6 +5,7 @@ import type { Page } from '@playwright/test';
 import { PASSWORD } from '../sync/harness.ts';
 import { startServer } from '../server.ts';
 import type { Server } from '../server.ts';
+import { selectable } from './app.ts';
 import { test as base, expect } from './devices.ts';
 
 
@@ -113,6 +114,8 @@ test('an invite link made in Settings: joined with only a username and a passwor
   await expect(panel(a.page, 'Invites')).toContainText('A link makes one account, once, and runs out in 7 days.');
   const link = await makeLink(a.page);
   expect(link.startsWith(server.url)).toBe(true);
+  // There to be copied: the one line on the screen that selects.
+  expect(await selectable(panel(a.page, 'Invites').getByRole('region', { name: 'The new link' }).locator('p').first()), 'the invite link does not select').toBe(true);
 
   await joinBy(b.page, link, 'member');
   await expect(b.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
@@ -150,9 +153,9 @@ test('take back needs a second tap and the link is then refused; renew keeps the
   expect(after, 'the renewed link was replaced').toBeDefined();
   expect(after.expires).toBeGreaterThan(before.expires);
 
-  // Take back: the first tap only asks; Keep it keeps it; the second tap takes it.
+  // Take back: the first tap only asks; Keep the link keeps it; the second tap takes it.
   await invites.getByRole('button', { name: `Take back, the invite ending ${end(gone)}` }).click();
-  await invites.getByRole('button', { name: `Keep it, the invite ending ${end(gone)}` }).click();
+  await invites.getByRole('button', { name: `Keep the link, the invite ending ${end(gone)}` }).click();
   await expect(invites.getByRole('button', { name: `Take back, the invite ending ${end(gone)}` })).toBeVisible();
   await invites.getByRole('button', { name: `Take back, the invite ending ${end(gone)}` }).click();
   await invites.getByRole('button', { name: `Take it back, the invite ending ${end(gone)}` }).click();

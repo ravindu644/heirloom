@@ -24,15 +24,28 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
 const field = (page: Page, name: string) => page.getByRole('textbox', { name: new RegExp(`^${name}\\b`) });
 const plain = 'This address is plain http. Anyone on the same network can read what is sent, the password too.';
 
+const WELCOME = 'Work in laps. Race the you of last week.';
+
+// To the server step from a page that has none kept: through the welcome when it is shown. The
+// rules decide only that it is not shown again once an address is kept; the welcome test holds that.
+async function toServerStep(page: Page, reload = false) {
+  if (reload) await page.reload();
+  else await page.goto(appUrl());
+  const step = page.getByRole('heading', { name: 'Which server?', level: 1 });
+  await expect(page.getByRole('heading', { name: WELCOME }).or(step)).toBeVisible();
+  if (await page.getByRole('heading', { name: WELCOME }).isVisible()) await button(page, 'Connect to a server').click();
+  await expect(step).toBeVisible();
+}
+
 async function choose(page: Page, typed: string) {
   await field(page, 'Server').fill(typed);
   await button(page, 'Use this server').click();
 }
 
 test('the first screen asks which server; a bad string, a dead port and something that is not heirloom each say their own sentence and keep nothing; the real address is kept and named, with Change only signed out', async ({ deviceA: a }) => {
-  await a.page.goto(appUrl());
-  await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
-  await expect(a.page.getByText('heirloom keeps your laps on a server that you or a friend runs. Say where it is.')).toBeVisible();
+  await toServerStep(a.page);
+  const intro = a.page.getByText('heirloom keeps your laps on a server that you or a friend runs. Say where it is.');
+  await expect(intro).toBeVisible();
 
   const refusals: [string, string][] = [
     ['not a server, really', 'That is not an address or an invite link. An address looks like 192.168.1.20:8787.'],
@@ -42,9 +55,13 @@ test('the first screen asks which server; a bad string, a dead port and somethin
   ];
   for (const [typed, said] of refusals) {
     await choose(a.page, typed);
-    await expect(a.page.getByRole('alert')).toHaveText(said, { timeout: 10000 });
-    await a.page.reload();
-    await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
+    const alert = a.page.getByRole('alert');
+    await expect(alert).toHaveText(said, { timeout: 10000 });
+    // An error has its own line: the intro is still there to read, and the two do not overlap.
+    await expect(intro).toBeVisible();
+    const [e, i] = [(await alert.boundingBox())!, (await intro.boundingBox())!];
+    expect(e.y >= i.y + i.height || i.y >= e.y + e.height, `"${said}" overlaps the intro`).toBe(true);
+    await toServerStep(a.page, true);
     await expect(field(a.page, 'Server'), `"${typed}" was kept`).toHaveValue('');
   }
 
@@ -82,7 +99,7 @@ test('the first screen asks which server; a bad string, a dead port and somethin
 test('a pasted invite link sets the server and opens the join form with the invite in hand', async ({ deviceA: a }) => {
   const server = e2eServer();
   const link = `http://${ADDR}/#/join/${server.invite()}`;
-  await a.page.goto(appUrl());
+  await toServerStep(a.page);
   await choose(a.page, link);
   await expect(a.page.getByRole('heading', { name: 'Join with an invite', level: 1 })).toBeVisible({ timeout: 10000 });
   await expect(a.page.getByText(`This link is your invite to ${ADDR}. Choose a username and a password.`)).toBeVisible();
@@ -98,7 +115,7 @@ test('plain http is said once on the server step, once on the app\'s sign in, an
   // 127.0.0.2 is this machine too, but not a name the app counts as local: it stands for a LAN address.
   const host = `127.0.0.2:${18900 + Math.floor(Math.random() * 90)}`;
   await fresh(host);
-  await a.page.goto(appUrl());
+  await toServerStep(a.page);
   await choose(a.page, `http://${host}`);
   // A fresh server: the app's own first screen sets it up.
   await expect(a.page.getByRole('heading', { name: 'Set up this server', level: 1 })).toBeVisible({ timeout: 10000 });
@@ -121,7 +138,7 @@ test('plain http is said once on the server step, once on the app\'s sign in, an
 
 test('the phone app keeps a pasted link\'s invite across a restart, until it is used', async ({ deviceA: a }) => {
   const server = e2eServer();
-  await a.page.goto(appUrl());
+  await toServerStep(a.page);
   await choose(a.page, `http://${ADDR}/#/join/${server.invite()}`);
   await expect(a.page.getByRole('heading', { name: 'Join with an invite', level: 1 })).toBeVisible({ timeout: 10000 });
   // The app is closed and opened again at the join form: the invite is still in hand.
@@ -133,4 +150,22 @@ test('the phone app keeps a pasted link\'s invite across a restart, until it is 
   await field(a.page, 'Password').fill(PASSWORD);
   await button(a.page, 'Join').click();
   await expect(a.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+});
+
+test('the welcome: the phone app\'s first screen says what heirloom is; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {
+  await a.page.goto(appUrl());
+  await expect(a.page.getByRole('heading', { name: WELCOME })).toBeVisible();
+  for (const line of ['A lap is one stretch of focus', 'Plan the day in laps', 'Habits get a box to tick', 'In a room, friends see', 'It is free. Everything you do is kept on a server']) {
+    await expect(a.page.getByText(new RegExp(`^${line}`))).toBeVisible();
+  }
+  await button(a.page, 'Connect to a server').click();
+  await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
+  await button(a.page, 'Back').click();
+  await expect(a.page.getByRole('heading', { name: WELCOME })).toBeVisible();
+  await button(a.page, 'Connect to a server').click();
+  await choose(a.page, ADDR);
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible({ timeout: 10000 });
+  await a.page.reload();
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
+  await expect(a.page.getByRole('heading', { name: WELCOME })).toHaveCount(0);
 });

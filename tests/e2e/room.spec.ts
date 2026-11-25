@@ -78,7 +78,9 @@ test('presence: a lap on A shows on B and C within a second with the same time l
   await expect(page.getByRole('heading', { name: 'You are not in a room yet.' })).toBeVisible();
   await page.getByLabel('The code a friend gave you').fill('ABCD2345');
   await button(page, 'Join').click();
-  await expect(page.getByRole('alert')).toHaveText('No room has that code.');
+  // Each door's refusal is a region that is always there; the join door's says why, the make door's is empty.
+  await expect(page.locator('form').filter({ has: page.getByLabel('The code a friend gave you') }).getByRole('alert')).toHaveText('No room has that code.');
+  await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(1);
   await expect(page.getByText('study hall')).toHaveCount(0);
   expect(errors).toEqual([]);
   await outside.close();
@@ -235,5 +237,6 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await expect(a.page.getByText('Making or joining a room needs a connection.')).toBeVisible({ timeout: 3000 });
   await a.page.getByLabel('Its name').fill('offline room');
   await button(a.page, 'Make the room').click();
-  await expect(a.page.getByRole('alert')).toHaveText('Needs a connection. Nothing was sent.');
+  await expect(a.page.locator('form').filter({ has: a.page.getByLabel('Its name') }).getByRole('alert')).toHaveText('Needs a connection. Nothing was sent.');
+  await expect(a.page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(1);
 });

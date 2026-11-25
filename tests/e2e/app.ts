@@ -136,7 +136,9 @@ export async function quickAdd(page: Page, text: string) {
 }
 
 /** A task's row on Today, found by its box. */
-export const taskRow = (page: Page, title: string) => page.getByRole('checkbox', { name: `Done: ${title}`, exact: true }).locator('xpath=..');
+export const taskRow = (page: Page, title: string) =>
+  // Not the inert copy a row leaves behind for a moment as it goes.
+  page.locator(`[role="checkbox"][aria-label=${JSON.stringify(`Done: ${title}`)}]:not([inert] *)`).locator('xpath=..');
 
 /** A task row's squares, oldest first: 1 for a lap that rang, a share for one stopped or running, 0 for one to come. */
 export const squaresOf = (row: ReturnType<typeof taskRow>) =>
@@ -144,7 +146,63 @@ export const squaresOf = (row: ReturnType<typeof taskRow>) =>
 
 /** The titles of every task row on the screen, top to bottom. */
 export const titles = (page: Page) =>
-  page.getByRole('checkbox', { name: /^Done: / }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')!.slice('Done: '.length)));
+  page
+    .getByRole('checkbox', { name: /^Done: / })
+    // A row on its way out stays a moment as an inert copy: it is not a row of the list.
+    .evaluateAll((els) => els.filter((el) => !el.closest('[inert]')).map((el) => el.getAttribute('aria-label')!.slice('Done: '.length)));
 
 /** A list on Today, by the start of its heading (Later today carries its count): Next, Later today, Upcoming, Done. */
 export const list = (page: Page, heading: string) => page.locator('section').filter({ has: page.getByRole('heading', { name: new RegExp(`^${heading}`) }) });
+
+/** Waits until nothing moves: every animation and transition finished, then two frames drawn. */
+export const settle = (page: Page) =>
+  page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+    await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+
+/** Scrolls whatever holds `locator` so it stands in the middle of the screen: part way down, where pages jumped. */
+export const midScreen = (locator: ReturnType<Page['locator']>) => locator.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+
+/**
+ * DESIGN.md, Motion: "What you tapped stays under your finger." Reads where `control` is on the
+ * screen, does `act` (the tap), waits for the redraw and for motion to end, and fails if the
+ * control, or `after` when the tap puts something else in its place, moved more than 1px.
+ */
+export async function staysPut(page: Page, control: ReturnType<Page['locator']>, act: () => Promise<void>, after?: ReturnType<Page['locator']>) {
+  const before = await control.boundingBox();
+  expect(before, 'the control is not on the screen to be tapped').not.toBeNull();
+  await act();
+  await settle(page);
+  const target = after ?? control;
+  await expect(target).toBeVisible();
+  const now = (await target.boundingBox())!;
+  const moved = { x: Math.round((now.x - before!.x) * 10) / 10, y: Math.round((now.y - before!.y) * 10) / 10 };
+  // What takes a control's place may be another width, laid from either side: one edge keeps the place.
+  const right = Math.round((now.x + now.width - before!.x - before!.width) * 10) / 10;
+  const across = Math.abs(moved.x) <= 1 || (after !== undefined && Math.abs(right) <= 1);
+  expect(across && Math.abs(moved.y) <= 1, `${after ? 'what took its place' : 'the control'} moved ${moved.x}px across (its right edge ${right}px) and ${moved.y}px down`).toBe(true);
+}
+
+/** A colour token as rgb, as the page draws it now (light or dark). */
+export const token = (page: Page, name: string) =>
+  page.evaluate((name) => {
+    const probe = document.body.appendChild(document.createElement('i'));
+    probe.style.backgroundColor = `var(${name})`;
+    const c = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return c;
+  }, name);
+
+/** Whether text in an element can be selected, as the browser decides it: `auto` takes the parent's, and a field is a field. */
+export const selectable = (locator: ReturnType<Page['locator']>) =>
+  locator.first().evaluate((el) => {
+    if (el.matches('input, textarea')) return getComputedStyle(el).userSelect !== 'none';
+    for (let n: Element | null = el; n; n = n.parentElement) {
+      const v = getComputedStyle(n).userSelect;
+      if (v === 'none') return false;
+      if (v !== 'auto') return true;
+    }
+    return true;
+  });

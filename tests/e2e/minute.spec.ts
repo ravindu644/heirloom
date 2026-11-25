@@ -4,7 +4,7 @@
 import { accountWith, go, ready, sessionsWhen, signIn, squaresOf, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
-test('a minute in, stop and log keeps a stopped row on both laptops; set aside keeps a void row', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
+test('a minute in, stop and log keeps a stopped row on both laptops; not counting it keeps a void row', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
   test.setTimeout(120000);
   const logged = username('logged');
   const aside = username('aside');
@@ -41,8 +41,8 @@ test('a minute in, stop and log keeps a stopped row on both laptops; set aside k
   expect(part, 'a minute of a 25 minute lap').toBeCloseTo(((kept!.ended as number) - (kept!.started as number)) / 1500000, 3);
   expect(empty).toBe(0);
 
-  await c.page.getByRole('button', { name: 'Set aside' }).click();
-  await expect(c.page.getByText('Set aside. It stays in your timeline and counts nowhere.').filter({ visible: true })).toBeVisible();
+  await c.page.getByRole('button', { name: "Don't count this lap" }).click();
+  await expect(c.page.getByText('Not counted. The lap stays in your timeline and adds nothing to your day, week or streak.').filter({ visible: true })).toBeVisible();
   const [voided] = await sessionsWhen(aside, (rows) => rows.length > 0);
   expect(voided).toMatchObject({ kind: 'work', outcome: 'void' });
   expect((voided!.ended as number) - (voided!.started as number)).toBeGreaterThanOrEqual(60000);

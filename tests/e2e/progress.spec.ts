@@ -186,7 +186,7 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(panel(a.page, 'Today, hour by hour').getByRole('listitem')).toHaveCount(1);
 });
 
-test('the timeline: a lap set aside, a stopped lap and a pair that ran on two devices; setting one of the pair aside, and Count again', async ({ deviceA: a, deviceB: b }) => {
+test('the timeline: a lap not counted, a stopped lap and a pair that ran on two devices; not counting one of the pair, and Count it again', async ({ deviceA: a, deviceB: b }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   const start = Date.now() - 2 * HOUR;
   let pair: string[] = [];
@@ -199,8 +199,8 @@ test('the timeline: a lap set aside, a stopped lap and a pair that ran on two de
   const day = (page: Page) => panel(page, 'Today, hour by hour');
   const items = (page: Page) => day(page).getByRole('listitem');
   await expect(items(a.page)).toHaveCount(4);
-  await expect(items(a.page).nth(0)).toContainText('Lap set aside');
-  await expect(items(a.page).nth(0)).toContainText('25 minutes, counted nowhere');
+  await expect(items(a.page).nth(0)).toContainText('Lap, not counted');
+  await expect(items(a.page).nth(0)).toContainText('25 minutes, not counted');
   await expect(items(a.page).nth(1)).toContainText('Stopped lap');
   await expect(items(a.page).nth(1)).toContainText('12 minutes');
   for (const i of [2, 3]) await expect(items(a.page).nth(i)).toContainText('ran on two devices');
@@ -210,17 +210,17 @@ test('the timeline: a lap set aside, a stopped lap and a pair that ran on two de
 
   const at = new Date(start + 65 * MIN);
   const wall = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-  await day(a.page).getByRole('button', { name: `Set aside, the lap at ${wall}` }).click();
+  await day(a.page).getByRole('button', { name: `Don't count it, the lap at ${wall}` }).click();
   for (const page of [a.page, b.page]) {
     await expect(day(page).getByText('ran on two devices')).toHaveCount(0, { timeout: 2000 });
-    await expect(items(page).nth(3)).toContainText('Lap set aside');
+    await expect(items(page).nth(3)).toContainText('Lap, not counted');
     await expect(totals(page)).toHaveText('37 minutes of focus in 1 lap.');
   }
   const outcome = async () => (await serverRows(server, name, 'session')).get(pair[1]!)?.outcome;
   await expect.poll(outcome).toBe('void');
 
-  // The way back is offered at once, and stays: Count again, never a passing Undo.
-  await day(a.page).getByRole('button', { name: `Count again, the lap at ${wall}` }).click();
+  // The way back is offered at once, and stays: Count it again, never a passing Undo.
+  await day(a.page).getByRole('button', { name: `Count it again, the lap at ${wall}` }).click();
   await expect.poll(outcome).toBe('rang');
   await expect(totals(b.page)).toHaveText('52 minutes of focus in 2 laps.');
   await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);

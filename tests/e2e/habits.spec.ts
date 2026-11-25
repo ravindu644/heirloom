@@ -36,7 +36,8 @@ const box_ = (page: Page, title: string) => page.getByRole('checkbox', { name: `
 const row = (page: Page, title: string) => box_(page, title).locator('xpath=..');
 const open = async (page: Page, title: string) => {
   await row(page, title).getByRole('button', { name: new RegExp(title) }).click();
-  const sheet = page.getByRole('dialog', { name: 'Habit' });
+  // Exact: a closed "Archived habits" sheet is still sliding out for a moment.
+  const sheet = page.getByRole('dialog', { name: 'Habit', exact: true });
   await expect(sheet).toBeVisible();
   return sheet;
 };
