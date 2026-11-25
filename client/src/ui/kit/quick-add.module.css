@@ -1,3 +1,7 @@
+/* The field is the box, edge and focus ring as every field's; its button is laid over its right
+   end, inside the edge. It comes with the first character, when what is typed is still far from
+   it, so nothing is seen to move. */
+.add { position: relative; display: grid; }
 .add input {
   width: 100%;
   min-height: var(--layout-touch);
@@ -7,3 +11,9 @@
   background: var(--surface);
 }
 .add input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+/* While the button shows, what is typed ends short of it: its width and `sm`. */
+.add:has(button:enabled) input { padding-right: calc(var(--layout-touch) + var(--space-sm)); }
+/* Smaller than the box to the eye, a full target to a thumb. */
+.add button { position: absolute; top: var(--space-xs); right: var(--space-xs); width: var(--layout-touch); min-height: calc(var(--layout-touch) - var(--space-sm)); padding: 0; transition: opacity var(--motion-fill) var(--motion-ease), visibility var(--motion-fill); }
+.add button::after { content: ""; position: absolute; inset: calc(var(--space-xs) * -1); }
+.add button:disabled { visibility: hidden; opacity: 0; }

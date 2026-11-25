@@ -51,7 +51,10 @@ export function Stepper({ text, less, more, onLess, onMore, typed }: Props) {
           onKeyDown={(event) => event.key === 'Enter' && keep()}
         />
       ) : (
-        <output>{text}</output>
+        // Keyed by what it says: a stepped figure is a new one, and comes in.
+        <output>
+          <span key={text}>{text}</span>
+        </output>
       )}
       <Button aria-label={more} onClick={onMore}>
         +

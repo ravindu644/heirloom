@@ -6,6 +6,8 @@
   font-feature-settings: var(--feature-figure-md);
   text-align: center;
 }
+.stepper output span { display: inline-block; animation: step var(--motion-fill) var(--motion-ease); }
+@keyframes step { from { opacity: 0; transform: translateY(var(--space-xs)); } }
 /* A figure that is typed: the stepper's figure in a field, three digits wide, with its unit as a word after the plus. */
 .stepper input {
   width: calc(3ch + 2 * var(--space-md));

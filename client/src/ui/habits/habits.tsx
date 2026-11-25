@@ -8,7 +8,9 @@ import { cx } from '../kit/cx.ts';
 import { Panel } from '../kit/panel.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Race } from '../kit/race.tsx';
-import { Said, useSaid } from '../kit/said.tsx';
+import { Fold, Kept } from '../kit/fold.tsx';
+import { say } from '../kit/said.tsx';
+import said from '../kit/said.module.css';
 import { Sheet } from '../kit/sheet.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
@@ -43,7 +45,6 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   const [open, setOpen] = useState<string | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [shelf, setShelf] = useState<'archived' | 'deleted' | null>(null);
-  const [said, setSaid] = useSaid();
   const opened = list.find((habit) => habit.id === open);
   // The open habit went away, here or on another device: its sheet must not come back by itself.
   useEffect(() => {
@@ -52,7 +53,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   // The sheet hands the focus back to the row that opened it. When that row has gone, it goes to the heading.
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (wasOpen.current && !open && (!document.activeElement || document.activeElement === document.body)) document.getElementById('habits-title')?.focus();
+    if (wasOpen.current && !open && (!document.activeElement || document.activeElement === document.body)) document.getElementById('habits-title')?.focus({ preventScroll: true });
     wasOpen.current = !!open;
   }, [open]);
 
@@ -60,29 +61,28 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   const check = (habit: HabitView) => {
     if (habit.today.done) {
       habits.undo(habit.id);
-      return setSaid(null);
+      return say(null);
     }
     habits.checkIn(habit.id);
-    setSaid({
+    say({
       lead: s.habits.saidIn,
       title: habit.title,
       comma: habit.target > 1,
       tail: habit.target > 1 ? s.habits.saidCount(habit.today.count + 1, habit.target) : undefined,
       undo: () => habits.undo(habit.id),
-      row: () => document.querySelector(`[data-habit="${CSS.escape(habit.id)}"]`),
     });
   };
   const archive = (habit: HabitView) => {
     habits.edit(habit.id, { archived: true });
-    setSaid({ lead: s.habits.saidArchived, title: habit.title, undo: () => habits.edit(habit.id, { archived: false }) });
+    say({ lead: s.habits.saidArchived, title: habit.title, undo: () => habits.edit(habit.id, { archived: false }) });
   };
   const remove = (habit: HabitView) => {
     habits.remove(habit.id);
-    setSaid({ lead: s.today.saidRemoved, title: habit.title, tail: s.today.keeps, undo: () => habits.restore(habit.id) });
+    say({ lead: s.today.saidRemoved, title: habit.title, tail: s.today.keeps, undo: () => habits.restore(habit.id) });
   };
 
   const moves = (habit: HabitView, at: number) => (
-    <span class={css.moves}>
+    <span class={css.moves} data-moves>
       <Button kind="link" aria-label={s.today.upLabel(habit.title)} disabled={at === 0} onClick={() => habits.move(habit.id, list[at - 1]!.id)}>
         {s.today.up}
       </Button>
@@ -96,7 +96,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   const shelved = shelf === 'archived' ? archived : deleted;
 
   return (
-    <div class={css.habits}>
+    <div class={cx(css.habits, said.room)}>
       <header class={css.head}>
         <p>{s.habits.label(day)}</p>
         <h1 id="habits-title" tabIndex={-1}>
@@ -105,14 +105,16 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
       </header>
 
       <div class={css.cols}>
-        <div class={css.now}>
-          <QuickAdd name="habit" label={s.habits.add} hint={s.habits.addHint} onAdd={(text) => habits.add(text, 127, 1) !== null} />
+        <Fold gap="md" data-said>
+          <QuickAdd key="add" name="habit" label={s.habits.add} hint={s.habits.addHint} go={s.today.addGo} onAdd={(text) => habits.add(text, 127, 1) !== null} />
 
           {list.length === 0 ? (
-            <p class={css.quiet}>{s.habits.empty}</p>
+            <p key="empty" class={css.quiet}>
+              {s.habits.empty}
+            </p>
           ) : (
-            <section aria-label={ordering ? s.habits.ordering : s.habits.list}>
-              <div class={css.rows}>
+            <section key="list" aria-label={ordering ? s.habits.ordering : s.habits.list}>
+              <Fold gap="sm">
                 {list.map((habit, at) => (
                   <div key={habit.id} class={cx(css.row, ordering && css.ordering)} data-habit={habit.id}>
                     <Check checked={habit.today.done} label={s.habits.check(habit.title)} onChange={() => check(habit)} />
@@ -145,11 +147,12 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
                     {ordering && <div class={css.end}>{moves(habit, at)}</div>}
                   </div>
                 ))}
-              </div>
+              </Fold>
             </section>
           )}
 
-          <div class={links.links}>
+          {(list.length > 1 || archived.length > 0 || deleted.length > 0) && (
+          <div key="links" class={links.links}>
             {list.length > 1 && (
               <Button kind="link" onClick={() => setOrdering(!ordering)}>
                 {ordering ? s.today.orderKeep : s.today.order}
@@ -166,13 +169,12 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
               </Button>
             )}
           </div>
+          )}
+        </Fold>
 
-          {said && <Said said={said} undo={s.today.undo} onDone={() => setSaid(null)} />}
-        </div>
-
-        <div class={css.then}>
+        <Fold>
           {list.length > 0 && (
-            <Panel title={s.habits.week}>
+            <Panel key="week" title={s.habits.week}>
               <Race
                 you={{ label: s.habits.thisWeek, value: String(week.now), share: week.now / most }}
                 ghost={{ label: s.habits.lastWeek, value: String(week.before), share: week.before / most }}
@@ -180,9 +182,10 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
               <p>{s.habits.weekLine(week.now, week.before, day)}</p>
             </Panel>
           )}
-        </div>
+        </Fold>
       </div>
 
+      <Kept>
       {opened && (
         <HabitSheet
           habit={opened}
@@ -195,9 +198,9 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
         />
       )}
       {shelf && (
-        <Sheet title={shelf === 'archived' ? s.habits.archivedTitle : s.today.binTitle} close={s.task.close} onClose={() => setShelf(null)}>
+        <Sheet key="shelf" title={shelf === 'archived' ? s.habits.archivedTitle : s.today.binTitle} close={s.task.close} onClose={() => setShelf(null)}>
           <p class={css.quiet}>{shelf === 'archived' ? s.habits.archivedNote : s.habits.binNote}</p>
-          <div class={css.rows}>
+          <Fold gap="sm">
             {shelved.map((habit) => (
               <div key={habit.id} class={cx(css.row, css.plain)}>
                 <div class={css.words}>
@@ -211,9 +214,10 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
                 </div>
               </div>
             ))}
-          </div>
+          </Fold>
         </Sheet>
       )}
+      </Kept>
     </div>
   );
 }

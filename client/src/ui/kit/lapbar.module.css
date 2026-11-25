@@ -8,6 +8,8 @@
   background: var(--you);
   transform: scaleX(var(--share));
   transform-origin: left;
+  /* The fill runs to where it now stands. */
+  transition: transform var(--motion-fill) var(--motion-ease);
 }
 .big i { height: var(--layout-lane-set); }
 

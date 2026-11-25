@@ -1,2 +1,3 @@
 /* Quieter than the result it follows: the size of a label, in muted. */
-.marks { display: grid; gap: var(--space-xs); padding: 0; list-style: none; font: var(--type-label); color: var(--muted); }
+.marks { font: var(--type-label); color: var(--muted); }
+.marks p { padding-top: var(--space-sm); }

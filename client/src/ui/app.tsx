@@ -77,7 +77,7 @@ interface Props {
   habits: Habits;
   rooms: Rooms;
   settings: SettingsData;
-  /** A habit was given a reminder time where it had none: the moment to ask for leave to notify. */
+  /** A habit or a task was given a time where it had none: the moment to ask for leave to notify. */
   onReminderSet?: () => void;
   /** False where the browser cannot save a file (the phone app): Settings then says where a copy can be saved. */
   canSave?: boolean;
@@ -127,7 +127,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
       {screen === 'focus' ? (
         <FocusScreen engine={engine} focus={focus} today={today} rooms={rooms} settings={settings} />
       ) : screen === 'today' ? (
-        <TodayScreen focus={focus} today={today} settings={settings} />
+        <TodayScreen focus={focus} today={today} settings={settings} app={canSave === false} onReminderSet={onReminderSet} />
       ) : screen === 'progress' ? (
         <ProgressScreen focus={focus} progress={progress} />
       ) : screen === 'habits' ? (
@@ -135,6 +135,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
       ) : screen === 'room' ? (
         <RoomScreen engine={engine} rooms={rooms} />
       ) : (
+        // Settings is not one of the five: its name makes it a screen of its own for the frame.
         <Settings engine={engine} settings={settings} invites={invites} admins={admins} server={server} canSave={canSave} onSignIn={() => setAgain(true)} />
       )}
     </Shell>

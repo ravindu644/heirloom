@@ -10,7 +10,7 @@ import type { Phase, TimerState } from '../core/timer.ts';
 import type { AccountResult, Engine, Role, Row, SyncState } from '../sync/engine.ts';
 import { EXTEND_MS } from '../sync/focus.ts';
 import type { Focus } from '../sync/focus.ts';
-import type { Today } from '../sync/today.ts';
+import type { ProjectColor, Today } from '../sync/today.ts';
 import { App, Elsewhere } from './app.tsx';
 import { DAY, PROJECTS, demoToday } from './demo-today.ts';
 import type { DemoDay, DemoTask } from './demo-today.ts';
@@ -26,6 +26,8 @@ import type { Admins } from '../sync/admins.ts';
 import type { Invites } from '../sync/invites.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import { ServerStep } from './server.tsx';
+import { FirstRun } from './welcome.tsx';
+import { hexOf } from './kit/hex.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -72,6 +74,8 @@ interface Scene {
   phoneApp?: boolean;
   /** The phone app's server step, alone, as it is before there is any engine. */
   serverStep?: DemoServer;
+  /** The phone app with no server yet: the welcome, then the server step. */
+  welcome?: boolean;
   /** The phone app's server, for the sign-in screen and Settings: its address. Given, the app is the phone app. */
   serverAt?: string;
   /** A server with no account yet. `never`: the server does not say either way. `late`: it says so after a second. */
@@ -95,6 +99,10 @@ const lap2 = { phase: 'work', lap: 1, left: 18 * MIN + 42000 } as const;
 const tuesday: [number, number] = [150 * MIN, 200 * MIN];
 
 // The day of the Today mockup: five laps done, ten planned and left, last Tuesday at 3h 20m.
+// A colour a person picked has no name, only its value. The demo takes the value of a pale token,
+// so no colour is written here and the hair line around a picked square has something to do.
+const PICKED = hexOf('heat-1') as ProjectColor;
+
 const TASKS: DemoTask[] = [
   { id: 'kr', title: 'K&R 5.1 to 5.5: pointers and arrays', project: 'c', estimate: 4, squares: [1, 1], due: DAY },
   { id: 'ex', title: 'Exercise 5-3: strcat with pointers', project: 'c', estimate: 2, due: DAY },
@@ -142,6 +150,7 @@ const TODAY: Record<string, Scene> = {
   },
   'today-ordering': { ...idleAt2, about: 'Changing the order', day: day(), tap: 'Change the order' },
   'today-target': { ...idleAt2, about: 'Changing the day target', day: day(), tap: 'Change' },
+  'today-untargeted': { ...idleAt2, about: 'The target removed on another device while its editor is open here: the way to set one is back', day: day(), tap: ['Change', 'demo:untarget'] },
   'today-no-target': { ...idleAt2, about: 'No day target set', day: day(TASKS, { target: 0 }) },
   'today-added': { ...idleAt2, about: 'Just after quick add', day: day(), tap: 'demo:add' },
   'today-after-done': { ...idleAt2, about: 'Just after marking a task done: Undo', day: day(), tap: 'Done: Exercise 5-3' },
@@ -167,6 +176,11 @@ const TODAY: Record<string, Scene> = {
   },
   'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 9 })), tap: 'Exercise 5-3' },
   'sheet-project': { ...idleAt2, about: 'The sheet making a new project', day: day(), tap: ['Exercise 5-3', 'New project'] },
+  'today-timed': { ...idleAt2, about: 'Tasks with a time: today at 16:40 with free words, and one tomorrow', day: day([...swap('ex', { time: '16:40', when: 'after dinner' }), { id: 'viva', title: 'Viva practice with Sachi', project: 'uni', estimate: 1, due: '2026-11-25', time: '09:30' }]) },
+  'sheet-time': { ...idleAt2, about: 'The sheet of a task with a time: the day, the time, and No time', day: day(swap('ex', { time: '16:40', when: 'after dinner' })), tap: 'Exercise 5-3' },
+  'sheet-time-app': { ...idleAt2, about: 'The same in the phone app, which reminds at that minute', phoneApp: true, day: day(swap('ex', { time: '16:40' })), tap: 'Exercise 5-3' },
+  'today-picked': { ...idleAt2, about: 'A project in a colour the person picked: its square inside a hair line', day: day(TASKS, { projects: PROJECTS.map((project) => (project.id === 'c' ? { ...project, color: PICKED } : project)) }) },
+  'sheet-picked': { ...idleAt2, about: 'A new project in a picked colour: the thirteenth choice shows it', day: day(), tap: ['Exercise 5-3', 'New project', `fill:color=${PICKED}`] },
   'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 }, when: 'after dinner' })), tap: 'Exercise 5-3' },
   // An estimate of five here, so "lap 3 of 5 on this task" cannot be taken for the set of four above it.
   'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day(swap('kr', { estimate: 5 })) },
@@ -184,6 +198,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-ahead': { ...week, about: 'Progress: a week ahead of the last', record: { today: 300 } },
   'progress-level': { ...week, about: 'Progress: level with last week', record: { today: 150 } },
   'progress-behind': { ...week, about: 'Progress: three laps behind, nothing running', record: { today: 75 } },
+  'progress-one-lap': { ...week, about: 'Progress with one lap counted today: taking it out changes the heading, the week and the streak above the timeline', record: { today: 25 } },
   'progress-first-day': { about: 'Progress on a first day: nothing to compare, one square', next: 1, at: [10, 50], you: 25 * MIN, laps: 1, record: { history: 'day', today: 25, scripted: false } },
   'progress-nothing': { about: 'Progress before the first lap', next: 0, at: [9, 5], record: { history: 'none', scripted: false } },
   'progress-first-week': { ...week, about: 'Progress in a first week: no last week to race', record: { history: 'week' } },
@@ -220,7 +235,7 @@ const ROOM_SCENES: Record<string, Scene> = {
   'room-none-offline': { ...week, about: 'Not in a room, and no connection', sync: 'offline', room: { rooms: 'none', stale: true } },
   'room-alone': { ...week, about: 'A room of one', run: onKr, room: { members: 'alone' } },
   room: { ...week, about: 'Room: four friends, one cheer given, one away', run: onKr, room: {} },
-  'room-cheered': { ...week, about: 'Just after a cheer', run: onKr, room: {}, tap: 'Cheer sachi' },
+  'room-cheered': { ...week, about: 'Just after a cheer', run: onKr, room: {}, tap: 'Cheer' },
   'room-ranked': { ...week, about: 'A room that has switched its order on', run: onKr, room: { ranked: true } },
   'room-eight': { ...week, about: 'Eight members, a long name, a long task title', run: onKr, room: { members: 'eight', name: 'Second years, block C, the ones who stay up' } },
   'room-stale': { ...week, about: 'No connection: the room as it was last heard from', run: onKr, sync: 'offline', room: { stale: true } },
@@ -248,6 +263,10 @@ const LAN = 'http://192.168.1.20:8787';
 const asked = (typed: string) => [`fill:server=${typed}`, 'submit:server'];
 const owner: Scene = { ...idleAt2, about: '', settings: true, day: day(), role: 'owner' };
 const SERVER: Record<string, Scene> = {
+  welcome: { about: 'The phone app, first opened: what heirloom is, and the way to a server', welcome: true },
+  'welcome-server': { about: 'From the welcome to the server step, which has the way back', welcome: true, tap: 'Connect to a server' },
+  'signin-wrong': { about: 'A wrong password: the error on its own line above the buttons, the intro untouched', signedOut: true, tap: ['fill:username=sachi', 'fill:password=credentials', 'submit:username'] },
+  'join-wrong': { about: 'Joining with an invite the server does not know: the error above the buttons, every hint still there', signedOut: true, tap: ['I have an invite', 'fill:invite=k3J9xQ7mPa2f8Lw0', 'fill:username=sachi', 'fill:password=invite', 'submit:username'] },
   server: { about: 'The phone app asks for its server', serverStep: {} },
   'server-invalid': { about: 'What was typed is not an address', serverStep: { refusal: 'invalid' }, tap: asked('my server') },
   'server-unreachable': { about: 'Nothing answers at the address', serverStep: { refusal: 'unreachable' }, tap: asked('192.168.1.20:8787') },
@@ -480,13 +499,17 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
 if (scene && !location.hash) location.hash = scene.join ? `#/join/${scene.join}` : scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
+// Staged once, so a tap word can change what another device would have changed.
+const staged = scene && !scene.elsewhere && !scene.welcome && !scene.serverStep ? stage(scene) : undefined;
 render(
   scene?.elsewhere ? (
     <Elsewhere />
+  ) : scene?.welcome ? (
+    <FirstRun choice={demoServer({})} />
   ) : scene?.serverStep ? (
     <ServerStep choice={demoServer(scene.serverStep)} />
   ) : scene ? (
-    <App {...stage(scene)} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
+    <App {...staged!} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>
@@ -510,9 +533,14 @@ render(
     } else if (words.startsWith('fill:')) {
       // Typed, as a person would: `fill:<field's name>=<what is typed>`.
       const [, name, typed] = words.match(/^fill:([^=]+)=(.*)$/)!;
-      document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.value = typed!;
+      const field = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+      field.value = typed!;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
     } else if (words.startsWith('submit:')) {
       document.querySelector<HTMLInputElement>(`input[name="${words.slice(7)}"]`)!.form!.requestSubmit();
+    } else if (words === 'demo:untarget') {
+      // The day target taken away on another device, while this one has its editor open.
+      staged!.today.setTarget(0);
     } else if (words === 'demo:day') {
       // A week back in the year, by the keyboard.
       document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));

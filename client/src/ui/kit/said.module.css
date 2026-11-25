@@ -1,8 +1,12 @@
-/* What the last tap did: as wide as the list, one line, stuck to the bottom of the scroll so it
-   is seen wherever the list is. It sits after the last row, so that row scrolls clear of it. */
+/* What the last tap did. It is laid over the foot of the screen, `md` from its edges, and is no
+   part of the list: a short list does not leave it in the middle, and nothing scrolls or moves
+   to make room for it. Only the bar itself takes a tap; the screen under the rest stays live. */
+.over { position: relative; z-index: 2; align-self: end; height: 0; pointer-events: none; }
 .said {
-  position: sticky;
-  bottom: 0;
+  position: absolute;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  left: var(--space-md);
   display: flex;
   align-items: center;
   gap: var(--space-md);
@@ -11,7 +15,13 @@
   border-radius: var(--radius-md);
   background: var(--ink);
   color: var(--ground);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+  animation: rise var(--motion-sheet) var(--motion-ease);
 }
+.going { animation: fade var(--motion-sheet) var(--motion-ease) forwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+@keyframes fade { to { opacity: 0; } }
 .said > span { display: flex; flex: 1; flex-wrap: wrap; gap: 0 var(--space-xs); height: 1lh; min-width: 0; overflow: hidden; white-space: nowrap; }
 /* The bar's job is to say which task: the name has the line, cut short only when it alone is
    too long. What comes after it shows whole or not at all: when it does not fit beside the
@@ -21,3 +31,14 @@
 .tail { flex: none; }
 .said button { color: var(--ground); text-decoration-color: var(--ground); }
 .said button:hover { color: var(--ground); }
+
+/* The end of a list that speaks through the bar: a bar's height stays free under the last row,
+   so the bar never lies on something that cannot be scrolled clear of it. */
+.room { padding-bottom: var(--layout-touch); }
+/* And the bar's distance from the foot of the screen, as one more empty part of the column. */
+.room::after { content: ""; height: var(--space-md); }
+
+/* Beside a sidebar the bar stands under the column it speaks for (said.tsx measures it); this is where it stands when no column is marked. */
+@media (min-width: 720px) {
+  .said { right: auto; left: var(--layout-gutter); width: min(64ch, 100% - 2 * var(--layout-gutter)); }
+}

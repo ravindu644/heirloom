@@ -1,0 +1,26 @@
+/* A column whose parts come and go in time. The gap is the column's; a part on its way in or
+   out takes it back with a negative margin, so the space opens and closes with the part and
+   nothing snaps by a gap's width at either end. A flex column for that reason: in a grid a
+   track cannot be less than nothing. */
+.fold { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; padding: 0; list-style: none; }
+/* A part is one grid row, which can be animated from nothing to its content's height. */
+.part { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr; }
+/* What is in it fills it, as it would fill the column itself: a button is as wide as its part
+   on a phone, and `justify-self` still places it. */
+.part > div { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; min-height: 0; }
+.arriving { animation: open var(--motion-fill) var(--motion-ease); }
+.going { animation: close var(--motion-fill) var(--motion-ease) forwards; }
+/* Cut off only while it moves: at rest a focus ring and a 48px target reach past the part. */
+.arriving > div { animation: clip var(--motion-fill); }
+.going > div { overflow: hidden; }
+@keyframes open { from { grid-template-rows: 0fr; margin-bottom: calc(var(--gap) * -1); opacity: 0; } }
+@keyframes close { to { grid-template-rows: 0fr; margin-bottom: calc(var(--gap) * -1); opacity: 0; } }
+@keyframes clip { from, to { overflow: hidden; } }
+
+/* A part that holds only a column with nothing in it (a line that speaks now and then) takes no
+   gap either, and gives it back in time when the line comes. */
+.part { transition: margin-bottom var(--motion-fill) var(--motion-ease); }
+.part:has(> div > .fold:empty), .part:has(> div > .fold > .going:only-child) { margin-bottom: calc(var(--gap) * -1); }
+
+/* Around a child that moves itself: no box of its own. */
+.bare { display: contents; }

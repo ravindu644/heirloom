@@ -7,4 +7,5 @@
   background: var(--you);
   transform: scaleX(var(--share));
   transform-origin: left;
+  transition: transform var(--motion-fill) var(--motion-ease);
 }

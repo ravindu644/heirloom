@@ -20,6 +20,8 @@ export interface DemoTask {
   squares?: number[];
   due?: string;
   when?: string;
+  /** A clock time on its due day: "16:40". */
+  time?: string;
   repeat?: Repeat;
   notes?: string;
   done?: boolean;
@@ -89,6 +91,7 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       running,
       due: task.due ?? null,
       when: task.when ?? null,
+      time: task.due ? (task.time ?? null) : null,
       repeat: task.repeat ?? null,
       deleted: task.deleted ?? null,
       done: !!task.done,
@@ -109,6 +112,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     done: computed(() => top.value.filter((task) => task.done).map(view)),
     deleted: computed(() => tasks.value.filter((task) => task.deleted && !task.parent).map(view)),
     projects,
+    // Nothing in the demo reminds: the platform reads this, not a screen.
+    timed: signal([]),
     figures() {
       const inLap = timer.value.phase === 'work' ? lap() : null;
       const left_laps = open.value.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
@@ -137,6 +142,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
         ...fields,
         ...(fields.title !== undefined && { title: fields.title.trim() }),
         ...(fields.when !== undefined && { when: fields.when?.trim() || undefined }),
+        // A time on a task with no day lands on today, as the real one does.
+        ...(fields.time && !fields.due && !tasks.value.find((task) => task.id === id)?.due && { due: DAY }),
         project: fields.project === null ? undefined : (fields.project ?? tasks.value.find((task) => task.id === id)?.project),
       } as Partial<DemoTask>),
     setDone(id, done) {

@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import type { Mark, Settings } from '../../sync/settings.ts';
+import { Fold } from './fold.tsx';
 import css from './marks.module.css';
 
 /**
@@ -17,12 +18,12 @@ export function Marks({ settings, say, last }: { settings: Settings; say: (mark:
       settings.seen();
     };
   }, [any]);
-  if (!any) return null;
+  // The region is always there, with nothing in it: a line opens in place when it has one to say.
   return (
-    <ul class={css.marks} role="status">
+    <Fold class={css.marks} role="status">
       {marks.map((mark) => (
-        <li key={mark.key}>{say(mark)}</li>
+        <p key={mark.key}>{say(mark)}</p>
       ))}
-    </ul>
+    </Fold>
   );
 }

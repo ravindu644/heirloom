@@ -1,16 +1,18 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { Engine } from '../sync/engine.ts';
 import { inviteIn } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import { Button } from './kit/button.tsx';
 import { Field } from './kit/field.tsx';
 import { first } from './kit/first.ts';
+import { Fold } from './kit/fold.tsx';
 import links from './kit/links.module.css';
 import { ServerStep } from './server.tsx';
 import { Shell } from './shell.tsx';
 import css from './signin.module.css';
 import * as s from './strings.ts';
+import { About } from './welcome.tsx';
 
 interface Props {
   engine: Engine;
@@ -55,25 +57,8 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
     return () => void (gone = true);
   }, []);
 
-  // With the keyboard up there is half a screen. Bring the button into view, then the field being
-  // typed in: both when they fit, and the field when they do not. The keyboard opening is a resize.
-  const actions = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const show = () => {
-      if (!(document.activeElement instanceof HTMLInputElement)) return;
-      actions.current?.scrollIntoView({ block: 'nearest' });
-      document.activeElement.scrollIntoView({ block: 'nearest' });
-    };
-    addEventListener('resize', show);
-    addEventListener('focusin', show);
-    return () => {
-      removeEventListener('resize', show);
-      removeEventListener('focusin', show);
-    };
-  }, []);
-
   // The frame fills the screen whatever is in it, so nothing jumps when the form arrives.
-  if (held) return <Shell>{null}</Shell>;
+  if (held) return <Shell page="held">{null}</Shell>;
   if (changing && server) return <ServerStep choice={server} onBack={() => setChanging(false)} />;
 
   const submit = async (event: TargetedSubmitEvent<HTMLFormElement>) => {
@@ -85,8 +70,9 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
     // nobody joining means that. Nothing found is said, and nothing is sent.
     const joining = kind === 'join' ? (linked ?? inviteIn(field('invite'))) : '';
     if (joining === null) return setError(s.account.noInvite);
+    // What was said stays while the server is asked again: taken away now and put back a moment
+    // later, it would move the buttons twice under the finger.
     setBusy(true);
-    setError('');
     const result = kind === 'signin' ? await engine.signIn(field('username').trim(), field('password')) : await engine.register(joining, field('username').trim(), field('password'));
     setBusy(false);
     // The invite the phone app held has done its work, or the server will not have it: let it go.
@@ -112,18 +98,11 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
   const making = kind !== 'signin';
 
   return (
-    <Shell>
+    <Shell page="form">
+      <div class={css.page}>
       <form class={css.form} onSubmit={submit}>
         <h1>{kind === 'setup' ? s.account.setup : kind === 'join' ? s.account.join : s.account.signIn}</h1>
-        {/* What went wrong takes the place of the welcome, so nothing below it moves. The second
-            line is the same sentence for a screen reader, which only announces a region that was
-            already there. */}
-        <p class={error ? css.error : css.intro} aria-hidden={!!error}>
-          {error || (kind === 'setup' ? s.account.setupIntro : kind === 'join' ? (linked ? s.account.joinLinked(host) : s.account.joinIntro) : s.account.signInIntro(s.device()))}
-        </p>
-        <p class="sr" role="alert">
-          {error}
-        </p>
+        <p class={css.intro}>{kind === 'setup' ? s.account.setupIntro : kind === 'join' ? (linked ? s.account.joinLinked(host) : s.account.joinIntro) : s.account.signInIntro(s.device())}</p>
         {kind === 'join' && !linked && (
           <Field label={s.account.invite} hint={s.account.inviteHint} name="invite" required autocomplete="off" autocapitalize="none" spellcheck={false} />
         )}
@@ -145,7 +124,13 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
           required
           autocomplete={making ? 'new-password' : 'current-password'}
         />
-        <div class={css.actions} ref={actions}>
+        {/* What went wrong has a line of its own, directly above the buttons it answers: it opens
+            in place, and the intro, the labels and the hints stay as they were. The region is
+            always there, so a screen reader hears what arrives in it. */}
+        <div>
+          <Fold role="alert">{error && <p class={css.error}>{error}</p>}</Fold>
+        {/* DESIGN.md's one exception to "what you tapped stays": the error moves these buttons down by its own height, in time. */}
+        <div class={css.actions} data-moves>
           <Button kind="primary" type="submit" disabled={busy}>
             {kind === 'setup'
               ? busy
@@ -178,11 +163,13 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
             )
           )}
         </div>
+        </div>
         {/* The phone app is not served by its server, so it says which one it talks to, and that can be changed here. */}
         {server && (
           <div class={css.server}>
             <p>
-              <span>{s.server.at(host)}</span>
+              {/* The address is there to be copied. */}
+              <span class="copies">{s.server.at(host)}</span>
               <Button kind="link" class={links.end} onClick={() => setChanging(true)}>
                 {s.server.change}
               </Button>
@@ -191,6 +178,10 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
           </div>
         )}
       </form>
+      {/* In a browser, someone who was only handed a link reads what this is: beside the form
+          where there is room, under it on a phone. The phone app said it on its first screen. */}
+      {!server && !again && <About />}
+      </div>
     </Shell>
   );
 }

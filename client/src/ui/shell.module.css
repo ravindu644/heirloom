@@ -34,7 +34,11 @@
 /* Positioned, so a line kept for screen readers (out of the flow) lies inside the scroller and
    can never make the page itself taller than the screen. */
 .main { position: relative; grid-area: main; overflow-y: auto; padding: var(--space-sm) var(--layout-margin) 0; }
-.canvas { max-width: var(--layout-canvas); height: 100%; }
+/* A screen that is changed fades in and rises; the one before it is gone at once. */
+.canvas { max-width: var(--layout-canvas); height: 100%; animation: arrive var(--motion-fill) var(--motion-ease); }
+@keyframes arrive { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+/* What the last tap did lies over the foot of the screen, in the screen's own cell. */
+.over { grid-area: main; }
 
 /* What the connection has to say. It takes room when it speaks and none when it is silent. */
 .status, .statusKept {

@@ -5,6 +5,7 @@ import { Dots } from '../kit/dots.tsx';
 import { Heat, HeatKey } from '../kit/heat.tsx';
 import { Laps } from '../kit/laps.tsx';
 import { Panel } from '../kit/panel.tsx';
+import { Square } from '../kit/square.tsx';
 import { useWide } from '../kit/wide.ts';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
@@ -179,7 +180,7 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
             {shares.map((share) => (
               <li key={share.project?.id ?? ''}>
                 <span class={css.name}>
-                  {share.project && <i style={`background:var(--${share.project.color})`} />}
+                  {share.project && <Square color={share.project.color} />}
                   {share.project?.name ?? s.progress.noProject}
                 </span>
                 <b>{s.total(share.focus_ms)}</b>

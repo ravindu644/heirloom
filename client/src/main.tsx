@@ -4,7 +4,7 @@ import { onFront, startPlatform } from './platform/index.ts';
 import { serverChoice, startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
-import { ServerStep } from './ui/server.tsx';
+import { FirstRun } from './ui/welcome.tsx';
 import { result, ring } from './ui/strings.ts';
 
 const root = document.getElementById('app')!;
@@ -17,7 +17,7 @@ async function start() {
   // A build may come with an address filled in; once one is kept, that is the one.
   const server = APP ? await serverChoice(import.meta.env.VITE_SERVER_URL || undefined) : undefined;
   // No server yet: nothing to start. Choosing one starts the app again on it.
-  if (server && !server.address) return render(<ServerStep choice={server} />, root);
+  if (server && !server.address) return render(<FirstRun choice={server} />, root);
   const app = await startApp(server?.address ?? undefined);
   const { engine, focus, settings } = app;
   // The phone's WebView says it is visible right through screen off, so the browser's own
@@ -60,13 +60,15 @@ async function start() {
     notifier.reword();
   });
   // A habit with a reminder time is reminded on this device on the days it is planned, until it
-  // is checked in. The notifier keeps what the phone holds equal to this list.
+  // is checked in. A task with a time is reminded once, at that minute of its day, while it is
+  // open. The notifier keeps what the phone holds equal to this one list.
   effect(() =>
-    notifier.reminders(
-      app.habits.list.value
+    notifier.reminders([
+      ...app.habits.list.value
         .filter((habit) => habit.remind)
         .map((habit) => ({ habit: habit.id, title: habit.title, body: ring.remindBody, time: habit.remind!, days: habit.days, doneToday: habit.today.done })),
-    ),
+      ...app.today.timed.value.map((task) => ({ habit: task.id, title: task.title, body: ring.taskBody(task.time), time: task.time, days: 127, day: task.day, doneToday: false })),
+    ]),
   );
 
   // The ring is planned whenever the timer changes, on any device. The timer counts in server

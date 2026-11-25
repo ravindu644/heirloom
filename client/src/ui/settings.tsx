@@ -6,6 +6,7 @@ import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
 import { Button } from './kit/button.tsx';
+import { Fold } from './kit/fold.tsx';
 import form from './kit/form.module.css';
 import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
@@ -103,7 +104,8 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
   const accountPanel = (
     <Panel title={s.settings.account}>
       <Person name={account.username} />
-      <p>{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
+      {/* The sentence holds the server's address, which is there to be copied. */}
+      <p class="copies">{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
       {/* Said once more here, under the account: a fact, not an alarm. */}
       {plain && <p class={css.note}>{s.server.plain}</p>}
       <div class={css.actions}>
@@ -175,15 +177,17 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
           {s.settings.copyNote} {s.settings.importNote}
         </p>
         {/* Where a file cannot be saved (the phone app), the screen says where one can, and never "Saved". */}
-        {!canSave && <p>{s.settings.exportElsewhere(server)}</p>}
+        {!canSave && <p class="copies">{s.settings.exportElsewhere(server)}</p>}
         <div class={css.actions}>
           {canSave && <Button onClick={save}>{s.settings.export}</Button>}
           <Button kind="quiet" onClick={() => file.current!.click()}>
             {s.settings.import}
           </Button>
+          {/* Unseen, and inside the row: as a part of the panel it would cost a gap. */}
+          <input ref={file} type="file" accept=".json,application/json" hidden onChange={(event) => bring(event.currentTarget.files?.[0])} />
         </div>
-        <input ref={file} type="file" accept=".json,application/json" hidden onChange={(event) => bring(event.currentTarget.files?.[0])} />
-        <p role="status">{copy}</p>
+        {/* What became of the copy opens in place; the region is always there for a screen reader. */}
+        <Fold role="status">{copy && <p>{copy}</p>}</Fold>
       </Panel>
     </>
   );

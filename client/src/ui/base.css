@@ -12,12 +12,23 @@ body {
   /* A tap on a phone answers at once, with no grey flash and no wait for a double tap. */
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* DESIGN.md, It is an app, not a page: words on a screen are not text to drag over, and a long
+     press brings up no menu. What is typed into selects, and so does what is there to be copied,
+     which says so itself with `.copies` or with `user-select: all`. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
+input, textarea, .copies { user-select: text; -webkit-user-select: text; }
 a { color: inherit; text-decoration: none; }
 button, input { font: inherit; color: inherit; }
 /* A hint in an empty field is muted text, in every field: the browser's own grey is not one of ours. */
 ::placeholder { color: var(--muted); opacity: 1; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* The end a page is given when what was tapped could not otherwise stay under the finger
+   (kit/hold.ts): a clear edge under the screen's or the sheet's content, as tall as is needed. */
+main > div > *, dialog > * { border-bottom: var(--slack, 0px) solid transparent; }
 
 /* For a screen reader only. */
 .sr {
@@ -32,5 +43,5 @@ button, input { font: inherit; color: inherit; }
 /* DESIGN.md: under reduced motion every moment shows its final state at once. One rule, so no
    component can forget it. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+  *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important; }
 }

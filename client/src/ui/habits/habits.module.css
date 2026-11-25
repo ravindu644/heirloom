@@ -1,4 +1,4 @@
-.habits { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; padding-bottom: var(--space-md); }
+.habits { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; }
 
 /* The heading is a finding. The line over it says which day. */
 .head { display: grid; gap: var(--space-xs); }
@@ -8,10 +8,7 @@
 .head h1:focus { outline: none; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
-.now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
-.now > div:empty { display: none; }
 .quiet { color: var(--muted); text-wrap: pretty; }
-.rows { display: grid; gap: var(--space-sm); }
 
 /* A habit is a row as a task is: the box, the words, and what is counted at the end. Its week
    lies under the words on a phone and beside them where there is room. */

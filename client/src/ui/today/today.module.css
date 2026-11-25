@@ -1,5 +1,5 @@
 /* One column that cannot be pushed wider than the screen by a long title. */
-.today { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; padding-bottom: var(--space-md); }
+.today { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); min-height: 100%; }
 /* The day at a glance is one block: the heading, the figures, the target. */
 .summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
@@ -7,17 +7,22 @@
 .head h1 { font: var(--type-title); }
 .head p { color: var(--muted); }
 
-/* The day target: a bar of as many segments as laps, and its words. */
-.target { display: grid; gap: var(--space-xs); }
+/* The day target: a bar of as many segments as laps, and its words. The space under the bar is
+   the bar's own, so it opens and closes with it. */
+.lane { padding-bottom: var(--space-xs); }
 .target p { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); font: var(--type-label); color: var(--muted); }
-.targeting { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
+/* Its editor, open under the words: what the number is, the stepper and Done; and apart from
+   them, at the row's end or on a line of its own, the way to have no target. */
+.targeting { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 0 var(--space-md); padding-top: var(--space-xs); }
+.targeting > div { display: grid; gap: var(--space-xs); }
+.targeting > div > span { font: var(--type-label); color: var(--muted); }
+/* Done stands apart from the stepper: beside its plus it would read as a fourth key. */
+.targeting > div > div { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-lg); }
 
 .moves { display: flex; gap: var(--space-xs); }
 .moves button:disabled { visibility: hidden; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
-.now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
-.now > div:empty { display: none; }
 
 /* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
 .bar {
@@ -42,13 +47,16 @@
 
 .sect { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); font: var(--type-label); color: var(--muted); }
 .sect span { font-weight: inherit; }
-.rows { display: grid; gap: var(--space-sm); }
+/* The focus is sent to a list's heading when a sheet closes on a task that has left it: a place to read on from, not a control. */
+.sect:focus, .head h1:focus { outline: none; }
 
 .empty { color: var(--muted); }
 
-/* What was just achieved and what the last tap did stay in sight together, at the foot of the list. */
-.foot { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding-top: var(--space-sm); background: var(--ground); }
-.foot:empty { display: none; }
+
+/* What was just achieved, in sight over the place where the bar stands. The ground under it is
+   the line's own: with nothing to say, nothing is drawn across the list. */
+.foot { position: sticky; bottom: calc(var(--layout-touch) + var(--space-md)); }
+.foot p { padding-bottom: var(--space-sm); background: var(--ground); }
 
 .binNote { color: var(--muted); }
 

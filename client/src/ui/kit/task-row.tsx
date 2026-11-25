@@ -3,6 +3,7 @@ import type { TaskView } from '../../sync/today.ts';
 import { Check } from './check.tsx';
 import { cx } from './cx.ts';
 import { Laps } from './laps.tsx';
+import { Square } from './square.tsx';
 import css from './task-row.module.css';
 
 interface Props {
@@ -13,8 +14,6 @@ interface Props {
   note?: string;
   /** The one to start next: outlined in you. */
   next?: boolean;
-  /** It was added while the screen was open: it comes in with the `fill` motion, once. */
-  arriving?: boolean;
   /** At the row's end: a button, the move controls. The squares and the count sit to its left. */
   end?: ComponentChildren;
   /** What the box marks, for a screen reader. Left out with `onDone`, there is no box. */
@@ -24,7 +23,7 @@ interface Props {
 }
 
 /** A task as a row: the box, the title, its project and laps, and the count. The words open it. */
-export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDone, onOpen }: Props) {
+export function TaskRow({ task, of, note, next, end, checkLabel, onDone, onOpen }: Props) {
   // The laps as squares, with the count they picture. They sit at the row's right, apart from the
   // project's square: side by side the two would read as one more lap.
   const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />;
@@ -36,7 +35,7 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
           {task.project && (
             <span class={css.project}>
               {/* The square is never alone: the name follows it. */}
-              <i style={`background:var(--${task.project.color})`} />
+              <Square color={task.project.color} />
               {task.project.name}
             </span>
           )}
@@ -46,7 +45,7 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
     </>
   );
   return (
-    <div class={cx(css.row, next && css.next, arriving && css.arriving, task.done && css.done, !onDone && css.plain, !!end && css.trailed)}>
+    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed)}>
       {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
       {onOpen ? (
         <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>

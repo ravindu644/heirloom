@@ -1,6 +1,8 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { Button } from './button.tsx';
+import { cx } from './cx.ts';
+import { useGoing } from './fold.tsx';
 import css from './sheet.module.css';
 
 interface Props {
@@ -9,6 +11,8 @@ interface Props {
   /** The word on the button that closes it. */
   close: string;
   onClose: () => void;
+  /** Something can open inside it (a form, a line, an editor): on a phone it is then as tall as a sheet may be whatever it holds, so what opens moves only what is under it. */
+  grows?: boolean;
   children: ComponentChildren;
 }
 
@@ -17,18 +21,17 @@ interface Props {
  * the browser keeps the focus inside, closes it on Escape and hands the focus back to where it
  * came from. It is also one step of history, so the back button of a phone closes it and nothing
  * else. However it goes, that step goes with it: left behind, it would eat the next back press.
+ * Whoever shows a sheet wraps it in `Kept`: taken away, it closes itself and slides out before
+ * it is dropped, whichever way it was closed.
  */
 let sheets = 0;
 
-export function Sheet({ title, close, onClose, children }: Props) {
+export function Sheet({ title, close, onClose, grows, children }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const closed = useRef(onClose);
   closed.current = onClose;
-  // Closed while it is still in the page: that is what hands the focus back.
-  const shut = () => {
-    dialog.current?.close();
-    closed.current();
-  };
+  const shut = () => closed.current();
+  const leave = useRef(() => {});
   useEffect(() => {
     dialog.current!.showModal();
     const mine = ++sheets;
@@ -40,17 +43,35 @@ export function Sheet({ title, close, onClose, children }: Props) {
       shut();
     };
     addEventListener('popstate', back);
-    return () => {
+    leave.current = () => {
+      leave.current = () => {};
       removeEventListener('popstate', back);
       // Closed any other way, by its own button or by the screen behind taking it away (the task
       // was deleted elsewhere, midnight passed): take the step back, if it is still the one we are on.
       if (!wentBack && history.state?.sheet === mine) history.back();
     };
+    return () => leave.current();
   }, []);
+  // Taken away without a leaving (reduced motion keeps nothing): closed while it is still in the
+  // page all the same, which is what hands the focus back. A layout effect, because its way out
+  // runs before the dialog is taken from the page; a plain effect's runs after.
+  useLayoutEffect(() => {
+    const box = dialog.current!;
+    return () => box.close();
+  }, []);
+  // On its way out: closed while it is still in the page, which is what hands the focus back and
+  // lets the styles slide it away. The step of history goes now, not when the slide is over, or a
+  // sheet opened in that moment would find it in the way.
+  const going = useGoing();
+  useLayoutEffect(() => {
+    if (!going) return;
+    dialog.current?.close();
+    leave.current();
+  }, [going]);
   return (
     <dialog
       ref={dialog}
-      class={css.sheet}
+      class={cx(css.sheet, grows && css.grows)}
       aria-label={title}
       onCancel={(event) => {
         // A date field inside has a cancel of its own, for its picker, and it comes up through

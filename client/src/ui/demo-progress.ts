@@ -3,7 +3,7 @@
 // made up; the streak, the year, the bests and the week are worked out as the app works them out.
 // Not part of the build.
 
-import { signal } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import { addDays, bests, since, streakView, weekRace } from '../core/progress.ts';
 import type { Days } from '../core/progress.ts';
 import type { Estimates, Progress, ProjectShare, TimelineEntry } from '../sync/progress.ts';
@@ -71,11 +71,15 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   const minutes = kind === 'weeks' ? history() : kind === 'year' ? history('2025-11-17', '2025-11-17') : kind === 'week' ? { '2026-11-23': 200 } : {};
   for (const day of record.empty ?? []) minutes[day] = 0;
   for (const day of record.fill ?? []) minutes[day] = 100;
-  const todayMin = record.today ?? (kind === 'none' ? 0 : 125);
+  // A lap taken out of the count or put back moves the day's total, as the real one does: the
+  // figures above the timeline change with the tap, which is what a screen has to stand still under.
+  const moved = signal(0);
+  const todayMin0 = record.today ?? (kind === 'none' ? 0 : 125);
+  const todayMin = () => Math.max(0, todayMin0 + moved.value);
   const days = (): Days => {
     const out: Days = {};
     for (const [day, m] of Object.entries(minutes)) if (m > 0) out[day] = { focus_ms: m * MIN, laps: Math.floor(m / 25) };
-    if (todayMin > 0) out[DAY] = { focus_ms: todayMin * MIN, laps: Math.floor(todayMin / 25) };
+    if (todayMin() > 0) out[DAY] = { focus_ms: todayMin() * MIN, laps: Math.floor(todayMin() / 25) };
     return out;
   };
 
@@ -122,7 +126,7 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   ]);
   // Any other day: its laps from nine, a short break after each.
   const plain = (day: string): TimelineEntry[] =>
-    Array.from({ length: Math.floor((day === DAY ? todayMin : (minutes[day] ?? 0)) / 25) }, (_, i) => [
+    Array.from({ length: Math.floor((day === DAY ? todayMin0 : (minutes[day] ?? 0)) / 25) }, (_, i) => [
       { ...lap(`${day}-${i}`, 9, 0), started: at(day, 9, i * 30), ended: at(day, 9, i * 30) + LAP },
       { ...rest(`${day}-${i}r`, 9, 0), started: at(day, 9, i * 30 + 25), ended: at(day, 9, i * 30 + 30) },
     ]).flat();
@@ -156,26 +160,34 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
         ],
       };
   const note = signal((record.note ?? '').slice(0, 280));
+  // What a tap in the timeline made of a lap, on any day, over what the day was written with.
+  const turned = signal(new Map<string, TimelineEntry['outcome']>());
+  const timeline = (day: string) => (day === DAY && record.scripted !== false ? scripted.value : plain(day)).map((entry) => ({ ...entry, outcome: turned.value.get(entry.id) ?? entry.outcome }));
+  const turn = (id: string, to: 'void' | null) => {
+    const entry = timeline(DAY).find((one) => one.id === id);
+    if (entry) moved.value += (to ? -1 : 1) * Math.round(entry.ran_ms / MIN);
+    turned.value = new Map(turned.value).set(id, to ?? (entry && entry.ran_ms < LAP ? 'stopped' : 'rang'));
+  };
 
   return {
-    week: () => weekRace(days(), DAY, todayMin * MIN + lapNow(), (record.ghostByNow ?? 200) * MIN),
+    week: () => weekRace(days(), DAY, todayMin() * MIN + lapNow(), (record.ghostByNow ?? 200) * MIN),
     projects: () => (kind === 'none' || kind === 'day' ? [] : shares[record.projects ?? (kind === 'week' ? 'week' : 'usual')]!),
     lookBack: () => ({
       day: DAY,
-      focus_ms: todayMin * MIN + lapNow(),
-      laps: Math.floor(todayMin / 25),
-      done: todayMin >= 50 ? [{ id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 }] : [],
+      focus_ms: todayMin() * MIN + lapNow(),
+      laps: Math.floor(todayMin() / 25),
+      done: todayMin() >= 50 ? [{ id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 }] : [],
       note: note.value,
     }),
     today: signal(DAY),
     note: (day) => (day === DAY ? note.value : day === '2026-11-17' ? 'Arrays decay to pointers. Wrote that on my hand.' : ''),
-    streak: signal(streakView(days(), DAY)),
-    since: signal(since(days(), DAY)),
-    bests: signal(bests(days())),
+    streak: computed(() => streakView(days(), DAY)),
+    since: computed(() => since(days(), DAY)),
+    bests: computed(() => bests(days())),
     estimates: signal(kind === 'weeks' || kind === 'year' ? guesses : NO_GUESSES),
-    timeline: (day) => (day === DAY && record.scripted !== false ? scripted.value : plain(day)),
-    setAside: (id) => void (scripted.value = scripted.value.map((entry) => (entry.id === id ? { ...entry, outcome: 'void' } : entry))),
-    countAgain: (id) => void (scripted.value = scripted.value.map((entry) => (entry.id === id ? { ...entry, outcome: entry.ran_ms >= LAP ? 'rang' : 'stopped' } : entry))),
+    timeline,
+    setAside: (id) => turn(id, 'void'),
+    countAgain: (id) => turn(id, null),
     setNote: (_day, text) => void (note.value = text.slice(0, 280)),
     wake() {},
   };

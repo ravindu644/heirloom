@@ -2,7 +2,7 @@
   min-height: var(--layout-touch);
   /* A button's words wrap before the page scrolls sideways; then it grows past its 48px. */
   padding: var(--space-xs) var(--layout-margin);
-  border: 1px solid transparent;
+  border: var(--layout-hair) solid transparent;
   border-radius: var(--radius-sm);
   background: none;
   font: var(--type-body-strong);
@@ -16,13 +16,13 @@
 .primary:hover { background: color-mix(in srgb, var(--you), var(--ink) var(--state-hover)); }
 .primary:active { background: color-mix(in srgb, var(--you), var(--ink) var(--state-press)); }
 
-.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
-.secondary:hover { background: color-mix(in srgb, var(--surface), var(--ink) var(--state-hover)); }
-.secondary:active { background: color-mix(in srgb, var(--surface), var(--ink) var(--state-press)); }
+.secondary { background: var(--key); color: var(--ink); border-color: var(--key-edge); }
+.secondary:hover { background: color-mix(in srgb, var(--key), var(--ink) var(--state-hover)); }
+.secondary:active { background: color-mix(in srgb, var(--key), var(--ink) var(--state-press)); }
 
-.quiet { background: var(--raised); color: var(--ink); }
-.quiet:hover { background: color-mix(in srgb, var(--raised), var(--ink) var(--state-hover)); }
-.quiet:active { background: color-mix(in srgb, var(--raised), var(--ink) var(--state-press)); }
+.quiet { background: var(--key-quiet); color: var(--ink); }
+.quiet:hover { background: color-mix(in srgb, var(--key-quiet), var(--ink) var(--state-hover)); }
+.quiet:active { background: color-mix(in srgb, var(--key-quiet), var(--ink) var(--state-press)); }
 
 .link {
   min-width: var(--layout-touch);

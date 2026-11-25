@@ -79,6 +79,9 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               ))}
             </div>
           </div>
+          {/* The list and the line a screen reader is told are one part of the panel: the line is
+              out of the flow, and as a part of its own it would cost a gap. */}
+          <div>
           <ul class={css.list}>
             {entries.map((entry) => (
               <li key={entry.id}>
@@ -106,11 +109,12 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               </li>
             ))}
           </ul>
+          <p class="sr" role="status">
+            {said && s.progress.asideDone(said.started)}
+          </p>
+          </div>
         </>
       )}
-      <p class="sr" role="status">
-        {said && s.progress.asideDone(said.started)}
-      </p>
       {look && (
         <section class={css.look} aria-label={s.progress.lookBack}>
           <h3>{s.progress.lookBack}</h3>

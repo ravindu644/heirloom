@@ -1,5 +1,4 @@
 .note { color: var(--muted); text-wrap: pretty; }
-.note:empty { display: none; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 /* On a phone the button fills the row, as every button row does. */
 .actions > * { flex: 1; }
@@ -11,9 +10,13 @@
 .link { overflow-wrap: anywhere; user-select: all; }
 
 /* A row is the thing, with what can be done to it as links at its end. */
-.rows { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
-.rows li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-md); min-height: var(--layout-touch); }
-.rows li + li { border-top: var(--layout-hair) solid var(--line); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-md); min-height: var(--layout-touch); }
+/* The line between two rows is the lower row's own, so it goes with it. */
+.rows > li + li .row { border-top: var(--layout-hair) solid var(--line); }
+/* One place for two sets of links: each lies in the same cell, and the one not offered is unseen and cannot be pressed. */
+.slot { display: grid; }
+.slot > * { grid-area: 1 / 1; }
+.off { visibility: hidden; }
 .what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); min-width: 0; }
 .what b { font: var(--type-body-strong); }
 .what span { font: var(--type-label); color: var(--muted); }

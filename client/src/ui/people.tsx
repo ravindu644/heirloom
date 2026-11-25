@@ -5,7 +5,9 @@ import { UNDO_MS } from '../sync/focus.ts';
 import type { InviteView, Invites } from '../sync/invites.ts';
 import { Button } from './kit/button.tsx';
 import { copyText } from './kit/copy.ts';
+import { cx } from './kit/cx.ts';
 import { Field } from './kit/field.tsx';
+import { Fold } from './kit/fold.tsx';
 import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
@@ -56,16 +58,42 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
       </Panel>
     );
 
+  const links3 = (invite: InviteView) => (
+    <>
+      <Button kind="link" aria-label={s.people.forInvite(s.people.copy, invite.invite)} onClick={() => copy(invite.link)}>
+        {s.people.copy}
+      </Button>
+      <Button kind="link" aria-label={s.people.forInvite(s.people.renew, invite.invite)} onClick={() => renew(invite)}>
+        {s.people.renew}
+      </Button>
+      <Button kind="link" aria-label={s.people.forInvite(s.people.takeBack, invite.invite)} onClick={() => setTaking(invite.invite)}>
+        {s.people.takeBack}
+      </Button>
+    </>
+  );
+  const links2 = (invite: InviteView) => (
+    <>
+      <Button kind="link" aria-label={s.people.forInvite(s.people.takeBackGo, invite.invite)} onClick={() => takeBack(invite)}>
+        {s.people.takeBackGo}
+      </Button>
+      <Button kind="link" aria-label={s.people.forInvite(s.people.keep, invite.invite)} onClick={() => setTaking(null)}>
+        {s.people.keep}
+      </Button>
+    </>
+  );
+
+  // The panel is a column of parts: the link just made, the line that says what a tap did, and
+  // each row come and go in time.
   return (
     <Panel title={s.people.invites}>
-      <p class={css.note}>
+      <p key="note" class={css.note}>
         {s.people.canInvite} {s.people.linkNote}
       </p>
-      <div class={css.actions}>
+      <div key="make" class={css.actions}>
         <Button onClick={make}>{s.people.make}</Button>
       </div>
       {fresh && (
-        <section class={css.fresh} aria-label={s.people.fresh}>
+        <section key="fresh" class={css.fresh} aria-label={s.people.fresh}>
           <h3>{s.people.fresh}</h3>
           {/* It may break after `/join/` first, so the invite stays in one piece where there is room for it. */}
           <p class={css.link}>
@@ -78,46 +106,34 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
           </div>
         </section>
       )}
-      <p class={css.note} role="status">
-        {said}
-      </p>
-      {open && open.length === 0 && !fresh && <p class={css.note}>{s.people.none}</p>}
+      {open && open.length === 0 && !fresh && (
+        <p key="none" class={css.note}>
+          {s.people.none}
+        </p>
+      )}
       {open && open.length > 0 && (
-        <ul class={css.rows}>
+        <Fold key="rows" list class={css.rows}>
           {open.map((invite) => (
-            <li key={invite.invite}>
+            <div key={invite.invite} class={css.row}>
               <span class={css.what}>
                 <b>{s.people.ending(invite.invite)}</b>
                 <span>{s.people.runsOut(invite.expires)}</span>
               </span>
-              <span class={links.links}>
-                {taking === invite.invite ? (
-                  <>
-                    <Button kind="link" aria-label={s.people.forInvite(s.people.takeBackGo, invite.invite)} onClick={() => takeBack(invite)}>
-                      {s.people.takeBackGo}
-                    </Button>
-                    <Button kind="link" aria-label={s.people.forInvite(s.people.keep, invite.invite)} onClick={() => setTaking(null)}>
-                      {s.people.keep}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button kind="link" aria-label={s.people.forInvite(s.people.copy, invite.invite)} onClick={() => copy(invite.link)}>
-                      {s.people.copy}
-                    </Button>
-                    <Button kind="link" aria-label={s.people.forInvite(s.people.renew, invite.invite)} onClick={() => renew(invite)}>
-                      {s.people.renew}
-                    </Button>
-                    <Button kind="link" aria-label={s.people.forInvite(s.people.takeBack, invite.invite)} onClick={() => setTaking(invite.invite)}>
-                      {s.people.takeBack}
-                    </Button>
-                  </>
-                )}
+              {/* Two sets of links for one place. Both are always drawn there, one of them unseen,
+                  so the place is as large as the larger and nothing beside it moves at the tap. */}
+              <span class={css.slot}>
+                <span class={cx(links.links, taking === invite.invite && css.off)}>{links3(invite)}</span>
+                <span class={cx(links.links, taking !== invite.invite && css.off)}>{links2(invite)}</span>
               </span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </Fold>
       )}
+      {/* What a tap did is said under the rows, so no row moves under the finger that tapped it.
+          The region is always there, so a screen reader hears what arrives in it. */}
+      <Fold key="said" role="status">
+        {said && <p class={css.note}>{said}</p>}
+      </Fold>
     </Panel>
   );
 }
@@ -157,11 +173,13 @@ export function AdminsPanel({ admins }: { admins: Admins }) {
 
   return (
     <Panel title={s.people.admins}>
-      <p class={css.note}>{s.people.decide}</p>
+      <p key="note" class={css.note}>
+        {s.people.decide}
+      </p>
       {list && (
-        <ul class={css.rows}>
+        <Fold key="rows" list class={css.rows}>
           {list.map((one) => (
-            <li key={one.username}>
+            <div key={one.username} class={css.row}>
               <span class={css.who}>
                 <Person name={one.username} />
                 <span>{one.role === 'owner' ? s.people.owner : s.people.admin}</span>
@@ -171,12 +189,12 @@ export function AdminsPanel({ admins }: { admins: Admins }) {
                   {s.people.lower}
                 </Button>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </Fold>
       )}
       {lowered && (
-        <p class={css.undo} role="status">
+        <p key="undo" class={css.undo} role="status">
           {s.people.lowered(lowered)}
           <Button
             kind="link"
@@ -189,11 +207,13 @@ export function AdminsPanel({ admins }: { admins: Admins }) {
           </Button>
         </p>
       )}
-      <form class={css.raise} onSubmit={submit}>
+      <form key="raise" class={css.raise} onSubmit={submit}>
         <Field label={s.people.username} hint={s.people.usernameHint} name="admin" required autocomplete="off" autocapitalize="none" spellcheck={false} />
         <Button type="submit">{s.people.raise}</Button>
       </form>
-      {said && <p role="alert">{said}</p>}
+      <Fold key="said" role="alert">
+        {said && <p>{said}</p>}
+      </Fold>
     </Panel>
   );
 }

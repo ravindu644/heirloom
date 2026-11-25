@@ -13,14 +13,31 @@
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-float);
+  /* It slides up from under the screen and back, and stays drawn until it is there. */
+  transform: translateY(100%);
+  transition: transform var(--motion-sheet) var(--motion-ease), opacity var(--motion-sheet) var(--motion-ease), overlay var(--motion-sheet) allow-discrete, display var(--motion-sheet) allow-discrete;
   --track: var(--raised);
   --row: var(--raised);
   --row-track: var(--line);
 }
-.sheet[open] { animation: rise var(--motion-sheet) var(--motion-ease); }
-@keyframes rise { from { opacity: 0; transform: translateY(var(--space-lg)); } }
+/* A sheet in which something can open is as tall as it may be, whatever it holds: standing on
+   the bottom edge and only as tall as its content, it grew at its top when something opened
+   inside it, and everything above that thing moved up. */
+.grows { height: 90dvh; }
+.sheet[open] { transform: none; }
+@starting-style {
+  .sheet[open] { transform: translateY(100%); }
+}
 /* The page behind fades toward the ground, never to grey or black. */
-.sheet::backdrop { background: color-mix(in srgb, var(--ground) var(--state-scrim), transparent); }
+.sheet::backdrop {
+  background: color-mix(in srgb, var(--ground) var(--state-scrim), transparent);
+  opacity: 0;
+  transition: opacity var(--motion-sheet) var(--motion-ease), overlay var(--motion-sheet) allow-discrete, display var(--motion-sheet) allow-discrete;
+}
+.sheet[open]::backdrop { opacity: 1; }
+@starting-style {
+  .sheet[open]::backdrop { opacity: 0; }
+}
 
 .inside {
   display: grid;
@@ -35,10 +52,19 @@
   .sheet {
     width: calc(100% - 2 * var(--layout-gutter));
     max-width: 64ch;
+    /* As tall as its content up to its most, and hung from its top: it grows and shrinks at its foot. */
     max-height: 85dvh;
-    margin: auto;
+    margin: 7.5dvh auto auto;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
+    /* A panel in the middle of the screen fades and rises. */
+    opacity: 0;
+    transform: translateY(var(--motion-rise));
+  }
+  .grows { height: fit-content; }
+  .sheet[open] { opacity: 1; }
+  @starting-style {
+    .sheet[open] { opacity: 0; transform: translateY(var(--motion-rise)); }
   }
   .inside { padding: var(--space-md) var(--layout-gap) var(--layout-gap); }
 }

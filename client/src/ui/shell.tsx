@@ -1,10 +1,16 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect } from 'preact/hooks';
 import { Brand } from './kit/brand.tsx';
+import { holdTaps } from './kit/hold.ts';
 import { useKeyboard } from './kit/keyboard.ts';
 import { Person } from './kit/person.tsx';
+import { Said, say } from './kit/said.tsx';
 import { useSidebar } from './kit/wide.ts';
 import css from './shell.module.css';
 import * as s from './strings.ts';
+
+// What you tapped stays under your finger, on every screen the frame holds.
+holdTaps();
 
 export const DESTINATIONS = ['focus', 'today', 'progress', 'habits', 'room'] as const;
 export type Destination = (typeof DESTINATIONS)[number];
@@ -14,6 +20,8 @@ interface Props {
   person?: string;
   /** The destination being shown, if it is one of the five. */
   at?: Destination;
+  /** A name for what is shown when it is not a destination: a change of it is a change of screen, and comes in as one. */
+  page?: string;
   /** A destination this person has taken out of their navigation: Room, when rooms are hidden. */
   without?: Destination;
   /** What the connection has to say, or nothing. */
@@ -28,8 +36,10 @@ interface Props {
  * and the name in one place, the person at the right of the header (at the foot of the sidebar
  * on a laptop), the screen, what the connection has to say, and the five destinations.
  */
-export function Shell({ person, at, without, status = '', keepStatus, children }: Props) {
+export function Shell({ person, at, page = at, without, status = '', keepStatus, children }: Props) {
   const sidebar = useSidebar();
+  // What the last tap did was said of the screen it was made on.
+  useEffect(() => () => say(null), [page]);
   // While the keyboard is up on a phone the tab bar is not drawn: it would ride on the keys and
   // take a row of the little that is left. It is back the moment the keyboard goes.
   const typing = useKeyboard() && !sidebar;
@@ -49,7 +59,10 @@ export function Shell({ person, at, without, status = '', keepStatus, children }
   );
   const screen = (
     <main key="main" class={css.main}>
-      <div class={css.canvas}>{children}</div>
+      {/* Keyed by the screen: a new one is a new element, and fades in and rises. */}
+      <div key={page} class={css.canvas}>
+        {children}
+      </div>
     </main>
   );
   const said = (
@@ -68,5 +81,6 @@ export function Shell({ person, at, without, status = '', keepStatus, children }
   // then the bottom bar. With a sidebar: the sidebar from top to foot (the mark, the
   // destinations, the status, the person), then the screen. The parts are keyed, so crossing
   // the width moves them and the screen keeps everything it holds.
-  return <div class={css.shell}>{sidebar ? [brand, nav, said, who, screen] : [brand, who, screen, said, nav]}</div>;
+  const bar = <Said key="said" class={css.over} undo={s.today.undo} />;
+  return <div class={css.shell}>{sidebar ? [brand, nav, said, who, screen, bar] : [brand, who, screen, bar, said, nav]}</div>;
 }

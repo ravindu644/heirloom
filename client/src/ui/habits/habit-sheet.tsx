@@ -36,7 +36,7 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
   const done = habit.record.filter((day) => day.done).length;
 
   return (
-    <Sheet title={s.habits.sheet} close={s.task.close} onClose={onClose}>
+    <Sheet grows title={s.habits.sheet} close={s.task.close} onClose={onClose}>
       <Field label={s.habits.title} {...title} />
 
       <fieldset class={form.group}>

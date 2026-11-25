@@ -11,6 +11,7 @@ import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
 import { LapBar } from '../kit/lapbar.tsx';
 import { Marks } from '../kit/marks.tsx';
+import { Square } from '../kit/square.tsx';
 import { Panel } from '../kit/panel.tsx';
 import { Race, SplitChip } from '../kit/race.tsx';
 import * as s from '../strings.ts';
@@ -173,10 +174,13 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           <p class={cx(css.headline, css.words)} role="status">
             {headline}
           </p>
-          <div class={css.lanes}>
-            <Race big you={l.you} ghost={l.ghost} from={live && !set ? Math.max(0, race.you_ms - state.planned_ms) / (race.you_ms || 1) * l.you.share : undefined} />
+          {/* The marks open in place under the lanes, and take no room while there are none. */}
+          <div>
+            <div class={css.lanes}>
+              <Race big you={l.you} ghost={l.ghost} from={live && !set ? Math.max(0, race.you_ms - state.planned_ms) / (race.you_ms || 1) * l.you.share : undefined} />
+            </div>
+            <Marks settings={settings} say={s.mark} />
           </div>
-          <Marks settings={settings} say={s.mark} />
         </div>
         {/* What to do next, and the line that explains it, travel together: on a phone they are the screen's lower group. */}
         <div class={css.next}>
@@ -247,7 +251,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
                 <p class={css.about}>
                   {named.project && (
                     <span>
-                      <i style={`background:var(--${named.project.color})`} />
+                      <Square color={named.project.color} />
                       {named.project.name}
                     </span>
                   )}

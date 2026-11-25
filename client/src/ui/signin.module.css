@@ -1,15 +1,26 @@
 /* The form stands in the same frame as every other screen: the mark where it always is, the
-   form on the screen's one left edge, the free space under it. Nothing here sticks, so nothing
-   can cover a field when the keyboard takes half the screen; signin.tsx scrolls the button and
-   the field into view. */
-.form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); padding-bottom: var(--space-lg); }
+   form at the top on the screen's one left edge, the free space under it. Nothing here sticks,
+   so nothing can cover a field when the keyboard takes half the screen, and nothing here is
+   scripted: the browser brings the field being typed in into view, once, and a field's
+   scroll-margin gives it room for the button under it. */
+/* The form, and in a browser what heirloom is: under the form on a phone, beside it from 720px. */
+.page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-lg); padding-bottom: var(--space-lg); }
+.page > section { padding-top: var(--space-lg); border-top: var(--layout-hair) solid var(--line); }
+.form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 .form h1 { font: var(--type-title); }
-.intro, .error { min-height: 2lh; text-wrap: pretty; }
+.intro, .error { text-wrap: pretty; }
+/* Two lines whatever it says: sign in and join have intros of different lengths, and the form under them must not move between the two. */
+.intro { min-height: 2lh; }
 .intro { color: var(--muted); }
+/* The error's space to the buttons is its own, so it opens and closes with it. */
+.error { padding-bottom: var(--space-md); }
+.form input { scroll-margin: var(--space-md) 0 calc(2 * var(--layout-touch) + var(--space-lg)); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 /* On a phone the two buttons fill the row, as every button row does. */
 .actions > * { flex: 1; }
 @media (min-width: 720px) {
+  .page { grid-template-columns: minmax(0, 44ch) minmax(0, 44ch); gap: var(--space-xl); }
+  .page > section { padding-top: 0; border-top: 0; }
   .form { max-width: 44ch; }
   .actions > * { flex: none; }
 }

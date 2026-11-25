@@ -1,0 +1,17 @@
+/* The phone app's first screen: what it says at the top, what to do next at the bottom, the
+   free space between them. */
+.welcome { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto; gap: var(--space-lg); min-height: 100%; padding-bottom: var(--space-lg); }
+.first, .about { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+/* The app's one loud line. Each sentence starts a line of its own; the second may wrap, and is balanced when it does. */
+.first h1 { margin-bottom: var(--space-sm); font: var(--type-headline-lg); }
+.about h2 { font: var(--type-title); }
+.first h1 span, .about h2 span { display: block; text-wrap: balance; }
+.first p, .about p { text-wrap: pretty; }
+.where { color: var(--muted); text-wrap: pretty; }
+.go { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+
+@media (min-width: 720px) {
+  /* Beside a sidebar nothing is pinned to the foot: the button follows its sentence. */
+  .welcome { grid-template-rows: auto auto; align-content: start; max-width: 52ch; min-height: 0; }
+  .go { justify-items: start; }
+}

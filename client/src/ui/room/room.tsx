@@ -10,6 +10,7 @@ import form from '../kit/form.module.css';
 import links from '../kit/links.module.css';
 import { Panel } from '../kit/panel.tsx';
 import { Person } from '../kit/person.tsx';
+import { Fold, Kept } from '../kit/fold.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { Switch } from '../kit/switch.tsx';
@@ -50,15 +51,20 @@ function Doors({ rooms, onIn, inSheet }: { rooms: Rooms; onIn: (room?: string) =
       <Door title={s.room.make}>
         <form class={css.door} onSubmit={go('make')}>
           <Field label={s.room.name} name="make" maxLength={40} required autocomplete="off" />
-          <Button type="submit">{s.room.makeGo}</Button>
-          {refused.make && <p role="alert">{refused.make}</p>}
+          {/* Why not opens in place under the button it answers; the region is always there. */}
+          <div class={css.go}>
+            <Button type="submit">{s.room.makeGo}</Button>
+            <Fold role="alert">{refused.make && <p class={css.told}>{refused.make}</p>}</Fold>
+          </div>
         </form>
       </Door>
       <Door title={s.room.join}>
         <form class={css.door} onSubmit={go('join')}>
           <Field label={s.room.code} name="join" required autocomplete="off" autocapitalize="characters" spellcheck={false} />
-          <Button type="submit">{s.room.joinGo}</Button>
-          {refused.join && <p role="alert">{refused.join}</p>}
+          <div class={css.go}>
+            <Button type="submit">{s.room.joinGo}</Button>
+            <Fold role="alert">{refused.join && <p class={css.told}>{refused.join}</p>}</Fold>
+          </div>
         </form>
       </Door>
     </div>
@@ -75,7 +81,7 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
   const copy = async () => setCopied((await copyText(room.code)) ? s.room.copied : s.room.copyFailed);
 
   return (
-    <Sheet title={s.room.sheet} close={s.task.close} onClose={onClose}>
+    <Sheet grows title={s.room.sheet} close={s.task.close} onClose={onClose}>
       <section class={form.group} aria-label={s.room.codeTitle}>
         <h3 class={css.legend}>{s.room.codeTitle}</h3>
         {/* Two groups of four: easier to read out, and to hear. */}
@@ -83,12 +89,12 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
           {room.code.slice(0, 4)} {room.code.slice(4)}
         </p>
         <p class={css.quiet}>{s.room.codeNote}</p>
-        <div class={form.ends}>
-          <Button onClick={() => copy()}>{s.room.copy}</Button>
+        <div>
+          <div class={form.ends}>
+            <Button onClick={() => copy()}>{s.room.copy}</Button>
+          </div>
+          <Fold role="status">{copied && <p class={cx(css.quiet, css.told)}>{copied}</p>}</Fold>
         </div>
-        <p class={css.quiet} role="status">
-          {copied}
-        </p>
       </section>
 
       <form
@@ -115,12 +121,15 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
         />
       </fieldset>
 
-      <Switch label={s.room.ranked} note={s.room.rankedNote} on={room.ranked} onChange={(ranked) => change({ ranked })} />
-      {said && <p role="alert">{said}</p>}
+      <div>
+        <Switch label={s.room.ranked} note={s.room.rankedNote} on={room.ranked} onChange={(ranked) => change({ ranked })} />
+        <Fold role="alert">{said && <p class={css.told}>{said}</p>}</Fold>
+      </div>
 
       {/* Leaving cannot be undone from here, and the last one out ends the room: it takes a second tap, in the page, not in a box. */}
+      <Fold>
       {leaving ? (
-        <div class={form.group}>
+        <div key="leaving" class={form.group}>
           <p>{s.room.leaveNote(room.members.length === 1)}</p>
           <div class={form.ends}>
             <Button
@@ -138,12 +147,13 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
           </div>
         </div>
       ) : (
-        <div class={form.ends}>
+        <div key="leave" class={form.ends}>
           <Button kind="quiet" onClick={() => setLeaving(true)}>
             {s.room.leave}
           </Button>
         </div>
       )}
+      </Fold>
     </Sheet>
   );
 }
@@ -253,12 +263,14 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
         <p>{s.room.weekAt(room.week_ms, room.target_ms)}</p>
       </section>
 
-      <section class={css.members} aria-label={s.room.members}>
+      {/* A lane comes and goes with its member, and inside a lane a line or the button does, in time. */}
+      <Fold class={css.members} gap="sm" role="region" aria-label={s.room.members}>
         {room.members.map((m) => {
           const who = m.last?.cheerers.map((cheerer) => (cheerer.id === me ? s.room.you : cheerer.name)) ?? [];
           return (
             <article key={m.id} class={cx(css.member, m.you && css.you)}>
-              <div class={css.who}>
+              <Fold class={css.lane} gap="xs">
+              <div key="who" class={css.who}>
                 <Person name={m.name} label={m.you ? s.room.you : undefined} />
                 {/* With no connection nothing counts down for anyone but you: your own clock is on this device. */}
                 {m.ends_at !== null && (m.you || !stale) && (
@@ -267,34 +279,46 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
                   </b>
                 )}
               </div>
-              <p class={css.phase}>{phase(m)}</p>
+              <p key="phase" class={css.phase}>
+                {phase(m)}
+              </p>
               {/* From outside, not sharing and no task look the same. Your own lane knows which it is. */}
               {m.phase === 'work' && (m.task || !m.you || !rooms.shareTask.value) && (
-                <p class={m.task ? css.task : css.quiet}>{m.task ?? (m.you ? s.room.yoursHidden : s.room.notSharing)}</p>
+                <p key="task" class={m.task ? css.task : css.quiet}>
+                  {m.task ?? (m.you ? s.room.yoursHidden : s.room.notSharing)}
+                </p>
               )}
-              <p class={css.totals}>{s.room.totals(m.today_ms, m.today_laps, m.week_ms)}</p>
-              {who.length > 0 && <p class={css.totals}>{s.room.cheeredBy(who, m.you)}</p>}
+              <p key="totals" class={css.totals}>
+                {s.room.totals(m.today_ms, m.today_laps, m.week_ms)}
+              </p>
+              {who.length > 0 && (
+                <p key="cheered" class={css.totals}>
+                  {s.room.cheeredBy(who, m.you)}
+                </p>
+              )}
               {/* A lap that rang today can be cheered, once, and never one's own. Once cheered the
                   button goes: the sentence above says who did. */}
               {m.last && !m.you && !m.last.cheered && (
-                <div class={css.foot}>
+                <div key="cheer" class={css.foot}>
                   <Button aria-label={s.room.cheerLabel(m.name, m.last.ended)} onClick={() => rooms.cheer(room.id, m.id)}>
                     {s.room.cheer}
                   </Button>
                 </div>
               )}
+              </Fold>
             </article>
           );
         })}
-      </section>
+      </Fold>
 
       <Button kind="link" class={css.link} onClick={() => setSheet('another')}>
         {s.room.another}
       </Button>
 
+      <Kept>
       {sheet === 'room' && <RoomSheet room={room} rooms={rooms} onClose={() => setSheet(null)} />}
       {sheet === 'another' && (
-        <Sheet title={s.room.anotherTitle} close={s.task.close} onClose={() => setSheet(null)}>
+        <Sheet key="another" title={s.room.anotherTitle} close={s.task.close} onClose={() => setSheet(null)}>
           <Doors
             inSheet
             rooms={rooms}
@@ -305,6 +329,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
           />
         </Sheet>
       )}
+      </Kept>
     </div>
   );
 }

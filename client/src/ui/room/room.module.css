@@ -14,6 +14,9 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 /* The two ways in. */
 .doors { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
 .door { display: grid; gap: var(--space-md); }
+/* A button and the line that answers it: the line's space is its own, so it opens with it. */
+.go { display: grid; grid-template-columns: minmax(0, 1fr); }
+.told { padding-top: var(--space-sm); }
 
 /* The week the room fills together: one lane, a share for each person. */
 .week { display: grid; gap: var(--space-sm); }
@@ -22,8 +25,10 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .bar .mine { background: var(--you); }
 
 /* Side by side, each in a lane of their own, and all the same height in a row. */
-.members { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-.member { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+.member { display: flex; flex-direction: column; padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+/* The lane's lines fill it, and the part that holds the button takes what is left. */
+.lane { flex: 1; }
+.lane > div:has(.foot) { flex: 1; }
 /* Your own lane has your colour down its edge. */
 .you { box-shadow: inset var(--layout-stroke) 0 0 var(--you); }
 .who { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
@@ -53,5 +58,6 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
   .doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .door button, .rename button { justify-self: start; }
   .foot button { flex: none; }
-  .members { grid-template-columns: repeat(auto-fill, minmax(calc(var(--layout-sidebar) + var(--space-md)), 1fr)); gap: var(--layout-gap); }
+  /* Lanes side by side: the column of the phone becomes a grid, and a lane that comes or goes fades in its cell. */
+  div.members { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--layout-sidebar) + var(--space-md)), 1fr)); gap: var(--layout-gap); }
 }

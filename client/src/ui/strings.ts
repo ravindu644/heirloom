@@ -98,13 +98,13 @@ export const focus = {
   // Under a minute nothing is logged, so the button does not promise it.
   stop: (ran: number) => (ran >= MIN ? `Stop and log ${Math.floor(ran / MIN)} min` : 'Stop'),
   extend: (ms: number) => `${mins(ms)} more minutes`,
-  setAside: 'Set aside',
+  setAside: "Don't count this lap",
   startBreak: (ms: number) => `Start ${mins(ms)} min break`,
   skipBreak: 'Skip break',
 
   stopped: (ran: number) =>
     ran >= MIN ? `Stopped. ${length(Math.floor(ran / MIN) * MIN)} kept.` : 'Stopped. Under a minute, so nothing was logged.',
-  setAsideDone: 'Set aside. It stays in your timeline and counts nowhere.',
+  setAsideDone: 'Not counted. The lap stays in your timeline and adds nothing to your day, week or streak.',
   undo: 'Undo',
 
   // The line over the digits when the lap is for a task. The lap in progress is counted.
@@ -195,12 +195,29 @@ export const ring = {
   // The two kinds of notification, as the phone's settings list them.
   bellChannel: 'Bell',
   countdownChannel: 'Time left',
-  remindChannel: 'Habit reminders',
+  // Habits and tasks with a time share it.
+  remindChannel: 'Reminders',
   // A habit's reminder: its own title, and one plain line. It reminds; it does not ask why not yet.
   remindBody: 'Planned for today.',
+  // A task's reminder, at its minute: its title, and when it was planned for.
+  taskBody: (time: string) => `Planned for ${time}.`,
 };
 
 // A second tab of the same browser: it shares the first one's laps and must not run beside it.
+// What heirloom is, for someone who has never seen it: the phone app's first screen, and beside
+// the sign-in form in a browser. Sentences, in the order a day meets them.
+export const welcome = {
+  title: 'Work in laps. Race the you of last week.',
+  lines: [
+    'A lap is one stretch of focus, 25 minutes unless you change it, and then a break. Four make a set.',
+    'Plan the day in laps and tick them off. At the end you see how close your guesses were.',
+    'Habits get a box to tick, and two rest days a week that break nothing.',
+    'In a room, friends see who is on a lap right now and cheer each other on.',
+  ],
+  where: 'It is free. Everything you do is kept on a server that you or a friend runs, and nowhere else.',
+  go: 'Connect to a server',
+};
+
 export const elsewhere = 'heirloom is open in another tab of this browser. Close that one and this one takes over by itself.';
 
 export const settings = {
@@ -321,17 +338,22 @@ export const today = {
   laps,
 
   target: 'Day target',
-  targetNone: 'No target for today.',
+  targetNone: 'No target today.',
   targetSet: 'Set a target',
   targetAt: (done: number, target: number) => `${done} of ${laps(target)} today`,
   targetChange: 'Change',
-  targetKeep: 'Keep it',
-  targetClear: 'No target',
+  // Over the stepper, so it is plain what the number is.
+  targetLabel: 'Laps to run today',
+  // Every tap of the stepper is already kept: this only closes the editor.
+  targetKeep: 'Done',
+  targetClear: 'Remove the target',
   targetText: (n: number) => laps(n),
   targetLess: 'One lap less',
   targetMore: 'One lap more',
 
   add: 'Add a task',
+  // The button in the field, from the first character typed. The subtask field says the same.
+  addGo: 'Add',
   addHint: 'Add a task. End with ~3 for three laps.',
 
   // The bar of the lap in progress.
@@ -401,7 +423,10 @@ export const task = {
   projectSquare: 'Its square',
   addProject: 'Add project',
   // The five squares, named for a screen reader.
-  colors: { you: 'Tomato', rest: 'Green', ink: 'Ink', ghost: 'Grey', 'heat-2': 'Rose' },
+  colors: { you: 'Tomato', rest: 'Green', ink: 'Ink', ghost: 'Grey', 'heat-2': 'Rose', amber: 'Amber', olive: 'Olive', teal: 'Teal', sky: 'Blue', indigo: 'Indigo', plum: 'Plum', clay: 'Brown' },
+  // The thirteenth square opens the device's own picker; a picked colour has no name to say.
+  colorOther: 'Another colour',
+  colorPicked: 'A colour you picked',
 
   estimate: 'Estimate',
   estimateText: (n: number) => (n === 0 ? 'None' : laps(n)),
@@ -412,6 +437,11 @@ export const task = {
   nudgeGo: 'Add a subtask',
 
   due: 'Due',
+  // A clock time on the due day. Picking one with no day fills in today.
+  time: 'At',
+  noTime: 'No time',
+  // Said under the field: where the reminder comes from, so nobody waits for one from a browser.
+  timeNote: (app: boolean) => (app ? 'This phone reminds you at that minute, if the task is still open.' : 'The phone app reminds you at that minute. A browser only shows the time.'),
   repeat: 'Repeats',
   once: 'No',
   everyDay: 'Every day',
@@ -424,7 +454,6 @@ export const task = {
   subtasks: 'Subtasks',
   // The field has its own name, so a screen reader hears "New subtask" when the nudge sends the cursor there.
   subtaskNew: 'New subtask',
-  subtaskAdd: 'Add',
   subtaskHint: 'A smaller piece of it',
   subtaskTitle: 'Subtask',
   subtaskCheck: (title: string) => `Done: ${title}`,
@@ -519,17 +548,17 @@ export const progress = {
   toToday: 'Back to today',
   lap: 'Lap',
   stopped: 'Stopped lap',
-  aside: 'Lap set aside',
+  aside: 'Lap, not counted',
   shortBreak: 'Short break',
   longBreak: 'Long break',
   span: (start: number, end: number) => `${wall(start)} to ${wall(end)}`,
   ran: (ms: number) => (ms < MIN ? 'under a minute' : length(ms)),
   twoDevices: 'ran on two devices',
-  setAside: 'Set aside',
-  countAgain: 'Count again',
-  ranAside: (ms: number) => `${ms < MIN ? 'under a minute' : length(ms)}, counted nowhere`,
+  setAside: "Don't count it",
+  countAgain: 'Count it again',
+  ranAside: (ms: number) => `${ms < MIN ? 'under a minute' : length(ms)}, not counted`,
   forLap: (words: string, start: number) => `${words}, the lap at ${wall(start)}`,
-  asideDone: (start: number) => `Set aside: the lap at ${wall(start)}. It counts nowhere.`,
+  asideDone: (start: number) => `Not counted: the lap at ${wall(start)}. It adds nothing to your day, week or streak.`,
   dayEmpty: (isToday: boolean) => (isToday ? 'Nothing has run today yet. The first lap starts on Focus.' : 'Nothing ran on this day.'),
 
   lookBack: 'Looking back on today',
@@ -743,7 +772,7 @@ export const people = {
   renewed: (expires: number) => `Good until ${day(expires)}.`,
   takeBack: 'Take back',
   takeBackGo: 'Take it back',
-  keep: 'Keep it',
+  keep: 'Keep the link',
   takenBack: 'Taken back. That link no longer works.',
   // The names of the links, for a screen reader: each says which invite.
   forInvite: (words: string, invite: string) => `${words}, the invite ending ${invite.slice(-6)}`,
