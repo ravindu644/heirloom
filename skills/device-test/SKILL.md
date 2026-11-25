@@ -12,6 +12,9 @@ one into the repository.
 ## The phone
 1. `adb devices` first, every time. If no line ends in `device`, stop and tell the user.
 2. Install the debug build: `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`.
+   `make apk` builds the app that asks for its server. For a run against a server on the laptop,
+   build with `make apk SERVER=http://localhost:8787` and open the way with
+   `adb reverse tcp:8787 tcp:8787`; remove the reverse when done.
 3. Exact alarm proof, after starting a 1-minute timer:
    - `adb shell dumpsys alarm | grep -A3 <applicationId>` shows the alarm, its type and when.
    - Turn the screen off (`adb shell input keyevent 26`), wait past the end, then

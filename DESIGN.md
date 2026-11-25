@@ -451,6 +451,26 @@ Built once in `client/src/ui/kit/` and reused.
 - **The person:** a `raised` circle with the first letter of the username in `body-strong`, and
   the username beside it in `label`. In the header and in a room. Which side the circle is on:
   see The header.
+- **The server step:** the phone app's first screen, and what "Change" on the sign-in screen
+  opens. The header's mark and name, a headline, one field ("Server", with the hint that an invite
+  link works too, and an address as its placeholder so the shape is seen before the first try) and one primary button under it; the sentence that answers a refusal takes the
+  place of the intro, as on the sign-in screen, and is written to the intro's length so the field
+  under it does not move. Nothing else: no logo wall, no steps counter.
+- **A link to give away** (an invite): shown as Room shows its code, whole, in `body`, breaking
+  only where it must: after `/join/` first, so the invite itself stays in one piece wherever the
+  width allows. It never runs past the edge. Copy is a secondary button under it, and is called
+  "Copy the link" wherever it appears. Where the
+  browser may not copy (plain `http`), the sentence says so and the link stays selectable.
+- **Invites and Admins** are panels in Settings, and only for those whose role has them. On a
+  laptop they stand in the account's column under Account. On a phone, where the page is one
+  column, they come after what a person tunes every week (the lengths, the day target, starting by
+  itself, the bell, a finished lap) and before Rooms and Your copy: running the server is rarer
+  than changing a lap. As for what is drawn: nothing is drawn disabled for a member. A row is the thing (the
+  link's last characters and the day it runs out; a person's circle and name), with its actions as
+  links in a line at the row's end; on a phone, where three do not fit beside the words, the line
+  of links stands under them. What cannot be undone (taking a link back) takes a second tap; what
+  can (back to member) is done at once and leaves an Undo. The field that makes an admin follows the list, its button
+  after it.
 - **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
 
 ## Motion
@@ -506,6 +526,12 @@ Sample strings, the register to match:
   from.") and nothing counts down for anyone but you.
 - **The app writes times as 16:40.** The platform's own time field speaks as the device is set
   (it may say 4:40 PM); that is the device's voice and is left alone.
+
+- **Plain http is said once, where the address is typed and under the account in Settings,** as
+  a fact and not an alarm: "This address is plain http. Anyone on the same network can read what
+  is sent, the password too." No icon, no colour of its own.
+- **A role is named by what it does.** "You can invite people here." "You decide who can invite."
+  The words owner and admin appear as labels on a person, never as a rank to admire.
 
 ## Accessibility
 

@@ -59,7 +59,7 @@ bottom, before code changes.
 | Server | **Go**, one static binary, `CGO_ENABLED=0` | Supports kernel 4.14 (needs 3.2+), about 4 MB at idle, cross-compiles to arm64 | Node (kernel 4.14 unsupported), Bun (memory reports conflict), Rust (fine, slower to build) |
 | Server storage | SQLite in WAL mode, one writer, **bundled version 3.51.3 or later** | WAL corruption bug fixed in 3.51.3; Ubuntu 24.04 has 3.45.1 | System SQLite, Postgres |
 | Transport | One WebSocket per device, JSON messages; the same messages over `POST /api/sync` when sockets fail | Live timer needs push; the POST path survives hostile proxies | SSE (breaks behind buffering proxies), polling |
-| Exposure | **Cloudflare named Tunnel** on the user's domain (chosen 2026-11-24) | Friends need nothing installed; WebSockets on all plans | Tailscale Funnel (beta, WebSockets undocumented), port forwarding (home IP, no TLS) |
+| Exposure | **Cloudflare named Tunnel** on the user's domain (chosen 2026-11-24), or the home network over plain `http` (2026-11-25: the server then listens on every interface) | Friends need nothing installed; WebSockets on all plans | Tailscale Funnel (beta, WebSockets undocumented), port forwarding (home IP, no TLS) |
 
 Pure-Go SQLite drivers carry their own SQLite build; section 0 of the roadmap checks
 `select sqlite_version()` is at least 3.51.3 before anything else is written on top.
@@ -193,7 +193,12 @@ docs/          this file, PRODUCT.md, research/
 
 - Registration is by invite only: the server owner makes invite links. Usernames and passwords,
   hashed with argon2id. Each device gets its own revocable token, stored hashed.
-- The server listens on localhost; the tunnel terminates TLS. Login is rate limited.
+- Behind a tunnel the server listens on localhost and the tunnel terminates TLS. On a home network
+  it listens on every interface over plain `http`: whoever is on that network can read what is
+  sent, and the app says so where the address is typed. Login is rate limited.
+- Three roles, held by the server and checked on every call: member, admin (invite links), owner
+  (the first account; names the admins; cannot be changed). While a server has no account, the
+  first to register owns it.
 - Rooms show friends only what the user allows: focusing or not and today's time always, the task
   title only when switched on.
 - Backups: a daily `VACUUM INTO` copy, seven kept, and a JSON export for every user.
@@ -230,3 +235,5 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-25 | A `day` dataset holds the look back's one line, one row per local day | The note belongs to a day, not to a session or a task; a row per day cannot collide across devices except on the same line, where the later edit wins |
 | 2026-11-25 | Rooms pinned (protocol section 15): any member may rename a room, set its target or turn on ranking; a member who has hidden rooms shows as away but their time still counts; the server also reads `settings.share_task`, `settings.rooms_hidden` and the title of a shared task; devices send their UTC offset in the hello | Small rooms of friends need no owner; hiding is about not being watched; the server cannot share a title it never reads, nor know a member's today without their offset |
 | 2026-11-24 | Dev-only packages: `@playwright/test`, `@google/design.md`, `yaml`, `ajv`, `@preact/preset-vite` | e2e, the DESIGN.md lint, reading its front matter, checking fixtures against schemas, JSX and hot reload |
+| 2026-11-25 | Owner, admin and member; invite links stored as they are, good for 7 days, deleted when used | The user's choice, after Docmost's flow. Stored plain so an admin can copy a link again; 7 days and "Take back" bound what a stolen backup can do |
+| 2026-11-25 | The phone app's server is typed in the app, and may be plain `http` | The app is self-hostable; a home network has no certificate. Android needs cleartext and mixed content allowed for it |

@@ -135,7 +135,18 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [qa] Measured on the S10: idle RSS, RSS with 20 simulated devices, both under budget
 - [ ] Gate (the friend installs it from a link and joins a room)
 
-## 10. Release 1.0
+## 10. A server anyone can run
+
+- [x] [lead] PRODUCT, ARCHITECTURE, protocol section 10, DESIGN.md components, the facades
+- [x] [server] Roles, first-run setup, invitations (create, list, renew, revoke), admins (list, set), `setup` in healthz, `role` in welcome
+- [x] [core] The server's address (typed, probed, kept), `engine.role`, `needsSetup`, invites and admins facades
+- [x] [ui] The server step, "Set up this server", joining from a link, the Invites and Admins panels
+- [ ] [android] Plain http to any host from the app
+- [x] [qa] Setup, a link from make to join, raise and lower, the app build's server step
+- [ ] [lead] The S10 listens on the home network; the APK that asks
+- [ ] Gate (the user sets up the S10 from the phone, makes a link, a second device joins with it)
+
+## 11. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

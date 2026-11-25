@@ -106,6 +106,9 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | Light and dark, following the system | Comfort at night |
 | Export everything as JSON; import it back | Your data is yours; Focus To-Do users lost theirs |
 | Invite-only accounts on the user's own server | Free, private |
+| The phone app asks which server: an address or a pasted invite link, typed once, changed only while signed out. Plain `http` is allowed and said plainly | Anyone can run a server; one app serves them all, on a home network too |
+| A fresh server is set up from the app: the first account needs no invite and is the owner | Nobody should need a terminal to start |
+| Three roles. A member uses the app. An admin also recruits: makes invite links, renews them, takes them back. The owner, the first account, also decides who the admins are | The person who runs the server stays in charge of it; friends can help it grow |
 
 ## Words
 
@@ -130,4 +133,5 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-24 | The look is route B, Pacer: you against your own past as a ghost; see DESIGN.md |
 | 2026-11-24 | A pomodoro ends one of three ways: rang (minutes and a lap), stopped (minutes, no lap), set aside (neither). A stop under 60 s is not recorded |
 | 2026-11-24 | Two rest days a week, counted Monday to Sunday; the streak's day needs one pomodoro that rang |
+| 2026-11-25 | The app asks for its server and allows plain http; a fresh server is set up from the app; owner, admin and member, on Docmost's invitation flow written fresh (links good for 7 days, used once, renewed, taken back). No members list, no removing an account, no password reset: the user's words |
 | 2026-11-25 | Today's tasks can be put in order by hand (the lead's reading: "Next" needs an order, and ARCHITECTURE section 4 already rules on two devices reordering). Notes on a task are not in v1: the field exists in the data, no screen shows it, until the user says so |
