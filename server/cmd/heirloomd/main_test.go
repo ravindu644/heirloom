@@ -5,10 +5,21 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"heirloom/server/store"
 )
 
 func TestHealthz(t *testing.T) {
-	h, _ := newAPI(nil, time.Now, "3.51.3", http.NotFoundHandler(), nil)
+	db, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// One account, so this is a server in ordinary use: the three fields and no more.
+	if _, err := db.Exec("insert into account (public_id, username, password, created, role) values ('a', 'ravi', '', 0, 'owner')"); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := newAPI(db, time.Now, "3.51.3", http.NotFoundHandler(), nil)
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))

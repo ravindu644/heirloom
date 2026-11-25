@@ -74,6 +74,14 @@ type welcomeMsg struct {
 	Head       int64  `json:"head"`
 	// Every room the account is in right now. A device drops any room not named here.
 	Rooms []string `json:"rooms"`
+	// The account's role now. A device keeps it only to choose what to show: the server
+	// reads the role afresh on every call that needs one.
+	Role string `json:"role"`
+}
+
+type roleMsg struct {
+	Type string `json:"type"`
+	Role string `json:"role"`
 }
 
 type cellsMsg struct {
@@ -133,6 +141,9 @@ type SyncReply struct {
 	Nack       *Nack       `json:"nack,omitempty"`
 	// Every room the account is in, as a socket would be told it.
 	Rooms []*rooms.Message `json:"rooms"`
+	// The account's role now, as a socket's welcome says it: a device that only ever
+	// reaches the server by POST must hear it too.
+	Role string `json:"role"`
 }
 
 type conn struct {
@@ -215,6 +226,26 @@ func (h *Hub) Kick(token string) {
 	for c := range h.conns {
 		if c.token == token {
 			c.cancel(bye{"token"})
+		}
+	}
+}
+
+// RoleChanged tells every open socket of an account its role, as the database holds it
+// at this moment. It is called once a change is stored, so a device's settings follow the
+// owner's decision at once and not at its next reconnect. The role is read here, under
+// mu, and not passed in: two changes one after the other cannot then arrive the wrong
+// way round with an old role last.
+func (h *Hub) RoleChanged(account int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	role, err := h.auth.Role(account)
+	if ours(err) != nil {
+		return
+	}
+	msg := encode(roleMsg{"role", role})
+	for c := range h.conns {
+		if c.account == account {
+			c.send(msg)
 		}
 	}
 }
@@ -308,6 +339,9 @@ func (h *Hub) Sync(req SyncRequest) (SyncReply, error) {
 	}
 	// A push may have landed between the two reads; the head is never behind the page.
 	reply.ServerTime, reply.Head, reply.To, reply.Cells = h.now().UnixMilli(), max(head, page.To), page.To, page.Cells
+	if reply.Role, err = h.auth.Role(account); err != nil {
+		return SyncReply{}, err
+	}
 	in, err := h.rooms.Of(account)
 	if err != nil {
 		return SyncReply{}, err
@@ -500,7 +534,11 @@ func (h *Hub) serve(ctx context.Context, c *conn) error {
 	if err != nil {
 		return ours(err)
 	}
-	if err := c.write(encode(welcomeMsg{"welcome", h.now().UnixMilli(), head, names})); err != nil {
+	role, err := h.auth.Role(c.account)
+	if err != nil {
+		return ours(err)
+	}
+	if err := c.write(encode(welcomeMsg{"welcome", h.now().UnixMilli(), head, names, role})); err != nil {
 		return err
 	}
 	// Each of those rooms, straight after the welcome. The offset goes in first: it

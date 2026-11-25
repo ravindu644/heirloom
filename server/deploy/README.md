@@ -13,9 +13,44 @@ sudo systemctl daemon-reload && sudo systemctl enable heirloomd && sudo systemct
 ```
 
 The unit makes `/var/lib/heirloomd` itself, owned by `heirloomd` and closed to everyone else.
-The server listens on `127.0.0.1:8787`; the Cloudflare tunnel is the only way in.
 `systemctl status heirloomd` and `journalctl -u heirloomd` say how it is doing. The log holds a
 start line and errors, never anything a person wrote.
+
+## The two ways in
+
+The server listens on port 8787 of every address the container has.
+
+- **The home network**, at `http://<the container's address>:8787`. This is plain http: whoever
+  is on the same wifi can read a password as it is typed in and a token as it is used. A browser
+  also treats such an address as not secure, so the laptop there gets no bell with the tab
+  closed (Web Push and notifications need https) and the app is not kept for offline use.
+  Fine for a house you trust; not for anything further.
+- **A Cloudflare tunnel** to `127.0.0.1:8787`, on a name of your own. https, reachable from
+  anywhere, and everything works. This is the address to give friends.
+
+## Setting it up
+
+A server nobody has registered on belongs to whoever registers first: open its address in the
+app, choose a username and a password, and that account is the **owner**. Do this before the
+address is given to anyone, and before the tunnel is switched on. The journal says
+`no account yet` at each start until it is done, and `/healthz` says `"setup":true`.
+
+## Inviting people
+
+The owner, and anyone the owner has made an admin, makes invite links in the app's settings.
+A link makes one account, once, and is good for 7 days; it can be renewed or taken back there.
+Only the owner chooses who the admins are, and nobody can change who the owner is.
+
+From a shell on the server, without the app:
+
+```
+sudo -u heirloomd /usr/local/bin/heirloomd -data /var/lib/heirloomd -invite
+```
+
+It prints the invite, which is the last part of the link `<server>/#/join/<invite>`, and works
+while the server is running. As `heirloomd`, not as root: root would leave files in the data
+directory that the server cannot open. On a server nobody has registered on yet, the account
+made with it is the owner.
 
 ## Ringing browsers
 
@@ -30,15 +65,6 @@ dropped; the app subscribes again by itself. While it is not set, such a browser
 The server's key for this is made at the first start and lives in the database. Restoring a
 backup from before that first start would make a new key, and every browser would have to
 subscribe again.
-
-## An invite
-
-```
-sudo -u heirloomd /usr/local/bin/heirloomd -data /var/lib/heirloomd -invite
-```
-
-It works while the server is running. As `heirloomd`, not as root: root would leave files in the
-data directory that the server cannot open.
 
 ## Backups
 

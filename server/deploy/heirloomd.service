@@ -14,8 +14,14 @@ StartLimitBurst=5
 User=heirloomd
 Group=heirloomd
 
-# 127.0.0.1 only. The Cloudflare tunnel is the way in; nothing else on the network reaches it.
-ExecStart=/usr/local/bin/heirloomd -addr 127.0.0.1:8787 -data /var/lib/heirloomd
+# Every address of the container, port 8787. There are two ways in. The home network
+# reaches it as http://<the container's address>:8787: plain http, so a password or a
+# token crosses the house's wifi unencrypted, and a browser there will not ring with the
+# tab closed (Web Push and notifications want https). A Cloudflare tunnel to
+# 127.0.0.1:8787 is the other way, and the one for anywhere beyond the house: https, and
+# everything works. Either way, set the server up (register its first account, which
+# owns it) before giving its address to anyone: until then the first to arrive owns it.
+ExecStart=/usr/local/bin/heirloomd -addr 0.0.0.0:8787 -data /var/lib/heirloomd
 
 # /var/lib/heirloomd, made by systemd, owned by the user above, closed to everyone else.
 # UMask makes the database, its -wal and the backups 0600 as well.
@@ -62,7 +68,7 @@ ProtectClock=yes
 ProtectHostname=yes
 
 # Internet sockets and nothing else: no raw sockets, no netlink, no Bluetooth. It listens
-# on the loopback only (see ExecStart), and it calls out for one thing: at a bell it sends
+# on one port (see ExecStart), and it calls out for one thing: at a bell it sends
 # a Web Push to the browser's push service over HTTPS, after asking DNS where that is.
 # There is no IPAddressDeny here because those services (Google's, Mozilla's, Apple's,
 # Microsoft's) have no fixed addresses to allow, and systemd can filter by address but

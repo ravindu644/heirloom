@@ -33,18 +33,24 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	cells := sync.New(db, now)
 	together := rooms.New(db, cells, now)
 	h = hub.New(accounts, cells, together, now)
+	accounts.OnRole = h.RoleChanged
 	if bells != nil {
 		h.OnTimer = bells.TimerChanged
 	}
 
-	// The e2e run polls /healthz and reads these three fields; the shape is fixed.
-	health, err := json.Marshal(struct {
+	// The e2e run polls /healthz and reads these three fields; the shape is fixed. A
+	// server nobody has registered on yet says so with a fourth, and stops saying it for
+	// good once somebody has: that is all a stranger may learn before signing in.
+	type health struct {
 		OK      bool   `json:"ok"`
 		Version string `json:"version"`
 		SQLite  string `json:"sqlite"`
-	}{true, version, sqliteVersion})
-	if err != nil {
-		panic(err) // two strings and a bool always marshal
+		Setup   bool   `json:"setup,omitempty"`
+	}
+	settled, err1 := json.Marshal(health{true, version, sqliteVersion, false})
+	fresh, err2 := json.Marshal(health{true, version, sqliteVersion, true})
+	if err := errors.Join(err1, err2); err != nil {
+		panic(err) // two strings and two bools always marshal
 	}
 
 	type credentials struct {
@@ -58,7 +64,11 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	mux.Handle("GET /", app) // GET and HEAD; the mux answers any other method with 405
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(health)
+		if accounts.Fresh() {
+			w.Write(fresh)
+			return
+		}
+		w.Write(settled)
 	})
 	mux.HandleFunc("GET /api/ws", h.ServeWS)
 	mux.HandleFunc("POST /api/sync", bigBodies(make(chan struct{}, maxBigSyncs), post(maxSyncBody, func(_ context.Context, req hub.SyncRequest) (hub.SyncReply, error) {
@@ -73,6 +83,49 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	mux.HandleFunc("POST /api/logout", post(maxAccountBody, func(_ context.Context, c credentials) (struct{}, error) {
 		return struct{}{}, accounts.Logout(c.Token)
 	}))
+
+	// Invitations and admins (protocol section 10). The caller's role is read from the
+	// database inside each call: nothing a device says about itself is believed.
+	type staffRequest struct {
+		Token    string `json:"token"`
+		Device   string `json:"device"`
+		Invite   string `json:"invite"`
+		Username string `json:"username"`
+		Role     string `json:"role"`
+	}
+	staff := func(path string, do func(caller int64, req staffRequest) (any, error)) {
+		mux.HandleFunc("POST /api/"+path, post(maxAccountBody, func(_ context.Context, req staffRequest) (any, error) {
+			if !auth.ValidDevice(req.Device) {
+				return nil, auth.ErrBadRequest
+			}
+			caller, _, err := accounts.Check(req.Token, req.Device)
+			if err != nil {
+				return nil, err
+			}
+			return do(caller, req)
+		}))
+	}
+	one := func(inv auth.Invitation, err error) (any, error) {
+		return map[string]auth.Invitation{"invite": inv}, err
+	}
+	staff("invites/create", func(caller int64, _ staffRequest) (any, error) { return one(accounts.CreateInvite(caller)) })
+	staff("invites/renew", func(caller int64, req staffRequest) (any, error) {
+		return one(accounts.RenewInvite(caller, req.Invite))
+	})
+	staff("invites/list", func(caller int64, _ staffRequest) (any, error) {
+		open, err := accounts.Invites(caller)
+		return map[string][]auth.Invitation{"invites": open}, err
+	})
+	staff("invites/revoke", func(caller int64, req staffRequest) (any, error) {
+		return struct{}{}, accounts.RevokeInvite(caller, req.Invite)
+	})
+	staff("admins/list", func(caller int64, _ staffRequest) (any, error) {
+		admins, err := accounts.Admins(caller)
+		return map[string][]auth.Person{"admins": admins}, err
+	})
+	staff("admins/set", func(caller int64, req staffRequest) (any, error) {
+		return struct{}{}, accounts.SetRole(caller, req.Username, req.Role)
+	})
 
 	// Web Push at the bell (protocol section 17). The key is public: a browser needs it
 	// before it has anything to sign in with. Signing out removes a device's subscription
@@ -164,9 +217,11 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" {
 			// Any origin may ask: the phone app's WebView is one. Nothing rides along with a
 			// request by itself (no cookies), so there is nothing here for another site to borrow.
+			// /healthz is in this because that app asks it first, from its other origin, whether
+			// an address is a heirloom server at all and whether it still needs setting up.
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Expose-Headers", "Retry-After")
 			if r.Method == http.MethodOptions {

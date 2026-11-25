@@ -57,7 +57,11 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		// The invite alone on standard output, for a script to take. The server does not
+		// know the address people reach it by, so the link is for the owner to finish.
 		fmt.Println(code)
+		fmt.Fprintln(os.Stderr, "This is the last part of the link to give: <server>/#/join/"+code)
+		fmt.Fprintln(os.Stderr, "It makes one account, once, and is good for 7 days.")
 		return nil
 	}
 
@@ -66,6 +70,10 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	fresh, err := auth.NoAccounts(db)
+	if err != nil {
+		return err
+	}
 
 	// Listen before the start line, so a taken port is an error and not a lie in the log.
 	tcp, err := net.Listen("tcp", *addr)
@@ -93,6 +101,10 @@ func run() error {
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
 	log.Printf("heirloomd %s sqlite %s listening on %s", version, sqliteVersion, ln.Addr())
+	if fresh {
+		// Said once, at the start, where the one who set the server running will see it.
+		log.Printf("no account yet: whoever registers first owns this server. Set it up before giving its address to anyone")
+	}
 
 	// The daily copy, from inside the server: no second process, no cron line to forget.
 	// A failure is one line in the log and nothing more; tomorrow it is tried again.

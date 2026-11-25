@@ -190,6 +190,7 @@ type msg struct {
 	Gone     bool
 	Members  []rooms.Member
 	Rooms    []string // in a welcome
+	Role     string   // in a welcome, and the whole of a role message
 	raw      string
 }
 
@@ -802,6 +803,27 @@ func TestAnyOriginIsAnswered(t *testing.T) {
 	if res.StatusCode != 400 || res.Header.Get("Access-Control-Allow-Origin") != "*" {
 		t.Errorf("POST from another origin = %d, Allow-Origin %q", res.StatusCode, res.Header.Get("Access-Control-Allow-Origin"))
 	}
+	// /healthz too: the phone app, from its own origin, asks it before anything else
+	// whether this address is a heirloom server and whether it needs setting up.
+	for _, method := range []string{http.MethodGet, http.MethodOptions} {
+		req, _ = http.NewRequest(method, w.url+"/healthz", nil)
+		req.Header.Set("Origin", "https://localhost")
+		res, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.Header.Get("Access-Control-Allow-Origin") != "*" {
+			t.Errorf("%s /healthz from another origin: Allow-Origin %q, so a WebView reads a good server as unreachable", method, res.Header.Get("Access-Control-Allow-Origin"))
+		}
+		if method == http.MethodGet && (res.StatusCode != 200 || !strings.Contains(string(body), `"setup":true`)) {
+			t.Errorf("GET /healthz = %d %s", res.StatusCode, body)
+		}
+		if method == http.MethodOptions && (res.StatusCode != 204 || !strings.Contains(res.Header.Get("Access-Control-Allow-Methods"), "GET")) {
+			t.Errorf("OPTIONS /healthz = %d %v", res.StatusCode, res.Header)
+		}
+	}
 	// And the socket opens from an origin that is not the server's.
 	ravi := w.signUp("ravi", phone)
 	ctx, cancel := context.WithTimeout(context.Background(), patience)
@@ -956,6 +978,7 @@ func TestAppAndAPIShareTheListener(t *testing.T) {
 		t.Errorf("/ = %d %q with CSP %q, want the app's index.html under its policy", res.StatusCode, body, res.Header.Get("Content-Security-Policy"))
 	}
 	// /healthz is still the health check, byte for byte, and not a page of the app.
+	w.signUp("somebody", laptop)
 	if res, body := get("/healthz"); res.StatusCode != 200 || body != `{"ok":true,"version":"dev","sqlite":"test"}` || res.Header.Get("Content-Security-Policy") != "" {
 		t.Errorf("/healthz = %d %s", res.StatusCode, body)
 	}

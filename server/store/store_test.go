@@ -113,7 +113,7 @@ func TestSchemaIsMadeOnceAndANewerOneIsRefused(t *testing.T) {
 	if err := db.QueryRow("pragma user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow("select count(*) from sqlite_schema where type = 'table' and name in ('account', 'invite', 'token', 'cell', 'room', 'member', 'cheer', 'push_key', 'push_subscription')").Scan(&tables); err != nil {
+	if err := db.QueryRow("select count(*) from sqlite_schema where type = 'table' and name in ('account', 'invitation', 'token', 'cell', 'room', 'member', 'cheer', 'push_key', 'push_subscription')").Scan(&tables); err != nil {
 		t.Fatal(err)
 	}
 	if version != len(migrations) || tables != 9 {
@@ -141,5 +141,82 @@ func TestSchemaIsMadeOnceAndANewerOneIsRefused(t *testing.T) {
 	if newer, err := Open(dir); err == nil {
 		newer.Close()
 		t.Error("opened a database from a newer build without complaint")
+	}
+}
+
+// A server from before roles: two accounts, an unused invite code. After the migration
+// the older account owns it, the other is a member, and nothing else of theirs moved.
+func TestServerFromBeforeRolesGetsItsOwner(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "heirloom.db")
+	old, err := open(dsn(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range migrations[:3] {
+		if _, err := old.Exec(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := old.Exec(`pragma user_version = 3;
+		insert into account (id, public_id, username, password, created, utc_offset_min) values (7, 'a-ravi', 'ravi', 'hash-1', 100, 330), (9, 'a-sachi', 'sachi', 'hash-2', 200, 0);
+		insert into invite (hash, created) values (x'00', 150);
+		insert into token (account, device, hash, created) values (9, 'a1b2c3d4e5f60718', x'01', 200);
+		insert into cell (account, dataset, row_id, field, stamp, value, seq) values (7, 'task', 't1', 'title', 's', x'31', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	db, err := Open(dir)
+	if err != nil {
+		t.Fatalf("a version 3 database does not open: %v", err)
+	}
+	defer db.Close()
+	var roles string
+	if err := db.QueryRow("select group_concat(username || ' ' || role, ', ') from (select * from account order by id)").Scan(&roles); err != nil || roles != "ravi owner, sachi member" {
+		t.Errorf("roles after the migration: %q, %v; want the older account the owner", roles, err)
+	}
+	var kept, version, oldInvites int
+	if err := db.QueryRow(`select (select count(*) from cell) + (select count(*) from token) + (select count(*) from account where password like 'hash-%' and (utc_offset_min = 330 or id = 9)),
+		(select count(*) from sqlite_schema where name = 'invite')`).Scan(&kept, &oldInvites); err != nil || kept != 4 || oldInvites != 0 {
+		t.Errorf("after the migration %d of the 4 old rows are as they were and %d old invite tables remain, %v", kept, oldInvites, err)
+	}
+	if err := db.QueryRow("pragma user_version").Scan(&version); err != nil || version != len(migrations) {
+		t.Errorf("version %d, want %d", version, len(migrations))
+	}
+
+	// The schema itself holds two of the rules: one owner, and the owner stays.
+	if _, err := db.Exec("update account set role = 'owner' where username = 'sachi'"); err == nil {
+		t.Error("a second owner was stored")
+	}
+	for _, change := range []string{"update account set role = 'member' where username = 'ravi'", "update account set role = 'admin'"} {
+		if _, err := db.Exec(change); err == nil {
+			t.Errorf("%q changed the owner's role", change)
+		}
+	}
+	if _, err := db.Exec("update account set role = 'boss' where username = 'sachi'"); err == nil {
+		t.Error("a role that is not one of the three was stored")
+	}
+	if _, err := db.Exec("update account set role = 'admin' where username = 'sachi'"); err != nil {
+		t.Errorf("a member could not be made an admin: %v", err)
+	}
+	// An account made without naming a role is a member, as other tests' inserts rely on.
+	if _, err := db.Exec("insert into account (public_id, username, password, created) values ('a-mali', 'mali', '', 300)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow("select role from account where username = 'mali'").Scan(&roles); err != nil || roles != "member" {
+		t.Errorf("an account inserted without a role is %q, %v", roles, err)
+	}
+}
+
+// A server with no account yet migrates too, and its first account can be the owner.
+func TestEmptyServerHasNoOwnerYet(t *testing.T) {
+	db, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec("insert into account (public_id, username, password, created, role) values ('a', 'ravi', '', 0, 'owner')"); err != nil {
+		t.Errorf("the first account could not be stored as the owner: %v", err)
 	}
 }

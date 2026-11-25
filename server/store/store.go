@@ -147,6 +147,32 @@ create table push_subscription (
 	primary key (account, device),
 	foreign key (account, device) references token (account, device) on delete cascade
 ) strict, without rowid;
+`, `
+-- member, admin or owner. The oldest account is the owner: it is the one that set the
+-- server up, or on a server from before roles, the one whose server it has been all along.
+alter table account add column role text not null default 'member'
+	check (role in ('member', 'admin', 'owner'));
+update account set role = 'owner' where id = (select min(id) from account);
+
+-- One owner at most, and the owner stays the owner, whatever a request or a bug asks for.
+create unique index account_owner on account (role) where role = 'owner';
+create trigger account_owner_stays before update of role on account when old.role = 'owner'
+begin
+	select raise(abort, 'the owner stays the owner');
+end;
+
+-- An invitation is the last part of a link. It is kept as it is, not hashed, so an admin
+-- can copy the link again; it runs out after a week and can be taken back, which is what
+-- bounds the use of one read out of a stolen backup. Registering deletes it.
+create table invitation (
+	invite  text primary key,
+	made_by integer references account (id), -- null: made with "heirloomd -invite"
+	created integer not null,
+	expires integer not null
+) strict, without rowid;
+
+-- The codes of before were kept only as hashes and cannot be carried over.
+drop table invite;
 `}
 
 func migrate(db *sql.DB) error {

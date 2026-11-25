@@ -22,7 +22,7 @@ func TestUnitFileSaysWhatItMust(t *testing.T) {
 	}
 	for _, want := range []string{
 		"User=heirloomd",
-		"ExecStart=/usr/local/bin/heirloomd -addr 127.0.0.1:8787 -data /var/lib/heirloomd",
+		"ExecStart=/usr/local/bin/heirloomd -addr 0.0.0.0:8787 -data /var/lib/heirloomd",
 		"StateDirectory=heirloomd",
 		"StateDirectoryMode=0700",
 		"UMask=0077",
@@ -37,9 +37,11 @@ func TestUnitFileSaysWhatItMust(t *testing.T) {
 			t.Errorf("the unit lacks the line %q", want)
 		}
 	}
-	// It must never listen where the network can reach it.
-	if strings.Contains(string(data), "0.0.0.0") || strings.Contains(string(data), "-addr :") {
-		t.Error("the unit listens beyond the loopback")
+	// The home network may reach it, and the unit must say what that means beside the line.
+	for _, said := range []string{"plain http", "tunnel", "before giving its address"} {
+		if !strings.Contains(string(data), said) {
+			t.Errorf("the unit listens on every address and does not say %q", said)
+		}
 	}
 
 	// systemd's own reading of it, where this machine has systemd.
