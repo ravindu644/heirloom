@@ -6,7 +6,13 @@
   "additionalProperties": false,
   "properties": {
     "name": { "type": "string" },
-    "color": { "enum": ["you", "rest", "ink", "ghost", "heat-2"], "description": "A DESIGN.md colour role. DESIGN.md says why only these." },
+    "color": {
+      "description": "One of DESIGN.md's twelve project colours by name, or a colour the person picked. A value a build does not know is shown as ink, never refused.",
+      "oneOf": [
+        { "enum": ["you", "rest", "ink", "ghost", "heat-2", "amber", "olive", "teal", "sky", "indigo", "plum", "clay"] },
+        { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+      ]
+    },
     "order": { "type": "string" },
     "archived": { "type": ["integer", "null"], "description": "Server-time ms, null while active." },
     "deleted": { "type": ["integer", "null"] }

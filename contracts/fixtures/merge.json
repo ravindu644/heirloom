@@ -727,6 +727,48 @@
      "value": "low"
     }
    ]
+  },
+  {
+   "name": "a task's time set on two devices at once: the later one, and its day is its own cell",
+   "cells": [
+    {
+     "stamp": "2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "time",
+     "value": "15:30"
+    },
+    {
+     "stamp": "2026-11-24T04:30:20.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "time",
+     "value": "18:00"
+    },
+    {
+     "stamp": "2026-11-24T04:30:10.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "due",
+     "value": "2026-11-26"
+    }
+   ],
+   "expect": [
+    {
+     "stamp": "2026-11-24T04:30:20.000Z-0000-b2c3d4e5f6071829",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "time",
+     "value": "18:00"
+    },
+    {
+     "stamp": "2026-11-24T04:30:10.000Z-0000-a1b2c3d4e5f60718",
+     "dataset": "task",
+     "row": "task-pointers",
+     "field": "due",
+     "value": "2026-11-26"
+    }
+   ]
   }
  ],
  "drift": [

@@ -381,10 +381,28 @@ own, so each day's laps stay with that day's task:
 - its id is the series id, `-`, and that day as eight digits: `task-read-20261125`. The series id
   is the done task's id without such an ending. Two devices that mark the same task done offline
   therefore make the same row;
-- it copies `project`, `title`, `notes`, `estimate`, `repeat`, `when` and `order`. Subtasks are
-  not copied.
+- it copies `project`, `title`, `notes`, `estimate`, `repeat`, `when`, `time` and `order`.
+  Subtasks are not copied.
 
 Marking it not done again sets `deleted` on that next row; done again clears it.
+
+**A task's time.** `time` is a local time of day, `15:30`, on the task's `due` day; it means
+nothing while `due` is unset, and a device that sets a time on a task with no day writes today
+as its `due` in the same change, and a device that clears the day writes `time` as null in the
+same change: a time the person can no longer see must not come back with the next day they
+pick. The two are separate cells: one device moving the day while
+another moves the time keeps both. A device that can notify reminds once, at that day and
+minute, if the task is then not done and not deleted, and never for a moment already past. It
+is the device's own notification, as a habit's is (section 14); the server sends nothing. A
+value that is not a time of day is kept and sent on, and shown and reminded as none. If one
+device clears the day while another sets a time on the day it still saw, both cells are kept
+and the task has a time with no day: it shows and reminds as none until a day is set again.
+
+**A project's colour.** `color` is one of the twelve names DESIGN.md gives its project colours,
+or `#` and six hex digits for a colour the person picked: written in lowercase, read in either
+case. A build that does not know a
+value (an older one, a newer name) shows the project in `ink` and keeps the value as it is: a
+colour never hides a project and is never rewritten by a device that only read it.
 
 **Order.** `order` is a fractional index: 1 to 64 characters of `0-9 A-Z a-z`, compared as a plain
 string, never ending in `0`. Moving a row writes one new key between its new neighbours. Rows sort

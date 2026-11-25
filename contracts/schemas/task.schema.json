@@ -20,6 +20,7 @@
       ]
     },
     "when": { "type": ["string", "null"], "maxLength": 80, "description": "Free words for when in the day: after dinner." },
+    "time": { "type": ["string", "null"], "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$", "description": "Local time of day on its due day, 24 hour, 15:30. Null for none. Means nothing without a due day." },
     "done": { "type": ["integer", "null"], "description": "Server-time ms it was done, null while open." },
     "order": { "type": "string", "description": "Fractional index. Ties break by row id." },
     "deleted": { "type": ["integer", "null"], "description": "Server-time ms it was deleted, null while alive. Restorable for 30 days." }
