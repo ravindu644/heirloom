@@ -37,7 +37,7 @@ export const AHEAD_DAYS = 14;
 export const MAX_DUE = 400;
 
 /**
- * Reminder ids, apart from the bell (1 and 2) and the countdown (7400). A habit's: 100000 + slot *
+ * Reminder ids, apart from the bell (1 and 2) and the countdown (7400 running, 7401 paused). A habit's: 100000 + slot *
  * 16 + the day's number mod 16. A task's, one reminder each: 200000 + slot, a range of its own, so a
  * task can never take a habit's id.
  */

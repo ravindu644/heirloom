@@ -28,6 +28,15 @@
             </intent-filter>
 
         </activity>
+
+        <!-- The countdown's buttons. Its own empty task, so finishing it leaves the screen as it was. -->
+        <activity
+            android:name=".ActionActivity"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />

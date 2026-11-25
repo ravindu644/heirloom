@@ -18,7 +18,7 @@
 // - Laptop asleep: nothing can ring. On waking, a push less than 60 s old (its TTL) is shown; the
 //   page rings by itself if it looks first and the bell is under LATE_MS old.
 
-import { MOMENT_MS } from './notifier.ts';
+import { MOMENT_MS, isPaused } from './notifier.ts';
 import type { Notifier, Ring } from './notifier.ts';
 import { createPush } from './push.ts';
 import { upcoming } from './reminders.ts';
@@ -160,9 +160,12 @@ export function createWebNotifier(env: WebEnv): Notifier {
 
   return {
     plan(next) {
-      wanted = next;
-      plan(here ? next : null);
+      // Paused rings nowhere; the page itself shows the time standing still.
+      wanted = isPaused(next) ? null : next;
+      plan(here ? wanted : null);
     },
+    // A page has no buttons in the shade.
+    onAction() {},
     async allow() {
       const N = env.Notification;
       if (!N || N.permission === 'denied') return false;

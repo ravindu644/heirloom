@@ -72,7 +72,12 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     async clear() {
       calls.push('clear');
     },
+    async addListener(_event, heard) {
+      tap = heard;
+    },
   };
+  // What ActionActivity hands the page when a button is tapped.
+  let tap: (data: { act: string; run?: string | null }) => void = () => {};
   const notifier = createCapacitorNotifier({
     alarms,
     countdown,
@@ -87,7 +92,7 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
   const done = async () => {
     for (let i = 0; i < 20; i++) await settle();
   };
-  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume, held };
+  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume, held, tapped: (act: string, run: string | null = null) => tap({ act, run }) };
 }
 
 describe('the phone notifier', () => {
@@ -287,6 +292,108 @@ describe('ring here, on the phone', () => {
     await done();
     time.advance(60 * MIN);
     assert.deepEqual(pageRings, []);
+  });
+});
+
+describe('the countdown and its buttons', () => {
+  const ACTIONS = { pause: 'Pause', resume: 'Resume', stop: 'Stop', run: 'run-7' };
+  const lap = (inMs: number, during = 'Lap 1 of 4') => ({ at: T0 + inMs, title: 'Lap 1 of 4, done.', body: 'Take five.', during, actions: ACTIONS });
+  const still = { paused: true as const, during: 'Lap 1 of 4, paused', left: '12:34 left', actions: ACTIONS };
+
+  it('while a lap runs, the countdown carries Pause and Stop, worded by the caller', async () => {
+    const { notifier, done, shown } = rig();
+    notifier.plan(lap(25 * MIN));
+    await done();
+    assert.deepEqual(shown.at(-1), {
+      title: 'Lap 1 of 4',
+      end: T0 + 25 * MIN,
+      channel: 'countdown',
+      actions: [
+        { act: 'pause', label: 'Pause', run: 'run-7' },
+        { act: 'stop', label: 'Stop', run: 'run-7' },
+      ],
+    });
+  });
+
+  it('paused: the bell is taken back and a still notification offers Resume and Stop; resuming arms it again', async () => {
+    const { notifier, done, shown, held, calls, scheduled } = rig();
+    notifier.plan(lap(25 * MIN));
+    await done();
+    notifier.plan(still);
+    await done();
+    assert.ok(!held.has(RING_ID));
+    assert.deepEqual(shown.at(-1), {
+      title: 'Lap 1 of 4, paused',
+      text: '12:34 left',
+      channel: 'countdown',
+      actions: [
+        { act: 'resume', label: 'Resume', run: 'run-7' },
+        { act: 'stop', label: 'Stop', run: 'run-7' },
+      ],
+    });
+    assert.equal(calls.at(-1), 'countdown');
+    notifier.plan(lap(30 * MIN));
+    await done();
+    assert.equal(scheduled.at(-1).schedule.at.getTime(), T0 + 30 * MIN);
+    assert.equal(shown.at(-1).end, T0 + 30 * MIN);
+  });
+
+  it('a stop clears the still one too', async () => {
+    const { notifier, done, calls } = rig();
+    notifier.plan(still);
+    await done();
+    notifier.plan(null);
+    await done();
+    assert.equal(calls.at(-1), 'clear');
+  });
+
+  it('the same bell with another line redraws the countdown only: the alarm is not touched', async () => {
+    const { notifier, done, shown, calls } = rig();
+    notifier.plan(lap(25 * MIN, 'Lap 1 of 4'));
+    await done();
+    const before = calls.length;
+    notifier.plan(lap(25 * MIN, 'Lap 1 of 4, on the intro'));
+    await done();
+    assert.deepEqual(calls.slice(before), ['countdown']);
+    assert.equal(shown.at(-1).title, 'Lap 1 of 4, on the intro');
+  });
+
+  it('other words for the bell itself set the same alarm again, at the same moment, on the same id', async () => {
+    const { notifier, done, scheduled } = rig();
+    notifier.plan(lap(25 * MIN));
+    await done();
+    notifier.plan({ ...lap(25 * MIN), body: 'Take ten.' });
+    await done();
+    assert.deepEqual(
+      scheduled.map((n) => [n.id, n.schedule.at.getTime(), n.body]),
+      [
+        [RING_ID, T0 + 25 * MIN, 'Take five.'],
+        [RING_ID, T0 + 25 * MIN, 'Take ten.'],
+      ],
+    );
+  });
+
+  it('a tap reaches the app with the run its button was drawn for; one made before it listens (it opened the app) keeps its run', async () => {
+    const { notifier, tapped } = rig();
+    tapped('pause', 'run-6');
+    tapped('nonsense', 'run-6');
+    const heard: [string, string | null][] = [];
+    notifier.onAction((act, run) => heard.push([act, run]));
+    tapped('stop', 'run-7');
+    tapped('resume');
+    assert.deepEqual(heard, [
+      ['pause', 'run-6'],
+      ['stop', 'run-7'],
+      ['resume', null],
+    ]);
+  });
+
+  it('ring here off: no still notification either', async () => {
+    const { notifier, done, calls } = rig();
+    notifier.ringHere(false);
+    notifier.plan(still);
+    await done();
+    assert.ok(!calls.includes('countdown'));
   });
 });
 
@@ -493,6 +600,29 @@ describe('habit reminders, on the phone', () => {
     await done();
     assert.deepEqual(calls.slice(before), ['cancel', `remove ${ours[0].id}`]);
     assert.equal(reminders(held).filter(([, t]) => t === 'walk?').length, 14);
+  });
+
+  it('several times a day: a check-in for one place takes only that one out of the shade; a place that goes is cancelled', async () => {
+    const { time, notifier, done, held, calls } = rig({ remind: 'Reminders' });
+    const places = (done1: boolean) => [habit('water#0', '10:20'), habit('water#1', '10:40', DAILY, done1), habit('water#2', '18:00')];
+    notifier.reminders(places(false));
+    await done();
+    const today = (title: string, at: string) => [...held.values()].find((n) => n.title === title && new Date(n.schedule.at).toString().slice(16, 21) === at && new Date(n.schedule.at).getDate() === 24);
+    const first = today('water#0?', '10:20')!;
+    const second = today('water#1?', '10:40')!;
+    // 10:45: both have been shown. The second place is checked in.
+    time.jump(45 * MIN);
+    let before = calls.length;
+    notifier.reminders(places(true));
+    await done();
+    assert.deepEqual(calls.slice(before), ['cancel', `remove ${second.id}`]);
+    assert.ok(held.has(first.id));
+    // The third time is taken off the habit: all of its days go.
+    before = calls.length;
+    notifier.reminders(places(true).slice(0, 2));
+    await done();
+    assert.equal(calls.slice(before)[0], 'cancel');
+    assert.ok(![...held.values()].some((n) => n.title === 'water#2?'));
   });
 
   it('ten habits planned every day fit, far under the 500 alarms Android allows an app', async () => {

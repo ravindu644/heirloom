@@ -56,6 +56,24 @@ describe('upcoming reminders', () => {
     }
   });
 
+  it('a habit kept several times a day: one entry per time, ids apart, and 20 such habits held to the cap, nearest first', () => {
+    const times = ['08:00', '12:00', '16:00', '20:00'];
+    const set = Array.from({ length: 20 }, (_, h) => times.map((time, k) => habit(`habit${h}#${k}`, time))).flat();
+    const due = upcoming(set, now);
+    // 20 habits x 4 times x 14 days is 1120; Android takes 500 alarms from an app, we hold 400.
+    assert.equal(due.length, MAX_DUE);
+    assert.ok(due.every((d, i) => i === 0 || due[i - 1]!.at <= d.at));
+    assert.equal(new Set(due.map((d) => d.id)).size, due.length);
+    // The nearest 400 reach five days ahead: the rest come in as these pass.
+    assert.equal(local(due.at(-1)!.at), 'Sun Nov 29 2026 08:00');
+  });
+
+  it('a place done today drops only its own reminder', () => {
+    const set = [habit('h#0', '12:00'), habit('h#1', '16:00', 0b1111111, true), habit('h#2', '20:00')];
+    const today = upcoming(set, now).filter((d) => local(d.at).startsWith('Tue Nov 24'));
+    assert.deepEqual(today.map((d) => local(d.at)), ['Tue Nov 24 2026 12:00', 'Tue Nov 24 2026 20:00']);
+  });
+
   describe('a task', () => {
     const task = (id: string, time: string, day: string) => ({ habit: id, title: id, body: '', time, days: 127, doneToday: false, day });
 

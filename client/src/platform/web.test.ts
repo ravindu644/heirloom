@@ -187,6 +187,17 @@ describe('the web notifier', () => {
   });
 });
 
+describe('a pause, in the browser', () => {
+  it('rings nowhere, and the buttons of the phone are no business of the page', () => {
+    const { time, rings, notifier, ring } = rig();
+    notifier.plan(ring(MIN));
+    notifier.plan({ paused: true, during: 'Lap 1 of 4, paused', left: '0:30 left' });
+    notifier.onAction(() => assert.fail('a page has no buttons'));
+    time.advance(60 * MIN);
+    assert.deepEqual(rings, []);
+  });
+});
+
 describe('can the browser ring', () => {
   it('false only when notifications are refused; not asked yet, or no Notification at all, still rings', async () => {
     assert.equal(await rig({ permission: 'granted' }).notifier.canRing(), true);

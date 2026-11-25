@@ -9,8 +9,8 @@ import { registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
-import { MOMENT_MS } from './notifier.ts';
-import type { Notifier, Ring } from './notifier.ts';
+import { MOMENT_MS, isPaused } from './notifier.ts';
+import type { Act, Actions, Notifier, Paused, Ring } from './notifier.ts';
 import { AHEAD_DAYS, MAX_DUE, isReminderId, upcoming } from './reminders.ts';
 import type { Reminder } from './reminders.ts';
 import { bellOnDemand } from './sound.ts';
@@ -32,11 +32,23 @@ export interface Channels {
   remind?: string;
 }
 
-/** The countdown plugin in android/app (CountdownPlugin.java). */
-export interface Countdown {
-  show(options: { title: string; end: number; channel: string }): Promise<void>;
-  clear(): Promise<void>;
+/** One button on the countdown, and the run it acts on. */
+export interface Button {
+  act: Act;
+  label: string;
+  run: string | null;
 }
+
+/** The countdown plugin in android/app (CountdownPlugin.java). With `end` it counts down; without, it shows `text` standing still. */
+export interface Countdown {
+  show(options: { title: string; channel: string; end?: number; text?: string; actions?: Button[] }): Promise<void>;
+  clear(): Promise<void>;
+  /** A tap on a button, from ActionActivity. One made while the app was away arrives when this is called. */
+  addListener(event: 'action', heard: (data: { act: string; run?: string | null }) => void): Promise<unknown>;
+}
+
+const ACTS: readonly string[] = ['pause', 'resume', 'stop'] satisfies Act[];
+const buttons = (actions: Actions | undefined, acts: Act[]) => (actions ? { actions: acts.map((act) => ({ act, label: actions[act], run: actions.run })) } : {});
 
 export type Alarms = Pick<
   LocalNotificationsPlugin,
@@ -67,16 +79,18 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   // Anything but a plan's JSON, so the first plan always runs: an alarm left from the app's last
   // life must be cancelled when the timer it was for has since been stopped.
   let applied: string | undefined;
-  let current: Ring | null = null;
+  let current: Ring | Paused | null = null;
   // The person's "ring here" for this phone. Off: no alarm, no countdown, no page bell.
   let here = true;
-  // A phase that has already ended, or is ending now, rings nowhere.
-  const pending = () => (here && current && current.at - now() >= MOMENT_MS ? current : null);
+  // A phase that has already ended, or is ending now, rings nowhere. A paused one rings nowhere
+  // either, but keeps its still notification.
+  const pending = () => (!here || !current ? null : isPaused(current) || current.at - now() >= MOMENT_MS ? current : null);
   // What Android actually holds, which is less than `applied` while permission is missing.
   let live = 'null';
   // The last bell handed to Android: its id and time. Undefined until the first plan, which clears
   // both ids, since an alarm from the app's last life may be waiting for a timer since stopped.
-  let given: { id: number; at: number } | null | undefined;
+  let given: { id: number; at: number; words: string } | null | undefined;
+  const words = (ring: Ring) => JSON.stringify([ring.title, ring.body]);
 
   // Bridge calls are async and plans can come in a burst of sync messages. One at a time, in
   // order, so the last plan is the one left standing.
@@ -101,7 +115,17 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     (await alarms.checkPermissions()).display === 'granted' &&
     (await alarms.checkExactNotificationSetting()).exact_alarm === 'granted';
 
-  const apply = async (ring: Ring | null) => {
+  const countdownFor = (ring: Ring, at: number) =>
+    ring.during ? countdown.show({ title: ring.during, end: at, channel: 'countdown', ...buttons(ring.actions, ['pause', 'stop']) }) : countdown.clear();
+
+  const apply = async (next: Ring | Paused | null) => {
+    const ring = next && !isPaused(next) ? next : null;
+    // The same bell with other words for the countdown (the task's line changed): the alarm is left
+    // exactly as it is, and the countdown, silent on its own channel, is drawn again.
+    if (ring && given && given.at === Math.round(ring.at) && given.words === words(ring) && given.at - now() >= MOMENT_MS) {
+      live = JSON.stringify(ring);
+      return countdownFor(ring, given.at);
+    }
     // At the bell the timer stops running and plans null, a moment before Android may deliver the
     // alarm (in deep Doze it was late, and this cancel used to kill it). A bell whose time has come
     // is Android's from then on: it is left alone, and its id is reused two plans later, which also
@@ -116,6 +140,12 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
       given = null;
     } else if (given) id = otherId(given.id);
     live = 'null';
+    if (isPaused(next)) {
+      // Standing still: no bell, and a notification to resume from.
+      page.plan(null);
+      live = JSON.stringify(next);
+      return countdown.show({ title: next.during, text: next.left, channel: 'countdown', ...buttons(next.actions, ['resume', 'stop']) });
+    }
     if (!ring || !(await can())) {
       // Without permission Android rings nothing, so the page does, if it is on screen at the bell.
       // In the background there is nothing honest to do: no notification, and a page out of sight
@@ -141,9 +171,9 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
         },
       ],
     });
-    given = { id, at };
+    given = { id, at, words: words(ring) };
     live = JSON.stringify(ring);
-    await (ring.during ? countdown.show({ title: ring.during, end: at, channel: 'countdown' }) : countdown.clear());
+    await countdownFor(ring, at);
   };
 
   // Sets the pending bell if Android does not hold it yet, once the plans before this have run.
@@ -211,7 +241,23 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     run(() => apply(planned));
   };
 
+  // A tap on the countdown's buttons reaches the page's own code, the one writer of the timer. A tap
+  // that comes in before main.tsx listens (it opened the app) waits here for it.
+  let hear: ((act: Act, run: string | null) => void) | undefined;
+  const waiting: [Act, string | null][] = [];
+  void countdown
+    .addListener('action', ({ act, run = null }) => {
+      if (!ACTS.includes(act)) return;
+      if (hear) hear(act as Act, run);
+      else waiting.push([act as Act, run]);
+    })
+    .catch(warn);
+
   return {
+    onAction(heard) {
+      hear = heard;
+      for (const [act, run] of waiting.splice(0)) heard(act, run);
+    },
     plan(ring) {
       current = ring;
       settle();
