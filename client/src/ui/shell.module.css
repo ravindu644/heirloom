@@ -23,6 +23,11 @@
 }
 /* The person: one target, as wide as the circle and the name. */
 .person { grid-area: person; display: flex; align-items: center; justify-self: end; max-width: 100%; min-width: 0; min-height: var(--layout-touch); padding: 0 var(--layout-margin) 0 var(--space-md); }
+/* The circle stands on the edge the chip hangs from. At the top right that is the right edge:
+   the name comes first and is what gives way, so the circle never moves with its length. The
+   page is written circle first all the same; the circle is not read out, and the link has its
+   own name. */
+.person > span { flex-direction: row-reverse; }
 
 /* No padding below: the status line is the space under the screen, and a screen's own buttons
    may stick to the very bottom of the scroll. */
@@ -46,6 +51,8 @@
    connection, the worst case with it, must not move them. */
 .statusKept { min-height: calc(2lh + 2 * var(--space-sm)); }
 
+/* Put away while a keyboard is up: `hidden` alone would lose to the grid below. */
+.nav[hidden] { display: none; }
 .nav {
   grid-area: nav;
   display: grid;
@@ -91,5 +98,7 @@
   .nav a[aria-current] { background: var(--raised); }
   .main { padding: var(--layout-gutter); }
   .status, .statusKept { min-height: 0; padding: 0 var(--layout-gap) var(--space-sm); }
-  .person { padding: 0 var(--layout-gap) var(--space-md); }
+  /* At the foot of the sidebar the chip hangs from the left edge: the circle first, as in a row. */
+  .person { justify-self: start; padding: 0 var(--layout-gap) var(--space-md); }
+  .person > span { flex-direction: row; }
 }

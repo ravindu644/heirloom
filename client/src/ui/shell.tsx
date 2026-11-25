@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { Brand } from './kit/brand.tsx';
+import { useKeyboard } from './kit/keyboard.ts';
 import { Person } from './kit/person.tsx';
 import { useSidebar } from './kit/wide.ts';
 import css from './shell.module.css';
@@ -29,13 +30,16 @@ interface Props {
  */
 export function Shell({ person, at, without, status = '', keepStatus, children }: Props) {
   const sidebar = useSidebar();
+  // While the keyboard is up on a phone the tab bar is not drawn: it would ride on the keys and
+  // take a row of the little that is left. It is back the moment the keyboard goes.
+  const typing = useKeyboard() && !sidebar;
   const brand = (
     <a key="brand" class={css.brand} href="#/focus">
       <Brand name={s.brand} />
     </a>
   );
   const nav = person && (
-    <nav key="nav" class={css.nav} aria-label={s.nav.label}>
+    <nav key="nav" class={css.nav} aria-label={s.nav.label} hidden={typing}>
       {DESTINATIONS.filter((id) => id !== without).map((id) => (
         <a key={id} href={`#/${id}`} aria-current={id === at ? 'page' : undefined}>
           {id === at ? <b>{s.nav[id]}</b> : s.nav[id]}

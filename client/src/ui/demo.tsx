@@ -357,7 +357,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     },
   };
 
-  const account = signal(scene.signedOut ? null : { account: 'demo', username: 'ravi' });
+  const account = signal(scene.signedOut ? null : { account: 'demo', username: new URLSearchParams(location.search).get('name') ?? 'ravi' });
   const sync = signal<SyncState>(scene.sync ?? (scene.signedOut ? 'signed-out' : 'in-step'));
   const unsent = signal(scene.unsent ?? 0);
   const long = signal<ReadonlyMap<string, Row>>(new Map([['long', { id: 'long', title: LONG_TITLE }]]));

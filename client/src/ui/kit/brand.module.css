@@ -1,4 +1,6 @@
-.mark { display: inline-flex; gap: var(--space-xs); margin-right: var(--space-sm); }
-.mark i { width: calc(var(--space-sm) + var(--space-xs)); height: calc(var(--space-sm) + var(--space-xs)); border-radius: var(--radius-full); }
-.mark i:first-child { background: var(--you); }
-.mark i:last-child { border: 2px dashed var(--ghost); }
+/* As tall as the name's own line, so it stands a little over the letters, is centred on them,
+   and can never make the header's line taller. Its width follows from the drawing. */
+/* Nothing in it is filled unless it says so: a drawing's own default is black, which is no colour of ours. */
+.mark { flex: none; height: 1lh; margin-right: var(--space-sm); fill: none; }
+.you { fill: var(--you); }
+.ghost { fill: none; stroke: var(--ghost); }

@@ -260,7 +260,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
           return (
             <article key={m.id} class={cx(css.member, m.you && css.you)}>
               <div class={css.who}>
-                <Person name={m.you ? s.room.you : m.name} />
+                <Person name={m.name} label={m.you ? s.room.you : undefined} />
                 {/* With no connection nothing counts down for anyone but you: your own clock is on this device. */}
                 {m.ends_at !== null && (m.you || !stale) && (
                   <b class={m.phase === 'work' ? undefined : css.rest} aria-label={s.room.left(m.ends_at - now)}>
