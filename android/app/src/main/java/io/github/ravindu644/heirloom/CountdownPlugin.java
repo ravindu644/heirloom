@@ -19,7 +19,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "Countdown")
 public class CountdownPlugin extends Plugin {
 
-    // Apart from the bell, which is id 1 (RING_ID in client/src/platform/capacitor.ts).
+    // Apart from the bell, which takes ids 1 and 2 by turns (RING_ID in client/src/platform/capacitor.ts).
     private static final int ID = 7400;
 
     @PluginMethod

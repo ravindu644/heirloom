@@ -48,6 +48,9 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     async getPending() {
       return { notifications: [...held.values()] };
     },
+    async removeDeliveredNotificationsById(options: any) {
+      calls.push(`remove ${options.ids.join(',')}`);
+    },
     async checkPermissions() {
       return { display: state.display };
     },
@@ -287,6 +290,77 @@ describe('ring here, on the phone', () => {
   });
 });
 
+describe('a bell whose time has come', () => {
+  const lap = (inMs: number) => ({ at: T0 + inMs, title: 'Lap 1 of 4, done.', body: 'Take five.', during: 'Lap 1 of 4' });
+  const rest = (inMs: number) => ({ at: T0 + inMs, title: 'Break over.', body: 'Lap 2 is next.', during: 'Short break' });
+
+  it('is left to Android when the timer stops running at the bell, even if Android is late', async () => {
+    const { time, notifier, done, held, calls } = rig();
+    notifier.plan(lap(MIN));
+    await done();
+    // The page's own timer reaches the bell first: the lap stops running and plans nothing.
+    time.jump(MIN + 800);
+    notifier.plan(null);
+    await done();
+    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
+    assert.equal(calls.at(-1), 'clear');
+  });
+
+  it('with the break started by itself, the break goes on the other id and the lap still rings', async () => {
+    const { time, notifier, done, held } = rig();
+    notifier.plan(lap(MIN));
+    await done();
+    time.jump(MIN + 800);
+    notifier.plan(rest(MIN + 5 * MIN));
+    await done();
+    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
+    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
+  });
+
+  it('the break planned a moment after the lap planned nothing still goes on the other id', async () => {
+    const { time, notifier, done, held } = rig();
+    notifier.plan(lap(MIN));
+    await done();
+    time.jump(MIN + 300);
+    notifier.plan(null);
+    await done();
+    time.jump(500);
+    notifier.plan(rest(MIN + 5 * MIN));
+    await done();
+    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
+    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
+  });
+
+  it('a real stop before the bell still cancels, and the ids take turns so no more than two bells are ever held', async () => {
+    const { time, notifier, done, held, scheduled } = rig();
+    notifier.plan(lap(MIN));
+    await done();
+    time.jump(MIN + 800);
+    notifier.plan(rest(6 * MIN));
+    await done();
+    time.jump(5 * MIN);
+    // The break rang too; the next lap goes back on the first id, which clears the old bell from the shade.
+    notifier.plan(lap(6 * MIN + 1000 + 25 * MIN));
+    await done();
+    assert.deepEqual(scheduled.map((n) => n.id), [RING_ID, RING_ID + 1, RING_ID]);
+    // Stopped halfway through: that bell is taken back, the rung break is not touched.
+    notifier.plan(null);
+    await done();
+    assert.ok(!held.has(RING_ID));
+    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
+  });
+
+  it('switching ring here off takes back even a bell whose time has come', async () => {
+    const { time, notifier, done, held } = rig();
+    notifier.plan(lap(MIN));
+    await done();
+    time.jump(MIN + 300);
+    notifier.ringHere(false);
+    await done();
+    assert.ok(!held.has(RING_ID));
+  });
+});
+
 describe('habit reminders, on the phone', () => {
   // T0 is Tuesday 24 November 2026, 10:00 in Colombo (the zone these tests run in).
   process.env.TZ = 'Asia/Colombo';
@@ -295,7 +369,7 @@ describe('habit reminders, on the phone', () => {
   const reminders = (held: Map<number, any>) =>
     [...held.values()].filter((n) => n.id >= 100_000).map((n) => [new Date(n.schedule.at).toString().slice(0, 21), n.title]).sort();
 
-  it('schedules each planned day of the next fourteen, on their own quiet-but-audible channel, not as exact alarms', async () => {
+  it('schedules each planned day of the next fourteen, on their own quiet-but-audible channel, as exact alarms', async () => {
     const { notifier, done, held, calls } = rig({ remind: 'Habits' });
     notifier.reminders([habit('walk', '18:00'), habit('read', '07:30', 0b0000001)]);
     await done();
@@ -306,7 +380,8 @@ describe('habit reminders, on the phone', () => {
     assert.deepEqual(got.filter(([, t]) => t === 'read?').map(([at]) => at), ['Mon Dec 07 2026 07:30', 'Mon Nov 30 2026 07:30']);
     for (const n of [...held.values()].filter((n) => n.id >= 100_000)) {
       assert.equal(n.channelId, 'remind');
-      assert.equal(n.isExactNotification, false);
+      // Exact: inexact ones came up to an hour late on the Samsung. The plugin's default is exact.
+      assert.notEqual(n.isExactNotification, false);
       assert.equal(n.schedule.allowWhileIdle, true);
     }
   });
@@ -321,8 +396,10 @@ describe('habit reminders, on the phone', () => {
     await done();
     assert.ok(!reminders(held).some(([at]) => at === 'Tue Nov 24 2026 18:00'));
     assert.equal(reminders(held).length, 13);
-    // Only today's was touched: one cancel, nothing scheduled again.
-    assert.deepEqual(calls.slice(before), ['cancel']);
+    // Only today's was touched: cancelled, taken out of the shade, nothing scheduled again.
+    assert.equal(calls.slice(before).length, 2);
+    assert.equal(calls.slice(before)[0], 'cancel');
+    assert.match(calls.slice(before)[1]!, /^remove \d+$/);
   });
 
   it('the set is applied exactly: a habit gone loses its reminders, a changed time moves them', async () => {
@@ -373,6 +450,32 @@ describe('habit reminders, on the phone', () => {
     const future = [...held.values()].filter((n) => n.id >= 100_000 && new Date(n.schedule.at).getTime() > time.now());
     assert.equal(future.length, 14);
     assert.ok(reminders(held).some(([at]) => at === 'Thu Dec 10 2026 18:00'));
+  });
+
+  it('a reminder past its time today is still ours: kept while not done, cancelled and taken out of the shade once checked in', async () => {
+    const { time, notifier, done, held, calls } = rig({ remind: 'Habits' });
+    notifier.reminders([habit('walk', '10:30')]);
+    await done();
+    const today = [...held.values()].find((n) => new Date(n.schedule.at).getDate() === 24)!;
+    // 10:31: Android may not have shown it yet (it was late on the Samsung), or it sits in the shade.
+    time.jump(31 * MIN);
+    const before = calls.length;
+    notifier.reminders([habit('walk', '10:30')]);
+    await done();
+    assert.deepEqual(calls.slice(before), []);
+    notifier.reminders([habit('walk', '10:30', DAILY, true)]);
+    await done();
+    assert.deepEqual(calls.slice(before), ['cancel', `remove ${today.id}`]);
+    assert.ok(!held.has(today.id));
+  });
+
+  it('never schedules a reminder whose time has passed: the plugin would show it at once', async () => {
+    const { time, notifier, done, held } = rig({ remind: 'Habits' });
+    time.jump(31 * MIN);
+    notifier.reminders([habit('walk', '10:30')]);
+    await done();
+    assert.ok(reminders(held).every(([at]) => !at.startsWith('Tue Nov 24')));
+    assert.equal(reminders(held).length, 13);
   });
 
   it('ten habits planned every day fit, far under the 500 alarms Android allows an app', async () => {

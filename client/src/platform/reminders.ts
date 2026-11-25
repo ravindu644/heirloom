@@ -58,12 +58,13 @@ function slots(habits: string[]): Map<string, number> {
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 /**
- * Every reminder due from `now` over `ahead` days, nearest first, at most `max`. Times are the
+ * Every reminder due after `since` (now, unless said) over `ahead` days from today, nearest first,
+ * at most `max`. Times are the
  * device's own wall clock: `new Date(y, m, d, h, min)` follows the zone's rules for that date, so
  * summer time that starts or ends inside the window is already right. A move to another zone is
  * not known until this runs again.
  */
-export function upcoming(reminders: Reminder[], now: number, ahead = AHEAD_DAYS, max = MAX_DUE): Due[] {
+export function upcoming(reminders: Reminder[], now: number, ahead = AHEAD_DAYS, max = MAX_DUE, since = now): Due[] {
   const slot = slots(reminders.map((r) => r.habit));
   const start = new Date(now);
   const out: Due[] = [];
@@ -74,7 +75,7 @@ export function upcoming(reminders: Reminder[], now: number, ahead = AHEAD_DAYS,
       const at = new Date(start.getFullYear(), start.getMonth(), start.getDate() + d, Number(m[1]), Number(m[2])).getTime();
       const date = new Date(at);
       const weekday = (date.getDay() + 6) % 7;
-      if (!(r.days & (1 << weekday)) || at <= now || (d === 0 && r.doneToday)) continue;
+      if (!(r.days & (1 << weekday)) || at <= since || (d === 0 && r.doneToday)) continue;
       // The calendar day's own number, not the offset from today, so tomorrow's id is the same tomorrow.
       const day = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
       out.push({ id: FIRST_ID + slot.get(r.habit)! * 16 + (day % 16), at, title: r.title, body: r.body, sig: JSON.stringify([r.habit, at, r.title, r.body]) });
