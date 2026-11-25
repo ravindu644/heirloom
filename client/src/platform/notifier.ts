@@ -30,6 +30,11 @@ export interface Notifier {
   account(change: 'in' | 'out'): void;
   /** The words a push would say may have changed (the break lengths): sent again only if they differ. */
   reword(): void;
+  /**
+   * Whether a ring due now would be heard. Never asks. False only when the person has refused
+   * (permission denied); not asked yet is not refused, so it is true.
+   */
+  canRing(): Promise<boolean>;
   /** Every habit reminder wanted, whole: what this device holds is made to match it and nothing else. */
   reminders(set: Reminder[]): void;
 }

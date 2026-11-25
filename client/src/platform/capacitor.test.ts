@@ -505,6 +505,34 @@ describe('habit reminders, on the phone', () => {
   });
 });
 
+describe('can the phone ring', () => {
+  it('true when allowed or not asked yet, false only when notifications or exact alarms are refused, and it never asks', async () => {
+    const cases: [Grant, Grant, boolean][] = [
+      ['granted', 'granted', true],
+      ['prompt', 'granted', true],
+      ['denied', 'granted', false],
+      ['granted', 'denied', false],
+      ['denied', 'denied', false],
+    ];
+    for (const [display, exact, expected] of cases) {
+      const { notifier, calls } = rig({ display, exact });
+      assert.equal(await notifier.canRing(), expected, `${display}, ${exact}`);
+      assert.ok(!calls.includes('ask'));
+    }
+  });
+
+  it('a bridge that fails is not a refusal', async () => {
+    const { notifier, state, warned } = rig();
+    Object.defineProperty(state, 'display', {
+      get() {
+        throw new Error('bridge gone');
+      },
+    });
+    assert.equal(await notifier.canRing(), true);
+    assert.equal(warned.length, 1);
+  });
+});
+
 describe('in front again, on the phone', () => {
   it("is Capacitor's resume", () => {
     const seen: [string, () => void][] = [];

@@ -201,6 +201,8 @@ export function createWebNotifier(env: WebEnv): Notifier {
       else void push?.unsubscribe(false);
     },
     reword: subscribe,
+    // No Notification API at all still rings: the bell sounds while the page is open.
+    canRing: async () => env.Notification?.permission !== 'denied',
   };
 }
 

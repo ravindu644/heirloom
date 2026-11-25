@@ -187,6 +187,18 @@ describe('the web notifier', () => {
   });
 });
 
+describe('can the browser ring', () => {
+  it('false only when notifications are refused; not asked yet, or no Notification at all, still rings', async () => {
+    assert.equal(await rig({ permission: 'granted' }).notifier.canRing(), true);
+    assert.equal(await rig({ permission: 'default' }).notifier.canRing(), true);
+    assert.equal(await rig({ permission: 'denied' }).notifier.canRing(), false);
+    assert.equal(await rig({ notifications: false }).notifier.canRing(), true);
+    const asking = rig({ permission: 'default' });
+    await asking.notifier.canRing();
+    assert.deepEqual(asking.asked, []);
+  });
+});
+
 describe('the bell', () => {
   it('before unlock, play is a quiet no-op and makes no audio context', () => {
     let made = 0;

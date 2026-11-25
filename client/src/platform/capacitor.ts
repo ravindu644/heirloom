@@ -229,6 +229,20 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     account() {},
     // The phone's alarm says its words itself, when it is planned.
     reword() {},
+    async canRing() {
+      // Refused is denied, never prompt: notifications switched off (Android 13 and later ask; before
+      // that the person turns them off in settings), or exact alarms not allowed, which only Android
+      // 12 can do (USE_EXACT_ALARM covers 13 and later). A bridge that fails is not a refusal.
+      try {
+        return (
+          (await alarms.checkPermissions()).display !== 'denied' &&
+          (await alarms.checkExactNotificationSetting()).exact_alarm !== 'denied'
+        );
+      } catch (error) {
+        warn(error);
+        return true;
+      }
+    },
     async allow() {
       // main.tsx calls this as `void notifier.allow()`: a bridge failure is a no, not an unhandled rejection.
       const ok = await (async () =>
