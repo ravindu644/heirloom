@@ -232,3 +232,25 @@ What the stranger's walk then found in the fixes themselves, before the user did
 | "No reminders" wiped twenty times in one tap; minus on a stepper dropped a time for good | A control that removes several things at once is named as an act ("Remove the reminders"), is undoable, and what a toggle hid comes back when it is toggled again in the same sitting |
 | The keyboard rule was applied to subtasks, where no bar speaks and several are typed in a row | A rule made for one case is asked of each place it was applied: is the reason there too? |
 
+## 11. Lessons from the user's fourth hour
+
+| What the user met | The check |
+|---|---|
+| The set of four, named and given a mark, was asked about a third time: "why are there four hard coded lines", "why a long break line" | A thing asked about twice is not explained a third way. Ask first whether the person chose it or needs it; a count nobody set is the app's bookkeeping, and it comes off the screen. What it decides is said in the person's terms ("15 min long break after") |
+| A lap could not be longer than 99 minutes, because the clock face drew two digits | A limit is asked: whose is it? One that comes from the drawing is the drawing's to solve. The person's own top is the limit |
+| Upcoming could not be put in order; the one task under Next lifted to go nowhere | An act the screen offers is tried on every row it shows, in every group, with one row and with many. What cannot be acted on does not look as if it could |
+| Twelve short sessions made a wall of rows on Progress | A list that grows with use is looked at after a real day, tries and slips included, not with the demo's six tidy rows. It shows the latest few and says how many more |
+| The welcome explained a lap and its 25 minutes | A first screen is shown, not explained: drawn in the app's own marks, with only the words that say what it does |
+
+For the lead:
+
+- **When a fix is asked about again, the fix was to the wrong thing.** Section 13 gave the set a
+  noun and a mark; section 15 removed it. Before polishing how a thing is said, ask whether it
+  should be said.
+- **A new prominent count makes every row behind it visible.** Putting the day's laps on Focus
+  showed that a lap stopped after three seconds counted. When a number moves to a louder
+  place, list what feeds it and try the smallest and silliest of each.
+- **A lane's report of what it found on the way is worth as much as what it built.** Core's
+  check of a six hour lap found the midnight bug and a repeating task that could end silently;
+  ask every lane "what bends at the new extreme?" in the brief.
+

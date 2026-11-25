@@ -82,3 +82,9 @@ when it is done.
 - [13] A push to a closed browser tab words its bell from the set ("Lap 2 of 4 in this set, done."), while the phone and an open tab name the task ("Lap 1 done: Essay draft"): the server words a push from a list sent ahead and knows no task.
 - [13] An invite link just made stands in "The new link" with no Take back until it is copied: a link made by mistake has to be copied before it can be taken back.
 - [13] With automatic starts on, in a break after a lap whose task was then ticked done, Focus names Today's next task while the lap that starts by itself is for no task.
+- [15] "Start the next lap now" after a fourth lap gives the long break away and nothing says so: the count of four starts again and the next line reads "5 min break after".
+- [15] The server step says to ask a friend for the address; someone who means to run their own server is given no next step there.
+- [15] A daily task carried in from tomorrow and done: its next copy is due tomorrow when the row is the first of its series, and the day after for a later row, because a series' rows are named by their day and the first is not.
+- [15] The long clock keeps the short one's baseline, so about 98px stand between the task's title and "5:59:59" where 54 stand over "99:59".
+- [15] Device A starts a lap and is offline past its bell while B stops that lap in its first minute: B leaves no row, so the rang row A later writes for it stands, and the day gains a lap nobody ran. Closing it means A taking its bell back when it learns the timer was left before it.
+- [15] Upcoming rows dated by an earlier build keep keys that were never by day, so after the update they may stand out of date order until moved once; only rows dated from now on are placed by their day.

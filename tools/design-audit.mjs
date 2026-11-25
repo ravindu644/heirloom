@@ -93,9 +93,10 @@ export function type(el, s, width) {
   // figure-xl is the phone timer and nothing else. Under 720px it keeps its share of the width,
   // figure-xl times the width over 412, so a fixed 168px is wrong at 471. (Under 720 that stays
   // below figure-xxl, the cap DESIGN.md names.)
-  const xl = s.roles.find((r) => r.name === 'figure-xl');
+  // figure-xl-long is the same timer reading hours, two thirds its size, and keeps its share too.
+  const share = s.roles.filter((r) => r.name === 'figure-xl' || r.name === 'figure-xl-long');
   const k = width / s.phone;
-  const roles = width < 720 ? [...s.roles.filter((r) => r !== xl), { ...xl, size: xl.size * k, lh: xl.lh * k }] : s.roles;
+  const roles = width < 720 ? [...s.roles.filter((r) => !share.includes(r)), ...share.map((r) => ({ ...r, size: r.size * k, lh: r.lh * k }))] : s.roles;
   if (roles.some(fits)) return [];
   const nearest = roles.filter((r) => r.family === family).sort((a, b) => Math.abs(a.size - f.size) - Math.abs(b.size - f.size) || Math.abs(a.weight - f.weight) - Math.abs(b.weight - f.weight))[0];
   const say = (x) => `${r2(x.size)}px ${x.weight} ${x.lh === null ? 'normal' : r2(x.lh) + 'px'}`;

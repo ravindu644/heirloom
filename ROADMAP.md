@@ -223,17 +223,40 @@ The user, on the third build: the landing explains what a lap is and that it is 
 any timer's would. Show it instead: artwork drawn in the design's own language, and only
 enough words to say briefly what heirloom does.
 
-- [ ] [lead] DESIGN.md: what the welcome's artwork is made of (the app's own marks: the lap
-      squares, the set's bar, the race's two lanes, a week of habit days), what moves and what
-      does not, and the few words; PRODUCT row reworded
-- [ ] [ui] The welcome in the phone app and beside the browser's sign-in, drawn from tokens,
+- [x] [lead] DESIGN.md: what the welcome's artwork is made of (the app's own marks: a day as a
+      race in two lanes, a habit's week, a task's squares, a room), what moves and what does
+      not, and the few words; PRODUCT row reworded
+- [x] [ui] The welcome in the phone app and beside the browser's sign-in, drawn from tokens,
       no picture file that could not be redrawn in dark; reduced motion shows it still
-- [ ] [qa] It reads at 412, 206 and 1440, light and dark; nothing of it is announced twice to
+- [x] [qa] It reads at 412, 206 and 1440, light and dark; nothing of it is announced twice to
       a screen reader; the way on to the server field and to sign-in is one press
-- [ ] [design-review] Against "nothing generic": could this screen belong to another app?
-- [ ] Gate
+- [x] [design-review] Against "nothing generic": could this screen belong to another app?
+      (`reviews/14/welcome.md`: no; three drafts)
+- [ ] Gate (the user sees it on the phone)
 
-## 15. A way back in
+## 15. What the fourth hour found
+
+On the third build the user found no glitches; four things about how it reads and moves.
+
+- [x] [lead] DESIGN.md and protocol: the set is on no screen (Focus's bar is the day's target);
+      a lap up to 360 minutes; Today's open tasks are one list to the hand, Upcoming included;
+      the day's list of sessions shows its five latest
+- [x] [core] The lap's top at 360 minutes; Upcoming by day until a hand moves a row; a row
+      moved from Upcoming into Today is for today, in one write; a lap stopped in its first
+      minute is a start taken back; a long lap across midnight is one sitting; a repeat that
+      was carried or dated back no longer ends its series
+- [x] [ui] Focus's line and bar; the bell's and the room's words; hours on the timer from 100
+      minutes; rows carried between Next, Later today and Upcoming; the sessions list folded
+- [x] [qa] Each as a test, the moves on two devices (`tests/e2e/fourth-hour.spec.ts`)
+- [x] [design-review] Focus in every state with and without a target; the long timer; the list
+      (`reviews/15/`), and a stranger's walk (`reviews/15/stranger.md`: 15 findings, 11 fixed,
+      4 in findings.md)
+- [ ] Gate (the user lives with it). On the phone: a row carried with a finger; a 360 minute
+      lap's alarm with the screen off; the welcome under the phone's own bars. Five tests that
+      need the day's earlier hours were skipped by a run made after midnight: run `make e2e`
+      in the daytime
+
+## 16. A way back in
 
 - [ ] [lead] PRODUCT row and protocol: whoever owns the server gives a member a link that sets a
       new password; the owner's own way back is a command on the server
@@ -241,7 +264,7 @@ enough words to say briefly what heirloom does.
 - [ ] [qa] A reset on two devices; an old token after it
 - [ ] Gate
 
-## 16. Release 1.0
+## 17. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

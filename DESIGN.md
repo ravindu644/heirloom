@@ -68,6 +68,20 @@ typography:
     lineHeight: 0.9
     letterSpacing: -0.01em
     fontFeature: '"tnum" 1'
+  figure-xxl-long:
+    fontFamily: Barlow Condensed
+    fontSize: 200px
+    fontWeight: 600
+    lineHeight: 0.9
+    letterSpacing: -0.01em
+    fontFeature: '"tnum" 1'
+  figure-xl-long:
+    fontFamily: Barlow Condensed
+    fontSize: 112px
+    fontWeight: 600
+    lineHeight: 0.9
+    letterSpacing: -0.01em
+    fontFeature: '"tnum" 1'
   figure-lg:
     fontFamily: Barlow Condensed
     fontSize: 44px
@@ -409,9 +423,13 @@ Built once in `client/src/ui/kit/` and reused.
   stand eight to a line and up to four lines, 32 in all, like a small year: they fill from the
   right edge, the newest line at the foot, and the count ("3 of 12") is always at the right
   edge. The squares and their count are one thing and never part: the squares at the left,
-  the count at the right. Where the title leaves room the pair stands beside it, as before
-  (left of the row's control when it has one); where it does not, the pair takes a line of its
-  own under the words and the control, ending on the row's right edge, and never hides. A row holding more
+  the count at the right. In a row 720px or wider the pair stands beside the title, as before
+  (left of the row's control when it has one). In a narrower row it stands at the right end
+  of the project's line, under the title, in every row alike, so a list's rows are one height
+  and the counts one column; it takes a line of its own only where that line is full or the
+  task has no project and no day to show. It never hides. (Placed by each title's length, the
+  counts of one list stood at two heights and some rows grew a third line beside a half-empty
+  one.) A row holding more
   than 32 shows its count alone. (The user typed 45 laps into an estimate: the squares ran off
   the card and the title stood one letter to a line; then a top of 8 was too few.)
   In a row narrower than 280px (a phone at 200% zoom) the row's end, count and button, goes
@@ -428,7 +446,16 @@ Built once in `client/src/ui/kit/` and reused.
   scrolls the page: only a hold that has not moved picks a row up. With a keyboard, Alt and the
   arrow keys move the row that has the focus, and a screen reader hears where it now stands.
   No mode, no link, no handle to find first. (It was a link, "Change the order", that turned the
-  list into another screen with Up and Down on every row.)
+  list into another screen with Up and Down on every row.) Today's open tasks are one list to
+  the hand: a row can be set down anywhere among Next, Later today and Upcoming. Set down at
+  the top it is Next, and what was Next is the first of Later today. A row carried up out of
+  Upcoming is for today from then on, and the bar says so with Undo ("Moved to today."); a row
+  is not carried down into Upcoming, since that would need a day, which is given in the task:
+  let go there it returns, and the bar says why ("To plan it for another day, set its day in
+  the task."). The bar after a carry up names what was replaced: "Now due today. It was
+  tomorrow." Upcoming reads by day until a hand moves a row.
+  A row with nowhere to go does not lift: the only open task stays where it is. (Upcoming
+  could not be put in order at all, and the one task under Next lifted to go nowhere.)
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
   the task, and one button filled `ground` with `ink` text: the strip is the page turned inside out,
   and so is its button. (A grey `key` button on it could not be told from the strip.) When the lap has rung, its button to
@@ -482,12 +509,15 @@ Built once in `client/src/ui/kit/` and reused.
 - **A day's timeline:** a `lane-set` lane on an hour axis, each hour's label centred on its hour
   (only a label at the lane's very end is pulled in): laps in `you`, breaks in `rest`, a
   lap set aside hollow. Two laps that ran on two devices at once sit on two rows and say so
-  in words. Under it the same sessions as rows, because a block is too small to press.
+  in words. Under it the same sessions as rows, because a block is too small to press: the
+  five latest, in the order of the day, and over them one link that says how many more there
+  are ("7 earlier today") and opens them in place; open, it says "Show the latest 5". A day
+  of twelve short tries was a wall of rows before the first figure.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
 - **A person's circle** carries the first letter of their username everywhere, also where the
   words beside it say "You".
-- **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
+- **Room member:** a circle initial, the name, phase ("Focusing", "Paused"; no lap number: the set is on no screen), time left in
   figure-md (in `rest` on a break), the task only if shared, today and the week in `label`, who
   cheered, and a Cheer button: full width on a phone, its own width on a laptop. Side by side on
   a laptop the panels of a row are equally tall and each button is pinned to its panel's foot,
@@ -527,6 +557,14 @@ Built once in `client/src/ui/kit/` and reused.
   an empty list would find every later lap going to no task.
 - **A task's own lengths** are three steppers in its sheet behind one choice, "My usual lengths"
   or "Its own", and a task with its own says so on Focus where the length is shown.
+- **A lap runs up to 360 minutes** (the user's own top: a film, an exam paper, a long build).
+  The stepper's field takes three digits, and a figure typed past either end comes to the
+  nearest one it can be (400 becomes 360), never back to what it was without a word. From 100 minutes the timer reads hours, "5:59:59",
+  and its seven characters are set at two thirds of the timer's size, `figure-xl-long` on a
+  phone (keeping its share of the width as `figure-xl` does) and `figure-xxl-long` on a
+  laptop, on one line inside the column; under 100 minutes nothing changes, and what stands
+  under the digits does not move when a long lap comes under 100. A top of 99
+  was the clock face's limit, not the person's.
 - **The button in a field:** where one field alone makes something on Enter (quick add, a
   subtask), a secondary button stands at its right end with the word "Add", inside the field's
   box, from the first character typed until the field is empty again. Enter does the same. A
@@ -552,12 +590,33 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
-- **The welcome:** what heirloom is, for someone who has never seen it. The mark and name, one
-  headline, four short lines (a lap, the day's plan, habits, a room), one line on where it lives
-  (a server you or a friend runs), and in the phone app one primary button to the server step.
-  The phone app shows it once, before the server step; the browser shows the same lines beside
-  the sign-in form from 720px and under it below. No pictures of screens, no pages to swipe, no
-  feature grid: it is one screen of sentences in the app's own voice.
+- **The welcome:** what heirloom is, for someone who has never seen it, shown and not
+  explained. The mark and name, the headline, one sentence of what it does, then **one
+  drawing**: a day as a race, two lanes on one scale. Yours is made of laps as filled blocks
+  in `you`, with the breaks between them as slivers in `rest` and a wider one after the
+  fourth, the last lap still filling; under it last week's you, the same shape hollow and
+  dashed in `ghost`, a lap shorter, and the split between them as its chip. Under the drawing
+  stands **its key** on one line: three of the app's own marks, each with two to five words
+  (a lap, a break, you a week ago), so the first real screen is already half read. Then **small drawings** in two columns that end on one line,
+  each with one line under it: at the left a habit's week (seven day boxes under their
+  letters, five kept and two of rest, drawn as Habits draws them) and under it a task's
+  squares with its count (2 of 3); at the right a room (three friends as the Room shows them,
+  two with "18:42 left" on their lap and one on a break: a bare "18:42" read as a time of
+  day). The key names only what the race draws: a lap, a break, you a week ago. A key of seven entries was tried first and
+  read as a list of features with pictures for bullets. Then one line on where it lives (a server you or a
+  friend runs), and in the phone app one primary button to the server step, which keeps the foot of the
+  screen on a phone of any height while the drawings scroll above it.
+  - Everything in it is drawn by the kit's own pieces from tokens: nothing in the drawing is
+    a mark the app does not use, there is no picture file, no icon, no figure of a person, and
+    dark is the same drawing on the dark tokens.
+  - It moves once: your laps fill from the left in turn, each in `motion-fill`, the chip
+    last, and then it is still. Nothing loops. Reduced motion shows the end at once.
+  - Each drawing is one image to a screen reader, with one sentence that says what it shows;
+    the key is a list whose marks are not read.
+  - The phone app shows it once, before the server step; the browser shows it beside the
+    sign-in form from 720px and under it below. No pictures of screens, no pages to swipe, no
+    feature grid. (It was four sentences that explained a lap and its 25 minutes, as any
+    timer's would; the user asked for it drawn.)
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
   "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
   and an equal negative margin, so the line it sits in keeps its height.
@@ -765,20 +824,28 @@ Each is a rule for every screen, not for the one where it was seen.
   not "today", wherever the day target is edited.
 - **A thing is labelled with what it is,** never with the product's own noun for it: the race's
   second lane is "Last Tue", not "Ghost"; a figure is "Focused", not "Done" beside a list called Done.
-- **A count says of what.** "Lap 2 of 4" on Focus is the set of four that ends in the long
-  break; "1 of 3 laps today" on Today is the day's target; "1 of 2" on a row is the task's
-  estimate. Three counts of laps, and the first had no noun: the user set the day's target to 2
-  and then 3 and asked why Focus still said 4. Focus says "Lap 2 of 4 in this set", with "long
-  break after lap 4" beside it, and two bars that count different things are never left to be
-  told apart by their place alone: Focus's bar ends in a short fifth mark in `rest`, the long
-  break the four laps earn: hollow with a `rest` line until then, filled while it runs (drawn
-  in the grey of an empty lap it read as a fifth lap cut short). The same count carries its noun wherever it
-  is said: the bell ("Lap 2 of 4 in this set, done."), and a room's row ("Focusing, lap 2 in a
-  set of 4"). Each screen keeps to its own counts: Today counts the day and the task, Focus the
-  set and the task. So Today's strip after a bell says "Lap done" and no number, since the
-  row under it says "3 of 4" of the task. Outside the app the task's lap comes first and its
-  title last, where a long one may be cut: "Lap 1, 3 estimated: Essay draft", and at its bell
-  "Lap 1 done: Essay draft".
+- **A count the person did not set is not shown.** The set of four that ends in the long break
+  is the timer's own bookkeeping: nobody chose the four, and drawn as a bar on Focus it was
+  asked about three times ("why does it stay at 4", "why are there four hard coded lines, can I
+  clear them", "why a long break line"), with a noun and without. So the set is on no screen
+  and in no notification. Focus's bar is the day's target, the same bar Today has, with "Lap 3
+  of 5 today" and its state (", next", ", focus", ", paused", ", done"); past the target it says
+  "Lap 6 today, 5 planned"; with no target there is no bar, only "Lap 3 today". What the set
+  decides is said where it matters and in its own terms: at the line's right end, "5 min break
+  after" or "15 min long break after", and in a break "lap 4 today next". The one place the
+  rule is said is where the long break is earned, and it is said as a rule: "Four laps. The
+  long break is earned!" (not "in a row": the four may be hours apart). A bell says "Lap done."
+  and the break it has earned; a room's row says "Focusing" and the time left. Past the target
+  the line says "Lap 6 today, past your target of 5": "planned" is Today's word for estimates.
+  A lap begun before midnight is "A lap from yesterday" in every state it can be in, running,
+  rung or stopped; it is never "Lap 0", and nothing promises it will add to today.
+- **A count says of what.** "3 of 5 laps today" is the day's target; "1 of 2" on a row is the
+  task's estimate; neither stands without its noun where both can be seen. Today's strip after
+  a bell says "Lap done" and no number, since the row under it says "3 of 4" of the task.
+  Outside the app the task's lap comes first and its title last, where a long one may be cut:
+  "Lap 1, 3 estimated: Essay draft", and at its bell "Lap 1 done: Essay draft". (One round
+  earlier the set was given a noun, "Lap 2 of 4 in this set", and a mark for the long break at
+  the end of its bar. Named, it was still a count nobody had asked for.)
 - **A button that starts something names what it starts, and carries no count.** "Start the
   next lap now", not "Skip break", and not "Start lap 3 now": that 3 was the set's, under a line
   that said "lap 2 on this task". The line over the button does the counting.
