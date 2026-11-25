@@ -1,5 +1,23 @@
 # Section 4: Today, the list
 
+## Third pass, 2026-11-25. Verdict: PASS
+
+Pictures retaken 05:11; the rows measured from the running demo at 05:25.
+`node tools/design-audit.mjs`: 109 states at 412, 471 and 1440, 0 violations.
+
+| # | Finding of the second pass | Now | Measured |
+|---|---|---|---|
+| 1 | The count jammed against the row's control | Fixed. | Next row at 412: count y 438 to 452, Start 421 to 469, both centred on 445; count ends at x=283, Start begins at 299, 16px. Later rows end at 376. Restore and Up/Down the same. |
+| 2 | The bar dropped the name | Fixed. | "Done: Exercise 5-3: strcat with point..." takes the line; Undo 48px at the right. |
+| 3 | "Lap 2 of 4, ..." at 360 | Fixed. | The words wrap to two lines and "done" is there. |
+
+**The open call: upheld, and wider than proposed.** With squares, count and Start in one line the
+Next row's title has 121px at 412 and 69px at 360, and "K&R 5.1 to 5.5: pointers and arrays"
+stands on three lines; at 471 it has two. Hide the squares, keep the count, in any row that ends
+in a control and is narrower than 400px, which is 412 and 360 and also the ordering list, where
+every title is on three lines today. The count says what the squares say. From 400px up the
+squares stay.
+
 ## Second pass, 2026-11-25. Verdict: FAIL
 
 All 252 pictures in `reviews/4/shots/` opened (phone, wide 471x1020, small, laptop, the full-page

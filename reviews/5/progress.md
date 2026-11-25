@@ -1,6 +1,30 @@
 # Section 5: Progress
 
-## First pass, 2026-11-25. Verdict: FAIL
+## Second pass, 2026-11-25. Verdict: PASS
+
+Pictures retaken 05:10; every finding read again from the running demo at 05:25.
+`node tools/design-audit.mjs`: 109 states at 412, 471 and 1440, 0 violations.
+
+| # | Finding | Now | Measured |
+|---|---|---|---|
+| 1 | The phone page scrolls | Fixed. | Document 915 of 915 at 412x915, in four states. |
+| 2 | The year is a stamp | Fixed. | 24px cells: grid 68 to 354 of a 308px place on the phone; on the laptop the figures start 24px after the grid (598, 622). |
+| 3 | A full year does not fit the laptop | Fixed. | The panel runs 264 to 1408; grid 756px in a 756px window, nothing scrolls. |
+| 4 | A project's figure floats | Fixed. | Name text and figure end on the same line in every row (2613, 2614), with or without a square. |
+| 5 | The dashed line through your total | Fixed. | Ahead, "8h 20m" stands over its dot; on the first day "25m" stands clear of the 0h line. |
+| 6 | "16:00" left of its hour | Fixed. | Label 311.9 to 342.9, centred on the tick at 327.4. |
+| 7 | "Lap set aside" on two lines | Fixed. | 21px tall in both rows on the laptop. |
+| 8 | The streak's figure off the edge | Fixed. | `margin-left` -2.5px on the 44px figure. |
+| 9 | Time per project, all time | Built. | "15 laps, up 1h 15m on the week before, 61h 15m in all". |
+| 9 | Estimate accuracy over time | Built. | A small line of the weekly ratio against 1.0, "from Mon 5 Oct" to "this week", ending in its dot and "1.3". Hand-drawn, no legend. |
+| 10 | The headline's doubled number | Fixed. | "One lap behind last week. Last week ended on 15h 50m." |
+
+Also done from the rulings and the words: "Count again" from the first second, "This week" as the
+chart's heading in a first week, "A line or two about today".
+
+Still as it was, by decision: the look back is 2,200px down the phone page until section 6 links to it.
+
+## First pass, 2026-11-25 (kept as written). Verdict then: FAIL
 
 Pictures: 192 in `reviews/5/shots/`, 16 states at phone, wide (471x1020), small, laptop,
 phone-full and laptop-full, light and dark. Every one opened: the full pages in light at reading
@@ -14,7 +38,7 @@ The screen is the right screen: it opens with a finding, the chart is drawn by h
 scolds, no tile, no donut, no gradient. It fails on one bug, on the year grid, and on six small
 things a careful eye lands on.
 
-## Problems
+### Problems
 
 1. **On a phone the whole page scrolls, not only the content.** Progress at 412x915: the document
    is 1403px tall (1455 at 360x640); scrolled to its end the bottom bar sits at y=362 with bare
@@ -63,7 +87,7 @@ things a careful eye lands on.
     lap running, the second sentence carries a new fact, as ahead and level already do: "3 laps
     behind last week. Last week ended on 15h 50m."
 
-## PRODUCT.md section 3, row by row
+### PRODUCT.md section 3, row by row
 
 | Row | Delivered | Where |
 |---|---|---|
@@ -76,7 +100,7 @@ things a careful eye lands on.
 | Personal bests: best day, best week | Yes. | Streak panel |
 | A short end-of-day look back | Yes: the total, the tasks done, one field. It sits 2,200px down the phone page. | `progress-note-*` |
 
-## The Look table
+### The Look table
 
 | Row | Result |
 |---|---|
@@ -89,7 +113,7 @@ things a careful eye lands on.
 | Same job, same look | Fail: problem 4. The estimate and look-back rows use Today's squares and count, good. |
 | Dark | Pass. Same hierarchy; the "none" square is close to the surface but the audit holds its contrast. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **(a) 12px cells: overturned in part.** 12px with 2px gaps is right when a year has to fit, and
   the full year on the phone looks right. It is wrong for the first five months of anyone's use
@@ -113,7 +137,7 @@ things a careful eye lands on.
   under the chart, the panel's heading and the figures say all three.
 - **(i) Hand-drawn SVG from tokens: upheld.** Measured: chart 192px, dot 12px, line 2px, grid 1px.
 
-## For DESIGN.md and tools (the lead)
+### For DESIGN.md and tools (the lead)
 
 - Heat cell: the second size, and one line that the year is the single thing allowed to scroll
   sideways, on a phone only.
@@ -123,7 +147,7 @@ things a careful eye lands on.
 - A day's timeline: hour labels are centred on their hour.
 - Audit: on phone states the document is as tall as the screen and no taller (problem 1).
 
-## The words
+### The words
 
 Read against the Voice section, all of `strings.ts` `progress`.
 
@@ -139,7 +163,7 @@ Read against the Voice section, all of `strings.ts` `progress`.
 - "Longest day 5h 0m": "5h" reads like a person wrote it.
 - Nothing scolds. Behind is a count and a way back, a miss is never named, a rest day is a fact.
 
-## Keep
+### Keep
 
 The title of the page is the finding: "One lap behind last week. The lap you are in now draws you
 level." in the place where every other app writes "Statistics". Whatever changes, the screen

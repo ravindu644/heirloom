@@ -1,5 +1,10 @@
 # Section 4: the task sheet and Recently deleted
 
+## Third pass, 2026-11-25. Verdict: PASS
+
+The one thing left open is fixed in the shared row: in Recently deleted "1 of 1" is centred on
+"Restore" and 16px from it (`today-deleted-phone-light`, retaken 05:11). Nothing else changed here.
+
 ## Second pass, 2026-11-25. Verdict: PASS
 
 Pictures: `sheet-*`, `sheet-foot-{phone,wide,laptop}-*` and `today-deleted-*` in

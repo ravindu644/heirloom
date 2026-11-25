@@ -298,6 +298,9 @@ first, the rest after first paint.
   header and the bottom bar, which stay where they are.
 - **A form is the exception to the lower half:** its button follows its last field, wherever
   that is, because that is where the eye and the thumb already are.
+- **Settings on a laptop** is two columns, like Progress: what tunes the timer on the left (laps
+  and breaks, day target, starting by itself, the bell, a finished lap), and the account, rooms
+  and your copy on the right. Never one long narrow column beside an empty half.
 - **Laptop, 1440:** a 232px labelled sidebar on the ground, the canvas at 32px gutters, a 12-column
   grid of 72px columns and 24px gaps inside 1144px. One gap value, 24px, across and down.
 - Between the two, the sidebar collapses to the bottom bar under 720px.
@@ -341,13 +344,39 @@ Built once in `client/src/ui/kit/` and reused.
   empty) with "2 of 4" in `figure-sm` beside them. The count never outweighs the title. When
   the row ends in a control (Start, Restore, Up and Down), the squares and count sit to its
   left, centred on it and `md` away, so every row's count ends on one of two edges and never
-  touches a button.
+  touches a button. In such a row narrower than 400px the squares give way and the count stays:
+  the title is worth more than the picture of a number already written.
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
   the task, and one button drawn as an outline in `ground`. When the lap has rung, its button to
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
   to secondary.
-- **What the last tap did:** an `ink` bar as wide as the list, one line (the title clamps), with a
-  quiet underlined Undo. It never covers the row it speaks of.
+- **What the last tap did:** an `ink` bar as wide as the list, one line, with a quiet underlined
+  Undo. It never covers the row it speaks of. The title gives way last; the sentence after it
+  shows whole or not at all, never cut mid-word.
+- **Habit row:** the task row's box at the left (the same job, so the same control: on a day
+  already done it takes the latest check-in back), the title, under it the plan and the run in
+  `label` ("Every day, 9 days running"), a count on its way in `figure-sm` beside the words
+  ("2 of 3"), and the week: seven lanes `lane-set` tall and `xs` apart under M T W T F S S, each
+  letter centred on its lane. Done is filled in `you`, a count is filled that far, a rest day
+  carries the ring, a day not planned is a `stroke` line and never a miss, today has a `hair`
+  outline. Everything but the box opens the habit.
+- **A choice** (a weekday, one room of several, a project's square): off is `surface` with a
+  `hair` `line` border; on is `ink` with `ground` text. On and off must differ by more than a
+  border, and neither may look like a quiet button.
+- **Switch row:** the words at the left, a note under them in `label` when one is needed, the
+  stock box at the right; the whole row is the target. A row is as tall as its words, and the
+  box takes its 48px target by padding, so rows with and without a note keep the same `md`
+  between them.
+- **Stepper:** minus, the figure, plus. For a small count ("Once a day", "8 laps a day") the
+  figure is text. For a length in minutes the figure is a number field with the unit as a word
+  beside it, so 25 to 50 is typed once, and minus and plus are for nudging.
+- **Links at the end of a list** ("Change the order", "Archived, 1", "Recently deleted, 1") sit on
+  one line, `md` apart, wrapping when they must.
+- **A mark:** one line in `label` under the result, in the top group, quieter than the result.
+  No badge, no icon, no wall of them.
+- **Nothing is drawn disabled to say that something happened.** What happened is a sentence
+  ("You and sachi cheered this lap."), and the button that did it goes. A button may be busy for
+  the moment its own press takes ("Signing in"), and nothing else.
 - **The status line** keeps its space only where buttons sit at the bottom of a phone screen
   (Focus). Elsewhere it takes room when it has something to say and none when it is silent.
 - **Heat cell:** a square with 2px gaps (`heat-gap`), zero to four steps, in two sizes chosen by
@@ -373,7 +402,11 @@ Built once in `client/src/ui/kit/` and reused.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
-  figure-md, the task only if shared, and a Cheer button.
+  figure-md (in `rest` on a break), the task only if shared, today and the week in `label`, who
+  cheered, and a Cheer button: full width on a phone, its own width on a laptop. Side by side on
+  a laptop the panels of a row are equally tall and each button is pinned to its panel's foot,
+  so a row's buttons share one line. The room's own settings are an underlined link at the right
+  end of the line that names the room, never a button between the finding and the week.
 - **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
   `on-you` text, one per screen at most; secondary is `surface` with a 1px `line` border; quiet is
   `raised` with no border, for the lesser choice beside another button ("Skip break", "I have an
@@ -436,6 +469,12 @@ Sample strings, the register to match:
 - "41 of the last 45 days."
 - "Not sharing what they are on."
 - "Needs a connection. Your laps are safe on this phone."
+
+- **Old news is never said in the present.** When a screen shows what it last heard (a room with
+  no connection), the finding says so ("2 of 4 were focusing when the room was last heard
+  from.") and nothing counts down for anyone but you.
+- **The app writes times as 16:40.** The platform's own time field speaks as the device is set
+  (it may say 4:40 PM); that is the device's voice and is left alone.
 
 ## Accessibility
 

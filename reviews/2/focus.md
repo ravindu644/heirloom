@@ -1,5 +1,29 @@
 # Section 2: Focus
 
+## Third pass, 2026-11-25. Verdict: PASS
+
+Read against the rewritten rule, "Free space goes to one place": two groups on a phone, what the
+screen says at the top and what to do next at the bottom with its sentence, the space between
+them. Measured from the running demo at 412x915, 471x1020 and 360x640.
+
+| State | 412x915 | 471x1020 | 360x640 |
+|---|---|---|---|
+| Idle | panel ends 461; "Start now and it ends at 09:30." 713 to 736; button 752 | 483; 818 to 841; 857 | 442; 438 to 461; 477 |
+| Running | panel ends 516; links 704 to 752; buttons 752 | 514; 809; 857 | panel 300 to 497 runs under the links at 429 |
+| Paused | as running | as running | as running |
+| Result | lanes end 270; "level at 16:40. 6 laps today. Take five." 715 to 734; buttons 752 | 270; 820 to 839; 857 | 308; 440 to 459; 477 |
+| Break | panel ends 492; button 752 | 514; 857 | panel ends 473; button 477 |
+
+- The sentence now travels with its button, 16px over it, in idle and on the result at all three
+  sizes. Nothing floats and no group is split. That closes what the second Today pass raised.
+- The digits' ink against the line under them, scanned at 471: 19 to 20 against 21, within 2px.
+- At 360x640 there is no free space: while a lap runs the panel's last sentence lies under the
+  links and the screen scrolls to it. Right for the smallest phone; not a finding.
+- On a tall phone the result is its sentence and two lanes, then 550px of ground, then the line
+  and the buttons. That is the rule as written. If it reads as half empty in the hand, the
+  answer is in what the result says (the day's laps as squares, the week), not in moving the
+  button.
+
 ## Second pass, 2026-11-25. Verdict: PASS
 
 All 213 pictures opened (taken 01:47 to 01:48, after the last UI change at 01:46): phone, small,
