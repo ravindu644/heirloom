@@ -115,8 +115,9 @@ test('laps past the estimate: a task of 1 with two rung laps shows "2 of 1" and 
   for (const lap of [1, 2]) {
     await expect(next).toContainText('quiz');
     await next.getByRole('button', { name: 'Start', exact: true }).click();
-    await expect(a.page.getByText(`Lap ${lap} of 4, done`)).toBeVisible({ timeout: 8000 });
-    await expect(taskRow(a.page, 'quiz')).toContainText(`${lap} of 1`);
+    // Today's strip after a bell says it with no number; the row's count says which lap.
+    await expect(taskRow(a.page, 'quiz')).toContainText(`${lap} of 1`, { timeout: 8000 });
+    await expect(a.page.getByText('Lap done', { exact: true })).toBeVisible();
     if (lap === 1) atEstimate = await look(0);
   }
   const row = taskRow(a.page, 'quiz');
@@ -496,7 +497,7 @@ test('a removed subtask says so, and Undo brings it back', async ({ deviceA: a }
   expect([...rows.values()].filter((row) => row.parent)).toHaveLength(1);
 });
 
-test('at 412 wide, a row that ends in a control keeps its count and hides its squares; a row with nothing at its end keeps both', async ({ deviceA: a }) => {
+test('at 412 wide, a row that ends in a control keeps its count and its squares, all of them inside the row; a row with nothing at its end keeps both', async ({ deviceA: a }) => {
   await onToday([a], 'narrow');
   await a.page.setViewportSize({ width: 412, height: 915 });
   await quickAdd(a.page, 'essay ~4');
@@ -505,7 +506,15 @@ test('at 412 wide, a row that ends in a control keeps its count and hides its sq
   await expect(next.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   expect((await next.boundingBox())!.width).toBeLessThan(400);
   await expect(next).toContainText('0 of 4');
-  await expect(next.locator('[aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--share"]') })).toBeHidden();
+  // Squares never hide now (DESIGN.md, Task row): where the title leaves no room they take a line
+  // of their own under the count and the button, still inside the row.
+  const squares = next.locator('[data-squares] i');
+  await expect(squares).toHaveCount(4);
+  const row = (await next.boundingBox())!;
+  for (const box of await squares.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()))) {
+    expect(box.width, 'a square is not drawn').toBeGreaterThan(0);
+    expect(box.left >= row.x - 0.5 && box.right <= row.x + row.width + 0.5, 'a square stands outside its row').toBe(true);
+  }
   const later = taskRow(a.page, 'flashcards');
   await expect(later).toContainText('0 of 3');
   await expect(later.locator('i[style*="--share"]').first()).toBeVisible();

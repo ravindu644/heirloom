@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import type { Device as Node } from '../sync/harness.ts';
 import { until } from '../sync/harness.ts';
-import { accountWith, go, ready, signIn, taskRow, username } from './app.ts';
+import { accountWith, go, ready, signIn, startButton, startNow, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -44,11 +44,11 @@ const states: Record<string, (page: Page, name: string) => Promise<void>> = {
   },
   'Focus, running': async (page) => {
     await go(page, 'Focus');
-    await page.getByRole('button', { name: 'Start lap 1' }).click();
+    await startButton(page).click();
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   },
   'Focus, result': async (page) => {
-    await expect(page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+    await expect(startNow(page)).toBeVisible({ timeout: LAP + 4000 });
   },
   Today: async (page) => {
     await go(page, 'Today');
@@ -360,7 +360,7 @@ test('keyboard only: Tab reaches every control once in page order with a visible
   // Operating: Enter starts a lap, Space pauses it; Today's quick line by keys; Enter opens a task,
   // Escape closes it and gives the focus back; the arrows move the year.
   await states['Focus, idle']!(a.page, name);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).focus();
+  await startButton(a.page).focus();
   await a.page.keyboard.press('Enter');
   await expect(a.page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await a.page.getByRole('button', { name: 'Pause', exact: true }).focus();
@@ -422,9 +422,9 @@ test('reduced motion: nothing animates on a start, the lap-done moment or a shee
   await a.page.emulateMedia({ reducedMotion: 'reduce' });
   const name = await seeded(a, 'a11ymotion');
   await go(a.page, 'Focus');
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   for (let i = 0; i < 4; i++) faults.push(...(await running(a.page)).map((x) => `on a start: ${x}`));
-  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await expect(startNow(a.page)).toBeVisible({ timeout: LAP + 4000 });
   for (let i = 0; i < 4; i++) faults.push(...(await running(a.page)).map((x) => `at the lap-done moment: ${x}`));
   await states.Today!(a.page, name);
   await a.page.getByRole('button', { name: /read two papers/ }).click();
@@ -433,8 +433,8 @@ test('reduced motion: nothing animates on a start, the lap-done moment or a shee
 
   // Without the setting, on an account of its own: the moment runs, within the longest token and never on a loop.
   await seeded(b, 'a11ymotion2');
-  await b.page.getByRole('button', { name: 'Start lap 1' }).click();
-  await expect(b.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await startButton(b.page).click();
+  await expect(startNow(b.page)).toBeVisible({ timeout: LAP + 4000 });
   const timing = await b.page.evaluate(() => document.getAnimations().map((x) => x.effect?.getComputedTiming()).map((t) => ({ duration: Number(t?.duration ?? 0), iterations: t?.iterations ?? 1, delay: Number(t?.delay ?? 0) })));
   for (const t of timing) {
     expect(t.iterations, 'an animation on a loop').not.toBe(Infinity);
@@ -477,14 +477,14 @@ test('live regions: the timer speaks at most once a minute; what a tap did, a be
 
   await signIn(a.page, name);
   await ready(a.page);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await listen(a.page);
   // Five seconds of a running lap: the timer has nothing new to say.
   await a.page.waitForTimeout(5000);
   const timer = (await heard(a.page)).filter((x) => x.startsWith('timer'));
   expect(timer.length, timer.join('\n')).toBeLessThanOrEqual(1);
   // The bell: the result is said once.
-  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await expect(startNow(a.page)).toBeVisible({ timeout: LAP + 4000 });
   await a.page.waitForTimeout(1500);
   const said = await heard(a.page);
   const counts = new Map<string, number>();

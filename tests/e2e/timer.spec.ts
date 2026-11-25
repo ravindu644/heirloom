@@ -1,7 +1,7 @@
 // One timer on two laptops, both online: what one does, the other shows, and the session rows the
 // server ends up with (protocol sections 6 and 11).
 import type { Page } from '@playwright/test';
-import { accountWith, digits, ready, sessions, sessionsWhen, signIn, username } from './app.ts';
+import { accountWith, digits, ready, sessions, sessionsWhen, signIn, startButton, startNow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -41,12 +41,12 @@ test('a lap started on A shows on B within a second; pause, resume and five more
   await twoLaptops(a, b, 'live');
   const within = { timeout: 1000 };
 
-  await seen(test, 'start on A, seen on B', () => button(a.page, 'Start lap 1').click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
-  await expect(b.page.getByText('Lap 1 of 4, focus')).toBeVisible();
+  await seen(test, 'start on A, seen on B', () => startButton(a.page).click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
+  await expect(b.page.getByText('Lap 1 of 4 in this set, focus')).toBeVisible();
   await sameSecond(a.page, b.page);
 
   await seen(test, 'pause on B, seen on A', () => button(b.page, 'Pause').click(), () => expect(button(a.page, 'Resume')).toBeVisible(within));
-  await expect(a.page.getByText('Lap 1 of 4, paused')).toBeVisible();
+  await expect(a.page.getByText('Lap 1 of 4 in this set, paused')).toBeVisible();
   await sameSecond(a.page, b.page);
 
   await seen(test, 'resume on A, seen on B', () => button(a.page, 'Resume').click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
@@ -62,11 +62,11 @@ test('a lap started on A shows on B within a second; pause, resume and five more
 
 test('a lap rings on both laptops, leaves one rang row, and the break started on B shows on A', async ({ deviceA: a, deviceB: b }) => {
   const name = await twoLaptops(a, b, 'rings', { work_ms: 4000, short_ms: 60000 });
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   for (const d of [a, b]) {
-    await expect(d.page.getByText('Lap 1 of 4, done')).toBeVisible({ timeout: 8000 });
+    await expect(d.page.getByText('Lap 1 of 4 in this set, done')).toBeVisible({ timeout: 8000 });
     await expect(button(d.page, 'Start 1 min break')).toBeVisible();
-    await expect(button(d.page, 'Start lap 2 now')).toBeVisible();
+    await expect(startNow(d.page)).toBeVisible();
   }
   // Both laptops were in step at the bell, so both may write the row: it must still be one.
   const [row] = await sessionsWhen(name, (rows) => rows.length > 0);
@@ -76,15 +76,15 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   expect((row!.ended as number) - (row!.started as number)).toBe(4000);
 
   await button(b.page, 'Start 1 min break').click();
-  await expect(a.page.getByText('Short break, after lap 1 of 4')).toBeVisible({ timeout: 1000 });
-  await expect(button(a.page, 'Start lap 2 now')).toBeVisible();
+  await expect(a.page.getByText('Short break, after lap 1 of 4 in this set')).toBeVisible({ timeout: 1000 });
+  await expect(startNow(a.page)).toBeVisible();
   // A break is not stretched: the offer is for laps.
   for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);
 });
 
 test('stop under a minute still leaves a stopped row, says which lap stopped, and lap 2 is next on both', async ({ deviceA: a, deviceB: b }) => {
   const name = await twoLaptops(a, b, 'short');
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
   // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
@@ -97,7 +97,7 @@ test('stop under a minute still leaves a stopped row, says which lap stopped, an
 
 test('undo after a stop brings the lap back on both laptops, and it then rings as a full lap', async ({ deviceA: a, deviceB: b }) => {
   const name = await twoLaptops(a, b, 'undo', { work_ms: 8000, short_ms: 60000 });
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
   await ready(b.page, 2);

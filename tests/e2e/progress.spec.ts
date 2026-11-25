@@ -7,7 +7,7 @@ import { streakWindow } from '../../client/src/core/streak.ts';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { accountWith, go, ready, server, signIn, username } from './app.ts';
+import { accountWith, go, ready, server, signIn, startButton, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -179,7 +179,7 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await ready(b.page);
   const since = panel(a.page, 'Since your first lap');
   await expect(since).toContainText('The year starts with your first lap');
-  await b.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(b.page).click();
   await expect(b.page.getByRole('button', { name: 'Start 1 min break' })).toBeVisible({ timeout: 8000 });
   await expect(since).toContainText('of focus, 1 lap', { timeout: 3000 });
   await expect(since).toContainText('One square so far. Every day with a lap adds the next.');

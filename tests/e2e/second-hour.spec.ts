@@ -5,7 +5,7 @@ import type { CDPSession, Page } from '@playwright/test';
 import { hueHex } from '../../client/src/ui/kit/hue.ts';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { colourOf, go, list, quickAdd, ready, selectable, server, sessionsWhen, settle, signedInto, signIn, squaresOf, taskRow, titles } from './app.ts';
+import { colourOf, go, list, quickAdd, ready, selectable, server, sessionsWhen, settle, signedInto, signIn, squaresOf, startButton, startNow, taskRow, titles } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -26,7 +26,7 @@ async function also(d: { page: Page }, name: string) {
 test('Stop mid-lap: lap 2 is next, the first segment stays part filled after a reload and on a second device; a stop in the first seconds still leaves a row on both', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await signedInto(a, 'onestop', undefined, { work_ms: 20000 });
   await also(b, name);
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   // Eight seconds of twenty: two fifths.
   await expect(a.page.getByText('00:12', { exact: true })).toBeVisible({ timeout: 15000 });
   await expect(button(a.page, 'Stop + log')).toHaveCount(0);
@@ -47,7 +47,7 @@ test('Stop mid-lap: lap 2 is next, the first segment stays part filled after a r
   await expect.poll(async () => (await setBar(a.page))[0]).toBeCloseTo(fill!, 2);
 
   // Lap 2 stopped in its first second: a lap however short, a row on both devices, lap 3 next.
-  await button(a.page, 'Start lap 2').click();
+  await startButton(a.page).click();
   await button(a.page, 'Stop').click();
   await ready(a.page, 3);
   await expect(a.page.getByText('Lap 2 stopped in its first minute. Lap 3 is next.').filter({ visible: true })).toBeVisible();
@@ -91,10 +91,10 @@ test('ticking the running task ends its lap: the timer is at rest, the lap is a 
 
 test('"Done for now" after a bell and in a break: the timer rests, nothing starts, and the next lap is the right one', async ({ deviceA: a }) => {
   const { name } = await signedInto(a, 'donefornow', undefined, { work_ms: 3000, short_ms: 60000 });
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   await expect(button(a.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
   await expect(button(a.page, 'Skip break')).toHaveCount(0);
-  await expect(button(a.page, 'Start lap 2 now')).toBeVisible();
+  await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
   await ready(a.page, 2);
   await expect(a.page.getByText('Stopped after lap 1. Lap 2 is next.').filter({ visible: true })).toBeVisible();
@@ -103,10 +103,10 @@ test('"Done for now" after a bell and in a break: the timer rests, nothing start
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
   expect((await timer(name))?.set_index).toBe(1);
 
-  await button(a.page, 'Start lap 2').click();
+  await startButton(a.page).click();
   await expect(button(a.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
   await button(a.page, 'Start 1 min break').click();
-  await expect(button(a.page, 'Start lap 3 now')).toBeVisible();
+  await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
   await ready(a.page, 3);
   await expect(a.page.getByText('Stopped after lap 2. Lap 3 is next.').filter({ visible: true })).toBeVisible();
@@ -407,6 +407,20 @@ test('nothing selects inside an open sheet: every sheet the app has, its heading
   await sheet.getByRole('button', { name: 'Close' }).click();
   await expect(a.page.locator('dialog')).toHaveCount(0);
 
+  // Focus's chooser, "This lap is for": its rows' words do not select.
+  await go(a.page, 'Focus');
+  await a.page.getByRole('button', { name: /^This lap is for / }).click();
+  // Its words are all rows to tap, so the triple click goes to its heading only.
+  sheet = a.page.getByRole('dialog', { name: 'This lap is for' });
+  await expect(sheet).toBeVisible();
+  await settle(a.page);
+  expect(await selects(a.page, sheet.getByRole('heading').first()), 'the chooser: its heading selects').toBe('');
+  for (const words of [sheet.getByRole('heading').first(), sheet.getByText('Nothing in particular', { exact: true }), sheet.getByText('bravo', { exact: true })]) {
+    expect(await selectable(words), 'the chooser: its words are selectable').toBe(false);
+  }
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expect(a.page.locator('dialog')).toHaveCount(0);
+
   // A room's sheet: its words do not select, its code does.
   await go(a.page, 'Room');
   await a.page.getByLabel('Its name').fill('quiet room');
@@ -471,23 +485,29 @@ test('the task sheet at 412x1180, a phone with its keyboard up: every field focu
 
 // 5. Every number has a top.
 
-test('an estimate stops at 8, by the stepper and by "~45"; a row holding 45 from an older build stays in its card and breaks its title only between words', async ({ deviceA: a }) => {
+test('an estimate stops at 32, by the stepper and by "~33"; a row holding 45 from an older build stays in its card, shows its count alone and breaks its title only between words', async ({ deviceA: a }) => {
   const long = 'reading the whole of the operating systems chapter on paging';
   const { name } = await signedInto(a, 'estimate', (node) => node.engine.write('task', 'old', { title: long, estimate: 45, order: 'A' }));
   await a.page.setViewportSize({ width: 412, height: 915 });
   await go(a.page, 'Today');
-  await quickAdd(a.page, 'essay ~45');
+  await quickAdd(a.page, 'essay ~33');
   await expect(taskRow(a.page, 'essay')).toBeVisible();
-  await expect.poll(async () => [...(await serverRows(server, name, 'task')).values()].find((r) => r.title === 'essay')?.estimate).toBe(8);
+  await expect.poll(async () => [...(await serverRows(server, name, 'task')).values()].find((r) => r.title === 'essay')?.estimate).toBe(32);
 
   await taskRow(a.page, 'essay').getByRole('button', { name: /essay/ }).click();
   const sheet = a.page.getByRole('dialog', { name: 'Task', exact: true });
   const more = sheet.getByRole('button', { name: 'One lap more' });
-  for (let i = 0; i < 3; i++) await more.click({ force: true }).catch(() => {});
-  await expect(sheet.getByRole('group', { name: 'Estimate' }).last()).toContainText('8 laps');
+  const estimate = sheet.getByRole('group', { name: 'Estimate' }).last();
+  await expect(estimate).toContainText('32 laps');
   await expect(more, 'the plus at the top is not off').toBeDisabled();
+  // Down two, then up past the top: it stops at 32.
+  for (let i = 0; i < 2; i++) await sheet.getByRole('button', { name: 'One lap less' }).click();
+  await expect(estimate).toContainText('30 laps');
+  for (let i = 0; i < 4; i++) await more.click({ force: true }).catch(() => {});
+  await expect(estimate).toContainText('32 laps');
+  await expect(more).toBeDisabled();
   await sheet.getByRole('button', { name: 'Close' }).click();
-  await expect.poll(async () => [...(await serverRows(server, name, 'task')).values()].find((r) => r.title === 'essay')?.estimate).toBe(8);
+  await expect.poll(async () => [...(await serverRows(server, name, 'task')).values()].find((r) => r.title === 'essay')?.estimate).toBe(32);
 
   // The old row: 45 laps, a 60 character title, on a phone.
   const row = taskRow(a.page, long);
@@ -524,7 +544,7 @@ test('an estimate stops at 8, by the stepper and by "~45"; a row holding 45 from
   });
   expect(look.overflows, 'something in the row stands outside its card').toBe(0);
   expect(look.scrollWide, 'the row overflows sideways').toBe(false);
-  expect(look.squares, 'more than twelve squares are drawn').toBeLessThanOrEqual(12);
+  expect(look.squares, 'a row past 32 shows its count alone').toBe(0);
   expect(look.broken, 'words broken across two lines').toEqual([]);
   expect(look.titleLines).toBeGreaterThan(0);
   expect(look.titleLines, 'the title runs past two lines').toBeLessThanOrEqual(2);
@@ -667,17 +687,19 @@ test('the set on the result: after lap 1 rings one segment is full and three emp
   test.setTimeout(90000);
   const { name } = await signedInto(a, 'setbar', undefined, { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
   await also(b, name);
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   for (const d of [a, b]) {
-    await expect(button(d.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+    await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
     await expect.poll(() => setBar(d.page), { message: 'the lap that just rang is not drawn full' }).toEqual([1, 0, 0, 0]);
   }
+  // Laps 2 to 4, each started at once and run to its bell: the lap line names which one rang.
   for (const lap of [2, 3, 4]) {
-    await button(a.page, `Start lap ${lap} now`).click();
-    if (lap < 4) await expect(button(a.page, `Start lap ${lap + 1} now`)).toBeVisible({ timeout: 8000 });
+    await startNow(a.page).click();
+    await expect(button(a.page, 'Pause')).toBeVisible();
+    if (lap < 4) await expect(a.page.getByText(`Lap ${lap} of 4 in this set, done`).filter({ visible: true }).first()).toBeVisible({ timeout: 8000 });
   }
   for (const d of [a, b]) {
-    await expect(button(d.page, 'Start lap 1 now')).toBeVisible({ timeout: 8000 });
+    await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
     await expect.poll(() => setBar(d.page), { message: 'the set moment is not four full' }).toEqual([1, 1, 1, 1]);
   }
 });
@@ -750,7 +772,7 @@ test('the within-estimate mark: not for a task ticked a few seconds into its lap
 
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
   await expect(strip).toContainText('rung');
-  await expect(a.page.getByText('Lap 2 of 4, done')).toBeVisible({ timeout: 8000 });
+  await expect(a.page.getByText('Lap done', { exact: true })).toBeVisible({ timeout: 8000 });
   await taskRow(a.page, 'rung').getByRole('checkbox').click();
   await expect(a.page.getByText('rung: done in 1 lap. You estimated 2.')).toBeVisible({ timeout: 3000 });
   await expect.poll(marks).toContain('estimate-rung');
@@ -762,8 +784,8 @@ test('after a bell, "5 more minutes": Today\'s laps and the task\'s count stay w
   await also(b, name);
   await go(b.page, 'Today');
   const focused = (page: Page) => page.locator('dl > div').filter({ hasText: 'Focused' });
-  await button(a.page, 'Start lap 1').click();
-  await expect(button(a.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+  await startButton(a.page).click();
+  await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
   for (const d of [a, b]) {
     if (d === a) await go(a.page, 'Today');
     await expect(focused(d.page)).toContainText('1 lap', { timeout: 3000 });
@@ -797,7 +819,7 @@ test('leaving Today with a row lifted and coming back before letting go: nothing
   await a.page.waitForTimeout(500);
   await a.page.mouse.move(alpha.x, alpha.y + 60, { steps: 5 });
   await a.page.evaluate(() => (location.hash = '#/focus'));
-  await expect(a.page.getByRole('button', { name: 'Start lap 1', exact: true })).toBeVisible();
+  await expect(startButton(a.page)).toBeVisible();
   await a.page.evaluate(() => (location.hash = '#/today'));
   await expect(taskRow(a.page, 'charlie')).toBeVisible();
   await a.page.mouse.up();

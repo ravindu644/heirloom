@@ -1,7 +1,7 @@
 // Accounts through the screens (protocol section 10), and the API from another origin, which is
 // what the phone app is.
 import { PASSWORD } from '../sync/harness.ts';
-import { accountWith, go, join, ready, server, signIn, statusLine, username } from './app.ts';
+import { accountWith, go, join, ready, server, signIn, startButton, statusLine, username } from './app.ts';
 import { ADDR } from './server.ts';
 import { expect, test } from './devices.ts';
 
@@ -20,7 +20,7 @@ test('join with an invite on A, sign in on B; a wrong password and a used invite
   await expect(c.page.getByRole('alert')).toHaveText('That invite is not known here, or it was used, taken back or ran out. A link works once.');
 
   // One account on both: a lap started on A is on B.
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 1000 });
 });
 
@@ -31,7 +31,7 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
     await signIn(d.page, name);
     await ready(d.page);
   }
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect(statusLine(a.page)).toHaveText('');
 
@@ -44,7 +44,7 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
   // Signing in again opens where signing out was done, Settings; the lap is on Focus.
   await go(a.page, 'Focus');
   await expect(a.page.getByRole('button', { name: 'Resume' })).toBeVisible({ timeout: 5000 });
-  await expect(a.page.getByText('Lap 1 of 4, paused')).toBeVisible();
+  await expect(a.page.getByText('Lap 1 of 4 in this set, paused')).toBeVisible();
 });
 
 test('a page from another origin can sign in over the API and open the socket, as the phone app will', async ({ browser }) => {

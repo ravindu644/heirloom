@@ -32,8 +32,11 @@ function watch(page: Page, errors: string[]) {
   page.on('pageerror', (err) => errors.push(`page: ${err.message}`));
 }
 
-async function device({ browser }: { browser: Browser }, use: (d: Device) => Promise<void>) {
-  const context = await browser.newContext();
+// A phone: a finger, not a mouse, and a phone's window. The rest is the same rail.
+const PHONE = { hasTouch: true, isMobile: true, viewport: { width: 412, height: 915 } };
+
+const device = (options: Parameters<Browser['newContext']>[0] = {}) => async ({ browser }: { browser: Browser }, use: (d: Device) => Promise<void>) => {
+  const context = await browser.newContext(options);
   const errors: string[] = [];
   // The browser logs a CSP violation too, but the event says it whatever the console does.
   await context.addInitScript(() =>
@@ -82,14 +85,15 @@ async function device({ browser }: { browser: Browser }, use: (d: Device) => Pro
   });
   await context.close();
   if (errors.length) throw new Error(`errors on the device's pages:\n${errors.join('\n')}`);
-}
+};
 
-// Playwright only builds the fixtures a test names, so deviceC costs nothing until a test asks.
+// Playwright only builds the fixtures a test names, so deviceC and phone cost nothing until a test asks.
 // `nodes` is automatic: Node devices a test made (to read the server, or to write settings) stop with it.
-export const test = base.extend<{ deviceA: Device; deviceB: Device; deviceC: Device; nodes: void }>({
-  deviceA: device,
-  deviceB: device,
-  deviceC: device,
+export const test = base.extend<{ deviceA: Device; deviceB: Device; deviceC: Device; phone: Device; nodes: void }>({
+  deviceA: device(),
+  deviceB: device(),
+  deviceC: device(),
+  phone: device(PHONE),
   nodes: [
     async ({}, use) => {
       await use();

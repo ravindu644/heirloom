@@ -3,7 +3,7 @@
 import { stats } from '../../client/src/core/stats.ts';
 import type { Session } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
-import { accountWith, digits, go, onDisk, ready, server, sessionsWhen, signIn, statusLine, taskRow, timerOnDisk, username } from './app.ts';
+import { accountWith, digits, go, onDisk, ready, server, sessionsWhen, signIn, startButton, startNow, statusLine, taskRow, timerOnDisk, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const offlineWords = /^No connection\. .* safe on this laptop\.$/;
@@ -19,9 +19,9 @@ test('both laptops offline each run a lap; back online, both laps are kept, the 
 
   for (const d of [a, b]) await d.setOffline(true);
   for (const d of [a, b]) await expect(statusLine(d.page)).toHaveText('No connection. Your laps are safe on this laptop.');
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await a.page.waitForTimeout(1500);
-  await b.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(b.page).click();
   // Neither saw the other's lap: each runs its own, and each rings with nobody to tell.
   for (const d of [a, b]) {
     await expect(d.page.getByRole('button', { name: 'Start 1 min break' })).toBeVisible({ timeout: 10000 });
@@ -60,7 +60,7 @@ test('a reload with no connection still opens the app (PRODUCT: works fully offl
   // The lap is safe once its transaction commits, a few ms after the tap. A reload sooner than
   // that is a tab closed mid-write, which no store survives; this test is about the page coming back.
   const onDisk = timerOnDisk(a.page);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   const ms = await onDisk;
   test.info().annotations.push({ type: 'tap to IndexedDB', description: `${ms.toFixed(1)} ms` });
   console.log(`tap to the timer cell committed in IndexedDB: ${ms.toFixed(1)} ms`);
@@ -77,7 +77,7 @@ test('a lap started offline is in IndexedDB: it survives a reload with the serve
     await ready(d.page);
   }
   await a.setOffline(true);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await a.page.waitForTimeout(2000);
   const before = await digits(a.page).textContent();
 
@@ -116,7 +116,7 @@ test('offline, the screen says so in the app\'s words, counts what waits, and no
   await expect(status).toHaveText('');
   await a.setOffline(true);
   await expect(status).toHaveText('No connection. Your laps are safe on this laptop.', { timeout: 2000 });
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await a.page.getByRole('button', { name: 'Pause' }).click();
   await expect(status).toHaveText('No connection. 1 change is safe on this laptop.');
   await ready(b.page);
@@ -180,8 +180,8 @@ test('work done offline is still there after an offline reload once it is on dis
   await expect(digits(a.page)).toHaveText('00:03');
   await a.setOffline(true);
   // A lap that rings with no connection: its row is written here.
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
-  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: 8000 });
+  await startButton(a.page).click();
+  await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
   await onDisk(a.page, 'session/', 1);
   await go(a.page, 'Today');
   await a.page.getByRole('checkbox', { name: 'Done: chapter 5' }).click();

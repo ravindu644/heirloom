@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { accountWith, colourOf, go, midScreen, quickAdd, ready, selectable, server, settle, signedInto, signIn, staysPut, taskRow, token, username } from './app.ts';
+import { accountWith, colourOf, go, midScreen, quickAdd, ready, selectable, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow, token, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 import { demoUrl } from './server.ts';
@@ -451,7 +451,7 @@ test('nothing selects: a heading, a task title, a button\'s words and a sentence
   expect(await a.page.evaluate(() => String(getSelection()))).toBe('');
 
   await go(a.page, 'Focus');
-  for (const l of [a.page.getByText(/^Lap 1 of 4/).first(), a.page.getByRole('button', { name: 'Start lap 1' })]) expect(await selectable(l), 'Focus selects').toBe(false);
+  for (const l of [a.page.getByText(/^Lap 1 of 4/).first(), startButton(a.page)]) expect(await selectable(l), 'Focus selects').toBe(false);
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   // Not "keeps step with the server at ...": the address in it is there to be copied.
   expect(await selectable(a.page.getByRole('heading', { name: 'Settings', level: 1 })), 'Settings: the heading selects').toBe(false);
@@ -597,8 +597,8 @@ test('with motion, a row that changes place glides there in the fill time, 160 m
 // Section 12: one word for one thing (DESIGN.md, "Said so a stranger knows"): estimate, never
 // guess; Restore, never bring back; a lap reaches its bell, never rings or rang; not counted,
 // never void; and the buttons that went: Skip break, Stop and log, Don't count this lap, the free
-// "when", the order mode, Another colour, Ghost.
-const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b|Skip break|Stop and log|Don't count this lap|\b[Gg]uess|[Bb]ring back|\brings\b|\brang\b|\b[Vv]oid\b|When in the day|Change the order|Keep this order|Another colour|\bGhost\b|No target today/;
+// "when", the order mode, Another colour, Ghost. Section 13: the old hint and the second start button.
+const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b|Skip break|Stop and log|Don't count this lap|\b[Gg]uess|[Bb]ring back|\brings\b|\brang\b|\b[Vv]oid\b|When in the day|Change the order|Keep this order|Another colour|\bGhost\b|No target today|End with ~3 for three laps|Start without a task/;
 
 test('the words that went are nowhere: not in any demo state, not on the live screens', async ({ deviceA: a }) => {
   test.setTimeout(180000);
@@ -623,9 +623,9 @@ test('the words that went are nowhere: not in any demo state, not on the live sc
     node.engine.write('task', 't1', { title: 'task 1', order: 'V' });
     if (since > 2.5 * HOUR) lap(node, 'aside', Date.now() - 2 * HOUR, 'void');
   }, { work_ms: 3000, short_ms: 60000 });
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await scan('Focus, running');
-  await expect(button(a.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+  await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
   await scan('Focus, result');
   await button(a.page, 'Start 1 min break').click();
   await expect(button(a.page, 'Done for now')).toBeVisible();

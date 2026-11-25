@@ -181,14 +181,14 @@ test('the sheet saves as typed, B shows it, and a reload with no connection keep
   await expect(title).toHaveValue('  piano scales  ');
   // Weekends off: Saturday and Sunday unpressed.
   for (const day of ['Sat', 'Sun']) await sheet.getByRole('button', { name: day, exact: true }).click();
-  await sheet.getByLabel('Reminder').fill('07:30');
+  await sheet.getByLabel('Reminder', { exact: true }).fill('07:30');
   await sheet.getByRole('button', { name: 'Close' }).click();
 
   await expect(row(a.page, 'piano scales')).toContainText('Weekdays');
   await expect(row(b.page, 'piano scales')).toContainText('Weekdays');
   sheet = await open(b.page, 'piano scales');
   await expect(sheet.getByLabel('Its name', { exact: true })).toHaveValue('piano scales');
-  await expect(sheet.getByLabel('Reminder')).toHaveValue('07:30');
+  await expect(sheet.getByLabel('Reminder', { exact: true })).toHaveValue('07:30');
   for (const day of ['Mon', 'Fri']) await expect(sheet.getByRole('button', { name: day, exact: true })).toHaveAttribute('aria-pressed', 'true');
   for (const day of ['Sat', 'Sun']) await expect(sheet.getByRole('button', { name: day, exact: true })).toHaveAttribute('aria-pressed', 'false');
   await sheet.getByRole('button', { name: 'Close' }).click();

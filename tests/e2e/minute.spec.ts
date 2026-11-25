@@ -1,13 +1,13 @@
 // One Stop (DESIGN.md, Voice 4): a lap stopped a minute in says how far it ran, keeps a stopped row
 // on both laptops, is a lap on its task ("1 of 2") and a part square as full as it ran. This waits
 // a real minute, for the line that names the minutes.
-import { accountWith, go, ready, sessionsWhen, signIn, squaresOf, taskRow, username } from './app.ts';
+import { accountWith, go, ready, sessionsWhen, signIn, squaresOf, startButton, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 test('a minute in, Stop keeps a stopped row on both laptops; it is a lap on its task, a part square, and lap 2 is next', async ({ deviceA: a, deviceB: b }) => {
   test.setTimeout(120000);
   const name = username('logged');
-  // The lap that is stopped is on a task: Start lap 1 starts on today's next task.
+  // The lap that is stopped is on a task: Focus's start begins today's next task.
   const node = await accountWith(name);
   node.engine.write('task', 'proofs', { title: 'proofs', estimate: 2, order: 'V' });
   for (const d of [a, b]) {
@@ -15,7 +15,7 @@ test('a minute in, Stop keeps a stopped row on both laptops; it is a lap on its 
     await ready(d.page);
   }
 
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible();
   // One Stop, and its name does not change while the lap runs.
   const stop = a.page.getByRole('button', { name: 'Stop', exact: true });

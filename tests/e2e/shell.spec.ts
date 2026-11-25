@@ -1,7 +1,7 @@
 // The frame every screen stands in: the header with the person, Settings behind it, and the
 // widths of real phones.
 import type { Page } from '@playwright/test';
-import { accountWith, digits, go, ready, signIn, statusLine, username } from './app.ts';
+import { accountWith, digits, go, ready, signIn, startButton, statusLine, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -36,7 +36,7 @@ test('sign out offline with unsent work is refused in the words, and the person 
   await signIn(a.page, name);
   await ready(a.page);
   await a.setOffline(true);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await expect(statusLine(a.page)).toHaveText('No connection. 1 change is safe on this laptop.');
   await person(a.page, name).click();
   await a.page.getByRole('button', { name: 'Sign out' }).click();

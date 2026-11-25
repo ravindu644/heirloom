@@ -1,5 +1,5 @@
 // Two tabs of one browser are one device with one database: only one may run the engine.
-import { accountWith, digits, ready, signIn, statusLine, username } from './app.ts';
+import { accountWith, digits, ready, signIn, startButton, statusLine, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
 test('a second tab says heirloom is open elsewhere and shows no timer; closing the first hands it the running lap', async ({ deviceA: a }) => {
@@ -7,7 +7,7 @@ test('a second tab says heirloom is open elsewhere and shows no timer; closing t
   await accountWith(name);
   await signIn(a.page, name);
   await ready(a.page);
-  await a.page.getByRole('button', { name: 'Start lap 1' }).click();
+  await startButton(a.page).click();
   await expect(a.page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect(statusLine(a.page)).toHaveText('');
 
@@ -19,7 +19,7 @@ test('a second tab says heirloom is open elsewhere and shows no timer; closing t
 
   await a.page.close();
   await expect(second.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 5000 });
-  await expect(second.getByText('Lap 1 of 4, focus')).toBeVisible();
+  await expect(second.getByText('Lap 1 of 4 in this set, focus')).toBeVisible();
   // Counting down, from the lap the first tab started: the clock rounds up, so it reads 25:00 for the first second.
   await expect(digits(second)).toHaveText(/^24:5\d$/, { timeout: 3000 });
 });

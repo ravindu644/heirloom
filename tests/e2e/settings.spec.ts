@@ -1,7 +1,7 @@
 // Settings through the screen, on the real engine and server, and the whole app at phone widths.
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
-import { accountWith, digits, go, quickAdd, ready, signIn, taskRow, username } from './app.ts';
+import { accountWith, digits, go, quickAdd, ready, signIn, startButton, startNow, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -72,9 +72,9 @@ test('auto-start: with both switches on, the break starts when a lap reaches its
     await expect(box).toHaveAttribute('aria-checked', 'true');
   }
   await go(a.page, 'Focus');
-  await button(a.page, 'Start lap 1').click();
-  await expect(a.page.getByText('Short break, after lap 1 of 4')).toBeVisible({ timeout: 6000 });
-  await expect(a.page.getByText('Lap 2 of 4, focus')).toBeVisible({ timeout: 6000 });
+  await startButton(a.page).click();
+  await expect(a.page.getByText('Short break, after lap 1 of 4 in this set')).toBeVisible({ timeout: 6000 });
+  await expect(a.page.getByText('Lap 2 of 4 in this set, focus')).toBeVisible({ timeout: 6000 });
 });
 
 test('"Ring on this laptop" stays this laptop\'s own, across a reload', async ({ deviceA: a, deviceB: b }) => {
@@ -100,13 +100,13 @@ test('"Mark a finished lap": off, a first lap shows no mark; on, the first lap s
   await celebrate.click();
   await expect(celebrate).toHaveAttribute('aria-checked', 'false');
   await go(a.page, 'Focus');
-  for (const d of [a, b]) await button(d.page, 'Start lap 1').click();
-  for (const d of [a, b]) await expect(button(d.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+  for (const d of [a, b]) await startButton(d.page).click();
+  for (const d of [a, b]) await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
   await expect(b.page.getByText('Lap 1. The bell works.')).toBeVisible();
   await a.page.waitForTimeout(500);
   await expect(a.page.getByText('Lap 1. The bell works.')).toHaveCount(0);
   await b.page.reload();
-  await expect(button(b.page, 'Start lap 2 now')).toBeVisible();
+  await expect(startNow(b.page)).toBeVisible();
   await b.page.waitForTimeout(500);
   await expect(b.page.getByText('Lap 1. The bell works.')).toHaveCount(0);
 });

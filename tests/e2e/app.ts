@@ -27,8 +27,16 @@ export async function join(page: Page, invite: string, name: string) {
   await page.getByRole('button', { name: 'Join', exact: true }).click();
 }
 
-/** What a ready Focus screen shows: the button for the lap a tap starts. */
-export const ready = (page: Page, lap = 1) => expect(page.getByRole('button', { name: `Start lap ${lap}`, exact: true })).toBeVisible();
+/** Focus's one start, before a lap: it names no number (the lap line over the digits does). */
+export const startButton = (page: Page) => page.getByRole('button', { name: 'Start the lap', exact: true });
+/** After a bell or in a break: the lap that comes next, started at once. */
+export const startNow = (page: Page) => page.getByRole('button', { name: 'Start the next lap now', exact: true });
+
+/** What a ready Focus screen shows: its start, under the line that names the lap a tap starts. */
+export async function ready(page: Page, lap = 1) {
+  await expect(startButton(page)).toBeVisible();
+  await expect(page.getByText(`Lap ${lap} of 4 in this set, next`).filter({ visible: true }).first()).toBeVisible();
+}
 
 /**
  * A new account made from Node, with these lap lengths in its settings: the Node device is the
@@ -149,10 +157,13 @@ export async function quickAdd(page: Page, text: string) {
   await box.press('Enter');
 }
 
-/** A task's row on Today, found by its box. */
+/** A task's row on Today, found by its box: the row the box stands in, with its words, squares, count and control. */
 export const taskRow = (page: Page, title: string) =>
-  // Not the inert copy a row leaves behind for a moment as it goes.
-  page.locator(`[role="checkbox"][aria-label=${JSON.stringify(`Done: ${title}`)}]:not([inert] *)`).locator('xpath=..');
+  // Not the inert copy a row leaves behind for a moment as it goes. The box and the words are one
+  // piece inside the row, so the row is the nearest box whose class is the kit's row.
+  page
+    .locator(`[role="checkbox"][aria-label=${JSON.stringify(`Done: ${title}`)}]:not([inert] *)`)
+    .locator('xpath=ancestor::div[starts-with(@class, "_row_") or contains(@class, " _row_")][1]');
 
 /** A task row's squares, oldest first: 1 for a lap that rang, a share for one stopped or running, 0 for one to come. */
 export const squaresOf = (row: ReturnType<typeof taskRow>) =>

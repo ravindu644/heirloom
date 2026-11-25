@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 import { PASSWORD } from '../sync/harness.ts';
 import { startServer } from '../server.ts';
 import type { Server } from '../server.ts';
-import { selectable } from './app.ts';
+import { selectable, startButton } from './app.ts';
 import { test as base, expect } from './devices.ts';
 
 
@@ -44,7 +44,7 @@ async function setUp(page: Page, server: Server, username: string) {
   await field(page, 'Username').fill(username);
   await field(page, 'Password').fill(PASSWORD);
   await button(page, 'Set up').click();
-  await expect(page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(page)).toBeVisible();
 }
 const settings = async (page: Page, username: string) => {
   await page.getByRole('link', { name: `Settings, signed in as ${username}` }).click();
@@ -118,7 +118,7 @@ test('an invite link made in Settings: joined with only a username and a passwor
   expect(await selectable(panel(a.page, 'Invites').getByRole('region', { name: 'The new link' }).locator('p').first()), 'the invite link does not select').toBe(true);
 
   await joinBy(b.page, link, 'member');
-  await expect(b.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(b.page)).toBeVisible();
   await settings(b.page, 'member');
   await expect(b.page.getByRole('heading', { name: 'Invites' })).toHaveCount(0);
   await expect(b.page.getByRole('heading', { name: 'Admins' })).toHaveCount(0);
@@ -142,6 +142,13 @@ test('take back needs a second tap and the link is then refused; renew keeps the
   const gone = await makeLink(a.page);
   const end = (link: string) => link.split('/').pop()!.slice(-6);
   const invites = panel(a.page, 'Invites');
+  // The newest link stands in its own block until it is copied, and is then a row like the others
+  // (DESIGN.md: a thing shown as new is not also drawn in the list under it).
+  await a.context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const newest = invites.getByRole('region', { name: 'The new link' });
+  await newest.getByRole('button', { name: 'Copy the link' }).click();
+  await expect(newest).toHaveCount(0);
+  await expect(invites.getByRole('button', { name: `Take back, the invite ending ${end(gone)}` })).toBeVisible();
 
   // Renew: the same link, a later end.
   const { token, device: id } = await tokenOf(server, 'owner');
@@ -171,7 +178,7 @@ async function ownerAndSam(fresh: () => Promise<Server>, a: Page, b: Page) {
   await setUp(a, server, 'owner');
   await settings(a, 'owner');
   await joinBy(b, await makeLink(a), 'sam');
-  await expect(b.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(b)).toBeVisible();
   await settings(b, 'sam');
   await expect(b.getByRole('heading', { name: 'Invites' })).toHaveCount(0);
   return server;
@@ -240,7 +247,7 @@ test('nobody can change the owner: naming the owner is bad_request from the owne
   await setUp(a.page, server, 'owner');
   await settings(a.page, 'owner');
   await joinBy(b.page, await makeLink(a.page), 'sam');
-  await expect(b.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(b.page)).toBeVisible();
   const owner = await tokenOf(server, 'owner');
   expect(await api(server, '/api/admins/set', { ...owner, username: 'sam', role: 'admin' })).toEqual({ status: 200, body: {} });
   const sam = await tokenOf(server, 'sam');

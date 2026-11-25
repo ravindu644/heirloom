@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 import { PASSWORD } from '../sync/harness.ts';
 import { startServer } from '../server.ts';
 import type { Server } from '../server.ts';
-import { username } from './app.ts';
+import { startButton, username } from './app.ts';
 import { test as base, expect } from './devices.ts';
 import { ADDR, appUrl, e2eServer } from './server.ts';
 
@@ -89,7 +89,7 @@ test('the first screen asks which server; a bad string, a dead port and somethin
   await field(a.page, 'Username').fill(name);
   await field(a.page, 'Password').fill(PASSWORD);
   await button(a.page, 'Join').click();
-  await expect(a.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(a.page)).toBeVisible();
   await expect(button(a.page, 'Change')).toHaveCount(0);
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   await expect(a.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
@@ -108,7 +108,7 @@ test('a pasted invite link sets the server and opens the join form with the invi
   await field(a.page, 'Username').fill(name);
   await field(a.page, 'Password').fill(PASSWORD);
   await button(a.page, 'Join').click();
-  await expect(a.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(a.page)).toBeVisible();
 });
 
 test('plain http is said once on the server step, once on the app\'s sign in, and once in Settings\' Account, for a server on the network', async ({ fresh, deviceA: a }) => {
@@ -130,7 +130,7 @@ test('plain http is said once on the server step, once on the app\'s sign in, an
   await field(a.page, 'Username').fill('owner');
   await field(a.page, 'Password').fill(PASSWORD);
   await button(a.page, 'Set up').click();
-  await expect(a.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(a.page)).toBeVisible();
   await a.page.getByRole('link', { name: 'Settings, signed in as owner' }).click();
   await expect(a.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
   await expect(a.page.getByText(plain)).toHaveCount(1);
@@ -149,7 +149,7 @@ test('the phone app keeps a pasted link\'s invite across a restart, until it is 
   await field(a.page, 'Username').fill(username('kept'));
   await field(a.page, 'Password').fill(PASSWORD);
   await button(a.page, 'Join').click();
-  await expect(a.page.getByRole('button', { name: /^Start lap 1$/ })).toBeVisible();
+  await expect(startButton(a.page)).toBeVisible();
 });
 
 test('the welcome: the phone app\'s first screen says what heirloom is; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {

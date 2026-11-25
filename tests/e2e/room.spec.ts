@@ -1,7 +1,7 @@
 // Rooms through the screen (protocol section 15): three accounts in three browser contexts, and a
 // fourth outside. The roadmap's box: presence within 1 s, totals right, privacy holds.
 import type { Page } from '@playwright/test';
-import { accountWith, digits, go, ready, signIn, username } from './app.ts';
+import { accountWith, digits, go, ready, signIn, startButton, startNow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -49,8 +49,8 @@ test('presence: a lap on A shows on B and C within a second with the same time l
   const [nameA] = names;
   await go(a.page, 'Focus');
   const start = Date.now();
-  await button(a.page, 'Start lap 1').click();
-  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Focusing, lap 1 of 4', { timeout: 1000 });
+  await startButton(a.page).click();
+  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Focusing, lap 1 in a set of 4', { timeout: 1000 });
   console.log(`start on A, seen on B and C: ${Date.now() - start} ms`);
   // Time left on the lane, against A's own digits: within a second.
   const seconds = (text: string) => Number(text.split(':')[0]) * 60 + Number(text.split(':')[1]);
@@ -60,7 +60,7 @@ test('presence: a lap on A shows on B and C within a second with the same time l
     expect(Math.abs(theirs - mine), `${theirs} s on the lane, ${mine} s on A`).toBeLessThanOrEqual(1);
   }
   await button(a.page, 'Pause').click();
-  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Paused, lap 1 of 4', { timeout: 1000 });
+  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Paused, lap 1 in a set of 4', { timeout: 1000 });
   await button(a.page, 'Resume').click();
   await a.page.getByRole('button', { name: 'Stop', exact: true }).click();
   for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Not on a lap', { timeout: 1000 });
@@ -100,13 +100,13 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
 
   // A runs one lap, B two.
   await go(a.page, 'Focus');
-  await button(a.page, 'Start lap 1').click();
+  await startButton(a.page).click();
   await go(b.page, 'Focus');
-  await button(b.page, 'Start lap 1').click();
-  await expect(button(b.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
-  await button(b.page, 'Start lap 2 now').click();
-  await expect(button(b.page, 'Start lap 3 now')).toBeVisible({ timeout: 8000 });
-  await expect(button(a.page, 'Start lap 2 now')).toBeVisible();
+  await startButton(b.page).click();
+  await expect(startNow(b.page)).toBeVisible({ timeout: 8000 });
+  await startNow(b.page).click();
+  await expect(startNow(b.page)).toBeVisible({ timeout: 8000 });
+  await expect(startNow(a.page)).toBeVisible();
   await go(b.page, 'Room');
   await expect(lane(c.page, nameA)).toContainText('0m today in 1 lap, 0m this week.', { timeout: 3000 });
   await expect(lane(c.page, nameB)).toContainText('0m today in 2 laps, 0m this week.');
@@ -161,8 +161,8 @@ test('privacy: the task title only while A shares it, gone at once when A stops;
   await go(b.page, 'Room');
   await expect(lane(b.page, nameC)).toContainText('Away', { timeout: 2000 });
   await go(c.page, 'Focus');
-  await button(c.page, 'Start lap 1').click();
-  await expect(button(c.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+  await startButton(c.page).click();
+  await expect(startNow(c.page)).toBeVisible({ timeout: 8000 });
   await expect(lane(b.page, nameC)).toContainText('in 1 lap', { timeout: 3000 });
   await expect(lane(b.page, nameC)).toContainText('Away');
   await expect(lane(b.page, nameC).getByRole('button', { name: /Cheer/ })).toHaveCount(0);
@@ -200,7 +200,7 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   // A and B on laps; then B without a connection: old news is said in the past, and only B's own time left shows.
   for (const d of [a, b]) {
     await go(d.page, 'Focus');
-    await button(d.page, 'Start lap 1').click();
+    await startButton(d.page).click();
     await go(d.page, 'Room');
   }
   await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 focusing now.', { timeout: 2000 });
