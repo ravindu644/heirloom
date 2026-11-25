@@ -9,6 +9,7 @@ colors:
   ink: "#121412"
   muted: "#474C47"
   line: "#D5D9D3"
+  edge: "#7C827B"
   you: "#C4321A"
   you-tint: "#FBE2DA"
   on-you: "#FFFFFF"
@@ -23,6 +24,7 @@ colors:
   dark-ink: "#F0F2EE"
   dark-muted: "#A4A9A3"
   dark-line: "#2B2F2B"
+  dark-edge: "#7C827B"
   dark-you: "#FF6A4D"
   dark-you-tint: "#3B1D16"
   dark-on-you: "#140806"
@@ -236,6 +238,11 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
   16px uses ink or muted only, never ghost.
 - **line:** dividers, and the empty part of a lane that sits on the ground. On a white surface the
   empty part is `raised`: `raised` on `ground` is too faint to see, `line` on `surface` too harsh.
+- **edge:** the outline of anything typed into or chosen: a field, a number in a stepper, a choice
+  that is off. One grey that stands 3:1 or more against ground, surface and raised in both themes
+  (3.4, 3.9, 3.2 in light; 4.9, 4.5, 3.9 in dark), because a field with a `line` edge at 1.3:1 is a
+  white box on white to many eyes. `line` stays for dividers and for a button's border, where
+  the words inside already say what it is.
 - **you:** the one hue. Your marks, your line, your current lap, the one primary button per screen.
 - **you-tint:** the fill of a split chip and the selected row.
 - **on-you:** text on a you-filled button.
@@ -310,6 +317,13 @@ first, the rest after first paint.
 - Three sizes are written in CSS as numbers, because a media query cannot read a variable: 720px
   (bottom bar below, sidebar from there), 1280px (from there the 300px timer and the rail sit side
   by side), and 412px, the width the phone is drawn for.
+- **Nothing breaks down to 320 wide.** That is a small phone, and it is also a 412 phone at 130%
+  or a laptop window zoomed to 400%. Down to 320 the page never scrolls sideways: a username in
+  the header is cut with an ellipsis, a button's words wrap, a row gives up its picture before
+  its words.
+- **The order of the page is the order of the eye.** Tab and a screen reader meet the header
+  first (the mark, then the person), then the screen, then the bottom bar, whatever the CSS does
+  to place them.
 - **A phone is not always 412 wide.** The first real one measured 471. Under 720px the layout is
   fluid: every column runs from margin to margin (fields, panels and button rows fill it; a
   measure in `ch` caps a line of text only from 720px up), and the timer keeps its share of the
@@ -361,8 +375,9 @@ Built once in `client/src/ui/kit/` and reused.
   carries the ring, a day not planned is a `stroke` line and never a miss, today has a `hair`
   outline. Everything but the box opens the habit.
 - **A choice** (a weekday, one room of several, a project's square): off is `surface` with a
-  `hair` `line` border; on is `ink` with `ground` text. On and off must differ by more than a
-  border, and neither may look like a quiet button.
+  `hair` `edge` border; on is `ink` with `ground` text. On and off must differ by more than a
+  border, and neither may look like a quiet button. The seven weekdays always share one row:
+  under 400px they narrow equally and keep their 48px height.
 - **Switch row:** the words at the left, a note under them in `label` when one is needed, the
   stock box at the right; the whole row is the target. A row is as tall as its words and never
   under `touch` less `md`, so two one-line rows still give a finger 48px each; rows with and
@@ -484,6 +499,13 @@ Sample strings, the register to match:
 - Never colour alone: ahead and behind carry a sign and a word, rest days a mark, the ghost a dash.
 - Every control has a label a screen reader can say; the timer announces once a minute, not every
   second.
+
+- **The focus ring** is 2px solid `ink`, 2px off the thing, on everything that takes focus by key,
+  and never removed.
+- **A name says which.** Two controls on one screen never share an accessible name: "A lap, one
+  minute more", not "One minute more" three times.
+- **Nothing is announced that is not so.** A status line speaks only of what has happened: no
+  "No connection" in the moment before the first connection is made.
 
 ## Consistency
 

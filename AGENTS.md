@@ -127,6 +127,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | `make check` | Every check, each one reported. The gate runs this |
 | `make dev` / `web` / `server` / `apk` | Vite beside heirloomd / the built app / the binary for here and arm64 / the debug APK |
 | `make deploy`, `make s10-rss` | Copy the arm64 binary to the S10 / run it there for 3 s and print its memory |
+| `tools/sim/soak.ts`, `load.ts` | Many devices at random against a server for an hour, or a burst of them for a memory reading; `--url --invites --rss --minutes --seed` |
 | `tools/tokens.mjs` | DESIGN.md to `client/src/ui/tokens.css`, fonts included. Run by `make tokens` |
 | `tools/style-check.mjs` | Fails on a colour, font name or duration literal in `client/src/ui/` |
 | `tools/design-audit.mjs` | Every demo state, built, in a browser at 412, 471 and 1440 against DESIGN.md: type, colour, shape, space, left edge, bearing, rhythm, touch, header, scroll |

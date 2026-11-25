@@ -47,3 +47,12 @@ when it is done.
 - [9] SQLite creates `heirloom.db` as 0644, and the data directory is 0700 only when heirloomd makes it. Settle with the systemd unit.
 - [any] `tools/style-check.mjs` sees `200ms` in text but not `setTimeout(fn, 200)`.
 - [any] `tools/budget.mjs` counts every JS chunk as first load. Read Vite's manifest once a lazy chunk exists.
+- [8] Sounds: the app has one bell, made in the browser with WebAudio (no file, no licence), and the phone rings with its own notification sound. The roadmap's "small set, licensed" is not built; the box stays open for the user to decide whether v1 needs more than one.
+- [8] The result on a tall phone (471x1020) has about 550px of ground between the lanes and the line with its buttons. It follows the free-space rule; the reviewer passed it and expects the user may not. If it reads half empty in the hand, the result says more rather than the button moving.
+- [8] In Settings a length has its unit outside the stepper ("minutes" after the plus) and the day target has it inside ("8 laps a day"). Both follow the Stepper rule; one arrangement would be tidier.
+- [9] "Save a copy" is not offered in the phone app (a blob download in the Android WebView is unverified); it points to the browser. Verify on the phone, then offer it there or keep the sentence.
+- [9] A push subscription answered 401 or 403 is dropped only once the server has `-contact` set; without one it is kept and tried at every bell. The S10 runs without a contact until the user gives an address.
+- [5] A project's all-time figure and a mark's `estimate-` key have known edges written in protocol sections 13 and 16.
+- [any] A tap is on this device's disk 4 to 12 ms after it (measured, IndexedDB at strict durability). A page reloaded or closed inside that window, with no connection, has not kept that one tap; with a connection it is also on its way to the server. A browser gives a page no way to save before it answers the tap. The test that found it (`habits.spec.ts`) now waits for the disk; `offline.spec.ts` proves a lap, a done task and a check-in all survive an offline reload once written.
+- [10] Under 320 wide (a 412 phone at 200% zoom is 206) Focus and plain Today reflow, but Today's ordering list, the target editor and the sheets still scroll sideways by a few pixels. WCAG's reflow line is 320, which every screen and sheet passes.
+

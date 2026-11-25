@@ -367,6 +367,11 @@ rule and a day in, the next day out. `next`: a done task's id, `due`, today and 
 row's id and `due` out. `order`: property checks, described in the file. `squares`: sessions, the
 timer state, `now` and a task in, `laps` and `squares` out.
 
+**Rows that cannot be real.** A day that is not a calendar date (`2026-02-31`), a time before
+2020 or after 2199, a length that is negative or not a number, a timer state that is not one:
+such a value, from an imported copy or a device with a dead clock, is kept and sent on like any
+cell, and is not counted, shown or walked from. Nothing a screen reads may throw on a row.
+
 ## 13. Progress
 
 The rules behind the Progress screen. All of it is worked out on the device from `session`, `task`,
@@ -560,8 +565,10 @@ before it). A mark is for what was done on this device (the lap's bell, the task
 lap was written here), and is shown once per account: the device that shows it writes
 `settings/current` field `marks`, an object of mark keys to the time shown (`laps-25`,
 `estimate-<task id>`, `week-<monday>`), and no device shows a mark whose key is there. A mark
-achieved more than a day ago is never shown, so the object need not remember everything: keys
-older than two days are dropped when the next is written, and it stays a few keys long. With
+achieved more than a day ago is never shown. Keys are kept as long as their mark could be shown
+again: a `laps-` key always, a `week-<monday>` key while that week is the current one or the one
+before, and the newest hundred of the others; the rest are dropped when the next mark is written.
+(Dropping by age was wrong: a week's mark is achieved again with every lap of that week.) With
 `celebrate` off nothing is shown and nothing is written, and turning it on later replays
 nothing older than a day.
 

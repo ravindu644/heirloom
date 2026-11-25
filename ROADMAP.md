@@ -78,30 +78,30 @@ The first thing the user can touch: one timer, live on two screens.
 
 ## 4. Today
 
-- [ ] [ui] Today list: tasks with estimate and done count, the day target bar, quick add with
+- [x] [ui] Today list: tasks with estimate and done count, the day target bar, quick add with
       `~4` estimates, the "break it down?" nudge above 7
-- [ ] [ui] Projects with colours, one level of subtasks, due dates, repeats, optional "when"
-- [ ] [ui] Start a pomodoro from a task; the Focus screen shows the task
-- [ ] [ui] Recently deleted with Restore
+- [x] [ui] Projects with colours, one level of subtasks, due dates, repeats, optional "when"
+- [x] [ui] Start a pomodoro from a task; the Focus screen shows the task
+- [x] [ui] Recently deleted with Restore
 - [x] [core] Fractional ordering; repeat rule expansion; fixtures added to `contracts/`
-- [ ] [design-review] Today at both sizes
+- [x] [design-review] Today at both sizes
 - [ ] Gate
 
 ## 5. Progress
 
 - [x] [core] Stats from sessions: per day, week against week, per project, estimate accuracy,
       personal bests, the forgiving streak ("41 of the last 45"); `stats.json` and `streak.json`
-- [ ] [ui] Heatmap of the year (hand-drawn SVG, no chart library)
-- [ ] [ui] This week against last week; time per project; estimate accuracy
-- [ ] [ui] Day timeline with void and "ran on two devices" marks, void with a tap
-- [ ] [ui] End-of-day look back
-- [ ] [design-review] Progress at both sizes
+- [x] [ui] Heatmap of the year (hand-drawn SVG, no chart library)
+- [x] [ui] This week against last week; time per project; estimate accuracy
+- [x] [ui] Day timeline with void and "ran on two devices" marks, void with a tap
+- [x] [ui] End-of-day look back
+- [x] [design-review] Progress at both sizes
 - [ ] Gate
 
 ## 6. Habits
 
-- [ ] [ui] Habits with weekdays and a count; one-tap check-in; undo
-- [ ] [ui] Per-habit heatmap and streak
+- [x] [ui] Habits with weekdays and a count; one-tap check-in; undo
+- [x] [ui] Per-habit heatmap and streak
 - [x] [android] Habit reminder notifications
 - [x] [qa] Two devices check in offline; both kept; the day is done
 - [ ] Gate
@@ -110,19 +110,19 @@ The first thing the user can touch: one timer, live on two screens.
 
 - [x] [server] Rooms: create, invite code, join, leave, members; presence from the timer cell and
       socket liveness; today's and this week's totals from sessions; cheers
-- [ ] [ui] Room screen: who is focusing, phase and time left, today and week, the shared weekly
+- [x] [ui] Room screen: who is focusing, phase and time left, today and week, the shared weekly
       target, cheer with one tap; opt-in ranked view; task titles only when allowed
-- [ ] [ui] Settings: what rooms see; hide rooms
+- [x] [ui] Settings: what rooms see; hide rooms
 - [x] [qa] Three accounts in three contexts: presence within 1 s, totals right, privacy holds
 - [ ] Gate (the user and a friend study together for a session)
 
 ## 8. Rewards and words
 
-- [ ] [ui] Milestones with our own named tiers; within-estimate and best-week marks; all switchable
+- [x] [ui] Milestones with our own named tiers; within-estimate and best-week marks; all switchable
 - [ ] [ui] Sounds: a small set, licensed, under 200 KB in total
-- [ ] [ui] Settings screen complete: durations, auto-start, sounds, celebrations, ring here
+- [x] [ui] Settings screen complete: durations, auto-start, sounds, celebrations, ring here
 - [x] [lead] Copy pass over every string against the voice rules in DESIGN.md
-- [ ] [design-review] Every screen, empty states included, at both sizes, light and dark
+- [x] [design-review] Every screen, empty states included, at both sizes, light and dark
 - [ ] Gate
 
 ## 9. Live on the S10
@@ -131,14 +131,14 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [server] Web Push with VAPID at phase end for laptop browsers
 - [ ] [lead] Exposure: Cloudflare named Tunnel on the user's domain (`cloudflared` on the S10
       container, its RSS measured); WebSocket and the 25 s heartbeat tested through it
-- [ ] [ui] Export and import as JSON
+- [x] [ui] Export and import as JSON
 - [x] [qa] Measured on the S10: idle RSS, RSS with 20 simulated devices, both under budget
 - [ ] Gate (the friend installs it from a link and joins a room)
 
 ## 10. Release 1.0
 
-- [ ] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
-- [ ] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
+- [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
+- [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
 - [ ] [qa] Budgets: bundle, tap latency on the phone, live timer arrival
 - [x] [lead] README for friends: install the APK, open the web app, join a room
 - [ ] [lead] Signed release APK; tag `v1.0.0`
