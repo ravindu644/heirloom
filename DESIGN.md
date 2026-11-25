@@ -225,6 +225,7 @@ motion:
   press: 100ms
   fill: 160ms
   sheet: 200ms
+  hold: 350ms
   rise: 8px
   lap-done: 700ms
   set-done: 1200ms
@@ -272,8 +273,13 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **A project's colour** is the one place another hue lives (the user's choice, 2026-11-25:
   five tones could not tell a term's subjects apart). Twelve are offered by name: `you`, `rest`,
   `ink`, `ghost`, `heat-2`, and `amber`, `olive`, `teal`, `sky`, `indigo`, `plum`, `clay`, each
-  with a dark twin at 3:1 or more on `surface`. A thirteenth choice, "Another colour", opens the
-  device's own colour picker; what is picked is shown as picked on both grounds, inside a `hair`
+  with a dark twin at 3:1 or more on `surface`. A thirteenth square, "Pick", stands after
+  the twelve in a place of its own and never moves: it opens the app's own picker in place under the squares, two
+  sliders (which colour, and from pale to deep; the first is drawn at the depth the second
+  holds, so the strip is never louder than the colours it gives), and then carries the picked colour itself. (It
+  was "Another colour" and opened the phone's picker, which shows a list of squares of its own
+  before the real one; and the picked colour took a place in the row and pushed the button to
+  the next line.) What is picked is shown as picked on both grounds, inside a `hair`
   line of `edge` so a pale one still shows on a pale ground. Whatever the colour, it is a small
   square before the project's name and nothing else: never alone, never a fill behind text, never
   a bar or a line (a project's bar stays `ink`), and never beside lap squares, which would read
@@ -377,9 +383,13 @@ Lanes and bars are square ended: a track has no rounded corners. Rows and button
 
 Built once in `client/src/ui/kit/` and reused.
 
-- **Lap bar:** four segments, 8px tall (`lane`), 4px gaps. Done laps filled in you, the current lap
-  filled to its elapsed share, the long break after lap four named in words beside it. In the
+- **Lap bar:** four segments, 8px tall (`lane`), 4px gaps. A lap that rang is filled in you; one
+  that was stopped is filled as far as it ran and stays that way, so the bar never says more than
+  was done; the current lap is filled to its elapsed share, the long break after lap four named in words beside it. In the
   set-of-four moment it stands 24px tall (`lane-set`): that is what makes a set bigger than a lap.
+- **Focus's buttons** keep the foot of the screen in every state, and the one quiet line over them
+  holds what is lesser: "Undo", "5 more minutes", and after a bell or in a break "Done for now"
+  at its right end. The buttons never move because a lap rang.
 - **Race strip:** two lanes, you over ghost, on one scale; the split between them as a chip.
 - **Ghost lane:** the same lane as yours, hollow, with a dashed ghost outline: 1px on a strip, 2px
   on the tall lanes of a result (`lane-result`, 40px), where 1px thins to a hairline.
@@ -391,9 +401,29 @@ Built once in `client/src/ui/kit/` and reused.
   the row ends in a control (Start, Restore, Up and Down), the squares and count sit to its
   left, centred on it and `md` away, so every row's count ends on one of two edges and never
   touches a button. In such a row narrower than 400px the squares give way and the count stays:
-  the title is worth more than the picture of a number already written.
+  the title is worth more than the picture of a number already written. The title always has
+  its room: it breaks between words and never inside one, runs to two lines at most, and the
+  line under it does the same; whatever is at the right gives way first. At most twelve squares
+  are drawn; a row with more laps than that shows its count alone. (The user typed 45 laps into
+  an estimate: the squares ran off the card and the title stood one letter to a line.)
+  In a row narrower than 280px (a phone at 200% zoom) the row's end, count and button, goes
+  under the words: the title is never what gives way.
+  A row that ends in two links ("Restore", "Delete for good") follows the invite row on a phone:
+  the links stand under the words, so the title keeps the row's width.
+- **Every number a person can raise has a top,** and the row that shows it is looked at with the
+  top in it: an estimate stops at 8 laps, a day's target and a habit's count at theirs. A stepper
+  at its top shows its plus as off.
+- **Putting rows in order:** press and hold a row and it lifts (`raised`, the one shadow, a `hair`
+  line of `ink`); an empty lap square on it takes `line`, since `raised` is what an empty square is made of;
+  it then follows the finger or the mouse up and down, the rows it passes glide
+  out of its way, and letting go sets it down. A short tap still opens the row and a swipe still
+  scrolls the page: only a hold that has not moved picks a row up. With a keyboard, Alt and the
+  arrow keys move the row that has the focus, and a screen reader hears where it now stands.
+  No mode, no link, no handle to find first. (It was a link, "Change the order", that turned the
+  list into another screen with Up and Down on every row.)
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
-  the task, and one button drawn as an outline in `ground`. When the lap has rung, its button to
+  the task, and one button filled `ground` with `ink` text: the strip is the page turned inside out,
+  and so is its button. (A grey `key` button on it could not be told from the strip.) When the lap has rung, its button to
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
   to secondary.
 - **Habit row:** the task row's box at the left (the same job, so the same control: on a day
@@ -411,10 +441,12 @@ Built once in `client/src/ui/kit/` and reused.
   stock box at the right; the whole row is the target. A row is as tall as its words and never
   under `touch` less `md`, so two one-line rows still give a finger 48px each; rows with and
   without a note keep the same `md` between them.
-- **Stepper:** minus, the figure, plus. For a small count ("Once a day", "8 laps a day") the
+- **Stepper:** minus, the figure, plus. At its top the plus is off, at its bottom the minus: the
+  `key-quiet` fill with no line in both themes, its sign in `muted`, and it takes no press. (Off
+  was first "the key without its line", which in dark, where a key has no line, changed nothing.) For a small count ("Once a day", "8 laps a day") the
   figure is text. For a length in minutes the figure is a number field with the unit as a word
   beside it, so 25 to 50 is typed once, and minus and plus are for nudging.
-- **Links at the end of a list** ("Change the order", "Archived, 1", "Recently deleted, 1") sit on
+- **Links at the end of a list** ("Archived, 1", "Recently deleted, 1") sit on
   one line, `md` apart, wrapping when they must.
 - **A mark:** one line in `label` under the result, in the top group, quieter than the result.
   No badge, no icon, no wall of them.
@@ -456,7 +488,7 @@ Built once in `client/src/ui/kit/` and reused.
 - **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
   `on-you` text, one per screen at most; secondary is `key` with a `hair` line of `key-edge`;
   quiet is `key-quiet` with no line, for the lesser choice beside another button ("Skip break",
-  "I have an invite", "Stop and log 6 min"). **Secondary always outweighs quiet,** in both themes
+  "I have an invite", "Stop"). **Secondary always outweighs quiet,** in both themes
   and on whatever it stands. In dark the weight is a fill: `key` is one step lighter than
   `key-quiet`, and its edge is its own colour. In light there is no room above the ground for a
   second lighter step and a darker grey reads as switched off, so the weight is a line: the same
@@ -551,6 +583,7 @@ found none of this and called it the one thing that makes the rest feel finished
 | A row arrives, goes, is done or is moved | `fill` 160ms | It fades and its height opens or closes, so the rows under it glide to their place |
 | Something opens in place (an editor, a form, a panel's extra lines, an error) | `fill` 160ms | Its height opens; what is under it glides |
 | A box ticked, a switch thrown, a figure stepped, a lap segment filling | `fill` 160ms | The mark draws, the knob slides, the fill runs |
+| A row picked up to be moved | `hold` 350ms | How long a finger or the mouse rests on a row, without moving 8px, before the row lifts. Shorter and a slow tap lifts it; longer and nobody finds it |
 | A sheet or menu | `sheet` 200ms | It slides `rise` and more from the bottom on a phone, fades and rises on a laptop; its scrim fades |
 | What the last tap did | `sheet` 200ms | Rises `rise` in, fades out |
 | The timer | none | Digits change; nothing animates |
@@ -566,9 +599,14 @@ animation runs on a loop, ever. Motion is built into the kit (a row, a sheet, an
 bar), so a screen gets it by using the kit and never writes its own.
 
 **What you tapped stays under your finger.** After a tap, the control tapped is where it was on
-the screen, to the pixel, unless the tap was a move to another place. (At the very top of a
-page, where nothing can scroll, a thing closing above the control carries it up, in time.) The four ways a page
-jumps, each seen by the user:
+the screen, to the pixel, unless the tap was a move to another place. It is held by scrolling
+and by nothing else, so only as far as the page can really scroll: **a page is never scrolled
+past its own content, and one that fits the screen is never scrolled at all.** At the top or the
+end of a page, where there is nothing left to scroll, the control moves with what opens or
+closes beside it, in time. (The first build gave the page a blank end to scroll into: "Keep
+this order" left Today pushed up under the header with half a screen of nothing below it, and a
+sheet's last field ended up in the middle of the screen.) The four ways a page jumps, each seen
+by the user:
 
 1. Something above the control changes height (a total, a panel that appears or goes). The
    scroll is corrected in the same frame so the control does not move.
@@ -583,6 +621,20 @@ jumps, each seen by the user:
 resizes: no script scrolling, no height recomputed in code (the shell hiding the bottom bar while
 a keyboard is up is the one thing a resize may do). The field the person is typing in is
 brought into view once, by the browser, with `scroll-margin` giving it room for its button.
+Every field has that margin, from the kit, `lg` above and below: a field being typed in never
+touches the keyboard or the top of its sheet. A sheet with a keyboard up is the same sheet in
+less room: it keeps its foot on the keyboard, scrolls inside, and shows no blank end.
+
+**What a person made, they can rename and remove,** and in the place they meet it: a task and a
+habit in their sheet, a project where it is chosen ("Edit project" opens the form it was made
+with, filled in, with "Delete project" at its foot). Anything that cannot be taken back asks
+twice, as "Take back" on an invite does: the button's own words change to the question ("Delete
+for good?") and a second tap answers it. Nothing asks in a box of the browser's.
+
+**What opened closes when it is answered.** A form or an editor that opened in place for one
+question ("New project", the picker, the target's editor) closes when the question is answered
+some other way: another project chosen, None chosen, the sheet closed. Nothing stays open asking
+for what the person has just said they do not want.
 
 An Undo is offered for ten seconds, everywhere, and then goes without a word.
 
@@ -602,9 +654,13 @@ A running partner who counts for you. Plain, specific, warm, never a coach shout
 2. **Say what happened, then what is next.** "Level with last Tuesday. Take five."
 3. **Behind is a fact with a way back.** "One lap behind last week. The lap you are in now draws you
    level." Never "you missed", never "you failed".
-4. **A void pomodoro is "not counted",** not lost or failed, and the button says what it does:
-   "Don't count this lap", "Count it again". (It was "set aside" until the user read "It counts
-   nowhere" and asked: in what?) A missed day is not mentioned the day after.
+4. **One word for one act, and one button for it.** Focus has one Stop, and it says only
+   "Stop": it ends the lap where it is, and the line after says what that did ("Lap 1 stopped
+   at 12 minutes. Lap 2 is next."). (There were three: "Stop", "Stop and log 2 min" and "Don't
+   count this lap", and the user could not say what each did.) Two controls that end the same
+   thing are one too many; a button whose name changes while you look at it is two. A lap taken
+   out of the count is "not counted", from the timeline: "Don't count it", "Count it again". A
+   missed day is not mentioned the day after.
 5. **No exclamation marks** except in the one big moment of a set, and then one.
 6. **Short sentences, one idea each.** Sentence case everywhere, including buttons.
 7. **Name the thing, not the feature.** "Who is focusing now", not "Live presence".
@@ -651,7 +707,9 @@ Sample strings, the register to match:
 - **Nothing selects.** Words on a screen are not text to drag over: `user-select: none` on
   everything, in the browser as in the phone app, with no long-press callout and no tap
   highlight. Two exceptions, by name: what is typed into (every field), and what is there to be
-  copied (an invite link, a room's code, the server's address).
+  copied (an invite link, a room's code, the server's address). A sheet is on the browser's
+  top layer and was found selectable when the page under it was not: the rule is checked inside
+  an open sheet as well as on a screen.
 - **A word that can be pressed looks pressable.** See Buttons and Links in a line.
 
 ## Consistency
@@ -665,6 +723,34 @@ first and the screen uses it second.
 browser and reads what was drawn: every font, size, weight, colour, radius, border and space
 must be a value this file defines, every block in a column must share its left edge, and
 everything that can be pressed must be 48px to touch. It runs in `make check`.
+
+## Said so a stranger knows
+
+Found by walking every screen as someone who was only handed the app (2026-11-25, 28 findings).
+Each is a rule for every screen, not for the one where it was seen.
+
+- **A sheet says there is no Save.** Everything saves as it is changed, so the sheet's foot says
+  "Changes are saved as you make them." And a pair of ways out says what each keeps ("Archive
+  keeps its record and takes it off the list. Delete keeps it for 30 days.").
+- **A setting that stands until changed is never worded as today's.** "Laps to run each day",
+  not "today", wherever the day target is edited.
+- **A thing is labelled with what it is,** never with the product's own noun for it: the race's
+  second lane is "Last Tue", not "Ghost"; a figure is "Focused", not "Done" beside a list called Done.
+- **A button that starts something names what it starts.** "Start lap 3 now", not "Skip break".
+- **A switch that cannot work on this device says why,** in place of its note, with where to
+  change it.
+- **A step that asks for something the person may not have says where to get it.**
+- **What is done more than once shows how far it has got and the way to take one back,** where
+  it is edited.
+- **What a tap did is said where eyes can read it.** Nothing is said to a screen reader only.
+  Inside an open sheet it is said in the sheet, beside what was changed: the bar stands under a
+  sheet and cannot be read there.
+- **A thing shown as new is not also drawn in the list under it.**
+- **A list that opened as a sheet closes with its last row.**
+- **What a change does to other people is said before it is made, and after.**
+- **A refusal with two causes is two sentences,** and the app says the one that is true.
+- **One word for one thing, everywhere:** estimate (never guess), Restore (never bring back), a
+  lap "reaches its bell" (never rings, rang or phase), a lap not counted (never void or set aside).
 
 ## Do's and Don'ts
 

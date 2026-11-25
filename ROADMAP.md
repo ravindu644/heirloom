@@ -167,7 +167,41 @@ lesson in `skills/taste-gate` and a test.
 - [x] [lead] Every point in `skills/taste-gate` with its check
 - [ ] Gate (the user goes through the twelve points again on the phone and the laptop)
 
-## 12. Release 1.0
+## 12. What the second hour found
+
+Nine more points from the user's hands, and one instruction: find the other places that confuse
+in the same way. Each becomes a fix, a rule in DESIGN.md, a lesson in a skill and a test.
+
+- [x] [lead] The rules first: one Stop (protocol sections 6, 7, 11, 12), PRODUCT rows, DESIGN.md
+      (a page is never scrolled past its content, rows put in order by holding, the picker,
+      every number has a top, what opened closes when answered, a field's room from the keyboard)
+- [x] [core] Stop ends the lap and the set moves on; a lap always leaves a row; a lap's fill;
+      estimates stop at 8; fixtures
+- [x] [server] A room's laps count stopped laps too
+- [x] [ui] Focus: one Stop, laps drawn as full as they ran
+- [x] [ui] Today: hold a row to move it; a row that cannot overflow; the strip's button; no
+      blank end after a tap
+- [x] [ui] The task sheet: no free "when", "Pick" and the app's own picker, "New project" closes,
+      nothing selects in a sheet, a field's room from the keyboard
+- [x] [lead] A walk through every screen as a stranger: two controls for one act, words that need
+      the data model, numbers with no top, things that never close; the findings fixed or parked
+- [x] [core] [ui] What a person made they can rename and remove: a project's name and Delete, and
+      "Delete for good" on a deleted task or habit
+- [x] [qa] Each point as a test, the new ones at the extremes (45 laps, a page that fits, a sheet
+      with a keyboard)
+- [x] [design-review] Every changed screen at 412, 471 and 1440, light and dark
+- [x] [lead] The lessons in `skills/`
+- [ ] Gate (the user goes through the points on the phone)
+
+## 13. A way back in
+
+- [ ] [lead] PRODUCT row and protocol: whoever owns the server gives a member a link that sets a
+      new password; the owner's own way back is a command on the server
+- [ ] [server] [core] [ui] The reset link, made in the Admins panel and from `heirloomd`
+- [ ] [qa] A reset on two devices; an old token after it
+- [ ] Gate
+
+## 14. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

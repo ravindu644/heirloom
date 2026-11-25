@@ -52,6 +52,8 @@ A lane that needs a change outside its folder asks the lead in its report; it ne
      on frames of everything that moves; fix what it marks as a FAIL.
    - Run the `code-review` skill at `medium`. Fix real bugs and regressions in normal use,
      re-review at most once, send the rest to `findings.md`, one line each.
+   - UI changed: a fresh agent walks it as a stranger (`skills/stranger-walk`), and each fix is
+     tried where it was not made: another layer, the ends of a page, the extreme.
    - **The user tries it** on the phone and the laptop, as the section's gate says. Tests passing
      is not the same as it feeling right.
    - Tick the boxes, commit, push.
@@ -119,6 +121,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | Any screen or component | `taste-gate`, plus the global `design-taste-frontend` |
 | Naming, copy, a reward moment, anything that could come out generic | the global `antialgorithm` |
 | A new dataset or field, anything touching sync | `sync-change` |
+| A UI gate, a build about to go to the user, anything called confusing | `stranger-walk` |
 | Anything on the phone or the S10 | `device-test` |
 
 ## Tools
@@ -140,6 +143,8 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
   `token-like-ignored` on our own keys (`motion`, `layout`, `state`, `shadow`, read by tools/tokens.mjs) are expected.
 - The build minifies `200ms` to `.2s`: never `parseFloat` a `--motion-*` token, and prove motion
   on `make web`'s output, not on the dev server.
+- One browser spec run by hand (`playwright test x.spec.ts`) uses the last built `server/bin/heirloomd`,
+  which carries the web app: run `make server` first or it tests old code. `make e2e` rebuilds it.
 - A visually hidden element placed `absolute` needs a positioned ancestor, or it makes the whole page scroll.
 - Playwright's `getByRole(..., { name: 'Back' })` also matches "Bring a copy back": pass `exact: true`.
 - Chromium's `elementFromPoint` snaps x.5 to the next pixel: sample whole pixels when measuring a target.

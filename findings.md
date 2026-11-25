@@ -67,3 +67,10 @@ when it is done.
 - [11] Motion left for a later round: from 720px a room's lanes reflow at once when one comes or goes; rows inside Progress panels (project shares, estimate tasks) and the Invites and Admins panels appearing on a role change still come between two frames; a row's top hair line goes one frame late.
 - [11] At the very top of a page nothing can scroll, so a panel closing above a tapped control carries it up (in time). DESIGN.md says so; a page given slack at its top would close it and is not built.
 - [11] The reviewer opened the 412 light set at full size and the rest as overview sheets or not at all (471, dark laptop): those rest on the audit. The user's own look is the check.
+- [12] After a Stop is undone, the stop's row is still held by the server and other devices until the run ends again, so a room's `today_laps` is one high for that long. It corrects itself at the bell or the next stop.
+- [12] A set that crosses midnight draws the lap that started yesterday as full even if it was stopped part way: the set on screen reads today's rows only (protocol section 7).
+- [12] A task whose only lap was stopped can still earn the within-estimate mark: the mark counts a task's laps as the task shows them.
+- [12] If only heirloom's "Bell" channel is switched off in Android's settings, `canRing()` still says yes and nothing rings. Covering it means reading the channels (`listChannels()`, importance 0 is off).
+- [12] "Cheer" names the lap by when it ended ("the lap that ended at 16:40"), not by its number: a room's `last` carries no lap number. Adding one is a server and protocol change.
+- [12] `kit/lift.ts` holds three sizes as constants (8px of slop, a 56px edge, 8px a frame) and the picker starts at one fixed tone: values that belong in DESIGN.md. `tools/style-check.mjs` does not see a number in a `.ts` file.
+- [any] `tools/style-check.mjs` also reads the kit's test files, so a test that needs a colour or a duration has to spell it in pieces. Leaving `*.test.ts` out would let them read plainly.

@@ -31,7 +31,8 @@ Each of these is something a competitor does well. Leaving them out is why this 
 |---|---|
 | Pomodoro of 25 / 5, a 15 to 30 minute long break after four, all adjustable, free | Cirillo's definition; locked custom lengths were Focus To-Do's top complaint |
 | A deliberate tap to start each pomodoro; auto-start is an option, off by default | Cirillo: starting is "a declaration of your determination" |
-| Pause, stop, and set aside. A stopped pomodoro keeps its minutes but is not a lap, and the next start is a fresh one. One set aside ("void") stays in history and counts nowhere. Neither is scolded | Minutes really worked are kept; Cirillo's void, "as if it had never been set", is there when the user asks for it; no punishment ([motivation.md](research/motivation.md) §6) |
+| Marking a task done while its lap runs ends the lap there. After a bell and in a break, "Done for now" puts the timer to rest without starting anything | The user: a timer still counting for a ticked task read as a bug; and someone finished for the day had two buttons that both started something |
+| Pause, and one Stop. Stop ends the lap where it is: it keeps its minutes, is drawn as full as it ran, and the next start is the next lap. A lap can be taken out of the count afterwards, from the day's timeline ("Don't count it"), and put back. Neither is scolded | One rule a person can say back: a lap ends at its bell or when you stop it. Minutes really worked are kept; what is earned (a streak day, a mark, a cheer) still needs the bell; no punishment ([motivation.md](research/motivation.md) §6) |
 | A pomodoro can be for a task or for nothing in particular | Starting must not need planning |
 | Time left identical on every device, live; any device can pause or stop it | The user's first requirement |
 | Rings on time on the phone with the screen off; a live countdown in the notification | Focus To-Do users complained of timers dying in the background |
@@ -42,16 +43,16 @@ Each of these is something a competitor does well. Leaving them out is why this 
 
 | Feature | Why |
 |---|---|
-| Tasks with an estimate in whole pomodoros, and done vs estimate shown on each. Done may pass the estimate ("6 of 5"), with no warning colour | Cirillo's estimate loop; Focus To-Do's best planning feature; the overrun feeds estimate accuracy |
+| Tasks with an estimate in whole pomodoros, 8 at most, and done vs estimate shown on each. Done may pass the estimate ("6 of 5"), with no warning colour | Cirillo's estimate loop; Focus To-Do's best planning feature; the overrun feeds estimate accuracy |
 | A gentle nudge when an estimate is over 7 ("break it down?") | Cirillo: "If It Takes More Than 5-7 Pomodoros, Break It Down" |
 | Projects with a colour, used to tag what the time went to (C, React, Next.js): twelve to choose from, or any colour from the device's picker | The record reads as a learning log ([motivation.md](research/motivation.md) §7); five tones were too few for the user |
 | Subtasks, one level | Enough to break a task down; deeper trees are project management |
 | Due date and repeat (daily, chosen weekdays, weekly) | Free in v1; locked repeats were a Focus To-Do complaint |
 | A time of day on a task's due day ("15:30"), shown on its row; the phone app reminds at that minute if the task is not done. The browser shows the time and does not remind | Asked for by the user on first use: "giving a task a time is the whole point" |
 | A day target in pomodoros with a bar that fills toward it | Goal-gradient: effort rises as the goal nears |
-| Optional "when" on a planned task ("after dinner") | Implementation intentions, d = .65 |
 | Quick add with the estimate typed inline ("pointers chapter 3 ~4") | Capture in one line |
-| Recently deleted, 30 days | Undo for the rare sync clash, and for mistakes |
+| Recently deleted, 30 days, with "Delete for good" on each row for what should go now | Undo for the rare sync clash, and for mistakes; and the user's word: what is mine I can rename and I can remove |
+| A project can be renamed, recoloured and deleted where it is chosen; its tasks stay | A typo in a project's name was in every task sheet for good |
 
 ### 3. Progress (the record)
 
@@ -138,3 +139,5 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-25 | The app asks for its server and allows plain http; a fresh server is set up from the app; owner, admin and member, on Docmost's invitation flow written fresh (links good for 7 days, used once, renewed, taken back). No members list, no removing an account, no password reset: the user's words |
 | 2026-11-25 | From the user's first hour with the app: a welcome that says what heirloom is (the phone app's first screen, and beside the browser's sign-in); a clock time on a task with a reminder on the phone; twelve project colours and a picker; "set aside" becomes "not counted" in every word the app says; nothing on a screen selects; things move when they change, and a tap never moves the page |
 | 2026-11-25 | Today's tasks can be put in order by hand (the lead's reading: "Next" needs an order, and ARCHITECTURE section 4 already rules on two devices reordering). Notes on a task are not in v1: the field exists in the data, no screen shows it, until the user says so |
+| 2026-11-25 | From the user's second hour: one Stop. A stopped lap is a lap that ended early (it has its place in the set and on its task, and is drawn as full as it ran), where it used to give its place back; the second button, "Don't count this lap", is gone from Focus and lives on in the timeline. A lap always leaves a row, however short. The free words for "when" are gone from a task: a clock time says it. An estimate stops at 8 laps. Today's order is changed by pressing and holding a row |
+| 2026-11-25 | Whatever a person makes they can rename and remove: a project gets a name and a Delete, and a deleted task or habit can be deleted for good without waiting 30 days (the user, after a stranger's walk found a project could never be changed) |

@@ -163,3 +163,43 @@ Two things about process, for the lead:
 - **A rule read as a ban hides a hole.** "No animation on a loop, the timer never animates" grew
   into "nothing animates". When a rule says what not to do, the review still asks what should
   be there instead.
+
+## 9. Lessons from the user's second hour
+
+Written 2026-11-25. Section 11's fixes were in their hand an hour later and nine more points
+came back. Most were not new kinds of bug: they were the first hour's fixes, each right where
+it was tested and wrong one step to the side. **A fix is tested where it was not made:** in a
+sheet as well as on a screen, at the end of a page as well as its middle, at the largest number
+as well as a small one.
+
+| What the user met | The check, before any screen ships |
+|---|---|
+| Words in a sheet could be selected after "nothing selects" shipped | A rule for "everything" is checked in every layer: a screen, an open sheet (the browser's top layer), the bar, a menu. The e2e test for it opens a sheet |
+| After "Keep this order" Today sat pushed up under the header, with a blank end below | A page that fits is never scrolled; no page is scrolled past its content. After every tap, at the top, the middle and the end of a page: is anything blank, is the heading where it was? A fix that invents room (a blank end, a spacer) is a second bug |
+| A field in a sheet touched the keyboard; the last field sat mid-screen over nothing | Focus every field of every sheet with the window as short as a phone with its keyboard up (412x1180 of 412x2000). The field has room above and below; the sheet ends at its content |
+| An estimate of 45 laps: squares off the card, the title one letter to a line | Every number has a top and every row is looked at with the top in it, beside a 60 character title. A title breaks between words, never inside one. A demo state holds the extreme so the audit sees it every run |
+| "Stop", "Stop and log 2 min" and "Don't count this lap": "why two stop buttons?" | One act, one control, one name that does not change. If two controls end, remove or undo the same thing, one goes. If the difference needs a sentence to explain, the person will not read it |
+| "When in the day" beside a clock time: "what does it actually do?" | Every field is asked: what does the app do with this? "It shows it back to you" beside a field that does more is not an answer. A field that came from a research paper goes when a plainer one arrives |
+| "Change the order" was a link into a mode | A thing people do with their hands on every phone (drag a row, swipe back, pull down) is done that way here, with a keyboard path beside it. A link that turns the screen into another screen is the last resort |
+| "Another colour" opened a list before the picker; the picked colour moved the button | A control that opens the platform's own picker is tried on the phone, not in the laptop's browser: the two differ. A control never moves because it was used |
+| "New project" stayed open after another project was chosen | What opened for one question closes when the question is answered another way. Open every form, then answer it from outside the form |
+| The Pause button on the light strip was grey on white | A component is looked at on every ground it can stand on, the inverted one too. The fix for a pair of buttons on the page was never looked at on the strip |
+
+For the lead:
+
+- **Ask what the first fix did not cover before the user finds it.** After a round of fixes,
+  list for each one the places it was not tried (other layers, other grounds, the extremes, the
+  ends of a page) and try those. This round would have been three points, not nine.
+- **Walk it as a stranger, every section.** See `skills/stranger-walk`.
+- **A green suite says what the tests ask, not what the app does.** With 127 browser tests
+  passing, the code review still found five bugs a person would hit in the first minutes (the lap
+  that had just rung drawn empty, a dropped row opening its sheet, a picker that overwrote a colour
+  on opening). The review runs before anyone is told a build is ready, and each bug it finds gets
+  the test that would have caught it.
+- **A change to what a word means is traced through every reader of it.** "A lap" grew to include
+  a stopped one, and three places that meant "a lap that rang" quietly changed with it (a mark,
+  today's count mid-extension, the bar after a bell). When a definition moves, list every use and
+  say for each which meaning it had.
+- **The user's model wins over the book's.** Cirillo's pomodoro is indivisible, so a stopped
+  one was "not a lap"; the user's is "stop ends the lap, the next is lap 2". When the product's
+  rule needs explaining and the user's does not, take theirs and write down what it costs.
