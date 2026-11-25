@@ -7,14 +7,15 @@ import { Square } from './square.tsx';
 import css from './task-row.module.css';
 
 interface Props {
-  task: TaskView;
+  /** A task, or as much of one as a row shows. */
+  task: Pick<TaskView, 'id' | 'title' | 'project' | 'estimate' | 'laps' | 'squares' | 'done'>;
   /** After the laps run: " of 4", or nothing when there is no estimate. */
   of: string;
   /** A few words after the squares: a date, "after dinner". */
   note?: string;
   /** The one to start next: outlined in you. */
   next?: boolean;
-  /** At the row's end: a button, the move controls. The squares and the count sit to its left. */
+  /** At the row's end: a button. The squares and their count sit to its left, or under it where a title leaves them no room. */
   end?: ComponentChildren;
   /** What the box marks, for a screen reader. Left out with `onDone`, there is no box. */
   checkLabel?: string;
@@ -52,19 +53,23 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
     // The box round the row is what is measured, so the row itself can be laid out by its width: it wraps where it is very narrow.
     <div class={css.measure}>
     <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked)} data-lift={lift ? task.id : undefined}>
-      {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
-      {onOpen ? (
-        <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>
-          {words}
-        </button>
-      ) : (
-        <div class={css.words}>{words}</div>
-      )}
-      {/* A control at the row's end has the squares and the count to its left, centred on it. */}
-      <div class={css.end}>
-        {laps}
-        {end}
+      {/* The box and the words are one piece: a row that breaks never parts them. */}
+      <div class={css.lead}>
+        {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
+        {onOpen ? (
+          <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>
+            {words}
+          </button>
+        ) : (
+          <div class={css.words}>{words}</div>
+        )}
       </div>
+      {(laps || end) && (
+        <div class={css.end}>
+          {laps}
+          {end}
+        </div>
+      )}
       {links && <div class={css.links}>{links}</div>}
       </div>
     </div>

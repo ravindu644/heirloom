@@ -1,12 +1,6 @@
-/* The squares give way to a title as a whole: all of them or none. This box has no width of
-   its own (so the row's words are measured without it) and grows into what room the row has
-   left, up to the width of its squares. It is one square tall and wraps: squares that do not
-   fit on its one line fall to a second, which is cut off. */
-.fit { display: inline-flex; flex: 1 1 0; flex-wrap: wrap; min-width: 0; max-width: calc(var(--n) * (var(--layout-lane) + var(--space-xs)) - var(--space-xs)); height: var(--layout-lane); overflow: hidden; contain: inline-size; }
-/* Something that is always on the first line, a square tall and no width at all: a line holds
-   its first item whatever its width, so without this the squares would never wrap. */
-.fit::before { content: ""; width: 0; height: var(--layout-lane); }
-.squares { display: inline-flex; flex: none; gap: var(--space-xs); }
+/* As wide as its longest line and no wider: a line that is not full ends at the right edge,
+   under the last square of the line over it. */
+.squares { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-xs); width: calc(var(--n) * (var(--layout-lane) + var(--space-xs)) - var(--space-xs)); }
 .squares i { position: relative; width: var(--layout-lane); height: var(--layout-lane); overflow: hidden; background: var(--track, var(--line)); }
 .squares i::after {
   content: "";

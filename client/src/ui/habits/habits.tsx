@@ -97,6 +97,13 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
   }, [shelf, shelved.length]);
 
   const most = Math.max(week.now, week.before, 1);
+  // Said on the bar, as a task added is.
+  const add = (text: string) => {
+    if (habits.add(text, 127, 1) === null) return false;
+    say({ lead: s.today.saidAdded, title: text.trim() });
+    return true;
+  };
+
   return (
     <div class={cx(css.habits, said.room)}>
       <header class={css.head}>
@@ -111,7 +118,7 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
 
       <div class={css.cols} ref={lists}>
         <Fold gap="md" data-said>
-          <QuickAdd key="add" name="habit" label={s.habits.add} hint={s.habits.addHint} go={s.today.addGo} onAdd={(text) => habits.add(text, 127, 1) !== null} />
+          <QuickAdd key="add" name="habit" label={s.habits.add} hint={s.habits.addHint} example={s.habits.addExample} go={s.today.addGo} said onAdd={add} />
 
           {list.length === 0 ? (
             <p key="empty" class={css.quiet}>

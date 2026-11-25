@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { UNDO_MS } from '../../sync/focus.ts';
 import type { HabitView, Habits } from '../../sync/habits.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
@@ -42,6 +43,45 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
   };
   const done = habit.record.filter((day) => day.done).length;
 
+  // A time for each time a day it is done, at most: the ones set and one empty field after them,
+  // so twenty times a day is not twenty empty fields. What is written is the times in order with
+  // the empty ones left out; a field being typed in or cleared keeps its place until the focus
+  // leaves the group, and then they stand closed up, in the order they will ring.
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const held = draft ?? habit.reminds;
+  const last = held.reduce((at, time, i) => (time ? i : at), -1);
+  const times = Array.from({ length: Math.min(habit.target, last + 2) }, (_, i) => held[i] ?? '');
+  const remind = (at: number, time: string) => {
+    const next = times.map((was, i) => (i === at ? time : was));
+    setDraft(next);
+    edit({ reminds: next.filter(Boolean).sort() });
+    cut.current = [];
+    if (time && habit.reminds.length === 0) onReminderSet?.();
+  };
+  // A count stepped down cuts the times past it, and stepped up again while the sheet is open
+  // it has them back: one press too many on minus is not a reminder lost. A time set or cleared
+  // by hand in between is the newer word, and the cut ones are let go.
+  const cut = useRef<string[]>([]);
+  const less = () => {
+    if (habit.reminds.length > cut.current.length) cut.current = habit.reminds;
+    edit({ target: Math.max(1, habit.target - 1) });
+  };
+  const more = () => {
+    const target = Math.min(TARGET_MAX, habit.target + 1);
+    const back = cut.current.slice(habit.reminds.length, target);
+    edit(back.length > 0 ? { target, reminds: [...habit.reminds, ...back] } : { target });
+  };
+  // All of them removed in one tap can be had back for as long as any Undo lasts. Said here in
+  // the sheet: the bar stands under an open sheet, where it cannot be read.
+  const [removed, setRemoved] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const timer = setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [removed]);
+  const many = habit.target > 1;
+  const note = many ? s.habits.remindsNote : s.habits.remindNote;
+
   return (
     <Sheet grows title={s.habits.sheet} close={s.task.close} onClose={onClose}>
       <Field label={s.habits.title} {...title} />
@@ -75,8 +115,8 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
           text={s.habits.times(habit.target)}
           less={s.habits.less}
           more={s.habits.more}
-          onLess={() => edit({ target: Math.max(1, habit.target - 1) })}
-          onMore={() => edit({ target: Math.min(TARGET_MAX, habit.target + 1) })}
+          onLess={less}
+          onMore={more}
           top={habit.target >= TARGET_MAX}
           floor={habit.target <= 1}
         />
@@ -95,23 +135,51 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
         </Fold>
       </fieldset>
 
-      <div class={css.remind}>
-        <Field
-          label={s.habits.remind}
-          hint={app ? s.habits.remindNote : `${s.habits.remindNote} ${s.remindsWhere}`}
-          type="time"
-          value={habit.remind ?? ''}
-          onInput={(event) => {
-            const time = event.currentTarget.value || null;
-            edit({ remind: time });
-            if (time && !habit.remind) onReminderSet?.();
-          }}
-        />
-        {habit.remind && (
-          <Button kind="link" onClick={() => edit({ remind: null })}>
-            {s.habits.noRemind}
-          </Button>
-        )}
+      <div class={css.remind} role="group" aria-label={s.habits.reminds} onFocusOut={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && setDraft(null)}>
+        {/* Two to a line, and a line opens for every two more. */}
+        <Fold gap="md">
+          {times.map(
+            (_, at) =>
+              at % 2 === 0 && (
+                <div key={at} class={cx(css.times, !many && css.one)}>
+                  {times.slice(at, at + 2).map((time, i) => (
+                    <Field key={i} label={many ? s.habits.remindNth(at + i + 1) : s.habits.remind} type="time" value={time} onInput={(event) => remind(at + i, event.currentTarget.value)} />
+                  ))}
+                </div>
+              ),
+          )}
+        </Fold>
+        <small>{app ? note : `${note} ${s.remindsWhere}`}</small>
+        <Fold>
+          {habit.reminds.length > 0 && (
+            <Button
+              key="remove"
+              kind="link"
+              onClick={() => {
+                setRemoved(habit.reminds);
+                cut.current = [];
+                setDraft(null);
+                edit({ reminds: [] });
+              }}
+            >
+              {many ? s.habits.noReminds : s.habits.noRemind}
+            </Button>
+          )}
+          {removed && habit.reminds.length === 0 && (
+            <p key="gone" class={css.gone} role="status">
+              {removed.length > 1 ? s.habits.remindsGone : s.habits.remindGone}
+              <Button
+                kind="link"
+                onClick={() => {
+                  edit({ reminds: removed });
+                  setRemoved(null);
+                }}
+              >
+                {s.today.undo}
+              </Button>
+            </p>
+          )}
+        </Fold>
       </div>
 
       <section class={cx(form.group, css.record)} aria-label={s.habits.record}>

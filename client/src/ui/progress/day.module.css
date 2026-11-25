@@ -35,7 +35,7 @@
 .look { display: grid; gap: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--line); }
 .look h3 { font: var(--type-label); color: var(--muted); }
 .done { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
-.done li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
+.done li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); padding: var(--space-sm) 0; }
 .done li + li { border-top: 1px solid var(--line); }
 .done li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

@@ -1,5 +1,7 @@
-/* The count keeps its room; the squares before it take what room is left, or none. */
-.laps { display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: var(--space-sm); }
-/* Small, so a list never reads as a column of large zeros. */
-.count { flex: none; font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
+/* The squares, then their count, on one line that never breaks. */
+.laps { display: inline-flex; flex: none; align-items: flex-start; gap: var(--space-sm); margin-left: auto; }
+/* Small, so a list never reads as a column of large zeros. The count stands on the first line
+   of the squares, centred on it: its box is one square tall and its words, a taller line, are
+   centred in that and reach past it above and below. */
+.count { display: inline-flex; flex: none; align-items: center; height: var(--layout-lane); font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
 .count b { font: inherit; color: var(--ink); }

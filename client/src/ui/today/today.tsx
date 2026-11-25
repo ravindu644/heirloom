@@ -237,14 +237,14 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
       <div>
       <div class={css.cols} ref={lists}>
         <Fold gap="md" data-said>
-          <QuickAdd key="add" name="task" label={s.today.add} hint={s.today.addHint} go={s.today.addGo} onAdd={add} />
+          <QuickAdd key="add" name="task" label={s.today.add} hint={s.today.addHint} example={s.today.addExample} go={s.today.addGo} said onAdd={add} />
 
           {state.phase !== 'idle' && !(isBreak && view.over) && (
             <div key="bar" class={css.bar}>
               <i class={isBreak ? css.rest : undefined} />
               <a href="#/focus" aria-label={s.today.toFocus}>
                 {rung ? (
-                  <span class={css.rung}>{s.today.lapDone(state.set_index + 1)}</span>
+                  <span class={css.rung}>{s.today.lapDone}</span>
                 ) : (
                   <>
                     <b>{s.clock(view.left_ms)}</b>
@@ -256,7 +256,8 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
                   next, here as on Focus: its button takes the fill and the list's Start steps down. */}
               {rung ? (
                 <Button kind="primary" onClick={() => focus.start()}>
-                  {s.focus.startBreak(view.next.phase === 'long' ? focus.lengths.value.long_ms : focus.lengths.value.short_ms)}
+                  {/* The break a lap on this task has earned: the task's own length where it has one. */}
+                  {s.focus.startBreak(focus.lengthsFor(state.task)[view.next.phase === 'long' ? 'long_ms' : 'short_ms'])}
                 </Button>
               ) : view.paused ? (
                 <Button class={css.onBar} onClick={() => focus.resume()}>
@@ -358,6 +359,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
             onClose={() => setOpen(null)}
             onDone={() => setDone(opened, !opened.done)}
             onRemove={() => remove(opened)}
+            lengths={focus.lengths.value}
             app={app}
             onReminderSet={onReminderSet}
           />

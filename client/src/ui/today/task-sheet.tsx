@@ -1,5 +1,5 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { UNDO_MS } from '../../sync/focus.ts';
 import { COLORS, ESTIMATE_MAX, PROJECT_NAME_MAX } from '../../sync/today.ts';
 import type { ProjectColor, SubtaskView, TaskView, Today } from '../../sync/today.ts';
@@ -9,6 +9,8 @@ import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import { Fold } from '../kit/fold.tsx';
 import { hueHex, toneOf } from '../kit/hue.ts';
+import { Lengths } from '../kit/lengths.tsx';
+import type { LengthsOf } from '../kit/lengths.tsx';
 import { Picker } from '../kit/picker.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Square } from '../kit/square.tsx';
@@ -44,6 +46,8 @@ interface Props {
   /** Done or not done, said and undone by the list behind. */
   onDone: () => void;
   onRemove: () => void;
+  /** The account's lengths: what a task's own start from, and what stands in for one it does not have. */
+  lengths: LengthsOf;
   /** In the phone app, which reminds at a task's time. A browser only shows the time. */
   app?: boolean;
   /** The task was given a time where it had none: the moment to ask for leave to notify. */
@@ -51,7 +55,7 @@ interface Props {
 }
 
 /** One task, open. Every edit is saved as it is made: there is no Save, and closing loses nothing. */
-export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false, onReminderSet }: Props) {
+export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app = false, onReminderSet }: Props) {
   // The project form: for a new one, or filled in with the chosen one, where each change is kept as it is made.
   const [making, setMaking] = useState<'new' | 'edit' | false>(false);
   const editing = making === 'edit' ? task.project : null;
@@ -87,6 +91,11 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
   };
   const [chosen, setChosen] = useState(task.repeat?.every === 'week');
   const estimate = task.estimate ?? 0;
+  const own = Object.values(task.lengths).some((length) => length !== null);
+  // What a lap on this task gets: its own length where it has one, the account's where it has not.
+  const ownLengths = { work_ms: task.lengths.work_ms ?? lengths.work_ms, short_ms: task.lengths.short_ms ?? lengths.short_ms, long_ms: task.lengths.long_ms ?? lengths.long_ms };
+  // "My usual lengths" tapped to compare, or by mistake: while the sheet is open, "Its own" gives back what was set.
+  const keptOwn = useRef<LengthsOf | null>(null);
   const edit = today.edit.bind(today, task.id);
   const title = useTyped(task.title, (text) => text.trim() && edit({ title: text }));
   const leave = (then: () => void) => () => {
@@ -271,6 +280,34 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
               <Button kind="link" data-moves onClick={(event) => event.currentTarget.closest('dialog')?.querySelector<HTMLInputElement>('[name="subtask"]')?.focus()}>
                 {s.task.nudgeGo}
               </Button>
+            </p>
+          )}
+        </Fold>
+      </fieldset>
+
+      {/* One choice, and with "Its own" the three steppers Settings has, starting from the
+          account's. They are kept at once, as everything here is: what is shown is what a lap
+          on this task will get. */}
+      <fieldset class={form.group}>
+        <legend>{s.settings.lengths}</legend>
+        <Fold gap="md">
+          <div key="choices" class={form.choices}>
+            <button type="button" class={form.choice} aria-pressed={!own}
+              onClick={() => {
+                if (own) keptOwn.current = ownLengths;
+                edit({ work_ms: null, short_ms: null, long_ms: null });
+              }}
+            >
+              {s.task.usual}
+            </button>
+            <button type="button" class={form.choice} aria-pressed={own} onClick={() => own || edit(keptOwn.current ?? lengths)}>
+              {s.task.own}
+            </button>
+          </div>
+          {own && <Lengths key="own" of={ownLengths} onSet={edit} />}
+          {own && (
+            <p key="note" class={css.saved}>
+              {s.task.ownNote}
             </p>
           )}
         </Fold>

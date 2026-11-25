@@ -10,3 +10,9 @@
   white-space: nowrap;
 }
 .strip .yours { color: var(--you); }
+/* A phone at twice its type size: three side by side cut their words and their figures, so they
+   stand one under another, a line between them. */
+@media (max-width: 280px) {
+  .strip { grid-auto-flow: row; }
+  .strip div + div { border-top: 1px solid var(--line); border-left: 0; }
+}

@@ -1,10 +1,12 @@
-import { effect, signal } from '@preact/signals-core';
+import { computed, effect, signal } from '@preact/signals-core';
 import { render } from 'preact';
 import { onFront, startPlatform } from './platform/index.ts';
+import { isPaused } from './platform/notifier.ts';
 import { serverChoice, startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
 import { FirstRun } from './ui/welcome.tsx';
+import { planFor } from './plan.ts';
 import { result, ring } from './ui/strings.ts';
 
 const root = document.getElementById('app')!;
@@ -12,6 +14,9 @@ const root = document.getElementById('app')!;
 // The phone app (`make apk`) is another origin from its server and asks which one. In a browser
 // the server is the page's own and nothing asks.
 const APP = !!import.meta.env.VITE_APP;
+
+// A bell that moves by less than this is the same bell: well inside the two seconds a bell may be late.
+const STEADY_MS = 500;
 
 async function start() {
   // A build may come with an address filled in; once one is kept, that is the one.
@@ -42,9 +47,9 @@ async function start() {
       request: (path, body) => engine.request(path, body),
       remembered: () => engine.kept('push'),
       remember: (sent) => engine.keep('push', sent),
-      // Asked for at each subscribe: the break lengths in them change in Settings.
+      // Asked for at each subscribe: the break lengths in them change in Settings, and with the task.
       words: () => {
-        const breaks = focus.lengths.peek();
+        const breaks = focus.lengthsFor(focus.state.peek().task);
         return {
           lap: laps.map(ring.lapDone),
           take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
@@ -63,43 +68,58 @@ async function start() {
   effect(() => notifier.ringHere(settings.ringHere.value));
   effect(() => notifier.account(engine.account.value ? 'in' : 'out'));
   // A closed tab's bell is worded by the server from what it was last sent: send again when
-  // the lengths change, or a push would say "Take five" for a ten minute break.
+  // the lengths change, in Settings or with the task the lap is on, or a push would say
+  // "Take five" for a ten minute break.
+  // Read as one string: the lengths are worked out from every task row, and a title typed in
+  // a sheet must not send the words again at each letter.
+  const breaks = computed(() => Object.values(focus.lengthsFor(focus.state.value.task)).join());
   effect(() => {
-    void focus.lengths.value;
+    void breaks.value;
     notifier.reword();
   });
-  // A habit with a reminder time is reminded on this device on the days it is planned, until it
-  // is checked in. A task with a time is reminded once, at that minute of its day, while it is
-  // open. The notifier keeps what the phone holds equal to this one list.
+  // A habit is reminded on this device at each of its times on the days it is planned: the first
+  // time until the first check-in of the day, the second until the second, and so on. A task
+  // with a time is reminded once, at that minute of its day, while it is open. The notifier
+  // keeps what the phone holds equal to this one list.
   effect(() =>
     notifier.reminders([
-      ...app.habits.list.value
-        .filter((habit) => habit.remind)
-        .map((habit) => ({ habit: habit.id, title: habit.title, body: ring.remindBody, time: habit.remind!, days: habit.days, doneToday: habit.today.done })),
+      ...app.habits.list.value.flatMap((habit) =>
+        habit.reminds.map((time, place) => ({ habit: `${habit.id}#${place}`, title: habit.title, body: ring.remindBody, time, days: habit.days, doneToday: habit.today.count > place })),
+      ),
       ...app.today.timed.value.map((task) => ({ habit: task.id, title: task.title, body: ring.taskBody(task.time), time: task.time, days: 127, day: task.day, doneToday: false })),
     ]),
   );
 
-  // The ring is planned whenever the timer changes, on any device. The timer counts in server
-  // time and the notifier in this device's own, so the end is moved across by the difference.
+  let held = { bell: '', at: 0 };
+  // The ring is planned whenever the timer changes, on any device, and whenever the line beside
+  // the countdown would read differently: the task's title, its laps, its estimate. What is
+  // planned is worked out in plan.ts.
   effect(() => {
     const state = focus.state.value;
-    const lengths = focus.lengths.value;
     // Also when the connection comes or goes: a welcome is when the device learns how far its
     // own clock is from the server's, and an alarm planned before that would ring that far off.
     void engine.sync.value;
+    const on = state.phase !== 'work' ? undefined : [...app.today.list.value, ...app.today.upcoming.value].find((task) => task.id === state.task);
+    // The timer counts in server time and the notifier in this device's own.
     const view = focus.view();
-    if (state.phase === 'idle' || view.ends_at === null) return notifier.plan(null);
-    const at = view.ends_at - (engine.now() - Date.now());
-    // The server names a bell by its run and its end in server time; the same pair lets the page
-    // know a push it hears of is for the bell it has planned.
-    const push = state.run === null ? undefined : { run: state.run, at: view.ends_at };
-    const lap = state.set_index + 1;
-    notifier.plan(
-      state.phase === 'work'
-        ? { at, title: ring.lapDone(lap), body: result.take(lap === 4 ? lengths.long_ms : lengths.short_ms), during: ring.lapRunning(lap), push }
-        : { at, title: ring.breakOver, body: ring.lapNext(view.next.set_index + 1), during: ring.breakRunning(state.phase === 'long'), push },
-    );
+    const plan = planFor({ state, view, on, lengths: focus.lengthsFor(state.task), ahead: engine.now() - Date.now() });
+    // The distance to the server's clock is smoothed at every ping, so the same bell works out
+    // a few ms apart from one run of this to the next. An alarm is not set again for that.
+    if (plan && !isPaused(plan)) {
+      const bell = `${state.run} ${view.ends_at}`;
+      if (held.bell === bell && Math.abs(plan.at - held.at) < STEADY_MS) plan.at = held.at;
+      else held = { bell, at: plan.at };
+    }
+    notifier.plan(plan);
+  });
+  // The countdown's buttons do what the same buttons on Focus do: this page stays the one
+  // writer of the timer, and a tap made while the app was away is done when it is back.
+  // A button of a notification left over from an earlier run does nothing.
+  notifier.onAction((act, run) => {
+    if (run !== focus.state.peek().run) return;
+    if (act === 'pause') focus.pause();
+    else if (act === 'resume') focus.resume();
+    else focus.stop();
   });
 
   // Permission to notify is asked for at the first start, from the tap, when it is plain what

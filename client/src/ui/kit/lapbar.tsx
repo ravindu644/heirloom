@@ -12,15 +12,18 @@ interface Props {
   big?: boolean;
   /** The set-done moment: the four segments light in turn, once. */
   lighting?: boolean;
+  /** The set's bar only: a short mark after the last lap, the long break the laps earn. True while that break is on, running or not. Left out, there is no mark. */
+  longBreak?: boolean;
 }
 
 /** The set of four, or a day's laps. The words beside it say the same thing, so a screen reader skips the picture. */
-export function LapBar({ fills, of = 4, share = 0, big, lighting }: Props) {
+export function LapBar({ fills, of = 4, share = 0, big, lighting, longBreak }: Props) {
   return (
-    <div class={cx(css.laps, big && css.big, lighting && css.lighting)} style={`--of:${of}`} aria-hidden="true">
+    <div class={cx(css.laps, big && css.big, lighting && css.lighting, longBreak !== undefined && css.ending)} style={`--of:${of}`} aria-hidden="true">
       {Array.from({ length: of }, (_, i) => (
         <i key={i} style={`--share:${Math.min(1, fills[i] ?? (i === fills.length ? share : 0))};--i:${i}`} />
       ))}
+      {longBreak !== undefined && <i class={css.rest} style={`--share:${+longBreak}`} />}
     </div>
   );
 }

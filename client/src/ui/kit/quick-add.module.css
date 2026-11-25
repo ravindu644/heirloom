@@ -17,3 +17,5 @@
 .add button { position: absolute; top: var(--space-xs); right: var(--space-xs); width: var(--layout-touch); min-height: calc(var(--layout-touch) - var(--space-sm)); padding: 0; transition: opacity var(--motion-fill) var(--motion-ease), visibility var(--motion-fill); }
 .add button::after { content: ""; position: absolute; inset: calc(var(--space-xs) * -1); }
 .add button:disabled { visibility: hidden; opacity: 0; }
+/* The shorthand as what one types, under the field while it is in use. */
+.example { padding-top: var(--space-xs); font: var(--type-label); color: var(--muted); }

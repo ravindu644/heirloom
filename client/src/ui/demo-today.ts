@@ -22,6 +22,10 @@ export interface DemoTask {
   when?: string;
   /** A clock time on its due day: "16:40". */
   time?: string;
+  /** Its own lengths, in ms: left out, the account's. */
+  work_ms?: number | null;
+  short_ms?: number | null;
+  long_ms?: number | null;
   repeat?: Repeat;
   notes?: string;
   done?: boolean;
@@ -98,6 +102,7 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       due: task.due ?? null,
       when: task.when ?? null,
       time: task.due ? (task.time ?? null) : null,
+      lengths: { work_ms: task.work_ms ?? null, short_ms: task.short_ms ?? null, long_ms: task.long_ms ?? null },
       repeat: task.repeat ?? null,
       deleted: task.deleted ?? null,
       done: !!task.done,

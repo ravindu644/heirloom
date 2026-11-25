@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { Button } from './button.tsx';
 import css from './stepper.module.css';
 
@@ -24,9 +24,13 @@ interface Props {
  * back. The caller names what is counted in the section it sits in.
  */
 export function Stepper({ text, less, more, onLess, onMore, typed, top = typed ? typed.value >= typed.max : false, floor = typed ? typed.value <= typed.min : false }: Props) {
-  const [draft, setDraft] = useState<string | null>(null);
-  // A value that changed elsewhere (a button here, another device) replaces what was half typed.
-  useEffect(() => setDraft(null), [typed?.value]);
+  // What is being typed, with the value it was typed over: a value that changed elsewhere (a
+  // button here, another device) replaces what was half typed. Read as it is drawn and not
+  // cleared by an effect: an effect also runs once after the field first shows, and threw away
+  // a figure typed into a stepper in its first moments.
+  const [typing, setTyping] = useState<{ text: string; over: number } | null>(null);
+  const draft = typing && typing.over === typed?.value ? typing.text : null;
+  const setDraft = (text: string | null) => setTyping(text === null || !typed ? null : { text, over: typed.value });
   const keep = () => {
     // An emptied field is no value: `Number('')` is 0, and where 0 is in bounds (a room's target)
     // it would be taken for one.

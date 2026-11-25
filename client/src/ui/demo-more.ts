@@ -25,6 +25,8 @@ export interface DemoHabit {
   days?: number;
   target?: number;
   remind?: string;
+  /** One time for each time a day it is done, in order. */
+  reminds?: string[];
   /** Check-ins by day. */
   counts: Record<string, number>;
   archived?: boolean;
@@ -64,7 +66,7 @@ export function demoHabits(seed: DemoHabit[]): Habits {
   const view = (habit: DemoHabit): HabitView => {
     const days = habit.days ?? 127;
     const target = habit.target ?? 1;
-    return { id: habit.id, title: habit.title, days, target, remind: habit.remind ?? null, deleted: habit.deleted ? DELETED_AT : null, ...habitDays({ days, target }, new Map(Object.entries(habit.counts)), DAY) };
+    return { id: habit.id, title: habit.title, days, target, reminds: habit.reminds ?? (habit.remind ? [habit.remind] : []), remind: habit.reminds?.[0] ?? habit.remind ?? null, deleted: habit.deleted ? DELETED_AT : null, ...habitDays({ days, target }, new Map(Object.entries(habit.counts)), DAY) };
   };
   const bump = (id: string, by: number) => {
     const habit = all.value.find((one) => one.id === id);
@@ -97,7 +99,13 @@ export function demoHabits(seed: DemoHabit[]): Habits {
       all.value = [...all.value, { id, title: title.trim(), days, target, counts: {} }];
       return id;
     },
-    edit: (id, fields) => change(id, { ...fields, title: fields.title?.trim() || all.value.find((habit) => habit.id === id)?.title, remind: fields.remind ?? undefined } as Partial<DemoHabit>),
+    // One list of times, sorted, never longer than the times a day it is done: as the real one keeps it.
+    edit(id, fields) {
+      const held = all.value.find((habit) => habit.id === id)!;
+      const target = fields.target ?? held.target ?? 1;
+      const times = fields.reminds ?? (fields.remind === undefined ? (held.reminds ?? (held.remind ? [held.remind] : [])) : fields.remind === null ? [] : [fields.remind]);
+      change(id, { ...fields, title: fields.title?.trim() || held.title, remind: undefined, reminds: [...times].sort().slice(0, target) } as Partial<DemoHabit>);
+    },
     checkIn(id) {
       bump(id, 1);
       return `in-${++ids}`;

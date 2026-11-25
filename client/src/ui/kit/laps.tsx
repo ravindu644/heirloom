@@ -11,14 +11,21 @@ interface Props {
   of: string;
 }
 
-/** Laps as small squares with the count they picture beside them, in `figure-sm`. Past the estimate nothing changes colour. */
+/**
+ * Laps as small squares with the count they picture at their right, in `figure-sm`. The two are
+ * one thing and never part: where a row has no room for them beside its words, the row puts the
+ * pair on a line of its own. Past the estimate nothing changes colour.
+ */
 export function Laps({ laps, squares, estimate, of }: Props) {
   return (
     <span class={css.laps}>
       <LapSquares squares={squares ?? Array.from({ length: laps }, () => 1)} estimate={estimate} />
+      {/* The words in a box one square tall, so they stand centred on the squares' first line. */}
       <span class={css.count}>
-        <b>{laps}</b>
-        {of}
+        <span>
+          <b>{laps}</b>
+          {of}
+        </span>
       </span>
     </span>
   );

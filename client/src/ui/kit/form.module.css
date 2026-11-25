@@ -40,3 +40,5 @@
 @media (min-width: 720px) {
   .ends > * { flex: none; }
 }
+/* Groups one under another, a group's gap apart, where nothing else lays them out. */
+.stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }

@@ -1,7 +1,8 @@
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-sm) var(--space-xs);
   min-height: calc(var(--layout-touch) + var(--space-md));
   padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xs);
   border-radius: var(--radius-md);
@@ -21,6 +22,8 @@
   gap: var(--space-xs);
   min-width: 0;
   min-height: var(--layout-touch);
+  /* As tall as the row, which the squares under a count may have made taller than the words. */
+  align-self: stretch;
   align-content: center;
   padding: 0;
   border: 0;
@@ -39,19 +42,24 @@ div.words { cursor: auto; }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); min-width: 0; color: var(--ink); overflow-wrap: break-word; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
-/* What is at the right gives way first: its count and its control keep their room, and its squares are drawn only in what the title leaves. */
-.end { position: relative; z-index: 1; display: flex; flex: 1 0 auto; align-items: center; justify-content: flex-end; gap: var(--space-md); }
+/* The squares and their count are one thing, at the row's end. Where the words leave them room
+   they stand beside the words; where they do not, the row breaks and they take a line of their
+   own, ending on the row's right edge. The row breaks by what its words would need on one line. */
+.lead { display: flex; flex: 1 1 auto; align-items: center; gap: var(--space-xs); min-width: 0; background: inherit; }
+.end { position: relative; z-index: 1; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-sm) var(--space-md); margin-left: auto; padding-left: var(--space-sm); }
+/* A row that ends in a control keeps the control on the words' line. Its end is as narrow as the
+   wider of the pair and the control and grows into the room the words leave: with room for both,
+   the pair stands left of the control; without, `wrap-reverse` puts the first of the two, the
+   pair, under the other. */
+.trailed { flex-wrap: nowrap; }
+.trailed .lead { flex: 0 1 auto; }
+.trailed .end { flex: 1 0 min-content; flex-wrap: wrap-reverse; }
 /* The words open the task, and so does the row's empty room: the target is laid over the whole row, under its box and what stands at its end. */
 .row { position: relative; }
-.row > :first-child:not(.words) { position: relative; z-index: 1; }
+.lead > :first-child:not(.words) { position: relative; z-index: 1; }
 button.words::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
-/* A row that ends in a control and is narrower than 400px: the squares give way and the count
-   stays. The title is worth more than the picture of a number already written. The row itself
-   is measured, not the screen. */
+/* The row itself is measured, not the screen. */
 .measure { container-type: inline-size; }
-@container (max-width: 400px) {
-  .trailed .end [data-squares] { display: none; }
-}
 
 /* A row with links of its own: at its end where there is room, and under the words in a narrow row. */
 .linked { flex-wrap: wrap; }
@@ -59,13 +67,12 @@ button.words::after { content: ""; position: absolute; inset: 0; border-radius: 
 @container (max-width: 400px) {
   .linked .links { flex-basis: 100%; }
 }
-/* A row too narrow to hold its words beside what stands at its end (a phone at twice its type
-   size is 206px wide): the title always has its room, so the end goes under the words, at the
-   row's right edge as ever. There is no room there to stand it on the words' own edge. */
+/* A row with a control that is too narrow to hold its words beside it (a phone at twice its type
+   size is 206px wide): the title always has its room, so the whole end goes under the words, at
+   the row's right edge as ever. */
 @container (max-width: 280px) {
-  .row { flex-wrap: wrap; }
-  .words { flex: 1 1 0; }
-  .end { flex: 1 0 100%; }
+  .trailed { flex-wrap: wrap; }
+  .trailed .end { flex-basis: 100%; }
 }
 
 .done .title { color: var(--muted); text-decoration-color: currentcolor; }

@@ -118,7 +118,24 @@ const TASKS: DemoTask[] = [
 ];
 const day = (tasks: DemoTask[] = TASKS, more: Partial<DemoDay> = {}): DemoDay => ({ tasks, target: 8, done_ms: 125 * MIN, laps: 5, ghost: { total_ms: 200 * MIN, laps: 8 }, ...more });
 const onKr = { ...lap2, task: 'kr' };
+// The squares at a count where a line fills or breaks, with the one below it and a single lap:
+// a long title and a short one, and the first row is the one with a Start button.
+const squaresDay = (n: number, shortFirst = false): DemoDay => {
+  const rows: DemoTask[] = [
+    { id: 'sq1', title: SIXTY, project: 'c', estimate: n, squares: Array<number>(Math.ceil(n / 2)).fill(1), due: DAY },
+    { id: 'sq2', title: 'Essay draft', project: 'uni', estimate: n, squares: [1, 0.5], due: DAY },
+    { id: 'sq3', title: SIXTY, estimate: n - 1, due: DAY },
+    { id: 'sq4', title: 'Essay draft', estimate: n - 1, squares: Array<number>(n - 1).fill(1), due: DAY },
+    { id: 'sq5', title: 'Read chapter 4', estimate: 1, due: DAY },
+    { id: 'sq6', title: SIXTY, estimate: n, squares: Array<number>(n).fill(1), done: true, due: DAY },
+    // One lap past what four lines hold: the count alone.
+    ...(n === 32 ? [{ id: 'sq7', title: 'Essay draft', estimate: n, squares: Array<number>(n + 1).fill(1), due: DAY }] : []),
+  ];
+  return day(shortFirst ? [rows[1]!, rows[0]!, ...rows.slice(2)] : rows);
+};
 const idleAt2: Scene = { about: '', next: 1, you: 125 * MIN, laps: 5, ghost: tuesday };
+// A task's own lengths: an hour of reading is not 25 minutes of drills.
+const OWN = { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN };
 const swap = (id: string, fields: Partial<DemoTask>) => TASKS.map((task) => (task.id === id ? { ...task, ...fields } : task));
 const READING: DemoTask = { id: 'read', title: 'Read one chapter of OSTEP', estimate: 1, due: DAY, repeat: { every: 'day' } };
 
@@ -157,22 +174,28 @@ const TODAY: Record<string, Scene> = {
   'today-untargeted': { ...idleAt2, about: 'The target removed on another device while its editor is open here: the way to set one is back', day: day(), tap: ['Change', 'demo:untarget'] },
   'today-top': {
     ...idleAt2,
-    about: 'Every row with its top in it: an estimate of 8, a task far past its estimate, a 60 character title, a target of 24',
+    about: 'Every row with its top in it: an estimate of 32, a task far past its estimate, a 60 character title, a target of 24',
     day: day(
       [
-        { id: 'top1', title: SIXTY, project: 'c', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1], due: DAY, time: '17:55' },
+        { id: 'top1', title: SIXTY, project: 'c', estimate: 32, squares: Array<number>(32).fill(1), due: DAY, time: '17:55' },
         { id: 'top2', title: 'Q/A session', project: 'react', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 1], due: DAY, time: '09:00' },
-        { id: 'top3', title: SIXTY, project: 'uni', estimate: 8, due: DAY },
-        { id: 'top4', title: SIXTY, project: 'next', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1], done: true, due: DAY },
-        { id: 'top5', title: SIXTY, project: 'c', estimate: 8, due: '2026-11-25', time: '23:59' },
+        { id: 'top3', title: SIXTY, project: 'uni', estimate: 32, due: DAY },
+        { id: 'top4', title: SIXTY, project: 'next', estimate: 32, squares: Array<number>(32).fill(1), done: true, due: DAY },
+        { id: 'top5', title: SIXTY, project: 'c', estimate: 32, due: '2026-11-25', time: '23:59' },
       ],
       { target: 24, laps: 24, done_ms: 600 * MIN },
     ),
   },
   'sheet-top': { ...idleAt2, about: 'The sheet of a task at the top of its estimate: the plus is off', day: day(swap('ex', { estimate: 8, title: SIXTY })), tap: SIXTY },
   'today-stopped': { ...idleAt2, about: 'A day with a stopped lap: the target bar draws it as full as it ran', day: day(TASKS, { fills: [1, 1, 0.5, 1, 0.2] }) },
+  'today-laps-9': { ...idleAt2, about: 'Squares where a second line begins: 9 laps, 8 and 1, long title and short', day: squaresDay(9) },
+  'today-laps-17': { ...idleAt2, about: 'Squares where a third line begins: 17 laps, 16 and 1, the short title first', day: squaresDay(17, true) },
+  'today-laps-32': { ...idleAt2, about: 'The most squares a row draws: 32 laps, 31 and 1', day: squaresDay(32) },
   'today-zoom': { about: 'The smallest row there is: one task with a project and an estimate, for a phone at twice its type size (206 wide)', next: 0, at: [9, 5], day: { tasks: [{ id: 'draft', title: 'chapter 2 draft', project: 'thesis', estimate: 4, due: DAY }], projects: [{ id: 'thesis', name: 'Thesis', color: 'plum' }] } },
   'today-no-target': { ...idleAt2, about: 'No day target set', day: day(TASKS, { target: 0 }) },
+  'today-adding': { ...idleAt2, about: 'The quick add in use: the shorthand as an example, under the field', day: day(), tap: 'focus:task' },
+  'sheet-own': { ...idleAt2, about: 'A task given its own lengths: three steppers that start from those of the account', day: day(), tap: ['Exercise 5-3', 'Its own'] },
+  'sheet-own-set': { ...idleAt2, about: 'A task whose own lengths are 50, 10 and 30 minutes', day: day(swap('ex', OWN)), tap: 'Exercise 5-3' },
   'today-added': { ...idleAt2, about: 'Just after quick add', day: day(), tap: 'demo:add' },
   'today-after-done': { ...idleAt2, about: 'Just after marking a task done: Undo', day: day(), tap: 'Done: Exercise 5-3' },
   'today-after-repeat': { ...idleAt2, about: 'A repeating task done: it says when it comes back', day: day([...TASKS, READING]), tap: 'Done: Read one chapter' },
@@ -256,6 +279,13 @@ const HABIT_SCENES: Record<string, Scene> = {
   'habits-checked': { ...week, about: 'Just after a check-in on a counted habit: Undo', habits: HABITS, tap: 'Check in: A glass of water' },
   'habits-all': { ...week, about: 'Every habit of today done', habits: HABITS.map((habit) => ({ ...habit, counts: { ...habit.counts, '2026-11-24': habit.target ?? 1 } })) },
   'habits-sheet': { ...week, about: 'A habit open: days, count, reminder, its record', habits: HABITS, tap: 'Push one commit' },
+  'habits-sheet-twice': { ...week, about: 'A habit done twice a day: a reminder for each time', habits: [{ id: 'teeth', title: 'Brush teeth', target: 2, reminds: ['06:00', '22:00'], counts: { '2026-11-24': 1, '2026-11-23': 2 } }, ...HABITS], tap: 'Brush teeth' },
+  'habits-adding': { ...week, about: 'The habit quick add in use: what a new habit starts as, under the field', habits: HABITS, tap: 'focus:habit' },
+  'habits-added': { ...week, about: 'Just after adding a habit: the bar says so', habits: HABITS, tap: ['fill:habit=Stretch for two minutes', 'submit:habit'] },
+  'habits-reminders-removed': { ...week, about: 'Every reminder of a habit removed in one tap: said in the sheet, with Undo', habits: [{ id: 'teeth', title: 'Brush teeth', target: 2, reminds: ['06:00', '22:00'], counts: { '2026-11-24': 1 } }, ...HABITS], tap: ['Brush teeth', 'Remove the reminders'] },
+  'habits-sheet-thrice': { ...week, about: 'Three times a day with one reminder set: the others stay empty', habits: [{ id: 'teeth', title: 'A glass of water', target: 3, reminds: ['13:00'], counts: {} }], tap: 'A glass of water' },
+  'habits-sheet-20': { ...week, about: 'Twenty times a day with two reminders set: those two fields and one empty one', habits: [{ id: 'teeth', title: SIXTY, target: 20, reminds: ['06:00', '22:00'], counts: { '2026-11-24': 3 } }], tap: 'Write up' },
+  'habits-sheet-20-set': { ...week, about: 'The most reminders there are: twenty times a day, a time for each', habits: [{ id: 'teeth', title: SIXTY, target: 20, reminds: Array.from({ length: 20 }, (_, i) => `${String(i + 4).padStart(2, '0')}:30`), counts: { '2026-11-24': 3 } }], tap: 'Write up' },
   'habits-sheet-new': { ...week, about: 'A habit open that has no check-in yet', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }], tap: 'Read 10 pages' },
   'habits-archived': { ...week, about: 'Archived habits, behind their link', habits: HABITS, tap: 'Archived' },
   'habits-deleted': { ...week, about: 'Recently deleted habits', habits: HABITS, tap: 'Recently deleted' },
@@ -356,6 +386,20 @@ const SCENES: Record<string, Scene> = {
   'break-done-for-now': { about: 'In a break, Done for now', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, tap: 'Done for now' },
   'focus-99': { about: 'The longest lap there is: four wide digits, and no more minutes on offer', run: { ...lap2, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday },
   break: { about: 'A short break running', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday },
+  'focus-task': { ...idleAt2, about: 'Before a start, with tasks: the two lines over the digits are the way to choose, and there is one Start', day: day() },
+  'focus-choose': { ...idleAt2, about: 'Choosing what the lap is for: the open tasks of today in order, then nothing in particular', day: day(), tap: 'css:[aria-haspopup=dialog]' },
+  'focus-chosen': { ...idleAt2, about: 'A task chosen that was not the next one', day: day(), tap: ['css:[aria-haspopup=dialog]', 'Exercise 5-3'] },
+  'focus-nothing': { ...idleAt2, about: 'Nothing in particular chosen: the same two lines say so', day: day(), tap: ['css:[aria-haspopup=dialog]', 'Nothing in particular'] },
+  'focus-top': { ...idleAt2, about: 'Before a start with rows at their top: a 60 character title over the digits and in Up next, 32 laps', day: squaresDay(32) },
+  'focus-choose-top': { ...idleAt2, about: 'Choosing among rows at their top: 32 laps and 60 character titles', day: squaresDay(32), tap: 'css:[aria-haspopup=dialog]' },
+  'focus-own': { ...idleAt2, about: 'The next task has its own lengths: the digits, the end and the line that says so', day: day(swap('kr', OWN)) },
+  'lap-done-own': { about: 'A lap over on a task with its own lengths: the break offered is the one that task has', run: { ...onKr, planned: 50 * MIN, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', OWN)) },
+  'long-break-paused': { about: 'The long break held: the set bar ends in its mark, filled', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000, paused: true }, you: 200 * MIN, laps: 8, ghost: tuesday },
+  'focus-choose-started': { ...idleAt2, about: 'A lap started on another device while the chooser was open: the chooser closes and Focus is on that lap', day: day(), tap: ['css:[aria-haspopup=dialog]', 'demo:start'] },
+  'stopped-elsewhere': { about: 'A lap stopped from the notification: Focus says so and offers Undo, as after its own Stop', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'demo:stop' },
+  'running-task': { about: 'A lap running on a task: the two lines are words', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'break-task': { about: 'A short break with tasks: the lines name the task the next lap is for', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day() },
+  'break-paused': { about: 'A short break held: the right end names the set', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000, paused: true }, you: 150 * MIN, laps: 6, ghost: tuesday },
   'break-over': { about: 'A short break that is over', run: { phase: 'short', lap: 1, left: 0 }, you: 150 * MIN, laps: 6, ghost: tuesday },
   'long-break': { about: 'The long break running', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000 }, you: 200 * MIN, laps: 8, ghost: tuesday },
   offline: { about: 'No connection, 3 edits unsent', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, sync: 'offline', unsent: 3 },
@@ -419,8 +463,15 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     you += ran();
     today.credit(task, over() ? 1 : ran() / state.value.planned_ms, ran());
   };
+  // What a run begun now for that task would get: the task's own lengths where it has them.
+  const lengthsFor = (task: string | null) => {
+    const own = (task ? today.list.value.find((one) => one.id === task) : undefined)?.lengths;
+    return { work_ms: own?.work_ms ?? LENGTHS.work_ms, short_ms: own?.short_ms ?? LENGTHS.short_ms, long_ms: own?.long_ms ?? LENGTHS.long_ms };
+  };
   const begin = (phase: Phase, task: string | null = null) => {
-    state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: phase === 'work' ? task : null, planned_ms: LENGTHS[`${phase}_ms`] }, now());
+    // A break takes the lengths of the task whose lap it follows.
+    const planned = lengthsFor(phase === 'work' ? task : state.value.task)[`${phase}_ms`];
+    state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: phase === 'work' ? task : null, planned_ms: planned }, now());
     // A new set starts with nothing in it.
     if (phase === 'work' && state.value.set_index === 0) part.clear();
   };
@@ -429,7 +480,10 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   // Ten seconds to take a stop back, as the real one gives.
   const undoable = signal(false);
   let before: { state: TimerState; you: number; laps: number } | null = null;
+  // The row a stop leaves: what Focus reads to say a stop it did not make itself.
+  const sessions = signal<ReadonlyMap<string, Row>>(new Map());
   const end = () => {
+    if (lapOpen() && !over()) sessions.value = new Map([['stopped', { id: 'stopped', kind: 'work', outcome: 'stopped', started: now() - ran(), ended: now(), paused_ms: 0 }]]);
     before = { state: state.value, you, laps };
     close();
     state.value = act(state.value, { do: 'stop' }, now());
@@ -449,6 +503,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const focus: Focus = {
     state,
     lengths: signal(LENGTHS),
+    lengthsFor,
     view() {
       const v = view(state.value, now());
       // What the real one does on a new day: the next thing is lap one, whatever came before.
@@ -476,7 +531,8 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     extend: () => void (state.value = act(state.value, { do: 'extend', ms: EXTEND_MS }, now())),
     stop: () => end(),
     fills() {
-      const ended = lapOpen() ? state.value.set_index + (over() ? 1 : 0) : view(state.value, now()).next.set_index;
+      // Through the long break the timer still stands on the set's last lap, so its four laps are drawn, as the real one draws them.
+      const ended = lapOpen() ? state.value.set_index + (over() ? 1 : 0) : state.value.phase === 'long' ? state.value.set_index + 1 : view(state.value, now()).next.set_index;
       return Array.from({ length: ended }, (_, at) => part.get(at) ?? 1);
     },
     undoable,
@@ -514,7 +570,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     device: 'demo',
     now,
     // The old long-title scene has a task with no day around it; every other scene's rows come from its day.
-    rows: (dataset) => (dataset !== 'task' ? none : scene.day ? today.rows : long),
+    rows: (dataset) => (dataset === 'session' ? sessions : dataset !== 'task' ? none : scene.day ? today.rows : long),
     write() {},
     stamp: () => undefined,
     act() {},
@@ -596,8 +652,20 @@ render(
       const field = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
       field.value = typed!;
       field.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (words.startsWith('focus:')) {
+      // The field taken up, nothing typed yet.
+      document.querySelector<HTMLInputElement>(`input[name="${words.slice(6)}"]`)!.focus();
+    } else if (words.startsWith('css:')) {
+      // A press on what has no words of its own to find it by.
+      document.querySelector<HTMLElement>(words.slice(4))!.click();
     } else if (words.startsWith('submit:')) {
       document.querySelector<HTMLInputElement>(`input[name="${words.slice(7)}"]`)!.form!.requestSubmit();
+    } else if (words === 'demo:start') {
+      // A lap started where this screen was not looking: Today's row on another device.
+      staged!.focus.start('ex');
+    } else if (words === 'demo:stop') {
+      // Stop pressed where this screen was not looking: the phone's notification.
+      staged!.focus.stop();
     } else if (words === 'demo:unproject') {
       // The chosen project deleted on another device, while its form is open here.
       staged!.today.removeProject('c');

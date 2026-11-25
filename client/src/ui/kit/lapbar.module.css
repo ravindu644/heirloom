@@ -12,10 +12,17 @@
   transition: transform var(--motion-fill) var(--motion-ease);
 }
 .big i { height: var(--layout-lane-set); }
+/* The set ends in its long break: a short mark after the laps, which stay as wide as each other.
+   It is what tells this bar from a day's, which has none. */
+.ending { grid-template-columns: repeat(var(--of), 1fr) var(--space-md); }
+/* Until the long break it is hollow, a line of `rest` as a rest day's ring is: in an empty lap's
+   grey it read as a fifth lap cut short. */
+.laps .rest { background: none; box-shadow: inset 0 0 0 var(--layout-stroke) var(--rest); }
+.laps .rest::after { background: var(--rest); }
 
 /* set-done: each segment takes a sixth of the moment and starts a sixth after the one before,
    which leaves the last sixth for the words. */
-.lighting i::after {
+.lighting i:not(.rest)::after {
   animation: light calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * var(--i) / 6) both;
 }
 @keyframes light { from { transform: scaleX(0); } }

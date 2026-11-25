@@ -74,25 +74,29 @@ export const nav = {
 export const focus = {
   title: 'Focus',
 
-  lap: (n: number) => `Lap ${n} of 4`,
+  // The four are the set that ends in the long break, and the line says so: a count says of what.
+  lap: (n: number) => `Lap ${n} of 4 in this set`,
   lapNext: ', next',
   lapFocus: ', focus',
   lapPaused: ', paused',
   lapDone: ', done',
   shortBreak: 'Short break',
   longBreak: 'Long break',
-  afterLap: (n: number) => `, after lap ${n} of 4`,
+  afterLap: (n: number) => `, after lap ${n} of 4 in this set`,
   afterSet: ', after the set',
   breakOver: ', over',
   longBreakAhead: (lap: number) => (lap < 4 ? 'long break after lap 4' : 'long break after this lap'),
   lapAhead: (n: number) => `lap ${n} next`,
+  // Beside a break's line that does not name the set itself ("Short break, over").
+  lapAheadInSet: (n: number) => `lap ${n} of 4 in this set next`,
 
-  endsIfStarted: (end: number) => `Start now and it ends at ${wall(end)}.`,
+  endsIfStarted: (end: number, own: boolean) => `Start now and it ends at ${wall(end)}.${own ? ` ${focus.ownLengths}` : ''}`,
   endsAt: (planned: number, end: number) => `of ${clock(planned)}, ends at ${wall(end)}`,
   pausedSince: (planned: number, since: number) => `of ${clock(planned)}, paused since ${wall(since)}`,
 
-  startLap: (n: number) => `Start lap ${n}`,
-  startLapNow: (n: number) => `Start lap ${n} now`,
+  // A button carries no count: the line over it does the counting.
+  startLap: 'Start the lap',
+  startLapNow: 'Start the next lap now',
   pause: 'Pause',
   resume: 'Resume',
   // One Stop, and it says only that: the line after says what it did.
@@ -114,10 +118,16 @@ export const focus = {
   // At the end of an Up next row: how far the task is.
   upNextLaps: (laps: number, estimate: number | null) => (estimate === null ? plural(laps, 'lap', 'laps') : `${laps} of ${plural(estimate, 'lap', 'laps')}`),
   // Starting must not need planning: the quiet way past the task that is next.
-  startFree: 'Start without a task',
   // A lap for no task, said in the two lines a task would have, so nothing moves.
   freeLabel: 'This lap is for',
   freeTitle: 'Nothing in particular',
+  // Before a start the two lines over the digits are a button: it opens today's open tasks.
+  // "Change" alone, after "4 estimated", read as changing the estimate.
+  change: 'Change task',
+  choose: (title: string) => `This lap is for ${title}. Change task`,
+  chooseTitle: 'This lap is for',
+  // 4: said with the length before a start, when the task chosen has lengths of its own.
+  ownLengths: 'This task has its own lengths.',
   upNext: 'Up next',
 
   // What a screen reader hears, once a minute.
@@ -189,11 +199,21 @@ export const status = {
 // The notification when a phase ends, for a tab out of sight or a phone in a pocket. What
 // happened in the title, what is next in the body.
 export const ring = {
-  lapDone: (n: number) => (n === 4 ? result.set : `Lap ${n} of 4, done.`),
+  lapDone: (n: number) => (n === 4 ? result.set : `Lap ${n} of 4 in this set, done.`),
   breakOver: 'Break over.',
-  lapNext: (n: number) => `Lap ${n} is next.`,
+  lapNext: (n: number) => `Lap ${n} of 4 in this set is next.`,
   // Beside the countdown in the phone's notification shade, while a phase runs.
-  lapRunning: (n: number) => focus.lap(n),
+  // The notification's own buttons and its word for a lap that is held.
+  pause: 'Pause',
+  resume: 'Resume',
+  stop: 'Stop',
+  paused: (ms: number) => `Paused, ${clock(ms)} left`,
+  // What the lap is for, with the task's own count: "Lap 1 of 4" alone was read as its estimate.
+  lapOn: (title: string | null, lap: number, estimate: number | null) => (title === null ? focus.lap(lap) : `Lap ${lap}${estimate === null ? '' : `, ${estimate} estimated`}: ${title}`),
+  // The bell's line for a lap on a task. The title stands last, where the phone may cut it.
+  lapOnDone: (title: string, lap: number) => `Lap ${lap} done: ${title}`,
+  // The way out of a break, from the notification: the words Focus has for it.
+  breakStop: focus.doneForNow,
   breakRunning: (long: boolean) => (long ? focus.longBreak : focus.shortBreak),
   // The two kinds of notification, as the phone's settings list them.
   bellChannel: 'Bell',
@@ -371,11 +391,14 @@ export const today = {
   add: 'Add a task',
   // The button in the field, from the first character typed. The subtask field says the same.
   addGo: 'Add',
-  addHint: 'Add a task. End with ~3 for three laps.',
+  addHint: 'Add a task',
+  // Under the field while it is in use: the shorthand as what one types.
+  addExample: 'Essay draft ~3 plans it at 3 laps.',
 
   // The bar of the lap in progress.
   free: 'A lap for nothing in particular',
-  lapDone: (n: number) => `Lap ${n} of 4, done`,
+  // No number: Today counts the day and the task, and the row under the strip says the task's.
+  lapDone: 'Lap done',
   toFocus: 'Open Focus',
 
   next: 'Next',
@@ -448,6 +471,10 @@ export const task = {
   addProject: 'Add project',
   // The five squares, named for a screen reader.
   colors: { you: 'Tomato', rest: 'Green', ink: 'Ink', ghost: 'Grey', 'heat-2': 'Rose', amber: 'Amber', olive: 'Olive', teal: 'Teal', sky: 'Blue', indigo: 'Indigo', plum: 'Plum', clay: 'Brown' },
+  // The task's own lengths: one choice, and with "Its own" three steppers that start from the account's.
+  usual: 'My usual lengths',
+  own: 'Its own',
+  ownNote: 'For a lap on this task and the breaks after it. A lap already running keeps its length.',
   // A project can be changed where it is chosen: the same form, filled in. Each change is kept as it is made.
   editProject: 'Edit project',
   editDone: 'Done',
@@ -610,7 +637,9 @@ export const habits = {
   finding: (done: number, planned: number, any: boolean) =>
     !any ? 'No habits yet.' : planned === 0 ? 'Nothing planned for today.' : `${done} of ${planned} today. ${countWord(planned - done)} left.`,
   add: 'Add a habit',
-  addHint: 'Add a habit. It starts as once a day, every day.',
+  addHint: 'Add a habit',
+  // Under the field while it is in use.
+  addExample: 'It starts as once a day, every day. Open it to change that.',
   empty: 'Add the first thing you want to do most days. One tap a day checks it in.',
   list: 'Habits',
   plan: (days: number) => (days === 127 ? 'Every day' : days === 31 ? 'Weekdays' : days === 96 ? 'Weekends' : WEEKDAYS_SHORT.filter((_, bit) => days & (1 << bit)).join(', ')),
@@ -660,7 +689,16 @@ export const habits = {
   lastDay: 'A habit keeps at least one day.',
   // B2: under the sheet's foot buttons.
   footNote: 'Archive keeps its record and takes it off the list. Delete keeps it for 30 days.',
-  noRemind: 'No reminder',
+  // An act, shown only while a time is set.
+  noRemind: 'Remove the reminder',
+  remindGone: 'Reminder removed.',
+  // Done more than once a day: one time for each, in order. Any may be left empty.
+  reminds: 'Reminders',
+  remindNth: (n: number) => `${ordinal(n)} reminder`,
+  remindsNote: 'On the days it is planned. The 1st reminds until the first check-in of the day, the 2nd until the second, and so on.',
+  noReminds: 'Remove the reminders',
+  // Said in the sheet, where the link stood, with the way back.
+  remindsGone: 'Reminders removed.',
   record: 'Since the first check-in',
   recordLabel: (title: string, done: number, of: number) => `${title}: ${done} of ${of} days done since the first check-in.`,
   recordNote: 'A filled square is a day done. A ring is a rest day.',
@@ -698,8 +736,9 @@ export const room = {
   share: (name: string, ms: number) => `${name} ${total(ms)}`,
   you: 'You',
   members: 'Who is focusing now',
-  focusing: (lap: number) => `Focusing, lap ${lap} of 4`,
-  paused: (lap: number) => `Paused, lap ${lap} of 4`,
+  // Said of you and of friends alike, so the set is neither "this" nor "their".
+  focusing: (lap: number) => `Focusing, lap ${lap} in a set of 4`,
+  paused: (lap: number) => `Paused, lap ${lap} in a set of 4`,
   shortBreak: 'Short break',
   longBreak: 'Long break',
   breakPaused: 'Break paused',

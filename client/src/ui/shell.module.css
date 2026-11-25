@@ -79,6 +79,13 @@
 .nav a[aria-current] { border-top-color: var(--you); color: var(--ink); }
 /* Where you are is said by the line and the ink, in the one weight a label has. */
 .nav b { font-weight: inherit; }
+/* A phone at twice its type size (206 wide): five equal shares are narrower than "Progress", and
+   the five words ran together as one. Each takes its own width and the room left is shared out
+   between them; and the name beside the circle, which had a sliver of room, goes whole. */
+@media (max-width: 280px) {
+  .nav { grid-auto-columns: auto; justify-content: space-between; column-gap: var(--space-xs); padding-inline: 0; }
+  .person > span > span { display: none; }
+}
 
 /* Laptop: a labelled sidebar on the ground, the canvas beside it. Everything in the sidebar
    starts on one edge, a block's gap in from the side. */

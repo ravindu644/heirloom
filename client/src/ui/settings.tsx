@@ -17,9 +17,9 @@ import { Stepper } from './kit/stepper.tsx';
 import { Switch } from './kit/switch.tsx';
 import { useWide } from './kit/wide.ts';
 import css from './settings.module.css';
+import { Lengths } from './kit/lengths.tsx';
 import * as s from './strings.ts';
 
-const MIN = 60000;
 // The schema allows a lap of a whole day. These are where a stepper stops being the way to get there.
 // Whether the app has moved from one screen to another since it was opened: then there is a step of its own to go back to.
 // Leaving an address with no screen named in it (the app's own first placing) is not such a move.
@@ -27,9 +27,6 @@ let moved = false;
 addEventListener('hashchange', (event) => void (new URL(event.oldURL).hash && (moved = true)));
 const cameFrom = () => moved;
 
-// The longest a lap may be planned, in minutes: with its seconds it still fits the four digits of the clock. Focus offers no more minutes past it.
-export const LAP_MAX_MIN = 99;
-const LENGTH_MAX = { work_ms: LAP_MAX_MIN, short_ms: 60, long_ms: 60 };
 // More laps than this in a day target and its bar would be dust.
 const TARGET_MAX = 24;
 
@@ -77,26 +74,6 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
     setRefusal(result.ok ? '' : result.error === 'unsent' ? s.status.signOutUnsent(engine.unsent.value, s.device()) : s.status.signOutFailed);
   };
   const refused = sync === 'signed-out';
-
-  const length = (field: keyof typeof LENGTH_MAX, name: string) => {
-    // A length kept by an earlier build may be over today's top: it is shown and stepped from
-    // the top, and nothing is written until the person changes it.
-    const minutes = Math.min(LENGTH_MAX[field], Math.round(all[field] / MIN));
-    const to = (next: number) => settings.set({ [field]: Math.min(LENGTH_MAX[field], Math.max(1, next)) * MIN } as Partial<SettingsView>);
-    return (
-      <fieldset class={form.group}>
-        <legend>{name}</legend>
-        <Stepper
-          text={s.settings.minutes(minutes)}
-          less={s.settings.less(name)}
-          more={s.settings.more(name)}
-          onLess={() => to(minutes - 1)}
-          onMore={() => to(minutes + 1)}
-          typed={{ value: minutes, min: 1, max: LENGTH_MAX[field], label: name, onSet: to }}
-        />
-      </fieldset>
-    );
-  };
 
   // A copy to keep: the browser saves it as a file named for the day.
   const save = () => {
@@ -146,9 +123,7 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
   const timer = (
     <>
       <Panel title={s.settings.lengths}>
-        {length('work_ms', s.settings.lap)}
-        {length('short_ms', s.settings.short)}
-        {length('long_ms', s.settings.long)}
+        <Lengths of={all} onSet={(change) => settings.set(change)} />
         <p class={css.note}>{s.settings.lengthsNote}</p>
       </Panel>
 

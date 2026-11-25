@@ -7,8 +7,10 @@
 /* The lap line and its bar. */
 .lapline {
   display: flex;
+  /* Where the two ends do not fit one line, the right end goes under: no word is dropped. */
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-md);
+  gap: 0 var(--space-md);
   margin-bottom: var(--space-sm);
   font: var(--type-label);
   color: var(--muted);
@@ -29,10 +31,18 @@
 .face { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
 /* The task the lap is for: its project and which lap of it this is, then its title. */
-.task { display: grid; gap: var(--space-xs); }
+.task { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); min-height: var(--layout-touch); align-content: center; }
+/* Before a start the two lines are pressed to choose the task. They stay the words they are in a
+   lap, so nothing moves when one starts; "Change", drawn as every link in a line, is what says
+   they can be pressed. */
+/* Over the digits: the box of a 300px figure reaches up past its ink, and a press on these lines must not land on it. */
+button.task { position: relative; z-index: 1; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .about { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
-.task span { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); }
+.project { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); }
 .task i { width: var(--layout-lane); height: var(--layout-lane); }
+/* At the line's end on a phone, as the day target's "Change" is. */
+.change { margin-left: auto; text-underline-offset: var(--space-xs); }
+button.task:hover .change, button.task:active .change { color: var(--ink); }
 .title {
   display: -webkit-box;
   overflow: hidden;
@@ -73,7 +83,8 @@
 .rail { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 /* On the phone the next task is named over the digits and Today is one tap away. */
 .upnext { display: none; }
-.upnext ul { display: grid; padding: 0; list-style: none; }
+/* One column no wider than the panel: a long title is cut with its dots and the count keeps its place. */
+.upnext ul { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
 .upnext li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
 .upnext li + li { border-top: 1px solid var(--line); }
 .upnext li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -95,7 +106,7 @@
 .told { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 /* The line of facts ends in what to do, and stands over the button that does it. */
 .next { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); margin-top: auto; background: var(--ground); }
-.headline { font: var(--type-headline); letter-spacing: var(--tracking-headline); text-wrap: balance; }
+.headline { font: var(--type-headline); letter-spacing: var(--tracking-headline); text-wrap: balance; overflow-wrap: break-word; }
 /* Balanced, so "Take five." is never left alone on a line. */
 .facts { text-wrap: balance; }
 
@@ -105,6 +116,15 @@
 .setMoment .told { animation: say calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * 5 / 6) both; }
 @keyframes say { from { opacity: 0; } }
 
+/* A phone at twice its type size (206 wide, as the task row's rule): the lower group would be
+   taller than the screen and stand over what it explains, so it is not held at the foot, and
+   "Done for now" goes under the sentence it had been squeezing to a word a line. */
+@media (max-width: 280px) {
+  .actions, .next { position: static; }
+  .over { flex-wrap: wrap; }
+  /* A size down, before a word of it has to break inside. */
+  .headline { font: var(--type-title); letter-spacing: normal; }
+}
 
 /* With a sidebar there is no thumb to serve: the actions follow the content, and the free space
    is the bottom of the canvas. */
@@ -117,6 +137,7 @@
   .main > * { flex: none; }
   .quiet { justify-content: flex-start; min-height: 0; }
   .far { margin-left: 0; }
+  .change { margin-left: 0; }
   .upnext { display: block; }
   .digits { font: var(--type-figure-xl); }
   .facts { max-width: 60ch; }
