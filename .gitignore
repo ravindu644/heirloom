@@ -26,6 +26,8 @@ client/src/ui/tokens.css
 test-results/
 playwright-report/
 reviews/*/shots/
+# pictures from a real phone carry its owner's status bar
+reviews/*/device/
 
 # secrets
 .env

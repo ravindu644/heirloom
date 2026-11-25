@@ -277,8 +277,11 @@ first, the rest after first paint.
   (Focus, Today, Progress, Habits, Room). The primary action sits in the lower half, in reach of a
   thumb.
 - **The header.** Every screen starts with the same line: the mark and the name at the left, and
-  at the right the person: their initial in a circle and their username. That is one 48px target
-  and it opens Settings. On the laptop the same chip sits at the foot of the sidebar. Sign out is
+  at the right the person: their username, then their initial in a circle. The circle stands on
+  the edge the chip hangs from, so a longer name never moves it: at the top right the name comes
+  first and the circle ends on the column's right edge; at the foot of the laptop's sidebar and
+  in a row the circle comes first, on the left edge. That is one 48px target and it opens
+  Settings. On the laptop the same chip sits at the foot of the sidebar. Sign out is
   in Settings and nowhere else. Settings is reached from the person, not from the five
   destinations.
 - **One left edge.** In a column every block starts at the same x: headings, figures, sentences,
@@ -324,6 +327,9 @@ first, the rest after first paint.
 - **The order of the page is the order of the eye.** Tab and a screen reader meet the header
   first (the mark, then the person), then the screen, then the bottom bar, whatever the CSS does
   to place them.
+- **The keyboard takes the bottom bar's place.** While the keyboard is up on a phone the bottom
+  bar is not drawn, so the field being typed in keeps the room; the bar is back the moment the
+  keyboard goes, also when the field still has focus.
 - **A phone is not always 412 wide.** The first real one measured 471. Under 720px the layout is
   fluid: every column runs from margin to margin (fields, panels and button rows fill it; a
   measure in `ch` caps a line of text only from 720px up), and the timer keeps its share of the
@@ -416,6 +422,8 @@ Built once in `client/src/ui/kit/` and reused.
   in words. Under it the same sessions as rows, because a block is too small to press.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
+- **A person's circle** carries the first letter of their username everywhere, also where the
+  words beside it say "You".
 - **Room member:** a circle initial, the name, phase and lap ("Focusing, lap 2 of 4"), time left in
   figure-md (in `rest` on a break), the task only if shared, today and the week in `label`, who
   cheered, and a Cheer button: full width on a phone, its own width on a laptop. Side by side on
@@ -433,8 +441,16 @@ Built once in `client/src/ui/kit/` and reused.
   These two, button and underlined link, are the only things that can be pressed besides rows,
   boxes and the navigation. A row is a painted box whose whole surface is the target (a task, a
   destination): its words need no fill of their own because the box is one.
+- **The mark:** the colon of the big timer, and its two dots are the two runners. The upper dot
+  is you, filled in `you`; the lower is the ghost, hollow and dashed in `ghost`, as wide as the
+  upper one. One over the other, never side by side. Beside the name it is as tall as the name's
+  line, so it never makes the header taller; at that size the ring's line is a little heavier and
+  has six dashes, or it fades on a screen of one pixel to the point. Where only one colour is allowed (the status bar, a themed icon) the
+  upper is filled and the lower dashed: eight dashes, six under 24dp, where eight run together.
+  Chosen 2026-11-25 from five; the others are kept in `design/logos/`.
 - **The person:** a `raised` circle with the first letter of the username in `body-strong`, and
-  the username beside it in `label`. In the header and in a room.
+  the username beside it in `label`. In the header and in a room. Which side the circle is on:
+  see The header.
 - **Sheet:** slides from the bottom on the phone, a centred panel on the laptop, one shadow.
 
 ## Motion

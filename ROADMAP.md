@@ -71,7 +71,7 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [android] Countdown notification plugin (`setChronometerCountDown`), started and cleared with
       the phase
 - [x] [ui] Safe areas, back button, keyboard, touch sizes on the phone
-- [ ] [qa] On the user's phone over adb: 1-minute timer, screen off, alarm fires within 2 s
+- [x] [qa] On the user's phone over adb: 1-minute timer, screen off, alarm fires within 2 s
       (`dumpsys alarm` and the notification log as proof); timer started on the laptop rings on
       the phone
 - [ ] Gate (the user lives with it for a day)
