@@ -156,6 +156,8 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 - Node does not support the S10's kernel (4.14). The server is Go for that reason.
 - `@capacitor/local-notifications` silently falls back to an inexact alarm without the exact-alarm
   permission. Declare `USE_EXACT_ALARM` and check `checkExactNotificationSetting()`.
+- Android hands an activity its first intent again when it is restored after a process kill: an
+  extra that does something once is dropped when a saved state or `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY` is there.
 - Chrome throttles timers in background tabs. The laptop's end-of-phase alert comes from Web Push,
   not from a `setTimeout` in the page.
 - Cloudflare closes idle WebSockets and restarts its servers: ping every 25 s and always reconnect.

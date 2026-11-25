@@ -74,3 +74,11 @@ when it is done.
 - [12] "Cheer" names the lap by when it ended ("the lap that ended at 16:40"), not by its number: a room's `last` carries no lap number. Adding one is a server and protocol change.
 - [12] `kit/lift.ts` holds three sizes as constants (8px of slop, a 56px edge, 8px a frame) and the picker starts at one fixed tone: values that belong in DESIGN.md. `tools/style-check.mjs` does not see a number in a `.ts` file.
 - [any] `tools/style-check.mjs` also reads the kit's test files, so a test that needs a colour or a duration has to spell it in pieces. Leaving `*.test.ts` out would let them read plainly.
+- [13] Two devices that each write a bell's break while one has not heard of the task's own break length start it at different lengths; the merge then picks one for both by device id, not by who knew the newer edit. Closing it needs the length's source on the timer cell.
+- [13] The phone holds the nearest 400 reminders and tops up when the app comes to the front: with 20 habits at 4 times a day that is about 5 days, so a phone not opened for longer stops reminding.
+- [13] Quick add's "~3" needs the tilde, which is on the second symbols page of Gboard and Samsung's keyboard. The task sheet's stepper is the other way in; a second spelling ("x3") would collide with titles.
+- [13] In a break the two lines over Focus's digits are words, not the button they were before the lap: the next lap's task cannot be changed until the break is over or skipped.
+- [13] A length typed past its top (99 minutes for a lap) snaps back and nothing says what the top is.
+- [13] A push to a closed browser tab words its bell from the set ("Lap 2 of 4 in this set, done."), while the phone and an open tab name the task ("Lap 1 done: Essay draft"): the server words a push from a list sent ahead and knows no task.
+- [13] An invite link just made stands in "The new link" with no Take back until it is copied: a link made by mistake has to be copied before it can be taken back.
+- [13] With automatic starts on, in a break after a lap whose task was then ticked done, Focus names Today's next task while the lap that starts by itself is for no task.

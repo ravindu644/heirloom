@@ -203,3 +203,32 @@ For the lead:
 - **The user's model wins over the book's.** Cirillo's pomodoro is indivisible, so a stopped
   one was "not a lap"; the user's is "stop ends the lap, the next is lap 2". When the product's
   rule needs explaining and the user's does not, take theirs and write down what it costs.
+
+## 10. Lessons from the user's third hour
+
+No glitches this time: every point was about daily use. Each row is a check to make before a
+build goes out.
+
+| What the user met | The check |
+|---|---|
+| "Added." came up behind the keyboard, and Back was needed to see it | On the phone, an act that ends typing (Add, the keyboard's own done key) lets go of the field first, then says what it did. Anything shown at the foot of the screen is looked at with the keyboard up |
+| The day target was 2, a task's estimate 3, and Focus's bar stayed at 4: "what does that even mean" | A count says of what. Two bars or two "x of y" that count different things never differ by their place alone: each carries its noun ("in this set", "today", "estimated"). Read every figure on a screen cold and ask "of what?" |
+| The notification said "Lap 1 of 4" for a task estimated at 2, and kept saying it after the estimate changed | Words shown outside the app (a notification, a push, a widget) are checked against the same rule as a screen, and they follow the data: change the thing while it shows and look again |
+| "End with ~3 for three laps" under the field: "I don't get what it means" | A hint is an example with its result ("Essay draft ~3 plans it at 3 laps."), never a rule in the app's own grammar. If it has to be decoded, it is not a hint |
+| Squares sat squeezed beside a long title | A row that holds a count and words is looked at with the most of both. The count gets a line of its own only when there is no room, and keeps one edge (the right) in both forms |
+| One reminder for a habit done several times a day; one set of lengths for every task | When a thing has a number ("3 times a day", "this task"), ask whether each setting beside it should follow that number. A global setting with no way to differ for one thing is asked about in the stranger's walk |
+| The task had to be chosen on Today before a start on Focus | The screen with the button holds the choice the button needs. Count the screens between wanting to do a thing and doing it |
+| The countdown notification could not pause or stop | A thing that shows a running state offers the two or three acts that state has, wherever it shows |
+
+What the stranger's walk then found in the fixes themselves, before the user did:
+
+| What it found | The check |
+|---|---|
+| "Start lap 2" under "lap 3 on this task" | A fix for a count without a noun is followed through every place a number of the same kind stands: buttons, the bell, the strip, a friend's row. A button carries no count |
+| The task chosen on Focus lasted one lap, then went back to the top of Today, saying nothing | A new choice is followed past its first use: what does the second lap do, the one started from another screen, the one that starts by itself? |
+| "Change" after "4 estimated" read as "change the estimate" | A one-word link is read with the words that stand before it. If it could act on two things, it names the one |
+| The countdown said the task's lap, the bell that replaced it the set's | Two messages about one moment are read one after the other, as they arrive |
+| Stop in the notification left no Undo in the app | A second way to do an act (a notification button, a shortcut, another device) gets everything the first way gives: the line that says what happened, the Undo |
+| "No reminders" wiped twenty times in one tap; minus on a stepper dropped a time for good | A control that removes several things at once is named as an act ("Remove the reminders"), is undoable, and what a toggle hid comes back when it is toggled again in the same sitting |
+| The keyboard rule was applied to subtasks, where no bar speaks and several are typed in a row | A rule made for one case is asked of each place it was applied: is the reason there too? |
+

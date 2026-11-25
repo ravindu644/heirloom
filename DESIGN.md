@@ -355,7 +355,10 @@ first, the rest after first paint.
 - **Nothing breaks down to 320 wide.** That is a small phone, and it is also a 412 phone at 130%
   or a laptop window zoomed to 400%. Down to 320 the page never scrolls sideways: a username in
   the header is cut with an ellipsis, a button's words wrap, a row gives up its picture before
-  its words.
+  its words. Narrower still (206px is a 412 phone at 200%) nothing is cut to a sliver or run
+  together: the bottom bar's five words keep a gap between them, the header's username goes
+  whole when it cannot be read, Today's three figures stack, and a headline steps down a size
+  before a word breaks inside.
 - **The order of the page is the order of the eye.** Tab and a screen reader meet the header
   first (the mark, then the person), then the screen, then the bottom bar, whatever the CSS does
   to place them.
@@ -400,18 +403,23 @@ Built once in `client/src/ui/kit/` and reused.
   empty) with "2 of 4" in `figure-sm` beside them. The count never outweighs the title. When
   the row ends in a control (Start, Restore, Up and Down), the squares and count sit to its
   left, centred on it and `md` away, so every row's count ends on one of two edges and never
-  touches a button. In such a row narrower than 400px the squares give way and the count stays:
-  the title is worth more than the picture of a number already written. The title always has
+  touches a button. The title always has
   its room: it breaks between words and never inside one, runs to two lines at most, and the
-  line under it does the same; whatever is at the right gives way first. At most twelve squares
-  are drawn; a row with more laps than that shows its count alone. (The user typed 45 laps into
-  an estimate: the squares ran off the card and the title stood one letter to a line.)
+  line under it does the same; whatever is at the right gives way first. The squares
+  stand eight to a line and up to four lines, 32 in all, like a small year: they fill from the
+  right edge, the newest line at the foot, and the count ("3 of 12") is always at the right
+  edge. The squares and their count are one thing and never part: the squares at the left,
+  the count at the right. Where the title leaves room the pair stands beside it, as before
+  (left of the row's control when it has one); where it does not, the pair takes a line of its
+  own under the words and the control, ending on the row's right edge, and never hides. A row holding more
+  than 32 shows its count alone. (The user typed 45 laps into an estimate: the squares ran off
+  the card and the title stood one letter to a line; then a top of 8 was too few.)
   In a row narrower than 280px (a phone at 200% zoom) the row's end, count and button, goes
   under the words: the title is never what gives way.
   A row that ends in two links ("Restore", "Delete for good") follows the invite row on a phone:
   the links stand under the words, so the title keeps the row's width.
 - **Every number a person can raise has a top,** and the row that shows it is looked at with the
-  top in it: an estimate stops at 8 laps, a day's target and a habit's count at theirs. A stepper
+  top in it: an estimate stops at 32 laps, a day's target and a habit's count at theirs. A stepper
   at its top shows its plus as off.
 - **Putting rows in order:** press and hold a row and it lifts (`raised`, the one shadow, a `hair`
   line of `ink`); an empty lap square on it takes `line`, since `raised` is what an empty square is made of;
@@ -498,6 +506,27 @@ Built once in `client/src/ui/kit/` and reused.
   looked at side by side in light and in dark, on the ground and on a panel, before it ships. A
   secondary is never mistaken for a choice, which is `surface` with a grey `edge`. All 48px tall, `body-strong`, `rounded.sm`. A bare word is never
   a button. On an `ink` bar the bar is the fill, and its button is an outline in `ground`. Hover mixes ink into the fill by `state.hover`, press by `state.press`.
+- **Adding puts the keyboard away.** When a field has made something a bar speaks of (a task,
+  a habit), on a phone the field lets go of the focus so the keyboard goes, and then the bar
+  says what was added: a bar behind a keyboard is not read, and nobody should press Back to see
+  what they made. On a laptop the field keeps the focus for the next one. A subtask's field
+  keeps the keyboard on the phone too: several are typed in a row, each lands in sight right
+  above the field, and no bar speaks.
+- **A hint is an example, not a rule to decode.** The quick add's hint is "Add a task", and the
+  shorthand is shown as what one types: "Essay draft ~3 plans it at 3 laps." under the field
+  while it is in use. ("End with ~3 for three laps" was read by the user as nothing at all.)
+- **Choosing the task on Focus:** the two lines over the digits are a button. Before a start it
+  opens today's open tasks and "Nothing in particular" as a sheet; the one chosen is what Start
+  begins. There is no second button for starting without a task. During a lap the lines are
+  words only. The link says "Change task" (a bare "Change" after "4 estimated" read as changing
+  the estimate). Focus stays on the task of the last lap, wherever that lap was started, until
+  another is chosen, the task is done or the day turns: a choice that lasted one lap and then
+  went back to the top of Today, saying nothing, is a choice lost. A lap that starts by itself
+  goes on with the same task (protocol section 16). A lap for nothing in particular leaves no
+  choice behind: Focus goes back to Today's next, or someone whose first lap was started with
+  an empty list would find every later lap going to no task.
+- **A task's own lengths** are three steppers in its sheet behind one choice, "My usual lengths"
+  or "Its own", and a task with its own says so on Focus where the length is shown.
 - **The button in a field:** where one field alone makes something on Enter (quick add, a
   subtask), a secondary button stands at its right end with the word "Add", inside the field's
   box, from the first character typed until the field is empty again. Enter does the same. A
@@ -736,7 +765,23 @@ Each is a rule for every screen, not for the one where it was seen.
   not "today", wherever the day target is edited.
 - **A thing is labelled with what it is,** never with the product's own noun for it: the race's
   second lane is "Last Tue", not "Ghost"; a figure is "Focused", not "Done" beside a list called Done.
-- **A button that starts something names what it starts.** "Start lap 3 now", not "Skip break".
+- **A count says of what.** "Lap 2 of 4" on Focus is the set of four that ends in the long
+  break; "1 of 3 laps today" on Today is the day's target; "1 of 2" on a row is the task's
+  estimate. Three counts of laps, and the first had no noun: the user set the day's target to 2
+  and then 3 and asked why Focus still said 4. Focus says "Lap 2 of 4 in this set", with "long
+  break after lap 4" beside it, and two bars that count different things are never left to be
+  told apart by their place alone: Focus's bar ends in a short fifth mark in `rest`, the long
+  break the four laps earn: hollow with a `rest` line until then, filled while it runs (drawn
+  in the grey of an empty lap it read as a fifth lap cut short). The same count carries its noun wherever it
+  is said: the bell ("Lap 2 of 4 in this set, done."), and a room's row ("Focusing, lap 2 in a
+  set of 4"). Each screen keeps to its own counts: Today counts the day and the task, Focus the
+  set and the task. So Today's strip after a bell says "Lap done" and no number, since the
+  row under it says "3 of 4" of the task. Outside the app the task's lap comes first and its
+  title last, where a long one may be cut: "Lap 1, 3 estimated: Essay draft", and at its bell
+  "Lap 1 done: Essay draft".
+- **A button that starts something names what it starts, and carries no count.** "Start the
+  next lap now", not "Skip break", and not "Start lap 3 now": that 3 was the set's, under a line
+  that said "lap 2 on this task". The line over the button does the counting.
 - **A switch that cannot work on this device says why,** in place of its note, with where to
   change it.
 - **A step that asks for something the person may not have says where to get it.**

@@ -193,7 +193,47 @@ in the same way. Each becomes a fix, a rule in DESIGN.md, a lesson in a skill an
 - [x] [lead] The lessons in `skills/`
 - [ ] Gate (the user goes through the points on the phone)
 
-## 13. A way back in
+## 13. What the third hour found
+
+No glitches this time; six things that matter in daily use.
+
+- [x] [lead] PRODUCT rows, protocol (a task's own lengths, a habit's `reminds`, estimates to 32),
+      DESIGN.md (squares eight to a line, adding puts the keyboard away, a hint is an example,
+      the task chosen on Focus)
+- [x] [core] A task's own lengths, read when a run begins; `reminds`; the estimate's top; a lap
+      that starts by itself goes on with the task before it
+- [x] [android] Pause and Stop in the countdown notification, and a notification for a paused
+      lap; its words follow the task; one reminder for each time of a habit's day; a button
+      names its run and is never done twice (built and unit tested; not yet run on a phone)
+- [x] [ui] The keyboard goes after Add; a habit's reminder times; the squares; a task's lengths;
+      the quick add's hint; the task chosen on Focus; every count with its noun
+- [x] [qa] Each as a test (`tests/e2e/third-hour.spec.ts`); the notification's words in
+      `client/src/plan.test.ts`
+- [x] [design-review] The changed screens (`reviews/13/`), and a stranger's walk over them
+      (`reviews/13/stranger.md`: 19 findings, 15 fixed, 4 in findings.md)
+- [ ] Gate (the user lives with it for a day). On the phone: the real keyboard after Add; the
+      notification's Pause, Resume, Stop and "Done for now", with the app in the background,
+      locked, and swiped away; a Stop made while the app was gone not done again after a new
+      lap and a force stop; two reminder times of one habit, the first leaving the shade alone
+      after one check-in
+
+## 14. A welcome that shows it
+
+The user, on the third build: the landing explains what a lap is and that it is 25 minutes, like
+any timer's would. Show it instead: artwork drawn in the design's own language, and only
+enough words to say briefly what heirloom does.
+
+- [ ] [lead] DESIGN.md: what the welcome's artwork is made of (the app's own marks: the lap
+      squares, the set's bar, the race's two lanes, a week of habit days), what moves and what
+      does not, and the few words; PRODUCT row reworded
+- [ ] [ui] The welcome in the phone app and beside the browser's sign-in, drawn from tokens,
+      no picture file that could not be redrawn in dark; reduced motion shows it still
+- [ ] [qa] It reads at 412, 206 and 1440, light and dark; nothing of it is announced twice to
+      a screen reader; the way on to the server field and to sign-in is one press
+- [ ] [design-review] Against "nothing generic": could this screen belong to another app?
+- [ ] Gate
+
+## 15. A way back in
 
 - [ ] [lead] PRODUCT row and protocol: whoever owns the server gives a member a link that sets a
       new password; the owner's own way back is a command on the server
@@ -201,7 +241,7 @@ in the same way. Each becomes a fix, a rule in DESIGN.md, a lesson in a skill an
 - [ ] [qa] A reset on two devices; an old token after it
 - [ ] Gate
 
-## 14. Release 1.0
+## 16. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
