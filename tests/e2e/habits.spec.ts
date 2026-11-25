@@ -130,14 +130,13 @@ test('a weekdays-only habit shows the weekend as not planned, and its run is a r
   for (const i of [0, 1, 2, 3, 4]) expect((await week.nth(i).locator('i').getAttribute('class')) ?? '').not.toMatch(/off/);
 });
 
-test('order, archive and bring back, delete with Undo, and Recently deleted; B keeps up', async ({ deviceA: a, deviceB: b }) => {
+test('order, archive and restore, delete with Undo, and Recently deleted; B keeps up', async ({ deviceA: a, deviceB: b }) => {
   await onHabits([a, b], 'hshelf');
   for (const t of ['alpha', 'bravo', 'charlie']) await add(a.page, t);
   await expect.poll(() => titles(b.page)).toEqual(['alpha', 'bravo', 'charlie']);
-  await a.page.getByRole('button', { name: 'Change the order', exact: true }).click();
-  await expect(a.page.getByRole('region', { name: 'Habits, in order' })).toBeVisible();
-  await a.page.getByRole('button', { name: 'Move up: charlie' }).click();
-  await a.page.getByRole('button', { name: 'Keep this order', exact: true }).click();
+  // No mode: Alt and up moves the habit with the focus. (Press and hold is in second-hour.spec.ts.)
+  await row(a.page, 'charlie').getByRole('button', { name: /charlie/ }).focus();
+  await a.page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => titles(b.page), { timeout: 1000 }).toEqual(['alpha', 'charlie', 'bravo']);
 
   let sheet = await open(a.page, 'bravo');
@@ -151,8 +150,9 @@ test('order, archive and bring back, delete with Undo, and Recently deleted; B k
   await a.page.getByRole('button', { name: 'Archived, 1' }).click();
   const shelf = a.page.getByRole('dialog', { name: 'Archived habits' });
   await expect(shelf).toContainText('An archived habit keeps its record and asks for nothing.');
-  await shelf.getByRole('button', { name: 'Bring back' }).click();
-  await shelf.getByRole('button', { name: 'Close' }).click();
+  await shelf.getByRole('button', { name: 'Restore' }).click();
+  // A list that opened as a sheet closes with its last row.
+  await expect(shelf).toBeHidden();
   await expect(box_(b.page, 'bravo')).toBeVisible();
 
   sheet = await open(a.page, 'alpha');
@@ -167,7 +167,7 @@ test('order, archive and bring back, delete with Undo, and Recently deleted; B k
   const bin = a.page.getByRole('dialog', { name: 'Recently deleted' });
   await expect(bin).toContainText('A deleted habit keeps for 30 days, then it is gone for good.');
   await bin.getByRole('button', { name: 'Restore' }).click();
-  await bin.getByRole('button', { name: 'Close' }).click();
+  await expect(bin).toBeHidden();
   await expect(box_(b.page, 'alpha')).toBeVisible();
 });
 

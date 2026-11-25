@@ -103,17 +103,17 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
   await button(a.page, 'Start lap 1').click();
   await go(b.page, 'Focus');
   await button(b.page, 'Start lap 1').click();
-  await expect(button(b.page, 'Skip break')).toBeVisible({ timeout: 8000 });
-  await button(b.page, 'Skip break').click();
-  await expect(button(b.page, 'Skip break')).toBeVisible({ timeout: 8000 });
-  await expect(button(a.page, 'Skip break')).toBeVisible();
+  await expect(button(b.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
+  await button(b.page, 'Start lap 2 now').click();
+  await expect(button(b.page, 'Start lap 3 now')).toBeVisible({ timeout: 8000 });
+  await expect(button(a.page, 'Start lap 2 now')).toBeVisible();
   await go(b.page, 'Room');
   await expect(lane(c.page, nameA)).toContainText('0m today in 1 lap, 0m this week.', { timeout: 3000 });
   await expect(lane(c.page, nameB)).toContainText('0m today in 2 laps, 0m this week.');
 
   // B cheers A: shown at once, once.
   const cheer = lane(b.page, nameA).getByRole('button', { name: /^Cheer / });
-  await expect(cheer).toHaveAccessibleName(/^Cheer .* for the lap that rang at \d\d:\d\d$/);
+  await expect(cheer).toHaveAccessibleName(/^Cheer .* for the lap that ended at \d\d:\d\d$/);
   await cheer.click();
   // Given, the cheer is a sentence, and nothing more to press.
   await expect(lane(b.page, nameA)).toContainText('You cheered this lap.');
@@ -162,7 +162,7 @@ test('privacy: the task title only while A shares it, gone at once when A stops;
   await expect(lane(b.page, nameC)).toContainText('Away', { timeout: 2000 });
   await go(c.page, 'Focus');
   await button(c.page, 'Start lap 1').click();
-  await expect(button(c.page, 'Skip break')).toBeVisible({ timeout: 8000 });
+  await expect(button(c.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
   await expect(lane(b.page, nameC)).toContainText('in 1 lap', { timeout: 3000 });
   await expect(lane(b.page, nameC)).toContainText('Away');
   await expect(lane(b.page, nameC).getByRole('button', { name: /Cheer/ })).toHaveCount(0);

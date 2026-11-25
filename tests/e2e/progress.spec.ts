@@ -66,7 +66,7 @@ test('a first day with nothing: the first-week words, no year, one sentence each
   await expect(heading(a.page)).toHaveText('Your first week starts with the next lap.');
   await expect(a.page.getByText('Last week has nothing to race. This week becomes the one to beat.')).toBeVisible();
   await expect(a.page.getByText('The year starts with your first lap: one square a day, darker the more laps it held.')).toBeVisible();
-  await expect(a.page.getByText('A day counts with one lap that rings. Two rest days a week do not break it.')).toBeVisible();
+  await expect(a.page.getByText('A day counts with one lap run to its bell. The first two days you miss in a week are rest days: they do not break it.')).toBeVisible();
   await expect(a.page.getByText('Nothing has run today yet. The first lap starts on Focus.')).toBeVisible();
   await expect(a.page.getByRole('slider')).toHaveCount(0);
   await expect(a.page.getByRole('img', { name: 'This week 0m so far.' })).toBeVisible();
@@ -204,17 +204,21 @@ test('the timeline: a lap not counted, a stopped lap and a pair that ran on two 
   await expect(items(a.page).nth(1)).toContainText('Stopped lap');
   await expect(items(a.page).nth(1)).toContainText('12 minutes');
   for (const i of [2, 3]) await expect(items(a.page).nth(i)).toContainText('ran on two devices');
-  // Counted once: 12 + 25 + 25 less the 10 shared.
+  // Counted once: 12 + 25 + 25 less the 10 shared. A stopped lap is a lap, a short one: three.
   const totals = (page: Page) => page.getByRole('region', { name: 'Looking back on today' }).locator('p').first();
-  await expect(totals(a.page)).toHaveText('52 minutes of focus in 2 laps.');
+  await expect(totals(a.page)).toHaveText('52 minutes of focus in 3 laps.');
 
   const at = new Date(start + 65 * MIN);
   const wall = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
   await day(a.page).getByRole('button', { name: `Don't count it, the lap at ${wall}` }).click();
+  // What it did is said on the bar, with its Undo.
+  const bar = a.page.getByRole('status').filter({ hasText: 'Not counted' });
+  await expect(bar).toContainText('Not counted. It adds nothing to your day, week or streak.');
+  await expect(bar.getByRole('button', { name: 'Undo' })).toBeVisible();
   for (const page of [a.page, b.page]) {
     await expect(day(page).getByText('ran on two devices')).toHaveCount(0, { timeout: 2000 });
     await expect(items(page).nth(3)).toContainText('Lap, not counted');
-    await expect(totals(page)).toHaveText('37 minutes of focus in 1 lap.');
+    await expect(totals(page)).toHaveText('37 minutes of focus in 2 laps.');
   }
   const outcome = async () => (await serverRows(server, name, 'session')).get(pair[1]!)?.outcome;
   await expect.poll(outcome).toBe('void');
@@ -222,7 +226,7 @@ test('the timeline: a lap not counted, a stopped lap and a pair that ran on two 
   // The way back is offered at once, and stays: Count it again, never a passing Undo.
   await day(a.page).getByRole('button', { name: `Count it again, the lap at ${wall}` }).click();
   await expect.poll(outcome).toBe('rang');
-  await expect(totals(b.page)).toHaveText('52 minutes of focus in 2 laps.');
+  await expect(totals(b.page)).toHaveText('52 minutes of focus in 3 laps.');
   await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);
 });
 
@@ -264,7 +268,7 @@ test('by project and estimates: one project up, one down, a task over its estima
   await expect(line('Reading')).toContainText('1 lap, down 50m on the week before');
   // By hand: (3 + 2) laps run over (2 + 4) guessed is 0.83.
   const estimates = panel(a.page, 'Estimates');
-  await expect(estimates).toContainText(`A task takes about ${(5 / 6).toFixed(1)} laps for each one you guess.`);
+  await expect(estimates).toContainText(`A task takes about ${(5 / 6).toFixed(1)} laps for each one you estimate.`);
   await expect(estimates.getByRole('listitem').filter({ hasText: 'slides' })).toContainText('3 of 2');
   await expect(estimates.getByRole('listitem').filter({ hasText: 'abstract' })).toContainText('2 of 4');
 });

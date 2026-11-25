@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import type { TimerState } from '../../client/src/core/timer.ts';
 import { createFocus } from '../../client/src/sync/focus.ts';
-import { account, converge, offline, online, serverHolds, signedIn, sleep, startServer, stopAll, table, until } from './harness.ts';
+import { account, converge, offline, online, serverHolds, serverRows, signedIn, sleep, startServer, stopAll, table, until } from './harness.ts';
 import type { Device, Server } from './harness.ts';
 
 let server: Server;
@@ -183,6 +183,49 @@ test('4. a lap still running when another device\'s newer start arrives is close
   const ran = (row.ended as number) - (row.started as number);
   assert.ok(ran >= 90000 && ran < 95000, `the replaced lap kept ${ran} ms`);
   for (const d of [a, b]) assert.deepEqual(d.engine.timer.value, newer);
+  fa.close();
+  fb.close();
+  await stop(a, b);
+});
+
+test('4. the same lap stopped on two devices, each offline, at different moments: after they meet one row, the later stop\'s, on both and on the server', async () => {
+  const [a, b] = await pair('row4s');
+  const focus = (d: Device) =>
+    createFocus(d.engine, {
+      utcOffsetMin: () => 0,
+      runId: () => 'run-shared',
+      schedule: (run, ms) => {
+        const t = setTimeout(run, ms);
+        return () => clearTimeout(t);
+      },
+    });
+  const [fa, fb] = [focus(a), focus(b)];
+  fa.start();
+  await converge([a, b]);
+  assert.equal(b.engine.timer.value.run, 'run-shared');
+  offline(a);
+  offline(b);
+  // A stops at twenty seconds, B, not knowing, at thirty-five: both under a minute, and a lap leaves a row however short.
+  a.skew.ms = 20000;
+  fa.stop();
+  b.skew.ms = 35000;
+  fb.stop();
+  // A's stop reaches the server first, so the later stop has to win on its stamp, not on arriving last.
+  online(a);
+  await until(() => a.engine.sync.value === 'in-step' && a.engine.unsent.value === 0, 5000, 'A did not come back');
+  online(b);
+  await settled('row4s', [a, b]);
+  const rows = await serverRows(server, 'row4s', 'session');
+  assert.deepEqual([...rows.keys()], ['run-shared'], 'one row for one lap');
+  const kept = rows.get('run-shared')!;
+  assert.equal(kept.outcome, 'stopped');
+  const ran = (kept.ended as number) - (kept.started as number);
+  assert.ok(ran >= 35000 && ran < 40000, `the row kept ${ran} ms, not B's 35 s`);
+  for (const d of [a, b]) {
+    assert.deepEqual(d.engine.rows('session').value.get('run-shared'), kept);
+    assert.equal(d.engine.timer.value.phase, 'idle');
+    assert.equal(d.engine.timer.value.set_index, 1, 'the set moved on once, not twice');
+  }
   fa.close();
   fb.close();
   await stop(a, b);

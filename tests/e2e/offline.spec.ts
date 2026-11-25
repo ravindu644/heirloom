@@ -181,7 +181,7 @@ test('work done offline is still there after an offline reload once it is on dis
   await a.setOffline(true);
   // A lap that rings with no connection: its row is written here.
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
-  await expect(a.page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: 8000 });
+  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: 8000 });
   await onDisk(a.page, 'session/', 1);
   await go(a.page, 'Today');
   await a.page.getByRole('checkbox', { name: 'Done: chapter 5' }).click();

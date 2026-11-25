@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { accountWith, go, midScreen, quickAdd, ready, selectable, server, settle, signIn, staysPut, taskRow, token, username } from './app.ts';
+import { accountWith, colourOf, go, midScreen, quickAdd, ready, selectable, server, settle, signedInto, signIn, staysPut, taskRow, token, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 import { demoUrl } from './server.ts';
@@ -21,15 +21,6 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
 const panel = (page: Page, title: string) => page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 2, exact: true }) });
 const sent = (node: Node) => until(() => node.engine.unsent.value === 0 && node.engine.sync.value === 'in-step', 10000, 'not sent');
 
-async function signedInto(d: Device, tag: string, seed: (node: Node) => void = () => {}, lengths: Parameters<typeof accountWith>[1] = {}) {
-  const name = username(tag);
-  const node = await accountWith(name, lengths);
-  seed(node);
-  await sent(node);
-  await signIn(d.page, name);
-  await ready(d.page);
-  return { name, node };
-}
 const tasks = (n: number) => (node: Node) => {
   for (let i = 0; i < n; i++) node.engine.write('task', `t${i}`, { title: `task ${i + 1}`, estimate: 2, order: `V${String(i).padStart(2, '0')}` });
 };
@@ -73,17 +64,24 @@ test('stays put on Today: quick add, a task ticked done and undone, the day targ
 
   // A row in the middle of a long list ticked done goes to Done: that is the tap's move, and the
   // rows under it glide up. What must not move is everything above it. Undone, the same in Done.
-  await a.page.getByRole('checkbox', { name: 'Done: task 9' }).click();
-  await settle(a.page);
-  const box = a.page.getByRole('checkbox', { name: 'Done: task 8' });
-  const above = a.page.getByRole('checkbox', { name: 'Done: task 7' });
+  // Done is the last list: nine rows in it leave the page room to scroll under its heading, so the
+  // untick is tried mid-page (at the very end of a page nothing can scroll, and DESIGN.md lets the
+  // heading move there).
+  for (let n = 14; n >= 6; n--) {
+    await a.page.getByRole('checkbox', { name: `Done: task ${n}` }).click();
+    await settle(a.page);
+  }
+  const box = a.page.getByRole('checkbox', { name: 'Done: task 4' });
+  const above = a.page.getByRole('checkbox', { name: 'Done: task 3' });
   await midScreen(box);
   await settle(a.page);
   await staysPut(a.page, above, () => box.click());
   const done = a.page.getByRole('heading', { name: 'Done', level: 2, exact: true });
   await midScreen(done);
   await settle(a.page);
-  await staysPut(a.page, done, () => a.page.getByRole('checkbox', { name: 'Done: task 8' }).click());
+  expect(await a.page.locator('main').evaluate((m) => m.scrollHeight - m.clientHeight - m.scrollTop), 'the page cannot scroll under the Done heading').toBeGreaterThan(100);
+  // Done lists rows in the order they were ticked: task 14 stands right under its heading, on the screen.
+  await staysPut(a.page, done, () => a.page.getByRole('checkbox', { name: 'Done: task 14' }).click());
 
   // Quick add: the field stays where it was.
   await midScreen(field);
@@ -98,7 +96,7 @@ test('stays put on Today: quick add, a task ticked done and undone, the day targ
   await midScreen(target);
   await settle(a.page);
   // Opening in place: the row it opens from keeps its place.
-  await staysPut(a.page, target, () => button(a.page, 'Set a target').click());
+  await staysPut(a.page, target, () => button(a.page, 'Set a day target').click());
   const more = button(a.page, 'One lap more');
   await staysPut(a.page, more, () => more.click());
   await staysPut(a.page, target, () => button(a.page, 'Done').click());
@@ -259,13 +257,13 @@ test('the Add in a field: absent while it is empty, there from the first charact
 
 // 5. The day target's editor.
 
-test('the day target: Set a target opens the editor with its label; the stepper changes the figure; Done closes it with the figure kept; Remove the target; nothing else closes it', async ({ deviceA: a }) => {
+test('the day target: Set a day target opens the editor with its label; the stepper changes the figure; Done closes it with the figure kept; Remove the day target; nothing else closes it', async ({ deviceA: a }) => {
   await signedInto(a, 'target', tasks(2));
   await go(a.page, 'Today');
   const target = a.page.getByRole('group', { name: 'Day target' });
-  await expect(target).toContainText('No target today.');
-  await target.getByRole('button', { name: 'Set a target' }).click();
-  await expect(target.getByText('Laps to run today', { exact: true })).toBeVisible();
+  await expect(target).toContainText('No day target.');
+  await target.getByRole('button', { name: 'Set a day target' }).click();
+  await expect(target.getByText('Laps to run each day', { exact: true })).toBeVisible();
   const figure = async () => Number((await target.innerText()).match(/of (\d+) laps? today/)?.[1]);
   const first = await figure();
   await button(target as never, 'One lap more').click();
@@ -274,28 +272,28 @@ test('the day target: Set a target opens the editor with its label; the stepper 
   const closers = await target.getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label') ?? el.textContent!.trim()));
   expect(closers.filter((n) => /^(done|keep it|keep this|close|ok|no target|cancel)$/i.test(n)), closers.join(', ')).toEqual(['Done']);
   await button(target as never, 'Done').click();
-  await expect(target.getByText('Laps to run today', { exact: true })).toHaveCount(0);
+  await expect(target.getByText('Laps to run each day', { exact: true })).toHaveCount(0);
   await expect.poll(figure).toBe(first + 1);
   await target.getByRole('button', { name: 'Change' }).click();
-  await target.getByRole('button', { name: 'Remove the target' }).click();
-  await expect(target).toContainText('No target today.');
+  await target.getByRole('button', { name: 'Remove the day target' }).click();
+  await expect(target).toContainText('No day target.');
 });
 
-test('the day target removed on B while A\'s editor is open: A shows no target and still has Set a target', async ({ deviceA: a, deviceB: b }) => {
+test('the day target removed on B while A\'s editor is open: A shows no target and still has Set a day target', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await signedInto(a, 'targetgone', tasks(2));
   await signIn(b.page, name);
   await ready(b.page);
   for (const d of [a, b]) await go(d.page, 'Today');
   const target = (page: Page) => page.getByRole('group', { name: 'Day target' });
-  await target(a.page).getByRole('button', { name: 'Set a target' }).click();
+  await target(a.page).getByRole('button', { name: 'Set a day target' }).click();
   await button(target(a.page) as never, 'Done').click();
-  await expect(target(b.page)).not.toContainText('No target today.', { timeout: 3000 });
+  await expect(target(b.page)).not.toContainText('No day target.', { timeout: 3000 });
   await target(a.page).getByRole('button', { name: 'Change' }).click();
-  await expect(target(a.page).getByText('Laps to run today', { exact: true })).toBeVisible();
+  await expect(target(a.page).getByText('Laps to run each day', { exact: true })).toBeVisible();
   await target(b.page).getByRole('button', { name: 'Change' }).click();
-  await target(b.page).getByRole('button', { name: 'Remove the target' }).click();
-  await expect(target(a.page)).toContainText('No target today.', { timeout: 3000 });
-  await expect(target(a.page).getByRole('button', { name: 'Set a target' })).toBeVisible();
+  await target(b.page).getByRole('button', { name: 'Remove the day target' }).click();
+  await expect(target(a.page)).toContainText('No day target.', { timeout: 3000 });
+  await expect(target(a.page).getByRole('button', { name: 'Set a day target' })).toBeVisible();
 });
 
 // 6. A task's time (protocol section 12).
@@ -381,14 +379,15 @@ test('a project\'s colour: two of the new named colours and a picked one fill th
   };
   await make('teal task', 'Biology', (s) => s.getByRole('radio', { name: 'Teal' }).click());
   await make('indigo task', 'History', (s) => s.getByRole('radio', { name: 'Indigo' }).click());
-  await make('picked task', 'Art', (s) =>
-    // The device's own picker answers with input and change events: so does this.
-    s.locator('input[type="color"]').evaluate((el: HTMLInputElement) => {
-      el.value = '#3a7bd5';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }),
-  );
+  // The app's own picker: Pick, then its two sliders, as a finger leaves them.
+  await make('picked task', 'Art', async (s) => {
+    await s.getByRole('radio', { name: /Pick/ }).click();
+    await s.getByRole('slider', { name: 'Colour' }).fill('214');
+    await s.getByRole('slider', { name: 'Pale to deep' }).fill('60');
+  });
+  await expect.poll(() => colourOf(name, 'Art')).toMatch(/^#[0-9a-f]{6}$/);
+  const picked = (await colourOf(name, 'Art'))!;
+  const rgb = `rgb(${[1, 3, 5].map((at) => parseInt(picked.slice(at, at + 2), 16)).join(', ')})`;
   // A colour value no build has yet, written as another device would.
   node.engine.write('project', 'future', { name: 'Music', color: 'chartreuse-ish', order: 'Z' });
   node.engine.write('task', 'music', { title: 'music task', project: 'future', order: 'Z' });
@@ -405,7 +404,7 @@ test('a project\'s colour: two of the new named colours and a picked one fill th
       await settle(d.page);
       expect(await square(d.page, 'teal task', 'Biology'), `teal, ${scheme}`).toBe(await token(d.page, '--teal'));
       expect(await square(d.page, 'indigo task', 'History'), `indigo, ${scheme}`).toBe(await token(d.page, '--indigo'));
-      expect(await square(d.page, 'picked task', 'Art'), `picked, ${scheme}`).toBe('rgb(58, 123, 213)');
+      expect(await square(d.page, 'picked task', 'Art'), `picked, ${scheme}`).toBe(rgb);
       await expect(taskRow(d.page, 'music task')).toContainText('Music');
       expect(await square(d.page, 'music task', 'Music'), `unknown, ${scheme}`).toBe(await token(d.page, '--ink'));
     }
@@ -443,8 +442,8 @@ test('nothing selects: a heading, a task title, a button\'s words and a sentence
   for (const [what, l] of [
     ['Today\'s heading', a.page.getByRole('heading', { level: 1 })],
     ['a task title', taskRow(a.page, 'task 1').getByText('task 1', { exact: true })],
-    ['a button\'s words', a.page.getByRole('button', { name: 'Set a target' })],
-    ['a sentence', a.page.getByText('No target today.')],
+    ['a button\'s words', a.page.getByRole('button', { name: 'Set a day target' })],
+    ['a sentence', a.page.getByText('No day target.')],
   ] as const) expect(await selectable(l), `Today: ${what} selects`).toBe(false);
   expect(await selectable(a.page.getByLabel('Add a task', { exact: true })), 'the quick-add field does not select').toBe(true);
   // A word dragged over selects nothing.
@@ -568,8 +567,10 @@ test('with motion, a row that changes place glides there in the fill time, 160 m
     await add.fill(t);
     await add.press('Enter');
   }
-  await a.page.getByRole('button', { name: 'Change the order', exact: true }).click();
-  const up = await a.page.getByRole('button', { name: 'Move up: charlie' }).elementHandle();
+  // Alt and up on charlie: the rows trade places and glide there.
+  const charlie = a.page.getByRole('checkbox', { name: 'Check in: charlie', exact: true }).locator('xpath=..').getByRole('button', { name: /charlie/ });
+  await charlie.focus();
+  const up = await charlie.elementHandle();
   // Every glide started, caught as it starts: one that lasts a fraction of a millisecond is over
   // before a frame could see it.
   const glides = await a.page.evaluate(async (up) => {
@@ -580,8 +581,8 @@ test('with motion, a row that changes place glides there in the fill time, 160 m
       if ((x.effect as KeyframeEffect).getKeyframes().some((k) => String(k.transform).includes('translateY'))) seen.push(Number(x.effect!.getTiming().duration));
       return x;
     };
-    (up as HTMLElement).click();
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    up!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
     Element.prototype.animate = animate;
     return seen;
   }, up);
@@ -593,7 +594,11 @@ test('with motion, a row that changes place glides there in the fill time, 160 m
 // 11. Words that are gone: across the demo's states and the live screens.
 
 // The button "Keep it" is gone; "Two rest days a week keep it going." is a sentence, and stays.
-const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b/;
+// Section 12: one word for one thing (DESIGN.md, "Said so a stranger knows"): estimate, never
+// guess; Restore, never bring back; a lap reaches its bell, never rings or rang; not counted,
+// never void; and the buttons that went: Skip break, Stop and log, Don't count this lap, the free
+// "when", the order mode, Another colour, Ghost.
+const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b|Skip break|Stop and log|Don't count this lap|\b[Gg]uess|[Bb]ring back|\brings\b|\brang\b|\b[Vv]oid\b|When in the day|Change the order|Keep this order|Another colour|\bGhost\b|No target today/;
 
 test('the words that went are nowhere: not in any demo state, not on the live screens', async ({ deviceA: a }) => {
   test.setTimeout(180000);
@@ -620,10 +625,14 @@ test('the words that went are nowhere: not in any demo state, not on the live sc
   }, { work_ms: 3000, short_ms: 60000 });
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
   await scan('Focus, running');
-  await expect(button(a.page, 'Skip break')).toBeVisible({ timeout: 8000 });
+  await expect(button(a.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
   await scan('Focus, result');
+  await button(a.page, 'Start 1 min break').click();
+  await expect(button(a.page, 'Done for now')).toBeVisible();
+  await scan('Focus, a break');
   await go(a.page, 'Today');
-  await button(a.page, 'Set a target').click();
+  await scan('Today, in a break');
+  await button(a.page, 'Set a day target').click();
   await scan('Today, the target open');
   await openSheet(a.page, 'task 1');
   await scan('Today, a task sheet');

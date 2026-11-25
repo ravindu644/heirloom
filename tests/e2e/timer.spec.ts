@@ -66,7 +66,7 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   for (const d of [a, b]) {
     await expect(d.page.getByText('Lap 1 of 4, done')).toBeVisible({ timeout: 8000 });
     await expect(button(d.page, 'Start 1 min break')).toBeVisible();
-    await expect(button(d.page, 'Skip break')).toBeVisible();
+    await expect(button(d.page, 'Start lap 2 now')).toBeVisible();
   }
   // Both laptops were in step at the bell, so both may write the row: it must still be one.
   const [row] = await sessionsWhen(name, (rows) => rows.length > 0);
@@ -82,16 +82,17 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);
 });
 
-test('stop under a minute leaves no row and says so', async ({ deviceA: a, deviceB: b }) => {
+test('stop under a minute still leaves a stopped row, says which lap stopped, and lap 2 is next on both', async ({ deviceA: a, deviceB: b }) => {
   const name = await twoLaptops(a, b, 'short');
   await button(a.page, 'Start lap 1').click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
   // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
-  await expect(a.page.getByText('Stopped. Under a minute, so nothing was logged.').filter({ visible: true })).toBeVisible();
-  // B ready again means the stop reached the server, and a row would have gone with it.
-  await ready(b.page);
-  expect(await sessions(name)).toEqual([]);
+  await expect(a.page.getByText('Lap 1 stopped in its first minute. Lap 2 is next.').filter({ visible: true })).toBeVisible();
+  for (const d of [a, b]) await ready(d.page, 2);
+  const rows = await sessionsWhen(name, (list) => list.length > 0);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ kind: 'work', outcome: 'stopped' });
 });
 
 test('undo after a stop brings the lap back on both laptops, and it then rings as a full lap', async ({ deviceA: a, deviceB: b }) => {
@@ -99,7 +100,7 @@ test('undo after a stop brings the lap back on both laptops, and it then rings a
   await button(a.page, 'Start lap 1').click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
-  await ready(b.page);
+  await ready(b.page, 2);
   await button(a.page, 'Undo').click();
   for (const d of [a, b]) await expect(button(d.page, 'Pause')).toBeVisible({ timeout: 1000 });
   await sameSecond(a.page, b.page);

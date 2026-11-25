@@ -1,49 +1,41 @@
-// A run leaves a row only after a minute of running (protocol section 11), so this waits a real
-// minute. Two accounts share the wait: one stops and logs (a part square on its task), the other
-// sets its lap aside.
+// One Stop (DESIGN.md, Voice 4): a lap stopped a minute in says how far it ran, keeps a stopped row
+// on both laptops, is a lap on its task ("1 of 2") and a part square as full as it ran. This waits
+// a real minute, for the line that names the minutes.
 import { accountWith, go, ready, sessionsWhen, signIn, squaresOf, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 
-test('a minute in, stop and log keeps a stopped row on both laptops; not counting it keeps a void row', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
+test('a minute in, Stop keeps a stopped row on both laptops; it is a lap on its task, a part square, and lap 2 is next', async ({ deviceA: a, deviceB: b }) => {
   test.setTimeout(120000);
-  const logged = username('logged');
-  const aside = username('aside');
+  const name = username('logged');
   // The lap that is stopped is on a task: Start lap 1 starts on today's next task.
-  const node = await accountWith(logged);
+  const node = await accountWith(name);
   node.engine.write('task', 'proofs', { title: 'proofs', estimate: 2, order: 'V' });
-  await accountWith(aside);
-  for (const [d, name] of [[a, logged], [b, logged], [c, aside]] as const) {
+  for (const d of [a, b]) {
     await signIn(d.page, name);
     await ready(d.page);
   }
 
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
-  await c.page.getByRole('button', { name: 'Start lap 1' }).click();
   await expect(b.page.getByRole('button', { name: 'Pause' })).toBeVisible();
-  // The button says what a tap keeps, and changes when there is a minute to keep.
-  await expect(a.page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  const stop = a.page.getByRole('button', { name: 'Stop and log 1 min' });
-  await expect(stop).toBeVisible({ timeout: 70000 });
+  // One Stop, and its name does not change while the lap runs.
+  const stop = a.page.getByRole('button', { name: 'Stop', exact: true });
+  await expect(stop).toBeVisible();
+  await expect(a.page.getByText(/^\d\d:\d\d$/).filter({ hasText: /^23:5\d$/ })).toBeVisible({ timeout: 70000 });
+  await expect(stop).toBeVisible();
+  await expect(a.page.getByRole('button', { name: /^Stop and log/ })).toHaveCount(0);
+  await expect(a.page.getByRole('button', { name: "Don't count this lap" })).toHaveCount(0);
 
   await stop.click();
-  // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
-  await expect(a.page.getByText('Stopped. 1 minute kept.').filter({ visible: true })).toBeVisible();
-  await ready(b.page);
-  const [kept] = await sessionsWhen(logged, (rows) => rows.length > 0);
-  expect(kept).toMatchObject({ kind: 'work', outcome: 'stopped', paused_ms: 0 });
+  await expect(a.page.getByText('Lap 1 stopped at 1 min. Lap 2 is next.').filter({ visible: true })).toBeVisible();
+  for (const d of [a, b]) await ready(d.page, 2);
+  const [kept] = await sessionsWhen(name, (rows) => rows.length > 0);
+  expect(kept).toMatchObject({ kind: 'work', outcome: 'stopped', paused_ms: 0, task: 'proofs' });
   expect((kept!.ended as number) - (kept!.started as number)).toBeGreaterThanOrEqual(60000);
-  expect(kept).toMatchObject({ task: 'proofs' });
-  // On Today the stopped minute is a part of a square, and no lap: "0 of 2".
+  // On Today the stopped lap is a lap, "1 of 2", and a part of a square as full as it ran.
   await go(b.page, 'Today');
   const row = taskRow(b.page, 'proofs');
-  await expect(row).toContainText('0 of 2');
+  await expect(row).toContainText('1 of 2');
   const [part, empty] = await squaresOf(row);
   expect(part, 'a minute of a 25 minute lap').toBeCloseTo(((kept!.ended as number) - (kept!.started as number)) / 1500000, 3);
   expect(empty).toBe(0);
-
-  await c.page.getByRole('button', { name: "Don't count this lap" }).click();
-  await expect(c.page.getByText('Not counted. The lap stays in your timeline and adds nothing to your day, week or streak.').filter({ visible: true })).toBeVisible();
-  const [voided] = await sessionsWhen(aside, (rows) => rows.length > 0);
-  expect(voided).toMatchObject({ kind: 'work', outcome: 'void' });
-  expect((voided!.ended as number) - (voided!.started as number)).toBeGreaterThanOrEqual(60000);
 });

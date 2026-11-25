@@ -41,6 +41,20 @@ export async function accountWith(name: string, lengths: { work_ms?: number; sho
   return node;
 }
 
+/** A new account seeded from Node, then signed in on this browser and ready. */
+export async function signedInto(d: { page: Page }, tag: string, seed: (node: Device) => void = () => {}, lengths: Parameters<typeof accountWith>[1] = {}) {
+  const name = username(tag);
+  const node = await accountWith(name, lengths);
+  seed(node);
+  await until(() => node.engine.unsent.value === 0 && node.engine.sync.value === 'in-step', 10000, 'not sent');
+  await signIn(d.page, name);
+  await ready(d.page);
+  return { name, node };
+}
+
+/** The colour the server holds for an account's project, by its name. */
+export const colourOf = async (name: string, project: string) => [...(await serverRows(server, name, 'project')).values()].find((r) => r.name === project)?.color as string | undefined;
+
 /** Session rows the server holds for an account. */
 export const sessions = async (name: string) => [...(await serverRows(server, name, 'session')).values()];
 

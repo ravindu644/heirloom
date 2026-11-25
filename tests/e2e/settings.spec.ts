@@ -63,10 +63,10 @@ test('lengths: typed, refused when not a whole number in bounds, nudged by minus
   await expect(b.page.getByText('0 of 1 lap today')).toBeVisible({ timeout: 2000 });
 });
 
-test('auto-start: with both switches on, the break starts when a lap rings and the next lap when the break rings (3 s lengths written from Node: the steppers stop at a minute)', async ({ deviceA: a }) => {
+test('auto-start: with both switches on, the break starts when a lap reaches its bell and the next lap when the break reaches its bell (3 s lengths written from Node: the steppers stop at a minute)', async ({ deviceA: a }) => {
   const name = await signedInto([a], 'sauto', { work_ms: 3000, short_ms: 3000 });
   await openSettings(a.page, name);
-  for (const label of ['Start the break when a lap rings', 'Start the next lap when a break rings']) {
+  for (const label of ['Start the break when a lap reaches its bell', 'Start the next lap when a break reaches its bell']) {
     const box = a.page.getByRole('checkbox', { name: label });
     await box.click();
     await expect(box).toHaveAttribute('aria-checked', 'true');
@@ -101,12 +101,12 @@ test('"Mark a finished lap": off, a first lap shows no mark; on, the first lap s
   await expect(celebrate).toHaveAttribute('aria-checked', 'false');
   await go(a.page, 'Focus');
   for (const d of [a, b]) await button(d.page, 'Start lap 1').click();
-  for (const d of [a, b]) await expect(button(d.page, 'Skip break')).toBeVisible({ timeout: 8000 });
+  for (const d of [a, b]) await expect(button(d.page, 'Start lap 2 now')).toBeVisible({ timeout: 8000 });
   await expect(b.page.getByText('Lap 1. The bell works.')).toBeVisible();
   await a.page.waitForTimeout(500);
   await expect(a.page.getByText('Lap 1. The bell works.')).toHaveCount(0);
   await b.page.reload();
-  await expect(button(b.page, 'Skip break')).toBeVisible();
+  await expect(button(b.page, 'Start lap 2 now')).toBeVisible();
   await b.page.waitForTimeout(500);
   await expect(b.page.getByText('Lap 1. The bell works.')).toHaveCount(0);
 });

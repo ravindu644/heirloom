@@ -80,7 +80,7 @@ test('a lap started from the Next row is named on both laptops; it rings, counts
   // Today's bar on A names it; Focus on B names it, with the lap it is on this task.
   await expect(a.page.getByRole('link', { name: 'Open Focus' })).toContainText('essay');
   await go(b.page, 'Focus');
-  await expect(b.page.getByText('lap 1 of 4 on this task')).toBeVisible();
+  await expect(b.page.getByText('lap 1 on this task, 4 estimated')).toBeVisible();
   await expect(b.page.getByText('essay', { exact: true })).toBeVisible();
 
   await expect(button(b.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
@@ -143,7 +143,7 @@ test('done with the box shows under Done on B; Undo brings it back on both', asy
 
 test('a first day with nothing says so and offers the quick add', async ({ deviceA: a }) => {
   await onToday([a], 'empty');
-  await expect(a.page.getByText('Nothing planned for today yet. Add the first thing to work on, and guess its laps.')).toBeVisible();
+  await expect(a.page.getByText('Nothing planned for today yet. Add the first thing to work on, and estimate its laps.')).toBeVisible();
   await expect(a.page.getByLabel('Add a task', { exact: true })).toBeVisible();
   // No past day to race yet: two figures, no ghost.
   await expect(a.page.locator('dl > div')).toHaveCount(2);
@@ -216,7 +216,8 @@ test('delete and Undo; delete and Restore from Recently deleted', async ({ devic
   const bin = a.page.getByRole('dialog', { name: 'Recently deleted' });
   await expect(bin).toContainText('A deleted task keeps for 30 days, then it is gone for good.');
   await bin.getByRole('button', { name: 'Restore' }).click();
-  await bin.getByRole('button', { name: 'Close' }).click();
+  // A list that opened as a sheet closes with its last row.
+  await expect(bin).toBeHidden();
   await expect(taskRow(a.page, 'old notes')).toBeVisible();
   await expect(taskRow(a.page, 'old notes')).toContainText('0 of 1');
 });
@@ -241,24 +242,27 @@ test('deleted on A while B, offline, retitles it: deleted on both with B\'s titl
   }
   await a.page.getByRole('dialog', { name: 'Recently deleted' }).getByRole('button', { name: 'Restore' }).click();
   for (const d of [a, b]) {
-    await d.page.getByRole('dialog', { name: 'Recently deleted' }).getByRole('button', { name: 'Close' }).click();
+    // Its last row restored, here or on the other laptop, the list closes itself.
+    await expect(d.page.getByRole('dialog', { name: 'Recently deleted' })).toBeHidden({ timeout: 5000 });
     await expect(taskRow(d.page, 'chapter 4, with the proofs')).toBeVisible({ timeout: 5000 });
   }
   const rows = await waitRows(name, (all) => [...all.values()].some((row) => row.title === 'chapter 4, with the proofs' && row.deleted === null));
   expect(rows.size).toBe(1);
 });
 
-test('reorder with Up and Down on A shows the same order on B; two laptops offline each add at the end and settle on one order', async ({ deviceA: a, deviceB: b }) => {
+test('reorder with Alt and the arrows on A shows the same order on B; two laptops offline each add at the end and settle on one order', async ({ deviceA: a, deviceB: b }) => {
   await onToday([a, b], 'order');
   for (const t of ['alpha', 'bravo', 'charlie']) await quickAdd(a.page, t);
   await expect.poll(() => titles(b.page)).toEqual(['alpha', 'bravo', 'charlie']);
 
-  await button(a.page, 'Change the order').click();
-  await a.page.getByRole('button', { name: 'Move up: charlie' }).click();
+  // No mode to enter: the row with the focus moves. (Press and hold is in second-hour.spec.ts.)
+  const words = (title: string) => taskRow(a.page, title).getByRole('button', { name: new RegExp(title) });
+  await words('charlie').focus();
+  await a.page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => titles(a.page)).toEqual(['alpha', 'charlie', 'bravo']);
-  await a.page.getByRole('button', { name: 'Move down: alpha' }).click();
+  await words('alpha').focus();
+  await a.page.keyboard.press('Alt+ArrowDown');
   await expect.poll(() => titles(a.page)).toEqual(['charlie', 'alpha', 'bravo']);
-  await button(a.page, 'Keep this order').click();
   await expect.poll(() => titles(b.page), { timeout: 1000 }).toEqual(['charlie', 'alpha', 'bravo']);
 
   for (const d of [a, b]) await d.setOffline(true);
@@ -304,7 +308,8 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
 
   await sheet.getByRole('button', { name: 'On chosen days' }).click();
   await sheet.getByRole('button', { name: 'Tue', exact: true }).click();
-  await sheet.getByLabel('When in the day').fill('after dinner');
+  // The free words for when are gone: a clock time says it.
+  await expect(sheet.getByLabel('When in the day')).toHaveCount(0);
 
   await a.page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
@@ -318,7 +323,6 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
     await expect(dialog.getByRole('group', { name: 'Estimate' }).last()).toContainText('8 laps');
     await expect(dialog.getByRole('button', { name: 'Thesis' })).toHaveAttribute('aria-pressed', 'true');
     await expect(dialog.getByRole('button', { name: 'Tue', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(dialog.getByLabel('When in the day')).toHaveValue('after dinner');
     await expect(dialog.getByRole('checkbox', { name: 'Done: outline' })).toHaveAttribute('aria-checked', 'true');
   };
   await check(sheet);
@@ -337,7 +341,7 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
   const upcoming = list(b.page, 'Upcoming');
   await expect(upcoming).toContainText('thesis draft, part one');
   await expect(upcoming).toContainText('Thesis');
-  await expect(upcoming).toContainText('tomorrow, after dinner');
+  await expect(upcoming).toContainText('tomorrow');
   const other = await open(b.page, 'thesis draft, part one');
   await check(other);
   await expect(other.getByLabel('Due')).toHaveValue(dayAfter(1));
@@ -372,9 +376,9 @@ test('the day target: set it, the bar fills as a lap rings, clear it', async ({ 
   await onToday([a], 'target', { work_ms: 3000, short_ms: 60000 });
   await quickAdd(a.page, 'drill ~3');
   const target = a.page.getByRole('group', { name: 'Day target' });
-  await expect(target).toContainText('No target today.');
+  await expect(target).toContainText('No day target.');
   // Set, it takes the laps planned on today's list.
-  await target.getByRole('button', { name: 'Set a target' }).click();
+  await target.getByRole('button', { name: 'Set a day target' }).click();
   await expect(target).toContainText('0 of 3 laps today');
   await target.getByRole('button', { name: 'One lap more', exact: true }).click();
   await expect(target).toContainText('0 of 4 laps today');
@@ -387,8 +391,8 @@ test('the day target: set it, the bar fills as a lap rings, clear it', async ({ 
   expect(await bar()).toEqual([1, 0, 0, 0]);
 
   await target.getByRole('button', { name: 'Change' }).click();
-  await target.getByRole('button', { name: 'Remove the target' }).click();
-  await expect(target).toContainText('No target today.');
+  await target.getByRole('button', { name: 'Remove the day target' }).click();
+  await expect(target).toContainText('No day target.');
 });
 
 // Opens a task's sheet by its words, as a person taps the row.
@@ -399,7 +403,7 @@ async function openSheet(page: Page, title: string) {
   return sheet;
 }
 
-test('typed key by key, the spaces stay while typing; the title, the "when" and a subtask are stored trimmed after leaving the field', async ({ deviceA: a }) => {
+test('typed key by key, the spaces stay while typing; the title and a subtask are stored trimmed after leaving the field', async ({ deviceA: a }) => {
   const name = await onToday([a], 'spaces');
   await quickAdd(a.page, 'paper');
   const sheet = await openSheet(a.page, 'paper');
@@ -408,9 +412,6 @@ test('typed key by key, the spaces stay while typing; the title, the "when" and 
   await title.press('ControlOrMeta+a');
   await title.pressSequentially('  thesis draft  ');
   await expect(title).toHaveValue('  thesis draft  ');
-  const when = sheet.getByLabel('When in the day');
-  await when.pressSequentially('  after dinner  ');
-  await expect(when).toHaveValue('  after dinner  ');
   const subtask = sheet.getByRole('textbox', { name: 'New subtask' });
   await subtask.pressSequentially('  outline the argument  ');
   await expect(subtask).toHaveValue('  outline the argument  ');
@@ -418,15 +419,15 @@ test('typed key by key, the spaces stay while typing; the title, the "when" and 
   await expect(sheet.getByRole('checkbox', { name: 'Done: outline the argument' })).toBeVisible();
   await sheet.getByRole('button', { name: 'Close' }).click();
 
-  await expect(taskRow(a.page, 'thesis draft')).toContainText('after dinner');
+  await expect(taskRow(a.page, 'thesis draft')).toBeVisible();
   const rows = await waitRows(name, (all) => [...all.values()].some((row) => row.title === 'outline the argument'));
   const task = [...rows.values()].find((row) => !row.parent)!;
-  expect(task).toMatchObject({ title: 'thesis draft', when: 'after dinner' });
+  expect(task).toMatchObject({ title: 'thesis draft' });
   expect([...rows.values()].find((row) => row.parent === task.id)).toMatchObject({ title: 'outline the argument' });
 });
 
 test('the task a lap runs on keeps its row in today\'s list, in its place, its square filling; a sheet open on it stays open when another laptop starts the lap', async ({ deviceA: a, deviceB: b }) => {
-  await onToday([a, b], 'running', { work_ms: 30000, short_ms: 60000 });
+  const name = await onToday([a, b], 'running', { work_ms: 30000, short_ms: 60000 });
   for (const t of ['alpha ~2', 'bravo ~1', 'charlie ~1']) await quickAdd(a.page, t);
   await expect.poll(() => titles(b.page)).toEqual(['alpha', 'bravo', 'charlie']);
 
@@ -441,10 +442,8 @@ test('the task a lap runs on keeps its row in today\'s list, in its place, its s
   // Next is the first task not running; alpha is still on the list, and in the true order it is first.
   await expect(list(a.page, 'Next')).toContainText('bravo');
   await expect(list(a.page, 'Later today')).toContainText('alpha');
-  await button(a.page, 'Change the order').click();
-  await expect(a.page.getByRole('heading', { name: 'Today, in order' })).toBeVisible();
-  expect(await titles(a.page)).toEqual(['alpha', 'bravo', 'charlie']);
-  await button(a.page, 'Keep this order').click();
+  const order = [...(await waitRows(name, (all) => all.size === 3)).values()].sort((x, y) => (String(x.order) < String(y.order) ? -1 : 1)).map((row) => row.title);
+  expect(order).toEqual(['alpha', 'bravo', 'charlie']);
 
   // The running lap's square fills as it runs: it is redrawn every few seconds.
   const first = (await squaresOf(taskRow(a.page, 'alpha')))[0]!;

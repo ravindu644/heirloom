@@ -48,7 +48,7 @@ const states: Record<string, (page: Page, name: string) => Promise<void>> = {
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   },
   'Focus, result': async (page) => {
-    await expect(page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+    await expect(page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
   },
   Today: async (page) => {
     await go(page, 'Today');
@@ -424,7 +424,7 @@ test('reduced motion: nothing animates on a start, the lap-done moment or a shee
   await go(a.page, 'Focus');
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
   for (let i = 0; i < 4; i++) faults.push(...(await running(a.page)).map((x) => `on a start: ${x}`));
-  await expect(a.page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
   for (let i = 0; i < 4; i++) faults.push(...(await running(a.page)).map((x) => `at the lap-done moment: ${x}`));
   await states.Today!(a.page, name);
   await a.page.getByRole('button', { name: /read two papers/ }).click();
@@ -434,7 +434,7 @@ test('reduced motion: nothing animates on a start, the lap-done moment or a shee
   // Without the setting, on an account of its own: the moment runs, within the longest token and never on a loop.
   await seeded(b, 'a11ymotion2');
   await b.page.getByRole('button', { name: 'Start lap 1' }).click();
-  await expect(b.page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await expect(b.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
   const timing = await b.page.evaluate(() => document.getAnimations().map((x) => x.effect?.getComputedTiming()).map((t) => ({ duration: Number(t?.duration ?? 0), iterations: t?.iterations ?? 1, delay: Number(t?.delay ?? 0) })));
   for (const t of timing) {
     expect(t.iterations, 'an animation on a loop').not.toBe(Infinity);
@@ -484,7 +484,7 @@ test('live regions: the timer speaks at most once a minute; what a tap did, a be
   const timer = (await heard(a.page)).filter((x) => x.startsWith('timer'));
   expect(timer.length, timer.join('\n')).toBeLessThanOrEqual(1);
   // The bell: the result is said once.
-  await expect(a.page.getByRole('button', { name: 'Skip break', exact: true })).toBeVisible({ timeout: LAP + 4000 });
+  await expect(a.page.getByRole('button', { name: 'Start lap 2 now', exact: true })).toBeVisible({ timeout: LAP + 4000 });
   await a.page.waitForTimeout(1500);
   const said = await heard(a.page);
   const counts = new Map<string, number>();
