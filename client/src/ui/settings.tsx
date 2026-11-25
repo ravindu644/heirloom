@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { Admins } from '../sync/admins.ts';
 import type { Engine } from '../sync/engine.ts';
+import type { Invites } from '../sync/invites.ts';
+import { isPlain } from '../sync/server.ts';
+import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
 import { Button } from './kit/button.tsx';
 import form from './kit/form.module.css';
 import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
+import { AdminsPanel, InvitesPanel } from './people.tsx';
 import { Stepper } from './kit/stepper.tsx';
 import { Switch } from './kit/switch.tsx';
 import { useWide } from './kit/wide.ts';
@@ -23,13 +28,28 @@ const TARGET_MAX = 24;
  * a choice. Each change is saved as it is made, and reaches the person's other devices, except
  * "ring here", which is this device's own.
  */
-export function Settings({ engine, settings, canSave = true, onSignIn }: { engine: Engine; settings: SettingsData; canSave?: boolean; onSignIn: () => void }) {
+interface Props {
+  engine: Engine;
+  settings: SettingsData;
+  invites: Invites;
+  admins: Admins;
+  /** The phone app's server; left out in a browser. */
+  server?: ServerChoice;
+  canSave?: boolean;
+  onSignIn: () => void;
+}
+
+export function Settings({ engine, settings, invites, admins, server: choice, canSave = true, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
   const server = new URL(engine.server, location.origin).host;
   const all = settings.all.value;
   const two = useWide();
+  const role = engine.role.value;
+  // Plain http to anything but this device itself: what is sent can be read on the way. One
+  // check for the phone app and the browser, core's.
+  const plain = choice ? choice.plain : isPlain(location.origin);
   const [refusal, setRefusal] = useState('');
   const [copy, setCopy] = useState('');
   const file = useRef<HTMLInputElement>(null);
@@ -84,6 +104,8 @@ export function Settings({ engine, settings, canSave = true, onSignIn }: { engin
     <Panel title={s.settings.account}>
       <Person name={account.username} />
       <p>{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
+      {/* Said once more here, under the account: a fact, not an alarm. */}
+      {plain && <p class={css.note}>{s.server.plain}</p>}
       <div class={css.actions}>
         {/* The server has already signed this device out: the way back in comes first. */}
         {refused && (
@@ -95,6 +117,14 @@ export function Settings({ engine, settings, canSave = true, onSignIn }: { engin
       </div>
       {refusal && <p role="alert">{refusal}</p>}
     </Panel>
+  );
+
+  // Who can come in, for those whose role has a say in it. A member is shown nothing: no panel, nothing greyed.
+  const people = (
+    <>
+      {role !== 'member' && <InvitesPanel invites={invites} />}
+      {role === 'owner' && <AdminsPanel admins={admins} />}
+    </>
   );
 
   // What tunes the timer.
@@ -166,13 +196,15 @@ export function Settings({ engine, settings, canSave = true, onSignIn }: { engin
           {s.settings.back}
         </Button>
       </header>
-      {/* On a phone the account comes first. With two columns the timer's settings are on the left
-          and the account, the rooms and the copy on the right, and the page is written in that order. */}
+      {/* On a phone the account comes first, then what a person tunes, then who can come in, the
+          rooms and the copy. With two columns the timer's settings are on the left and the account's
+          column on the right, and the page is written in that order. */}
       {two ? (
         <div class={css.cols}>
           <div class={css.col}>{timer}</div>
           <div class={css.col}>
             {accountPanel}
+            {people}
             {rest}
           </div>
         </div>
@@ -180,6 +212,7 @@ export function Settings({ engine, settings, canSave = true, onSignIn }: { engin
         <>
           {accountPanel}
           {timer}
+          {people}
           {rest}
         </>
       )}

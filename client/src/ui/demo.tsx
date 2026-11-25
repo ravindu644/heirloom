@@ -7,7 +7,7 @@ import { render } from 'preact';
 import { signal } from '@preact/signals';
 import { IDLE, act, view } from '../core/timer.ts';
 import type { Phase, TimerState } from '../core/timer.ts';
-import type { AccountResult, Engine, Row, SyncState } from '../sync/engine.ts';
+import type { AccountResult, Engine, Role, Row, SyncState } from '../sync/engine.ts';
 import { EXTEND_MS } from '../sync/focus.ts';
 import type { Focus } from '../sync/focus.ts';
 import type { Today } from '../sync/today.ts';
@@ -20,8 +20,12 @@ import type { Progress } from '../sync/progress.ts';
 import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
-import { HABITS, MANY_HABITS, demoHabits, demoRooms, demoSettings } from './demo-more.ts';
-import type { DemoHabit, DemoRoom } from './demo-more.ts';
+import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoRooms, demoServer, demoSettings } from './demo-more.ts';
+import type { DemoHabit, DemoRoom, DemoServer } from './demo-more.ts';
+import type { Admins } from '../sync/admins.ts';
+import type { Invites } from '../sync/invites.ts';
+import type { ServerChoice } from '../sync/server.ts';
+import { ServerStep } from './server.tsx';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -66,6 +70,22 @@ interface Scene {
   cheered?: string[];
   /** As the phone app is: a file cannot be saved from here. */
   phoneApp?: boolean;
+  /** The phone app's server step, alone, as it is before there is any engine. */
+  serverStep?: DemoServer;
+  /** The phone app's server, for the sign-in screen and Settings: its address. Given, the app is the phone app. */
+  serverAt?: string;
+  /** A server with no account yet. `never`: the server does not say either way. `late`: it says so after a second. */
+  fresh?: boolean | 'never' | 'late';
+  /** Somebody else sets the fresh server up first: what the server then answers this one's setup with. */
+  taken?: 'invite' | 'bad_request';
+  /** Arrived by an invite link carrying this invite. `refused` is one the server will not take. */
+  join?: string;
+  /** What the signed-in account may do, the open invites (a count, or forbidden) and the admins beside the owner. */
+  role?: Role;
+  invites?: number | 'forbidden' | 'token';
+  /** The invite the phone app holds from a pasted link. */
+  held?: string;
+  admins?: string[];
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -223,8 +243,41 @@ const MORE: Record<string, Scene> = {
   ...Object.fromEntries([4, 25, 250, 500, 1000, 2500].map((tier) => [`mark-${tier}`, { about: `Lap ${tier}`, run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: `laps-${tier}`, kind: 'laps', tier }] } as Scene])),
 };
 
+// Section 10: which server, a fresh server, an invite link, and who may invite.
+const LAN = 'http://192.168.1.20:8787';
+const asked = (typed: string) => [`fill:server=${typed}`, 'submit:server'];
+const owner: Scene = { ...idleAt2, about: '', settings: true, day: day(), role: 'owner' };
+const SERVER: Record<string, Scene> = {
+  server: { about: 'The phone app asks for its server', serverStep: {} },
+  'server-invalid': { about: 'What was typed is not an address', serverStep: { refusal: 'invalid' }, tap: asked('my server') },
+  'server-unreachable': { about: 'Nothing answers at the address', serverStep: { refusal: 'unreachable' }, tap: asked('192.168.1.20:8787') },
+  'server-other': { about: 'Something answers, but it is not heirloom', serverStep: { refusal: 'not-heirloom' }, tap: asked('192.168.1.1') },
+  'server-signed-in': { about: 'Changing the server with an account open', serverStep: { address: 'https://heirloom.example', refusal: 'signed-in' }, tap: 'submit:server' },
+  'server-busy': { about: 'The server is being asked', serverStep: { busy: true }, tap: asked('heirloom.example') },
+  'server-plain': { about: 'Changing from a plain http address', serverStep: { address: LAN } },
+  setup: { about: 'A server with no account yet: its first account', signedOut: true, fresh: true },
+  'setup-taken': { about: 'Two on a fresh server at once: the second is told, and signs in', signedOut: true, fresh: true, taken: 'bad_request', tap: ['fill:username=sachi', 'fill:password=long enough', 'submit:username'] },
+  'setup-unanswered': { about: 'The server does not say whether it is fresh: the frame alone, then sign in at 400 ms', signedOut: true, fresh: 'never' },
+  'setup-late': { about: 'A fresh server that answers after a second: sign in, then it turns into setup', signedOut: true, fresh: 'late' },
+  'join-link': { about: 'Arrived by an invite link', signedOut: true, join: 'k3J9xQ7mPa2f8Lw0' },
+  'join-link-refused': { about: 'An invite link the server will not take: the ordinary form', signedOut: true, join: 'refused', tap: ['fill:username=sachi', 'fill:password=long enough', 'submit:username'] },
+  'signin-phone': { about: 'Sign in, in the phone app: the server named, with Change', signedOut: true, serverAt: 'https://heirloom.example' },
+  'signin-phone-plain': { about: 'Sign in, in the phone app, on a plain http server', signedOut: true, serverAt: LAN },
+  'settings-owner': { ...owner, about: 'Settings as the owner: no invite open, two admins', admins: ['dilan', 'sachi'] },
+  'settings-owner-invites': { ...owner, about: 'The owner with three invites, one just made and shown whole', invites: 2, admins: ['dilan', 'sachi'], tap: 'Make an invite link' },
+  'settings-owner-unknown': { ...owner, about: 'Making an admin of a name nobody has here', admins: ['sachi'], tap: ['fill:admin=nobody_here', 'submit:admin'] },
+  'settings-owner-lowered': { ...owner, about: 'Just after an admin was made a member again: Undo', admins: ['dilan', 'sachi'], tap: 'Back to member' },
+  'settings-admin': { ...owner, about: 'Settings as an admin: invites, and no say over admins', role: 'admin', invites: 3 },
+  'settings-admin-taking': { ...owner, about: 'Taking an invite back: the second tap', role: 'admin', invites: 3, tap: 'Take back' },
+  'settings-demoted': { ...owner, about: 'An admin the owner has made a member again, before the server said so here', role: 'admin', invites: 'forbidden' },
+  'settings-signed-out': { ...owner, about: 'An admin whose device the server signed out asks for a link', role: 'admin', sync: 'signed-out', invites: 'token', tap: 'Make an invite link' },
+  'signin-phone-invite': { about: 'The phone app, started from a pasted invite link: the invite is in hand', signedOut: true, serverAt: 'https://heirloom.example', held: 'k3J9xQ7mPa2f8Lw0' },
+  'settings-plain': { ...owner, about: 'Settings in the phone app on a plain http server', role: 'member', serverAt: LAN },
+};
+
 const SCENES: Record<string, Scene> = {
   ...TODAY,
+  ...SERVER,
   ...PROGRESS,
   ...HABIT_SCENES,
   ...ROOM_SCENES,
@@ -259,7 +312,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins; server?: ServerChoice } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -371,6 +424,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     sync.value = 'in-step';
     return { ok: true };
   };
+  let setUp = false;
   const engine: Engine = {
     server: location.origin,
     sync,
@@ -385,7 +439,18 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     write() {},
     stamp: () => undefined,
     act() {},
-    register: (_invite, username, password) => answer(username, password),
+    // An invite called `refused` is one the server will not take.
+    register: async (invite, username, password) => {
+      // Said aloud, so a check can see what was sent, and that nothing was.
+      console.info(`demo: register with the invite "${invite}"`);
+      if (invite === 'refused') return { ok: false, error: 'invite' };
+      // Somebody else got there first: from now on the server is not fresh.
+      if (scene.taken && invite === '') return (setUp = true), { ok: false, error: scene.taken };
+      return answer(username, password);
+    },
+    needsSetup: () => new Promise((answer) => (scene.fresh === 'never' ? undefined : setTimeout(() => answer(!!scene.fresh && !setUp), scene.fresh === 'late' ? 1000 : 50))),
+    role: signal<Role>(scene.role ?? 'member'),
+    roleSaid: signal(0),
     signIn: answer,
     async signOut() {
       if (sync.value === 'offline' && unsent.value > 0) return { ok: false, error: 'unsent' };
@@ -406,17 +471,22 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
   const habits = demoHabits(scene.habits ?? HABITS);
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
-  return { engine, focus, today, progress, habits, rooms, settings };
+  const invites = demoInvites(scene.invites ?? 0, now);
+  const admins = demoAdmins(scene.admins ?? []);
+  const server = scene.serverAt ? demoServer({ address: scene.serverAt, held: scene.held }) : undefined;
+  return { engine, focus, today, progress, habits, rooms, settings, invites, admins, server };
 }
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
-if (scene && !location.hash) location.hash = scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
+if (scene && !location.hash) location.hash = scene.join ? `#/join/${scene.join}` : scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
 render(
   scene?.elsewhere ? (
     <Elsewhere />
+  ) : scene?.serverStep ? (
+    <ServerStep choice={demoServer(scene.serverStep)} />
   ) : scene ? (
-    <App {...stage(scene)} canSave={!scene.phoneApp} onReminderSet={() => console.info('demo: a reminder was set')} />
+    <App {...stage(scene)} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>
@@ -437,6 +507,12 @@ render(
       const field = document.querySelector<HTMLInputElement>('input[name=task]')!;
       field.value = 'pointers chapter 3 ~4';
       field.form!.requestSubmit();
+    } else if (words.startsWith('fill:')) {
+      // Typed, as a person would: `fill:<field's name>=<what is typed>`.
+      const [, name, typed] = words.match(/^fill:([^=]+)=(.*)$/)!;
+      document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.value = typed!;
+    } else if (words.startsWith('submit:')) {
+      document.querySelector<HTMLInputElement>(`input[name="${words.slice(7)}"]`)!.form!.requestSubmit();
     } else if (words === 'demo:day') {
       // A week back in the year, by the keyboard.
       document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));

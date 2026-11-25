@@ -263,10 +263,23 @@ export const settings = {
 
 export const account = {
   signIn: 'Sign in',
-  signInIntro: (device: string) => `Your laps live on your own server. Sign in and this ${device} keeps step with your other devices.`,
+  // This server, not their own: a friend's server is not theirs.
+  signInIntro: (device: string) => `Your laps live on this server. Sign in and this ${device} keeps step with your other devices.`,
   join: 'Join with an invite',
-  joinIntro: 'Accounts here are by invite. One code makes one account.',
-  invite: 'Invite code',
+  joinIntro: 'Accounts here are by invite. One link makes one account.',
+  // Arrived by an invite link: the invite is already in hand, and is not a field to type.
+  joinLinked: (server: string) => `This link is your invite to ${server}. Choose a username and a password.`,
+  linkRefused: 'That invite is no longer good: it was used, taken back or ran out. Ask for a new link, or sign in if you have an account here.',
+  invite: 'Invite',
+  inviteHint: 'The last part of the link you were sent. The whole link works too.',
+  noInvite: 'There is no invite in that. Paste the whole link, or its last part.',
+  // A server with no account yet: the first one needs no invite and runs it.
+  setup: 'Set up this server',
+  setupIntro: 'There is no account here yet. The first one runs this server: it can invite people, and decides who else can.',
+  // Two people on a fresh server's setup page at once: the second one is told what happened.
+  setupTaken: 'Someone set this server up a moment ago. Sign in if that was you, or ask them for an invite.',
+  setupGo: 'Set up',
+  settingUp: 'Setting up',
   username: 'Username',
   usernameHint: '3 to 32 characters: a to z, 0 to 9 and _',
   password: 'Password',
@@ -281,7 +294,7 @@ export const account = {
   error: (code: string, retryAfter?: number) =>
     ({
       credentials: 'That username and password do not match.',
-      invite: 'That invite is not known here, or it has been used. A code works once.',
+      invite: 'That invite is not known here, or it was used, taken back or ran out. A link works once.',
       taken: 'That username is taken. Pick another.',
       // The same code means two things: a username locked after five wrong tries (minutes), or a
       // server with a line of sign-ins ahead of this one (a second or two).
@@ -686,3 +699,83 @@ export const marks = {
 /** A mark as its one line, whichever kind it is. */
 export const mark = (m: { kind: 'laps'; tier: number } | { kind: 'estimate'; title: string; estimate: number; laps: number } | { kind: 'week'; focus_ms: number; before_ms: number }) =>
   m.kind === 'laps' ? marks.laps(m.tier) : m.kind === 'estimate' ? marks.estimate(m.title, m.laps, m.estimate) : marks.week(m.focus_ms, m.before_ms);
+
+/** The phone app's server: where it is, said as an address a person would type. */
+export const server = {
+  title: 'Which server?',
+  intro: 'heirloom keeps your laps on a server that you or a friend runs. Say where it is.',
+  field: 'Server',
+  hint: 'An address, or an invite link someone sent you.',
+  example: '192.168.1.20:8787',
+  go: 'Use this server',
+  busy: 'Asking it',
+  back: 'Back',
+  // Each says what happened and what to do next, in the two lines the intro had: the field under it must not move.
+  refusals: {
+    invalid: 'That is not an address or an invite link. An address looks like 192.168.1.20:8787.',
+    unreachable: 'Nothing answered at that address. Is this phone on the same network as the server?',
+    'not-heirloom': 'Something answered there, but it is not heirloom. Check the address and its port.',
+    'signed-in': 'An account is open on this phone. Sign out first, so nothing unsent is left behind.',
+  },
+  // Said once where the address is typed and once under the account: a fact, not an alarm.
+  plain: 'This address is plain http. Anyone on the same network can read what is sent, the password too.',
+  at: (host: string) => `Server: ${host}`,
+  change: 'Change',
+};
+
+const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+/** Who may invite, and the links they give away. A role is named by what it does. */
+export const people = {
+  invites: 'Invites',
+  canInvite: 'You can invite people here.',
+  make: 'Make an invite link',
+  fresh: 'The new link',
+  linkNote: 'A link makes one account, once, and runs out in 7 days.',
+  copyNew: 'Copy the link',
+  copied: 'Copied.',
+  copyFailed: 'This browser would not copy it. The link is above: select it.',
+  none: 'No invite is open.',
+  ending: (invite: string) => `\u2026${invite.slice(-6)}`,
+  runsOut: (expires: number) => `runs out on ${day(expires)}`,
+  copy: 'Copy the link',
+  renew: 'Renew',
+  renewed: (expires: number) => `Good until ${day(expires)}.`,
+  takeBack: 'Take back',
+  takeBackGo: 'Take it back',
+  keep: 'Keep it',
+  takenBack: 'Taken back. That link no longer works.',
+  // The names of the links, for a screen reader: each says which invite.
+  forInvite: (words: string, invite: string) => `${words}, the invite ending ${invite.slice(-6)}`,
+  notYours: 'Inviting is no longer yours on this server. Whoever runs it changed that.',
+
+  admins: 'Admins',
+  decide: 'You decide who can invite.',
+  owner: 'owner',
+  admin: 'admin',
+  lower: 'Back to member',
+  lowerLabel: (name: string) => `Back to member: ${name}`,
+  lowered: (name: string) => `${name} is a member again.`,
+  raise: 'Make an admin',
+  username: 'Username',
+  usernameHint: 'Someone who already has an account here.',
+
+  // What can go wrong for either panel, then what is each panel's own.
+  errors: {
+    forbidden: 'That is no longer yours to do on this server.',
+    slow_down: 'The server is busy. Try again in a moment.',
+    offline: 'Needs a connection. Nothing was sent.',
+  } as Record<string, string>,
+  // The server signed this device out and Settings still shows the panels: the way on is under Account.
+  signedOut: (device: string) => `The server signed this ${device} out. Sign in again, under Account, and then try this.`,
+  inviteErrors: {
+    full: 'This server has 50 invites open, the most there can be. Take one back first.',
+    unknown: 'That invite was used or taken back meanwhile.',
+  } as Record<string, string>,
+  adminErrors: {
+    bad_request: 'The owner stays the owner. Nothing was changed.',
+  } as Record<string, string>,
+  unknownName: 'Nobody by that name is on this server.',
+  goneName: (name: string) => `${name} has no account on this server any more.`,
+  failed: 'The server tripped over that. Nothing was changed.',
+};

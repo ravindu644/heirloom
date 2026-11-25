@@ -1,0 +1,32 @@
+.note { color: var(--muted); text-wrap: pretty; }
+.note:empty { display: none; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* On a phone the button fills the row, as every button row does. */
+.actions > * { flex: 1; }
+
+/* A link to give away: whole, breaking anywhere so it never runs past the edge, and selectable
+   where the browser may not copy it. */
+.fresh { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+.fresh h3 { font: var(--type-label); color: var(--muted); }
+.link { overflow-wrap: anywhere; user-select: all; }
+
+/* A row is the thing, with what can be done to it as links at its end. */
+.rows { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
+.rows li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-md); min-height: var(--layout-touch); }
+.rows li + li { border-top: var(--layout-hair) solid var(--line); }
+.what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); min-width: 0; }
+.what b { font: var(--type-body-strong); }
+.what span { font: var(--type-label); color: var(--muted); }
+.who { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.who > span:last-child { flex: none; font: var(--type-label); color: var(--muted); }
+
+.undo { color: var(--muted); }
+/* A full target for a thumb that takes no more room than the words beside it. */
+.undo button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
+
+/* The field that makes an admin follows the list, its button after it. */
+.raise { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+
+@media (min-width: 720px) {
+  .actions > *, .raise button { flex: none; justify-self: start; }
+}

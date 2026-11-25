@@ -13,3 +13,8 @@
   .form { max-width: 44ch; }
   .actions > * { flex: none; }
 }
+/* The phone app's server, under the form: its address and the way to change it on one line, and
+   under them, when it is so, that the address is plain http. */
+.server { display: grid; gap: var(--space-sm); padding-top: var(--space-md); border-top: var(--layout-hair) solid var(--line); color: var(--muted); }
+.server p:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.server span { min-width: 0; overflow-wrap: anywhere; }

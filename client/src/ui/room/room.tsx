@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Engine } from '../../sync/engine.ts';
 import type { MemberView, RoomResult, RoomView, Rooms } from '../../sync/rooms.ts';
 import { Button } from '../kit/button.tsx';
+import { copyText } from '../kit/copy.ts';
 import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import form from '../kit/form.module.css';
@@ -71,9 +72,7 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
   const [leaving, setLeaving] = useState(false);
   const hours = Math.round(room.target_ms / HOUR);
   const change = async (fields: Parameters<Rooms['update']>[1]) => setSaid(why(await rooms.update(room.id, fields)));
-  // On a plain http address (a server on the home network) a browser has no clipboard at all:
-  // that is said the same way as a clipboard that refuses.
-  const copy = () => (navigator.clipboard?.writeText(room.code) ?? Promise.reject()).then(() => setCopied(s.room.copied), () => setCopied(s.room.copyFailed));
+  const copy = async () => setCopied((await copyText(room.code)) ? s.room.copied : s.room.copyFailed);
 
   return (
     <Sheet title={s.room.sheet} close={s.task.close} onClose={onClose}>

@@ -69,7 +69,7 @@
 
 /* In the sheet. */
 .remind { display: grid; gap: var(--space-xs); justify-items: start; }
-.remind > label { width: 100%; }
+.remind > div { width: 100%; }
 .legend { font: var(--type-label); color: var(--muted); }
 /* The box the record's squares are sized against: large while every week fits it. */
 .record { container-type: inline-size; }

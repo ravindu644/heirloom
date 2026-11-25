@@ -6,8 +6,11 @@
 import { computed, signal } from '@preact/signals';
 import { habitDays } from '../core/habits.ts';
 import { addDays } from '../core/progress.ts';
+import type { AdminView, Admins } from '../sync/admins.ts';
 import type { HabitView, Habits } from '../sync/habits.ts';
+import type { InviteView, Invites } from '../sync/invites.ts';
 import type { MemberView, RoomResult, RoomView, Rooms } from '../sync/rooms.ts';
+import type { ServerChoice, ServerRefusal } from '../sync/server.ts';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
 import { DAY } from './demo-today.ts';
 
@@ -275,6 +278,86 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
       }
       if (copy?.heirloom !== 1 || !Array.isArray(copy.cells)) return { ok: false, error: 'not_heirloom' };
       return copy.cells.length === 0 ? { ok: false, error: 'empty' } : { ok: true, cells: 214 };
+    },
+  };
+}
+
+/** The phone app's server as the demo has it: an address, and one answer to whatever is typed. */
+export interface DemoServer {
+  address?: string;
+  /** Why the next address is not taken. Left out, nothing answers. */
+  refusal?: ServerRefusal;
+  /** The question is never answered: the button stays busy. */
+  busy?: boolean;
+  /** The invite a pasted link carried in, held until it is used or refused. */
+  held?: string;
+}
+
+export function demoServer(seed: DemoServer): ServerChoice {
+  const address = seed.address ?? null;
+  let held = seed.held ?? null;
+  return {
+    address,
+    plain: !!address && address.startsWith('http://'),
+    choose: (_typed) => new Promise((answer) => !seed.busy && setTimeout(() => answer(seed.refusal ?? 'unreachable'), 300)),
+    heldInvite: () => held,
+    forgetInvite: () => {
+      held = null;
+      console.info('demo: the held invite was let go');
+    },
+  };
+}
+
+const DAY_MS = 86400000;
+
+/** Invite links held in memory. `'forbidden'` is an account that was an admin until a moment ago. */
+export function demoInvites(seed: number | 'forbidden' | 'token', now: () => number): Invites {
+  const origin = 'https://heirloom.example';
+  let made = 0;
+  const one = (invite: string, daysLeft: number): InviteView => ({ invite, link: `${origin}/#/join/${invite}`, created: now() - (7 - daysLeft) * DAY_MS, expires: now() + daysLeft * DAY_MS });
+  const all = [one('k3J9xQ7mPa2f8Lw0', 6), one('Zt41bNc8RrV0e9Hd', 3), one('m0Qe77LsYpX2a4Ku', 1)];
+  const open = signal<readonly InviteView[] | null | 'forbidden'>(seed === 'forbidden' ? 'forbidden' : all.slice(0, seed === 'token' ? 3 : seed));
+  const list = () => (Array.isArray(open.value) ? (open.value as readonly InviteView[]) : []);
+  const later = <T>(answer: T) => new Promise<T>((done) => setTimeout(() => done(answer), 200));
+  return {
+    open,
+    refresh: async () => {},
+    make() {
+      // A device the server has signed out: every ask is refused with `token`.
+      if (seed === 'token') return later({ ok: false, error: 'token' });
+      const invite = one(['Hy6c2WfT9oDn5s1B', 'Qa8Lr3VxK7mE0jP4'][made++ % 2]!, 7);
+      open.value = [...list(), invite];
+      return later({ ok: true, invite });
+    },
+    renew(id) {
+      const renewed = { ...list().find((invite) => invite.invite === id)!, expires: now() + 7 * DAY_MS };
+      open.value = list().map((invite) => (invite.invite === id ? renewed : invite));
+      return later({ ok: true, invite: renewed });
+    },
+    takeBack(id) {
+      open.value = list().filter((invite) => invite.invite !== id);
+      return later({ ok: true });
+    },
+  };
+}
+
+/** The owner and whoever the owner has let invite. A username that is nobody's here is `nobody_here`. */
+export function demoAdmins(seed: string[]): Admins {
+  const list = signal<readonly AdminView[] | null>([{ username: 'ravi', role: 'owner' }, ...seed.map((username): AdminView => ({ username, role: 'admin' }))]);
+  const later = <T>(answer: T) => new Promise<T>((done) => setTimeout(() => done(answer), 200));
+  return {
+    list,
+    refresh: async () => {},
+    raise(username) {
+      if (username === 'nobody_here') return later({ ok: false, error: 'unknown' });
+      if (username === 'ravi') return later({ ok: false, error: 'bad_request' });
+      const admins = [...list.value!.slice(1).filter((one) => one.username !== username), { username, role: 'admin' as const }].sort((a, b) => a.username.localeCompare(b.username));
+      list.value = [list.value![0]!, ...admins];
+      return later({ ok: true });
+    },
+    lower(username) {
+      list.value = list.value!.filter((one) => one.username !== username);
+      return later({ ok: true });
     },
   };
 }

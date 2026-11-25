@@ -1,4 +1,5 @@
-.field { display: grid; gap: var(--space-xs); }
+/* The label (its words over its field) and the hint under it, all one gap apart. */
+.field, .field label { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 .field span { font: var(--type-label); color: var(--muted); }
 .field small { font: var(--type-label); color: var(--muted); }
 .field input, .field textarea {
