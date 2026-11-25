@@ -2,6 +2,9 @@
   "appId": "io.github.ravindu644.heirloom",
   "appName": "heirloom",
   "webDir": "client/dist-app",
+  "android": {
+    "allowMixedContent": true
+  },
   "plugins": {
     "LocalNotifications": {
       "smallIcon": "ic_stat_heirloom",

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- heirloom talks to the person's own server, which on a home network is plain http to an
+     address like 192.168.1.20:8787. Cleartext to any host, in every build. A network security
+     config rather than the manifest's usesCleartextTraffic: API 37's SDK marks that flag as one
+     that "will have no effect" in a future release, and this file works from Android 7 (API 24). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
