@@ -22,7 +22,7 @@ test('Settings is reached from the person in the header, on a phone and on a lap
     await person(a.page, name).click();
     await expect(a.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
     await expect(a.page.getByText('This laptop keeps step with the server at 127.0.0.1:8788.')).toBeVisible();
-    await a.page.getByRole('button', { name: 'Back' }).click();
+    await a.page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(a.page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
   }
   await person(a.page, name).click();
@@ -77,7 +77,7 @@ test('the header is the same on Focus, Today and Settings: the mark and the pers
     expect(seen.focus.mark, `${size.width}px`).not.toBeNull();
     expect(seen.today, `Today against Focus at ${size.width}px`).toEqual(seen.focus);
     expect(seen.settings, `Settings against Focus at ${size.width}px`).toEqual(seen.focus);
-    await a.page.getByRole('button', { name: 'Back' }).click();
+    await a.page.getByRole('button', { name: 'Back', exact: true }).click();
   }
 });
 

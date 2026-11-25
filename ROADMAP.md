@@ -113,7 +113,7 @@ The first thing the user can touch: one timer, live on two screens.
 - [ ] [ui] Room screen: who is focusing, phase and time left, today and week, the shared weekly
       target, cheer with one tap; opt-in ranked view; task titles only when allowed
 - [ ] [ui] Settings: what rooms see; hide rooms
-- [ ] [qa] Three accounts in three contexts: presence within 1 s, totals right, privacy holds
+- [x] [qa] Three accounts in three contexts: presence within 1 s, totals right, privacy holds
 - [ ] Gate (the user and a friend study together for a session)
 
 ## 8. Rewards and words

@@ -96,7 +96,7 @@ export function timerOnDisk(page: Page): Promise<number> {
 }
 
 /** A screen, by its link in the navigation. */
-export const go = (page: Page, screen: 'Focus' | 'Today' | 'Progress') =>
+export const go = (page: Page, screen: 'Focus' | 'Today' | 'Progress' | 'Habits' | 'Room') =>
   page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: screen, exact: true }).click();
 
 /** Quick add: one line, then Enter, as a person types it. */

@@ -84,7 +84,7 @@ function race(mine: number) {
 }
 
 for (const [mine, said] of [
-  [1, '2 laps behind last week. 2 laps draw you level.'],
+  [1, '2 laps behind last week. Last week ended on 1h 40m.'],
   [3, 'Level with last week. Last week ended on 1h 40m.'],
   [4, '25 minutes ahead of last week. Last week ended on 1h 40m.'],
 ] as const) {
@@ -94,7 +94,8 @@ for (const [mine, said] of [
     // By hand: last week 3 laps (75 minutes) by now and one more after, 100 in all; this week `mine` laps.
     const you = mine * 25;
     const gap = 75 - you;
-    const expected = gap > 0 ? `${Math.ceil(gap / 25)} laps behind last week. ${Math.ceil(gap / 25)} laps draw you level.` : gap === 0 ? 'Level with last week. Last week ended on 1h 40m.' : `${-gap} minutes ahead of last week. Last week ended on 1h 40m.`;
+    // With no lap running the headline says the gap once, then how last week ended.
+    const expected = gap > 0 ? `${Math.ceil(gap / 25)} laps behind last week. Last week ended on 1h 40m.` : gap === 0 ? 'Level with last week. Last week ended on 1h 40m.' : `${-gap} minutes ahead of last week. Last week ended on 1h 40m.`;
     expect(expected).toBe(said);
     await expect(heading(a.page)).toHaveText(said);
     const weekday = new Date(Date.now() + OFF * MIN).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
@@ -185,7 +186,7 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(panel(a.page, 'Today, hour by hour').getByRole('listitem')).toHaveCount(1);
 });
 
-test('the timeline: a lap set aside, a stopped lap and a pair that ran on two devices; setting one of the pair aside, Undo, and Count again', async ({ deviceA: a, deviceB: b }) => {
+test('the timeline: a lap set aside, a stopped lap and a pair that ran on two devices; setting one of the pair aside, and Count again', async ({ deviceA: a, deviceB: b }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   const start = Date.now() - 2 * HOUR;
   let pair: string[] = [];
@@ -218,21 +219,16 @@ test('the timeline: a lap set aside, a stopped lap and a pair that ran on two de
   const outcome = async () => (await serverRows(server, name, 'session')).get(pair[1]!)?.outcome;
   await expect.poll(outcome).toBe('void');
 
-  // Undo while it lasts, then set aside again and, after the ten seconds, Count again.
-  await day(a.page).getByRole('button', { name: `Undo, the lap at ${wall}` }).click();
-  await expect.poll(outcome).toBe('rang');
-  await expect(totals(b.page)).toHaveText('52 minutes of focus in 2 laps.');
-  await day(a.page).getByRole('button', { name: `Set aside, the lap at ${wall}` }).click();
-  await expect.poll(outcome).toBe('void');
-  await expect(day(a.page).getByRole('button', { name: `Count again, the lap at ${wall}` })).toBeVisible({ timeout: 12000 });
+  // The way back is offered at once, and stays: Count again, never a passing Undo.
   await day(a.page).getByRole('button', { name: `Count again, the lap at ${wall}` }).click();
   await expect.poll(outcome).toBe('rang');
+  await expect(totals(b.page)).toHaveText('52 minutes of focus in 2 laps.');
   await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);
 });
 
 test('the look back: a line typed key by key is saved with no button, shows on B, and is there after a reload offline', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await seeded([a, b], 'pnote', () => {});
-  const field = (page: Page) => page.getByLabel('One line about today');
+  const field = (page: Page) => page.getByLabel('A line or two about today');
   await field(a.page).pressSequentially('slept badly, still did two laps');
   await expect(field(a.page)).toHaveValue('slept badly, still did two laps');
   await expect(field(b.page)).toHaveValue('slept badly, still did two laps', { timeout: 2000 });

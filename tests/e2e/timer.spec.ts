@@ -87,7 +87,8 @@ test('stop under a minute leaves no row and says so', async ({ deviceA: a, devic
   await button(a.page, 'Start lap 1').click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
-  await expect(a.page.getByText('Stopped. Under a minute, so nothing was logged.')).toBeVisible();
+  // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
+  await expect(a.page.getByText('Stopped. Under a minute, so nothing was logged.').filter({ visible: true })).toBeVisible();
   // B ready again means the stop reached the server, and a row would have gone with it.
   await ready(b.page);
   expect(await sessions(name)).toEqual([]);

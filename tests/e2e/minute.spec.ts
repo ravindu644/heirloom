@@ -26,7 +26,8 @@ test('a minute in, stop and log keeps a stopped row on both laptops; set aside k
   await expect(stop).toBeVisible({ timeout: 70000 });
 
   await stop.click();
-  await expect(a.page.getByText('Stopped. 1 minute kept.')).toBeVisible();
+  // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
+  await expect(a.page.getByText('Stopped. 1 minute kept.').filter({ visible: true })).toBeVisible();
   await ready(b.page);
   const [kept] = await sessionsWhen(logged, (rows) => rows.length > 0);
   expect(kept).toMatchObject({ kind: 'work', outcome: 'stopped', paused_ms: 0 });
@@ -41,7 +42,7 @@ test('a minute in, stop and log keeps a stopped row on both laptops; set aside k
   expect(empty).toBe(0);
 
   await c.page.getByRole('button', { name: 'Set aside' }).click();
-  await expect(c.page.getByText('Set aside. It stays in your timeline and counts nowhere.')).toBeVisible();
+  await expect(c.page.getByText('Set aside. It stays in your timeline and counts nowhere.').filter({ visible: true })).toBeVisible();
   const [voided] = await sessionsWhen(aside, (rows) => rows.length > 0);
   expect(voided).toMatchObject({ kind: 'work', outcome: 'void' });
   expect((voided!.ended as number) - (voided!.started as number)).toBeGreaterThanOrEqual(60000);
