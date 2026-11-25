@@ -12,10 +12,12 @@
   background: var(--ink);
   color: var(--ground);
 }
-.said > span { display: flex; flex: 1; gap: var(--space-xs); min-width: 0; white-space: nowrap; }
-/* The bar's job is to say which task: what comes after the name gives way first, and all of it
-   before the name loses a letter. */
-.title { flex: 0 1 auto; min-width: 6ch; overflow: hidden; text-overflow: ellipsis; }
-.tail { flex: 0 10000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.said > span { display: flex; flex: 1; flex-wrap: wrap; gap: 0 var(--space-xs); height: 1lh; min-width: 0; overflow: hidden; white-space: nowrap; }
+/* The bar's job is to say which task: the name has the line, cut short only when it alone is
+   too long. What comes after it shows whole or not at all: when it does not fit beside the
+   name it falls to a second line, and the bar shows one. */
+.name { display: flex; flex: 0 1 auto; gap: var(--space-xs); min-width: 0; }
+.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tail { flex: none; }
 .said button { color: var(--ground); text-decoration-color: var(--ground); }
 .said button:hover { color: var(--ground); }

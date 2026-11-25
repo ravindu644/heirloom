@@ -83,7 +83,8 @@ async function start() {
   };
 
   // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
-  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} />, root);
+  // The phone app's WebView is not trusted to save a file; Settings sends that to the browser.
+  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} canSave={!import.meta.env.VITE_SERVER_URL} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

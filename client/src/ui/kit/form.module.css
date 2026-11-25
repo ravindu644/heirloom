@@ -3,7 +3,7 @@
 .group { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); min-width: 0; padding: 0; border: 0; }
 .group legend { padding: 0; margin-bottom: var(--space-xs); font: var(--type-label); color: var(--muted); }
 
-/* One of several, or several of seven: a row of buttons, the chosen ones in ink. */
+/* One of several, or several of seven: off is the surface with a line, on is ink with the ground's colour for its words. */
 .choices { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 .choice {
   display: inline-flex;
@@ -11,16 +11,16 @@
   gap: var(--space-sm);
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
-  border: 1px solid var(--line);
+  border: var(--layout-hair) solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font: var(--type-body-strong);
   cursor: pointer;
-  transition: background-color var(--motion-press) var(--motion-ease), border-color var(--motion-press) var(--motion-ease);
+  transition: background-color var(--motion-press) var(--motion-ease), border-color var(--motion-press) var(--motion-ease), color var(--motion-press) var(--motion-ease);
 }
 .choice:hover { border-color: var(--ghost); }
-/* Chosen: the fill steps to raised and the line to ink. The words keep their weight, so nothing shifts. */
-.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); }
+/* Chosen: ink, and never the grey of a quiet button. The words keep their weight, so nothing shifts. */
+.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--ground); }
 .choice i { width: var(--layout-lane); height: var(--layout-lane); }
 /* Seven days on one line of a phone: seven targets and six small gaps. */
 .days { gap: var(--space-xs); }

@@ -38,7 +38,9 @@ export function Said({ said, undo, onDone }: { said: Saying; undo: string; onDon
   return (
     <p class={css.said} role="status" ref={bar}>
       <span>
-        {said.lead} <span class={css.title}>{said.title}{said.comma ? ',' : '.'}</span>
+        <span class={css.name}>
+          {said.lead} <span class={css.title}>{said.title}{said.comma ? ',' : '.'}</span>
+        </span>
         {/* A space in the text itself: a screen reader must not run the two together. */}
         {said.tail && ' '}
         {said.tail && <span class={css.tail}>{said.tail}</span>}

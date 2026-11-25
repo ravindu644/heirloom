@@ -364,9 +364,9 @@ Built once in `client/src/ui/kit/` and reused.
   `hair` `line` border; on is `ink` with `ground` text. On and off must differ by more than a
   border, and neither may look like a quiet button.
 - **Switch row:** the words at the left, a note under them in `label` when one is needed, the
-  stock box at the right; the whole row is the target. A row is as tall as its words, and the
-  box takes its 48px target by padding, so rows with and without a note keep the same `md`
-  between them.
+  stock box at the right; the whole row is the target. A row is as tall as its words and never
+  under `touch` less `md`, so two one-line rows still give a finger 48px each; rows with and
+  without a note keep the same `md` between them.
 - **Stepper:** minus, the figure, plus. For a small count ("Once a day", "8 laps a day") the
   figure is text. For a length in minutes the figure is a number field with the unit as a word
   beside it, so 25 to 50 is typed once, and minus and plus are for nudging.

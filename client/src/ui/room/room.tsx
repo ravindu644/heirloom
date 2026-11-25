@@ -6,6 +6,7 @@ import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import form from '../kit/form.module.css';
+import links from '../kit/links.module.css';
 import { Panel } from '../kit/panel.tsx';
 import { Person } from '../kit/person.tsx';
 import { Sheet } from '../kit/sheet.tsx';
@@ -103,11 +104,12 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
       <fieldset class={form.group}>
         <legend>{s.room.target}</legend>
         <Stepper
-          text={s.room.targetText(hours)}
+          text={s.room.hours(hours)}
           less={s.room.targetLess}
           more={s.room.targetMore}
           onLess={() => change({ target_ms: Math.max(0, hours - 1) * HOUR })}
           onMore={() => change({ target_ms: Math.min(TARGET_MAX, hours + 1) * HOUR })}
+          typed={{ value: hours, min: 0, max: TARGET_MAX, label: s.room.target, onSet: (value) => change({ target_ms: value * HOUR }) }}
         />
       </fieldset>
 
@@ -216,8 +218,15 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
   return (
     <div class={css.room}>
       <header class={css.head}>
-        <p>{s.room.label(room.name)}</p>
-        <h1>{s.room.finding(room.members.length, room.members.filter((m) => m.phase === 'work' && !m.paused).length)}</h1>
+        {/* The room's own settings: a link at the end of the line that names it. */}
+        <p>
+          <span>{s.room.label(room.name)}</span>
+          <Button kind="link" class={links.end} onClick={() => setSheet('room')}>
+            {s.room.open}
+          </Button>
+        </p>
+        {/* Old news is never said in the present. */}
+        <h1>{(stale ? s.room.findingStale : s.room.finding)(room.members.length, room.members.filter((m) => m.phase === 'work' && !m.paused).length)}</h1>
       </header>
       {stale && (
         <p class={css.quiet} role="status">
@@ -225,18 +234,16 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
         </p>
       )}
 
-      <div class={form.choices}>
-        {/* More than one room: they are chosen between here, not in the navigation. */}
-        {list.length > 1 &&
-          list.map((one) => (
+      {/* More than one room: they are chosen between here, not in the navigation. */}
+      {list.length > 1 && (
+        <div class={form.choices} role="group" aria-label={s.room.rooms}>
+          {list.map((one) => (
             <button key={one.id} type="button" class={cx(form.choice, css.pick)} aria-pressed={one.id === room.id} onClick={() => setAt(one.id)}>
               {one.name}
             </button>
           ))}
-        <Button kind="quiet" onClick={() => setSheet('room')}>
-          {s.room.open}
-        </Button>
-      </div>
+        </div>
+      )}
 
       <section class={css.week} aria-label={s.room.week}>
         {/* One lane, everyone's week end to end in the order of the room: yours in you, the others in ink. */}
@@ -257,7 +264,8 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
             <article key={m.id} class={cx(css.member, m.you && css.you)}>
               <div class={css.who}>
                 <Person name={m.you ? s.room.you : m.name} />
-                {m.ends_at !== null && (
+                {/* With no connection nothing counts down for anyone but you: your own clock is on this device. */}
+                {m.ends_at !== null && (m.you || !stale) && (
                   <b class={m.phase === 'work' ? undefined : css.rest} aria-label={s.room.left(m.ends_at - now)}>
                     {s.clock(Math.max(0, m.ends_at - now))}
                   </b>
@@ -270,17 +278,13 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
               )}
               <p class={css.totals}>{s.room.totals(m.today_ms, m.today_laps, m.week_ms)}</p>
               {who.length > 0 && <p class={css.totals}>{s.room.cheeredBy(who, m.you)}</p>}
-              {/* A lap that rang today can be cheered, once, and never one's own. */}
-              {m.last && !m.you && (
+              {/* A lap that rang today can be cheered, once, and never one's own. Once cheered the
+                  button goes: the sentence above says who did. */}
+              {m.last && !m.you && !m.last.cheered && (
                 <div class={css.foot}>
-                <Button
-                  kind={m.last.cheered ? 'quiet' : 'secondary'}
-                  disabled={m.last.cheered}
-                  aria-label={m.last.cheered ? undefined : s.room.cheerLabel(m.name, m.last.ended)}
-                  onClick={() => rooms.cheer(room.id, m.id)}
-                >
-                  {m.last.cheered ? s.room.cheered : s.room.cheer}
-                </Button>
+                  <Button aria-label={s.room.cheerLabel(m.name, m.last.ended)} onClick={() => rooms.cheer(room.id, m.id)}>
+                    {s.room.cheer}
+                  </Button>
                 </div>
               )}
             </article>

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { Focus } from '../../sync/focus.ts';
 import type { Progress } from '../../sync/progress.ts';
 import { Dots } from '../kit/dots.tsx';
 import { Heat, HeatKey } from '../kit/heat.tsx';
 import { Laps } from '../kit/laps.tsx';
 import { Panel } from '../kit/panel.tsx';
+import { useWide } from '../kit/wide.ts';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
 import { Day } from './day.tsx';
@@ -13,18 +14,6 @@ import { Guesses, WeekChart } from './week.tsx';
 
 const MIN = 60000;
 const YEAR_DAYS = 371;
-
-/** True from the width where the sidebar and the rail fit side by side. */
-function useWide() {
-  const query = matchMedia('(min-width: 1280px)');
-  const [wide, setWide] = useState(query.matches);
-  useEffect(() => {
-    const change = () => setWide(query.matches);
-    query.addEventListener('change', change);
-    return () => query.removeEventListener('change', change);
-  }, []);
-  return wide;
-}
 
 /**
  * The record. It opens with a finding, not a title: how this week stands against the last one

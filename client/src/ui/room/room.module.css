@@ -2,7 +2,8 @@
 
 /* The heading is a finding. The line over it says which room. */
 .head { display: grid; gap: var(--space-xs); }
-.head p { font: var(--type-label); color: var(--muted); }
+.head p { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); font: var(--type-label); color: var(--muted); }
+.head p span { min-width: 0; overflow-wrap: anywhere; }
 .head h1 { font: var(--type-title); text-wrap: balance; }
 .quiet { color: var(--muted); text-wrap: pretty; }
 .link { justify-self: start; }
@@ -34,8 +35,10 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 /* Three lines hold any title a person would share, as on a task's own row. */
 .task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .totals { font: var(--type-label); color: var(--muted); }
-/* The button follows the words it is about; a lane with fewer words is not stretched to line them up. */
-.foot { display: grid; padding-top: var(--space-xs); }
+/* What is left of the lane under the words is the button's: it stands on the lane's foot, so
+   the buttons of a row share one line. */
+.foot { display: flex; flex: 1; align-items: flex-end; padding-top: var(--space-xs); }
+.foot button { flex: 1; }
 
 /* In the room's sheet. */
 .legend { font: var(--type-label); color: var(--muted); }
@@ -46,6 +49,7 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 @media (min-width: 720px) {
   .quiet { max-width: 60ch; }
   .doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .door button, .rename button, .foot button { justify-self: start; }
+  .door button, .rename button { justify-self: start; }
+  .foot button { flex: none; }
   .members { grid-template-columns: repeat(auto-fill, minmax(calc(var(--layout-sidebar) + var(--space-md)), 1fr)); gap: var(--layout-gap); }
 }

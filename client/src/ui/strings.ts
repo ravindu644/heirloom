@@ -216,7 +216,7 @@ export const settings = {
   lap: 'A lap',
   short: 'A short break',
   long: 'The long break, after four laps',
-  minutes: (ms: number) => length(ms),
+  minutes: (n: number) => (n === 1 ? 'minute' : 'minutes'),
   less: 'One minute less',
   more: 'One minute more',
 
@@ -224,7 +224,7 @@ export const settings = {
   autoBreak: 'Start the break when a lap rings',
   autoWork: 'Start the next lap when a break rings',
   autoNote:
-    'Off, every start is yours to tap. On, a device that wakes within two hours of a bell counts the laps and breaks that would have run meanwhile, watched or not. After the long break nothing starts by itself.',
+    'Off, every start is yours to tap. On, laps and breaks follow each other until the long break, and a phone that slept through a bell catches up when it wakes: up to two hours of laps count, watched or not.',
 
   target: 'Day target',
   targetText: (laps: number) => (laps === 0 ? 'No target' : plural(laps, 'lap a day', 'laps a day')),
@@ -232,7 +232,6 @@ export const settings = {
   targetMore: 'One lap more',
 
   bell: 'The bell',
-  oneBell: 'One bell for now.',
   ringHere: (device: string) => `Ring on this ${device}`,
   ringHereNote: (device: string) => `For this ${device} only. Your other devices keep their own.`,
   finish: 'A finished lap',
@@ -250,6 +249,7 @@ export const settings = {
   export: 'Save a copy',
   file: (day: string) => `heirloom-${day}.json`,
   exported: (name: string) => `Saved as ${name}.`,
+  exportElsewhere: (server: string) => `To save a copy, open heirloom in a browser at ${server}. It is the same account.`,
   import: 'Bring a copy back',
   importNote: 'A copy merges with what is here: the newer edit wins, so bringing one back twice loses nothing.',
   imported: (cells: number) => (cells === 0 ? 'Everything in that copy was here already.' : `${plural(cells, 'change', 'changes')} brought in.`),
@@ -538,7 +538,7 @@ export const habits = {
   finding: (done: number, planned: number, any: boolean) =>
     !any ? 'No habits yet.' : planned === 0 ? 'Nothing planned for today.' : `${done} of ${planned} today. ${countWord(planned - done)} left.`,
   add: 'Add a habit',
-  addHint: 'Add a habit. It starts as every day, once.',
+  addHint: 'Add a habit. It starts as once a day, every day.',
   empty: 'Add the first thing you want to do most days. One tap a day checks it in.',
   list: 'Habits',
   plan: (days: number) => (days === 127 ? 'Every day' : days === 31 ? 'Weekdays' : days === 96 ? 'Weekends' : WEEKDAYS_SHORT.filter((_, bit) => days & (1 << bit)).join(', ')),
@@ -573,7 +573,7 @@ export const habits = {
             : `${countWord(now - before)} ahead of last week at this time.`,
 
   sheet: 'Habit',
-  title: 'Habit',
+  title: 'Its name',
   daysOf: 'Days',
   weekdays: WEEKDAYS_SHORT,
   perDay: 'How often in a day',
@@ -614,6 +614,8 @@ export const room = {
   finding: (members: number, focusing: number) =>
     members === 1 ? 'Only you here so far. The code brings a friend in.' : focusing === 0 ? 'Nobody is on a lap right now.' : `${focusing} of ${members} focusing now.`,
   stale: 'This is the room as it was last heard from.',
+  findingStale: (members: number, focusing: number) =>
+    members === 1 ? 'Only you here.' : focusing === 0 ? 'Nobody was on a lap when the room was last heard from.' : `${focusing} of ${members} were focusing when the room was last heard from.`,
   week: 'Together this week',
   weekAt: (ms: number, target: number) => (target > 0 ? `${total(ms)} of ${total(target)} together this week.` : `${total(ms)} together this week.`),
   share: (name: string, ms: number) => `${name} ${total(ms)}`,
@@ -633,14 +635,14 @@ export const room = {
     laps === 0 && today < MIN ? `Nothing today yet, ${total(week)} this week.` : `${total(today)} today in ${plural(laps, 'lap', 'laps')}, ${total(week)} this week.`,
   cheer: 'Cheer',
   cheerLabel: (name: string, ended: number) => `Cheer ${name} for the lap that rang at ${wall(ended)}`,
-  cheered: 'Cheered',
   cheeredBy: (who: string[], yours: boolean) => `${names(who)} cheered ${yours ? 'your last lap' : 'this lap'}.`,
 
   open: 'Code and settings',
   sheet: 'This room',
   renameGo: 'Rename',
   target: 'Together in a week',
-  targetText: (hours: number) => (hours === 0 ? 'No target' : plural(hours, 'hour', 'hours')),
+  // The unit beside the typed figure. Nought is a figure too, and says what it means.
+  hours: (hours: number) => (hours === 0 ? 'hours: no target' : hours === 1 ? 'hour' : 'hours'),
   targetLess: 'One hour less',
   targetMore: 'One hour more',
   ranked: 'Order by this week',
@@ -668,9 +670,9 @@ const TIERS: Record<number, string> = {
   25: '25 laps. On a track that is the ten thousand metres.',
   100: '100 laps. Nearly a marathon: on a track, two kilometres short.',
   250: '250 laps. A hundred kilometres, seated.',
-  500: '500 laps. 200 kilometres. The ghost is asking how.',
-  1000: '1000 laps. Four figures, one bell at a time.',
-  2500: '2500 laps. 1000 kilometres. No medal exists for that, so this sentence will have to do.',
+  500: '500 laps. 200 kilometres.',
+  1000: '1000 laps. 400 kilometres, one bell at a time.',
+  2500: '2500 laps. 1000 kilometres. No medal exists for that.',
 };
 
 /** What was just achieved, one line each: the number first, no exclamation mark. */

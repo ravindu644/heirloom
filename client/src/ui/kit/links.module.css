@@ -1,0 +1,11 @@
+/* Links at the end of a list ("Change the order", "Archived, 1"): one line, `md` apart, wrapping
+   when they must. */
+.links { display: flex; flex-wrap: wrap; gap: 0 var(--space-md); }
+
+/* A link at the right end of a heading's line ("Back", "Code and settings"): on the heading's
+   baseline, its words ending on the column's edge. The button itself is only its words, so the
+   line keeps its height; its 48px target is laid over it, reaching `sm` above the words, as far
+   as the screen's own top margin allows on a phone, and the rest below, over whatever stands
+   under the line. */
+button.end { position: relative; z-index: 1; min-width: 0; min-height: 0; border: 0; }
+button.end::after { content: ""; position: absolute; top: calc(var(--space-sm) * -1); right: 0; width: max(100%, var(--layout-touch)); height: var(--layout-touch); }

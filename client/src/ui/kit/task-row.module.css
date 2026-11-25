@@ -37,5 +37,12 @@ div.words { cursor: auto; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
 .end { display: flex; flex: none; align-items: center; gap: var(--space-md); }
+/* A row that ends in a control and is narrower than 400px: the squares give way and the count
+   stays. The title is worth more than the picture of a number already written. The row itself
+   is measured, not the screen. */
+.row { container-type: inline-size; }
+@container (max-width: 400px) {
+  .trailed .end [aria-hidden="true"] { display: none; }
+}
 
 .done .title { color: var(--muted); text-decoration: line-through; }

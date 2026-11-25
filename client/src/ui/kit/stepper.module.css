@@ -6,3 +6,19 @@
   font-feature-settings: var(--feature-figure-md);
   text-align: center;
 }
+/* A figure that is typed: the stepper's figure in a field, three digits wide, with its unit as a word after the plus. */
+.stepper input {
+  width: calc(3ch + 2 * var(--space-md));
+  min-height: var(--layout-touch);
+  padding: 0;
+  border: var(--layout-hair) solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: var(--type-figure-md);
+  font-feature-settings: var(--feature-figure-md);
+  text-align: center;
+  appearance: textfield;
+}
+.stepper input::-webkit-inner-spin-button { appearance: none; }
+.stepper input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+.stepper span { margin-left: var(--space-xs); color: var(--muted); }

@@ -1,4 +1,10 @@
-.switch { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); cursor: pointer; }
+/* As tall as its words, with or without a note. The box keeps its 48px to a finger by reaching
+   past the row, by as much on every side as it is larger than what is drawn, so its drawing
+   ends on the panel's edge and rows stand `md` apart whatever they hold. One floor: a row of one
+   short line is as tall as a target less that `md`, or two such rows would stand closer than
+   two fingers can tell apart and the lower box would lie over the upper. */
+.switch { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: calc(var(--layout-touch) - var(--space-md)); cursor: pointer; }
 .switch > span { display: grid; gap: var(--space-xs); min-width: 0; }
 .switch b { font: var(--type-body); }
 .switch small { font: var(--type-label); color: var(--muted); text-wrap: pretty; }
+.switch > button { margin: calc((var(--space-md) + var(--space-xs) - var(--layout-touch)) / 2); }

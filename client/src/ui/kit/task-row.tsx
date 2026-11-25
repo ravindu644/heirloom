@@ -46,7 +46,7 @@ export function TaskRow({ task, of, note, next, arriving, end, checkLabel, onDon
     </>
   );
   return (
-    <div class={cx(css.row, next && css.next, arriving && css.arriving, task.done && css.done, !onDone && css.plain)}>
+    <div class={cx(css.row, next && css.next, arriving && css.arriving, task.done && css.done, !onDone && css.plain, !!end && css.trailed)}>
       {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
       {onOpen ? (
         <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>

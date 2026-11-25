@@ -9,7 +9,7 @@
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 .now, .then { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
-.now > button, .then > button { justify-self: start; }
+.now > div:empty { display: none; }
 .quiet { color: var(--muted); text-wrap: pretty; }
 .rows { display: grid; gap: var(--space-sm); }
 

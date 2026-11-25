@@ -8,6 +8,7 @@ import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
 import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
+import links from '../kit/links.module.css';
 import { Marks } from '../kit/marks.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Said, useSaid } from '../kit/said.tsx';
@@ -295,11 +296,18 @@ export function TodayScreen({ focus, today, settings }: { focus: Focus; today: T
             </>
           )}
 
-          {movable.length > 1 && (
-            <Button kind="link" onClick={() => setOrdering(!ordering)}>
-              {ordering ? s.today.orderKeep : s.today.order}
-            </Button>
-          )}
+          <div class={links.links}>
+            {movable.length > 1 && (
+              <Button kind="link" onClick={() => setOrdering(!ordering)}>
+                {ordering ? s.today.orderKeep : s.today.order}
+              </Button>
+            )}
+            {deleted.length > 0 && (
+              <Button kind="link" onClick={() => setBin(true)}>
+                {s.today.bin(deleted.length)}
+              </Button>
+            )}
+          </div>
 
           {!next && later.length === 0 && <p class={css.empty}>{done.length ? s.today.allDone : s.today.empty}</p>}
 
@@ -326,11 +334,6 @@ export function TodayScreen({ focus, today, settings }: { focus: Focus; today: T
               </h2>
               <div class={css.rows}>{done.map((task) => row(task, 'done'))}</div>
             </section>
-          )}
-          {deleted.length > 0 && (
-            <Button kind="link" onClick={() => setBin(true)}>
-              {s.today.bin(deleted.length)}
-            </Button>
           )}
         </div>
       </div>

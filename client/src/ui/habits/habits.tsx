@@ -3,6 +3,7 @@ import type { Focus } from '../../sync/focus.ts';
 import type { HabitDay, HabitView, Habits } from '../../sync/habits.ts';
 import { Button } from '../kit/button.tsx';
 import { Check } from '../kit/check.tsx';
+import links from '../kit/links.module.css';
 import { cx } from '../kit/cx.ts';
 import { Panel } from '../kit/panel.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
@@ -148,11 +149,23 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
             </section>
           )}
 
-          {list.length > 1 && (
-            <Button kind="link" onClick={() => setOrdering(!ordering)}>
-              {ordering ? s.today.orderKeep : s.today.order}
-            </Button>
-          )}
+          <div class={links.links}>
+            {list.length > 1 && (
+              <Button kind="link" onClick={() => setOrdering(!ordering)}>
+                {ordering ? s.today.orderKeep : s.today.order}
+              </Button>
+            )}
+            {archived.length > 0 && (
+              <Button kind="link" onClick={() => setShelf('archived')}>
+                {s.habits.archived(archived.length)}
+              </Button>
+            )}
+            {deleted.length > 0 && (
+              <Button kind="link" onClick={() => setShelf('deleted')}>
+                {s.today.bin(deleted.length)}
+              </Button>
+            )}
+          </div>
 
           {said && <Said said={said} undo={s.today.undo} onDone={() => setSaid(null)} />}
         </div>
@@ -166,16 +179,6 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
               />
               <p>{s.habits.weekLine(week.now, week.before, day)}</p>
             </Panel>
-          )}
-          {archived.length > 0 && (
-            <Button kind="link" onClick={() => setShelf('archived')}>
-              {s.habits.archived(archived.length)}
-            </Button>
-          )}
-          {deleted.length > 0 && (
-            <Button kind="link" onClick={() => setShelf('deleted')}>
-              {s.today.bin(deleted.length)}
-            </Button>
           )}
         </div>
       </div>

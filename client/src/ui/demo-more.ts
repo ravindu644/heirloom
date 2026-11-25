@@ -54,7 +54,7 @@ export const MANY_HABITS: DemoHabit[] = [
   ),
 ];
 
-export function demoHabits(seed: DemoHabit[], week: { now: number; before: number }): Habits {
+export function demoHabits(seed: DemoHabit[]): Habits {
   const all = signal(seed);
   let ids = 0;
   const change = (id: string, fields: Partial<DemoHabit>) => void (all.value = all.value.map((habit) => (habit.id === id ? { ...habit, ...fields } : habit)));
@@ -81,7 +81,13 @@ export function demoHabits(seed: DemoHabit[], week: { now: number; before: numbe
       const planned = list.value.filter((habit) => habit.today.planned);
       return { done: planned.filter((habit) => habit.today.done).length, planned: planned.length };
     }),
-    week: () => ({ now: week.now + tapped.value, before: week.before }),
+    // This week's check-ins so far, and last week's up to the same weekday: counted from the habits themselves.
+    week() {
+      void tapped.value;
+      const monday = addDays(DAY, -((new Date(DAY).getUTCDay() + 6) % 7));
+      const sum = (from: string, to: string) => all.value.filter((habit) => !habit.archived && !habit.deleted).reduce((n, habit) => n + Object.entries(habit.counts).reduce((m, [day, count]) => m + (day >= from && day <= to ? count : 0), 0), 0);
+      return { now: sum(monday, DAY), before: sum(addDays(monday, -7), addDays(DAY, -7)) };
+    },
     add(title, days, target) {
       if (!title.trim()) return null;
       const id = `new-${++ids}`;

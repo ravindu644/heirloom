@@ -64,6 +64,8 @@ interface Scene {
   marks?: Mark[];
   /** Who cheered the lap just finished. */
   cheered?: string[];
+  /** As the phone app is: a file cannot be saved from here. */
+  phoneApp?: boolean;
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -213,6 +215,7 @@ const ROOM_SCENES: Record<string, Scene> = {
 const lapOver = { phase: 'work', lap: 1, left: 0 } as const;
 const MORE: Record<string, Scene> = {
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
+  'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
   'mark-hundred': { about: 'Lap 100, a best week, and a cheer', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }, { key: 'week-2026-11-23', kind: 'week', focus_ms: 1075 * MIN, before_ms: 1050 * MIN }], cheered: ['sachi', 'dilan'] },
   'mark-off': { about: 'The same lap with celebrations off', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }], prefs: { celebrate: false } },
@@ -401,7 +404,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   };
   const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
   const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
-  const habits = demoHabits(scene.habits ?? HABITS, { now: 7, before: 8 });
+  const habits = demoHabits(scene.habits ?? HABITS);
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
   return { engine, focus, today, progress, habits, rooms, settings };
 }
@@ -413,7 +416,7 @@ render(
   scene?.elsewhere ? (
     <Elsewhere />
   ) : scene ? (
-    <App {...stage(scene)} onReminderSet={() => console.info('demo: a reminder was set')} />
+    <App {...stage(scene)} canSave={!scene.phoneApp} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>

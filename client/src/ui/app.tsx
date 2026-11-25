@@ -61,9 +61,11 @@ interface Props {
   settings: SettingsData;
   /** A habit was given a reminder time where it had none: the moment to ask for leave to notify. */
   onReminderSet?: () => void;
+  /** False where the browser cannot save a file (the phone app): Settings then says where a copy can be saved. */
+  canSave?: boolean;
 }
 
-export function App({ engine, focus, today, progress, habits, rooms, settings, onReminderSet }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, onReminderSet, canSave }: Props) {
   const screen = useScreen();
   const account = engine.account.value;
   const sync = engine.sync.value;
@@ -102,7 +104,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, o
       ) : screen === 'room' ? (
         <RoomScreen engine={engine} rooms={rooms} />
       ) : (
-        <Settings engine={engine} settings={settings} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} canSave={canSave} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );
