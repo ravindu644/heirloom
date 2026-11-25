@@ -11,7 +11,7 @@
   gap: var(--space-sm);
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
-  border: var(--layout-hair) solid var(--line);
+  border: var(--layout-hair) solid var(--edge);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font: var(--type-body-strong);
@@ -22,9 +22,14 @@
 /* Chosen: ink, and never the grey of a quiet button. The words keep their weight, so nothing shifts. */
 .choice[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--ground); }
 .choice i { width: var(--layout-lane); height: var(--layout-lane); }
-/* Seven days on one line of a phone: seven targets and six small gaps. */
-.days { gap: var(--space-xs); }
+/* Seven days on one line of a phone: seven targets and six small gaps. Where the line is under
+   400px the seven share it equally, a little narrower than a target and as tall, rather than
+   leave Sunday alone on a second line. The line itself is measured, not the screen. */
+.days { gap: var(--space-xs); container-type: inline-size; }
 .weekday { min-width: var(--layout-touch); padding: 0; justify-content: center; }
+@container (max-width: 400px) {
+  .weekday { flex: 1; min-width: 0; }
+}
 
 .line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); font: var(--type-label); color: var(--muted); }
 

@@ -25,8 +25,10 @@ export function Stepper({ text, less, more, onLess, onMore, typed }: Props) {
   // A value that changed elsewhere (a button here, another device) replaces what was half typed.
   useEffect(() => setDraft(null), [typed?.value]);
   const keep = () => {
-    const value = Number(draft);
-    if (typed && draft !== null && Number.isInteger(value) && value >= typed.min && value <= typed.max) typed.onSet(value);
+    // An emptied field is no value: `Number('')` is 0, and where 0 is in bounds (a room's target)
+    // it would be taken for one.
+    const value = draft?.trim() ? Number(draft) : NaN;
+    if (typed && Number.isInteger(value) && value >= typed.min && value <= typed.max) typed.onSet(value);
     setDraft(null);
   };
   return (

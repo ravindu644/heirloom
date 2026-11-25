@@ -5,7 +5,7 @@ export function Person({ name }: { name: string }) {
   return (
     <span class={css.person}>
       <i aria-hidden="true">{name.charAt(0).toUpperCase()}</i>
-      {name}
+      <span>{name}</span>
     </span>
   );
 }

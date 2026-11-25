@@ -9,3 +9,5 @@
   background: var(--raised);
   font: var(--type-body-strong);
 }
+/* A long name is cut where the room runs out; the circle is never squeezed. */
+.person span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

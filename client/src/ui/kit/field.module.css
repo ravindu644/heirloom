@@ -5,7 +5,8 @@
   width: 100%;
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
-  border: 1px solid var(--line);
+  /* A field is found by its edge: `edge` is seen where `line`, a divider's colour, is not. */
+  border: var(--layout-hair) solid var(--edge);
   border-radius: var(--radius-sm);
   background: var(--surface);
   transition: border-color var(--motion-press) var(--motion-ease);

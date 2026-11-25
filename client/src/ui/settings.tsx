@@ -54,8 +54,8 @@ export function Settings({ engine, settings, canSave = true, onSignIn }: { engin
         <legend>{name}</legend>
         <Stepper
           text={s.settings.minutes(minutes)}
-          less={s.settings.less}
-          more={s.settings.more}
+          less={s.settings.less(name)}
+          more={s.settings.more(name)}
           onLess={() => to(minutes - 1)}
           onMore={() => to(minutes + 1)}
           typed={{ value: minutes, min: 1, max: LENGTH_MAX[field], label: name, onSet: to }}

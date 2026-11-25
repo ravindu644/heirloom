@@ -71,6 +71,9 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
   const [leaving, setLeaving] = useState(false);
   const hours = Math.round(room.target_ms / HOUR);
   const change = async (fields: Parameters<Rooms['update']>[1]) => setSaid(why(await rooms.update(room.id, fields)));
+  // On a plain http address (a server on the home network) a browser has no clipboard at all:
+  // that is said the same way as a clipboard that refuses.
+  const copy = () => (navigator.clipboard?.writeText(room.code) ?? Promise.reject()).then(() => setCopied(s.room.copied), () => setCopied(s.room.copyFailed));
 
   return (
     <Sheet title={s.room.sheet} close={s.task.close} onClose={onClose}>
@@ -82,7 +85,7 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
         </p>
         <p class={css.quiet}>{s.room.codeNote}</p>
         <div class={form.ends}>
-          <Button onClick={() => navigator.clipboard.writeText(room.code).then(() => setCopied(s.room.copied), () => setCopied(s.room.copyFailed))}>{s.room.copy}</Button>
+          <Button onClick={() => copy()}>{s.room.copy}</Button>
         </div>
         <p class={css.quiet} role="status">
           {copied}
@@ -228,12 +231,6 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
         {/* Old news is never said in the present. */}
         <h1>{(stale ? s.room.findingStale : s.room.finding)(room.members.length, room.members.filter((m) => m.phase === 'work' && !m.paused).length)}</h1>
       </header>
-      {stale && (
-        <p class={css.quiet} role="status">
-          {s.room.stale}
-        </p>
-      )}
-
       {/* More than one room: they are chosen between here, not in the navigation. */}
       {list.length > 1 && (
         <div class={form.choices} role="group" aria-label={s.room.rooms}>

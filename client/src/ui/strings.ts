@@ -217,8 +217,9 @@ export const settings = {
   short: 'A short break',
   long: 'The long break, after four laps',
   minutes: (n: number) => (n === 1 ? 'minute' : 'minutes'),
-  less: 'One minute less',
-  more: 'One minute more',
+  // Three lengths on one screen: each button says whose minute it is.
+  less: (what: string) => `${what}, one minute less`,
+  more: (what: string) => `${what}, one minute more`,
 
   auto: 'Starting by itself',
   autoBreak: 'Start the break when a lap rings',
@@ -613,7 +614,6 @@ export const room = {
 
   finding: (members: number, focusing: number) =>
     members === 1 ? 'Only you here so far. The code brings a friend in.' : focusing === 0 ? 'Nobody is on a lap right now.' : `${focusing} of ${members} focusing now.`,
-  stale: 'This is the room as it was last heard from.',
   findingStale: (members: number, focusing: number) =>
     members === 1 ? 'Only you here.' : focusing === 0 ? 'Nobody was on a lap when the room was last heard from.' : `${focusing} of ${members} were focusing when the room was last heard from.`,
   week: 'Together this week',

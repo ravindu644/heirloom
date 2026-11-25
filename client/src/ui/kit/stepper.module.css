@@ -1,4 +1,4 @@
-.stepper { display: inline-flex; align-items: center; gap: var(--space-sm); }
+.stepper { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 .stepper button { min-width: var(--layout-touch); padding: 0; }
 .stepper output {
   min-width: 9ch;
@@ -11,7 +11,7 @@
   width: calc(3ch + 2 * var(--space-md));
   min-height: var(--layout-touch);
   padding: 0;
-  border: var(--layout-hair) solid var(--line);
+  border: var(--layout-hair) solid var(--edge);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font: var(--type-figure-md);

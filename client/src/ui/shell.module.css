@@ -3,7 +3,8 @@
    them differently. */
 .shell {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* The mark keeps its width; the person has the rest and gives it up, down to the circle. */
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas: "brand person" "main main" "status status" "nav nav";
   height: 100dvh;
@@ -21,7 +22,7 @@
   font: var(--type-body-strong);
 }
 /* The person: one target, as wide as the circle and the name. */
-.person { grid-area: person; display: flex; align-items: center; min-width: 0; min-height: var(--layout-touch); padding: 0 var(--layout-margin) 0 var(--space-md); }
+.person { grid-area: person; display: flex; align-items: center; justify-self: end; max-width: 100%; min-width: 0; min-height: var(--layout-touch); padding: 0 var(--layout-margin) 0 var(--space-md); }
 
 /* No padding below: the status line is the space under the screen, and a screen's own buttons
    may stick to the very bottom of the scroll. */

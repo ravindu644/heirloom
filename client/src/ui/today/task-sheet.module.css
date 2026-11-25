@@ -26,7 +26,7 @@
   min-width: 0;
   min-height: var(--layout-touch);
   padding: 0 var(--space-md);
-  border: 1px solid var(--line);
+  border: var(--layout-hair) solid var(--edge);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }

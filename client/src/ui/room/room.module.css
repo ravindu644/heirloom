@@ -27,7 +27,9 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 /* Your own lane has your colour down its edge. */
 .you { box-shadow: inset var(--layout-stroke) 0 0 var(--you); }
 .who { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
-.who > span { min-width: 0; overflow-wrap: anywhere; }
+.who > span { min-width: 0; }
+/* In a lane there is room under the name: a long one wraps and is read whole. */
+.who > span span { overflow-wrap: anywhere; white-space: normal; }
 .who b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 /* A break is the green of the calyx, here as everywhere. */
 .who .rest { color: var(--rest); }

@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { Brand } from './kit/brand.tsx';
 import { Person } from './kit/person.tsx';
+import { useSidebar } from './kit/wide.ts';
 import css from './shell.module.css';
 import * as s from './strings.ts';
 
@@ -27,32 +28,41 @@ interface Props {
  * on a laptop), the screen, what the connection has to say, and the five destinations.
  */
 export function Shell({ person, at, without, status = '', keepStatus, children }: Props) {
-  return (
-    <div class={css.shell}>
-      <a class={css.brand} href="#/focus">
-        <Brand name={s.brand} />
-      </a>
-      {person && (
-        <nav class={css.nav} aria-label={s.nav.label}>
-          {DESTINATIONS.filter((id) => id !== without).map((id) => (
-            <a key={id} href={`#/${id}`} aria-current={id === at ? 'page' : undefined}>
-              {id === at ? <b>{s.nav[id]}</b> : s.nav[id]}
-            </a>
-          ))}
-        </nav>
-      )}
-      <main class={css.main}>
-        <div class={css.canvas}>{children}</div>
-      </main>
-      <p class={keepStatus ? css.statusKept : css.status} role="status">
-        {status}
-      </p>
-      {/* The person is the way to Settings, and to nothing else: one target. */}
-      {person && (
-        <a class={css.person} href="#/settings" aria-label={s.settings.open(person)}>
-          <Person name={person} />
-        </a>
-      )}
-    </div>
+  const sidebar = useSidebar();
+  const brand = (
+    <a key="brand" class={css.brand} href="#/focus">
+      <Brand name={s.brand} />
+    </a>
   );
+  const nav = person && (
+    <nav key="nav" class={css.nav} aria-label={s.nav.label}>
+      {DESTINATIONS.filter((id) => id !== without).map((id) => (
+        <a key={id} href={`#/${id}`} aria-current={id === at ? 'page' : undefined}>
+          {id === at ? <b>{s.nav[id]}</b> : s.nav[id]}
+        </a>
+      ))}
+    </nav>
+  );
+  const screen = (
+    <main key="main" class={css.main}>
+      <div class={css.canvas}>{children}</div>
+    </main>
+  );
+  const said = (
+    <p key="status" class={keepStatus ? css.statusKept : css.status} role="status">
+      {status}
+    </p>
+  );
+  // The person is the way to Settings, and to nothing else: one target.
+  const who = person && (
+    <a key="person" class={css.person} href="#/settings" aria-label={s.settings.open(person)}>
+      <Person name={person} />
+    </a>
+  );
+  // CSS places the parts; the page is written in the order the eye meets them, which is what Tab
+  // and a screen reader follow. On a phone: the header (the mark, then the person), the screen,
+  // then the bottom bar. With a sidebar: the sidebar from top to foot (the mark, the
+  // destinations, the status, the person), then the screen. The parts are keyed, so crossing
+  // the width moves them and the screen keeps everything it holds.
+  return <div class={css.shell}>{sidebar ? [brand, nav, said, who, screen] : [brand, who, screen, said, nav]}</div>;
 }

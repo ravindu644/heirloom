@@ -1,11 +1,12 @@
 .button {
   min-height: var(--layout-touch);
-  padding: 0 var(--layout-margin);
+  /* A button's words wrap before the page scrolls sideways; then it grows past its 48px. */
+  padding: var(--space-xs) var(--layout-margin);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: none;
   font: var(--type-body-strong);
-  white-space: nowrap;
+  text-wrap: balance;
   cursor: pointer;
   transition: background-color var(--motion-press) var(--motion-ease), color var(--motion-press) var(--motion-ease);
 }
