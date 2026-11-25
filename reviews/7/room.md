@@ -1,6 +1,34 @@
 # Section 7: Room
 
-## First pass, 2026-11-25. Verdict: FAIL
+## Second pass, 2026-11-25. Verdict: FAIL, on one thing the fix brought
+
+Pictures retaken 05:49; measured from the running demo at 06:05, with 360x640 and 1280x800 added.
+`node tools/design-audit.mjs`: 110 states, 0 violations.
+
+| # | Finding | Now | Measured |
+|---|---|---|---|
+| 1 | "Cheered" as a dead button | Fixed. | No disabled button anywhere; "You and sachi cheered this lap." stays. |
+| 2 | Buttons at three heights in a laptop row | Fixed. | `room-eight` at 1440: both Cheers at y=376 in panels ending 440, the next row at 582 in panels ending 646. At 1280, three to a row, the same. |
+| 3 | "Code and settings" as the second thing on the screen | Fixed in place, broken next door: problem 1 below. | A link at the right end of the "Room: ..." line, ending on the edge (392, 451, 1408). |
+| 4 | Old news headed "now" | Fixed. | "2 of 4 were focusing when the room was last heard from."; only your own time left is shown. |
+
+### Problems now
+
+1. **With a long room name the link runs past the edge.** `room-eight-*`: the name takes the line
+   and squeezes the link's box to 92px at 412 and 79px at 360; the words need 102px (their width
+   in `room-stale`), so "Code and settings" ends 10px past the column at 412 (x=402) and at x=363
+   on a 360px screen, cut by the glass. At 471 and on the laptop it fits. DESIGN.md, one edge.
+   Fix: the link never shrinks or wraps (`flex: none`); the name is what wraps, as it already does.
+2. Small, words: offline the screen now says it twice, the new headline and under it "This is the
+   room as it was last heard from." Cut the paragraph.
+
+### The ruling asked for
+
+**Cheer pinned to the panel's foot, the space above it counted as the button's own row: upheld.**
+A member with a one-line task has up to 76px between the totals and Cheer when a neighbour's
+task takes three lines. That is the price of one line of buttons and it is the smaller fault.
+
+## First pass, 2026-11-25 (kept as written). Verdict then: FAIL
 
 Pictures: 130 in `reviews/7/shots/`, 13 states at phone, wide (471), small, laptop and phone-full,
 light and dark. Every one opened: the light phone pages and four laptop states at reading size,
@@ -10,7 +38,7 @@ from the running demo at 05:30. `node tools/design-audit.mjs`: 109 states, 0 vio
 The room says who is on a lap in one sentence and never ranks anyone unless the room asked.
 Four things to fix.
 
-## Problems
+### Problems
 
 1. **"Cheered" is a dead button drawn like a live one.** `room-*`: after a cheer the button stays,
    disabled, in the quiet fill of "Skip break" (`room.tsx:277`), 372 by 48px on the phone, under a
@@ -29,7 +57,7 @@ Four things to fix.
    happened. Fix: one sentence, "2 of 4 were focusing when the room was last heard from.", and no
    time left for anyone but you.
 
-## PRODUCT.md section 5, row by row
+### PRODUCT.md section 5, row by row
 
 | Row | Delivered | Where |
 |---|---|---|
@@ -42,7 +70,7 @@ Four things to fix.
 | Task titles hidden from the room unless switched on | Yes. "Not sharing what they are on.", and the switch in Settings is off by default. | `room-eight-*` |
 | A switch to hide rooms entirely | Yes. The destination leaves the bar; "Settings brings them back". | `room-hidden-*` |
 
-## The Look table
+### The Look table
 
 | Row | Result |
 |---|---|
@@ -54,7 +82,7 @@ Four things to fix.
 | Pressable | Fail: problem 1. |
 | Dark | Pass. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **The week as one lane of shares, yours in `you`, others in `ink`: upheld.**
 - **Members side by side on a laptop, stacked on a phone: upheld,** with equal heights in a row
@@ -68,7 +96,7 @@ Four things to fix.
   drawn as in Habits' problem 1.
 - **No lap bar per member: upheld.** "Focusing, lap 2 of 4" says it.
 
-## The words
+### The words
 
 - Keep: "2 of 4 focusing now." "Only you here so far. The code brings a friend in." "Whoever has
   it can join. Read it out, or copy it." "Your laps leave the room's week with you. The code
@@ -77,7 +105,7 @@ Four things to fix.
 - Problem 4.
 - Nothing ranks, nothing nags an away friend. "Away" is one word and their week still counts.
 
-## Keep
+### Keep
 
 The headline counts people, not minutes: "2 of 4 focusing now." It makes the room a place where
 friends are, and it leaves the slower friend unranked. Do not turn it into a total or a table.

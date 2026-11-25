@@ -1,6 +1,24 @@
 # Section 6: Habits
 
-## First pass, 2026-11-25. Verdict: FAIL
+## Second pass, 2026-11-25. Verdict: PASS
+
+Pictures retaken 05:49; measured from the running demo at 06:05, with 360x640 added.
+`node tools/design-audit.mjs`: 110 states, 0 violations.
+
+| # | Finding | Now | Measured |
+|---|---|---|---|
+| 1 | Nothing says which days are on | Fixed. | On: `ink` fill, `ground` text. Off (Wed pressed off): white, ink text, `ghost` border. |
+| 2 | The bar cuts its second sentence | Fixed. | "Deleted: Lights out by 00:30." and Undo, one line, at 412 and 360. |
+| 3 | The two links 64px apart | Fixed. | One line at 412, 360 and 1440: 20 to 121, 137 to 200, 216 to 325, 16px between. |
+| 4 | The one-habit demo contradicts itself | Fixed. | 0 and 0, "No check-ins yet this week." |
+| 5 | "Habit" twice | Fixed. | The field is "Its name". |
+
+One thing the fix shows at 360 only, not a FAIL at the sizes the audit holds: seven 48px chips
+need 360px and the sheet has 320, so Mon to Sat stand on one row (20 to 328) and "Sun" alone on
+the next (y=311). At 412 all seven fit (20 to 380). Fix: under 400px the seven share one row at
+equal width, about 41 by 48; DESIGN.md's "A choice" has to allow that width for the weekdays.
+
+## First pass, 2026-11-25 (kept as written). Verdict then: FAIL
 
 Pictures: 120 in `reviews/6/shots/`, 12 states at phone, wide (471), small, laptop and phone-full,
 light and dark. Every one opened: the light phone pages and four laptop states at reading size,
@@ -10,7 +28,7 @@ from the running demo at 05:30. `node tools/design-audit.mjs`: 109 states, 0 vio
 The list is right: a finding for a title, one box to tap, a week you can read at a glance, and
 "24 of 30 planned days" where another app would print a broken streak. Five things to fix.
 
-## Problems
+### Problems
 
 1. **In the sheet nothing says which days are on.** `habits-sheet-*`: an every-day habit shows
    seven grey buttons with a dark border. On is `raised` plus an ink border, off is `surface` plus
@@ -31,7 +49,7 @@ The list is right: a finding for a title, one box to tap, a week you can read at
 5. **"Habit" is written twice.** `habits-sheet-*`: the sheet's title and, 56px under it, the
    label of its first field. Fix: the field is "Its name", as in Room's sheet.
 
-## PRODUCT.md section 4, row by row
+### PRODUCT.md section 4, row by row
 
 | Row | Delivered | Where |
 |---|---|---|
@@ -40,7 +58,7 @@ The list is right: a finding for a title, one box to tap, a week you can read at
 | A small heatmap per habit, with the same forgiving streak | Yes. The week on the row, the whole record in the sheet at 24px, "9 days running" or "24 of 30 planned days". | `habits-sheet-*` |
 | A reminder time per habit | Yes, as a field. The platform's time field reads "--:-- --" with AM and PM in this browser while the app writes 16:40 everywhere else; see DESIGN.md's list. | `habits-sheet-*` |
 
-## The Look table
+### The Look table
 
 | Row | Result |
 |---|---|
@@ -52,7 +70,7 @@ The list is right: a finding for a title, one box to tap, a week you can read at
 | Same job, same look | Pass. The box, the bar, the bin and the ordering are Today's. |
 | Dark | Pass. |
 
-## Rulings on the lane's decisions
+### Rulings on the lane's decisions
 
 - **The task row's box, not the reference's circle: upheld.** Same job as Today's done box, so the
   same control.
@@ -63,7 +81,7 @@ The list is right: a finding for a title, one box to tap, a week you can read at
   today's outline are five shapes, not five colours.
 - **Everything but the box opens the sheet: upheld.** The row is a painted box.
 
-## The words
+### The words
 
 - Keep: "3 of 6 today. Three left." "6 of 6 today. None left." "24 of 30 planned days". "An
   archived habit keeps its record and asks for nothing." "Add the first thing you want to do most
@@ -73,7 +91,7 @@ The list is right: a finding for a title, one box to tap, a week you can read at
   starts as once a day, every day."
 - Nothing scolds. Yesterday is never mentioned.
 
-## Keep
+### Keep
 
 "Every day, 24 of 30 planned days" on a row that missed a day. The count never resets to zero in
 front of the person; a later change must not bring a broken streak back.

@@ -1,13 +1,40 @@
 # Section 8: Settings and the marks
 
-## First pass, 2026-11-25. Verdict: FAIL (Settings), PASS (the marks)
+## Second pass, 2026-11-25. Verdict: PASS (Settings), PASS (the marks)
+
+Pictures retaken 05:49, with `settings-phone-app`; measured from the running demo at 06:05 at
+412, 360, 1440 and 1280. `node tools/design-audit.mjs`: 110 states, 0 violations.
+
+| # | Finding | Now | Measured |
+|---|---|---|---|
+| 1 | "Back" under the heading and short of the edge | Fixed. | Both stand on y=79 (55 on the laptop); the word ends at 392, 340 at 360, 1408 and 1248 on the laptop. |
+| 2 | The loose rows under "Starting by itself" | Fixed, by the ruling below. | Words 24px apart, 20px under the heading; boxes 48px each, edge to edge. The box's right edge is now on the column's (376). |
+| 3 | 25 taps to 50 minutes | Fixed. | A number field, 68 by 48, between minus and plus, "minutes" beside. 180 fits (66 of 66px), 500 becomes 180, an emptied field takes its last value back. The same at 360. |
+| 4 | One long column on the laptop | Fixed. | Two columns at 1440 (264 to 824, 848 to 1408) and at 1280 (264 to 744, 768 to 1248); the page is 1,098px against 1,866. |
+
+Also done: Day target beside Laps and breaks; "One bell for now." gone; the three tier lines end
+on their number or their joke; the auto-start note says what a person sees.
+
+### The ruling asked for
+
+**A one-line switch row with a floor of 32px: upheld.** "As tall as its words" would leave two
+boxes 39px apart, under what a finger needs. The floor costs 4px under the heading and 8px
+between two one-line rows against rows with notes, where the first pass measured 13 and 25.
+
+### One thing to look at, not a finding
+
+"minutes" stands after the plus (minus, 25, plus, minutes) while in the next panel the unit is
+inside (minus, "8 laps a day", plus). Both follow the Stepper rule as written. If it reads as two
+kinds of control in the hand, give Day target and a room's hours the field too.
+
+## First pass, 2026-11-25 (kept as written). Verdict then: FAIL (Settings), PASS (the marks)
 
 Pictures: 140 in `reviews/8/shots/`, 14 states at phone, wide (471), small, laptop and phone-full,
 light and dark. Every one opened: Settings and five marks at reading size, the rest as sheets.
 Taken 05:03; `strings.ts` changed at 05:22, so the words were read from the file and the
 positions from the running demo at 05:30. `node tools/design-audit.mjs`: 109 states, 0 violations.
 
-## Problems (Settings)
+### Problems (Settings)
 
 1. **"Back" hangs under the heading and stops short of the edge.** `settings-phone-light`,
    scanned: "Settings" stands on y=79, "Back" on y=86, 7px lower (55 and 62 on the laptop); its last letter ends at x=383
@@ -26,7 +53,7 @@ positions from the running demo at 05:30. `node tools/design-audit.mjs`: 109 sta
    What you tune (laps and breaks, day target, starting by itself, the bell, a finished lap) on
    the left; who and where (account, rooms, your copy) on the right.
 
-## PRODUCT.md sections 6 and 7, row by row
+### PRODUCT.md sections 6 and 7, row by row
 
 | Row | Delivered | Where |
 |---|---|---|
@@ -41,7 +68,7 @@ positions from the running demo at 05:30. `node tools/design-audit.mjs`: 109 sta
 | Export everything as JSON; import it back | Yes. "Save a copy", "Bring a copy back", and the note says a copy merges. | Your copy |
 | Invite-only accounts on the user's own server | Yes, section 2; "This phone keeps step with the server at ...". | Account |
 
-## Rulings
+### Rulings
 
 - **Steppers for the lengths: overturned for the lengths, kept for small counts.** Between minus
   and plus the figure becomes a number field (`inputmode="numeric"`), set in the same figure
@@ -55,7 +82,7 @@ positions from the running demo at 05:30. `node tools/design-audit.mjs`: 109 sta
 - **The mark as one line under the result, quieter than it, no badge: upheld.** 13px, in the
   group at the top, never between the sentence and its button.
 
-## The words
+### The words
 
 Settings:
 - Keep: "This phone keeps step with the server at ...". "Save a copy" and "Bring a copy back".
@@ -82,7 +109,7 @@ The marks, each read as the tenth it would never be, since a tier comes once:
   best before was 17h 30m." are facts. "That task:" for a long title is vague on its own and is
   saved by the bar under it that names the task.
 
-## Keep
+### Keep
 
 "250 laps. A hundred kilometres, seated." One dry word after a true number. That is the register
 for every reward in this app: the fact first, the smile second, no exclamation mark.
