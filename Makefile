@@ -82,13 +82,14 @@ dev-web:
 dev-server:
 	cd server && go run ./cmd/heirloomd -data ../.local/data
 
-# The phone app carries its own copy of the web app, built to talk to SERVER (another origin
-# for it). `make apk SERVER=https://your.host`. The default is the laptop through `adb reverse`.
-SERVER ?= http://localhost:8787
+# The phone app carries its own copy of the web app and asks for its server (another origin for
+# it). `make apk SERVER=http://your.host:8787` fills the address in for the people that APK is
+# handed to; a device test through `adb reverse` uses SERVER=http://localhost:8787.
+SERVER ?=
 # Capacitor 8 needs Java 21. Where yours lives: `make apk JDK21=/path`, or JDK21 in the environment.
 JDK21 ?= $(HOME)/.jdks/jdk-21
 apk: tokens
-	VITE_SERVER_URL=$(SERVER) pnpm exec vite build --outDir dist-app
+	VITE_APP=1 VITE_SERVER_URL=$(SERVER) pnpm exec vite build --outDir dist-app
 	pnpm exec cap sync android
 	cd android && JAVA_HOME=$(JDK21) ./gradlew assembleDebug
 

@@ -1,16 +1,24 @@
 import { effect } from '@preact/signals-core';
 import { render } from 'preact';
 import { onFront, startPlatform } from './platform/index.ts';
-import { startApp } from './sync/browser.ts';
+import { serverChoice, startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
+import { ServerStep } from './ui/server.tsx';
 import { result, ring } from './ui/strings.ts';
 
 const root = document.getElementById('app')!;
 
+// The phone app (`make apk`) is another origin from its server and asks which one. In a browser
+// the server is the page's own and nothing asks.
+const APP = !!import.meta.env.VITE_APP;
+
 async function start() {
-  // The phone app is another origin, built knowing its server. In a browser the server is the page's own.
-  const app = await startApp(import.meta.env.VITE_SERVER_URL || undefined);
+  // A build may come with an address filled in; once one is kept, that is the one.
+  const server = APP ? await serverChoice(import.meta.env.VITE_SERVER_URL || undefined) : undefined;
+  // No server yet: nothing to start. Choosing one starts the app again on it.
+  if (server && !server.address) return render(<ServerStep choice={server} />, root);
+  const app = await startApp(server?.address ?? undefined);
   const { engine, focus, settings } = app;
   // The phone's WebView says it is visible right through screen off, so the browser's own
   // "visible again" never fires there. The platform knows when the app is really in front again:
@@ -93,12 +101,12 @@ async function start() {
 
   // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
   // The phone app's WebView is not trusted to save a file; Settings sends that to the browser.
-  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} canSave={!import.meta.env.VITE_SERVER_URL} />, root);
+  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} canSave={!APP} server={server} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes
 // the worker). Not under `make dev`, and not in the phone app, which carries its own files.
-if (import.meta.env.PROD && !import.meta.env.VITE_SERVER_URL && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && !APP && 'serviceWorker' in navigator) {
   void navigator.serviceWorker.register('/sw.js');
 }
 
