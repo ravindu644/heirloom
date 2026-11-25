@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"reflect"
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"heirloom/server/hub"
 	"heirloom/server/rooms"
@@ -284,6 +288,80 @@ func TestRoomCreateJoinLeave(t *testing.T) {
 	var left int
 	if err := w.db.QueryRow("select (select count(*) from room) + (select count(*) from member)").Scan(&left); err != nil || left != 0 {
 		t.Errorf("%d rows of the room are still stored, %v", left, err)
+	}
+}
+
+// A device that is slow to look must not lose a room its account is back in. Ravi's
+// laptop is still catching up when, on his phone, he leaves the room and joins it again
+// with the code. When the laptop gets to its news, the room is his: no "gone".
+func TestLeavingAndRejoiningBeforeADeviceLooksKeepsTheRoom(t *testing.T) {
+	w := start(t)
+	sachi, ravi := w.person("sachi", pocket, 330), w.person("ravi", phone, 330)
+	room, code := together(t, "Sachi and me", sachi, ravi)
+	// Three megabytes for the laptop to catch up on, in pages of about one.
+	note := strings.Repeat("n", 15000)
+	for batch := range 4 {
+		cells := map[[3]string]any{}
+		for i := range 50 {
+			cells[[3]string{"task", fmt.Sprintf("t%d-%d", batch, i), "notes"}] = note
+		}
+		ravi.set(cells)
+	}
+	ravi.settle()
+
+	// The laptop takes its welcome and the room, and then reads nothing more. Its socket
+	// has a small buffer, so the server is left standing in the middle of the first page.
+	small := &net.Dialer{Control: func(_, _ string, c syscall.RawConn) (err error) {
+		c.Control(func(fd uintptr) { err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, 4096) })
+		return err
+	}}
+	ws, _, err := websocket.Dial(t.Context(), "ws"+strings.TrimPrefix(w.url, "http")+"/api/ws",
+		&websocket.DialOptions{HTTPClient: &http.Client{Transport: &http.Transport{DialContext: small.DialContext}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ws.CloseNow() })
+	ws.SetReadLimit(16 << 20)
+	desk := &device{t, ws}
+	first := hello(w.signIn("ravi", laptop).Token, laptop, 0)
+	first["utc_offset_min"] = 330
+	desk.say(first)
+	desk.want("welcome")
+	if m := desk.want("room"); m.Room != room || names(m) != "sachi ravi(you)" {
+		t.Fatalf("the laptop was first shown %s", m.raw)
+	}
+	time.Sleep(aMoment)
+
+	ravi.ask("leave", map[string]any{"room": room}).ok(t, "leave on the phone")
+	ravi.ask("join", map[string]any{"code": code}).ok(t, "and join again")
+
+	// Now the laptop reads on.
+	desk.say(`{"type":"ping","t":1}`)
+	pages, held := 0, true
+	for done := false; !done; {
+		m, err := desk.read()
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch m.Type {
+		case "cells":
+			pages++
+		case "room":
+			held = !m.Gone
+		case "pong":
+			done = true
+		}
+	}
+	if pages == 0 {
+		t.Fatal("the laptop had already caught up when ravi left: this test did not hold it back")
+	}
+	if !held {
+		t.Error("the laptop was told the room is gone, and ravi is in it")
+	}
+	// And it is a room like any other again: its news arrives.
+	sachi.set(timerCell(running("work", "run-1", nil, w.ms.Load(), lapMs, 0)))
+	if m := desk.room(); m.Room != room || m.Gone || who(t, m, "sachi").Phase != "work" {
+		t.Errorf("after rejoining, the laptop was sent %s", m.raw)
 	}
 }
 

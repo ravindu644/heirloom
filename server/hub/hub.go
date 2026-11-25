@@ -373,15 +373,14 @@ func (h *Hub) announceOf(account int64) {
 	}
 }
 
-// Left tells the account's devices, once, that a room is gone for them. The mark makes
-// each drop what it remembered of the room; it finds the account is out and sends nothing.
-func (h *Hub) Left(account, room int64, public string) {
-	gone := encode(rooms.Gone{Type: "room", Room: public, Gone: true})
+// Left has the account's own devices look at a room it has just left: Announce no longer
+// reaches them, they are not members. Each one that was shown the room is told "gone" by
+// tell, when it gets there and if the account is still out.
+func (h *Hub) Left(account, room int64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for c := range h.conns {
 		if c.account == account {
-			c.send(gone)
 			c.mark(room)
 		}
 	}
@@ -389,6 +388,10 @@ func (h *Hub) Left(account, room int64, public string) {
 
 // tell sends this device each of these rooms as it is now, unless that is what the
 // device was last told. server_time moves with every reading and is not a change.
+//
+// "Gone" is decided here too, from the same reading, and nowhere else. A device slow to
+// look may find its account has left and come back: then it is told the room, never that
+// it is gone, and what it holds matches what we remember showing it.
 func (h *Hub) tell(c *conn, in []int64) error {
 	for _, room := range in {
 		msg, next, err := h.rooms.Message(room, c.account)
@@ -396,7 +399,13 @@ func (h *Hub) tell(c *conn, in []int64) error {
 			return ours(err)
 		}
 		if msg == nil {
-			delete(c.shown, room) // left, or the room ended: Left has said so
+			// Left, or the room ended. Said once, to a device that was shown the room.
+			if was, told := c.shown[room]; told {
+				delete(c.shown, room)
+				if err := c.write(encode(rooms.Gone{Type: "room", Room: was.msg.Room, Gone: true})); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		before := c.shown[room].msg

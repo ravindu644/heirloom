@@ -150,7 +150,7 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 	room("leave", func(account int64, req roomRequest) (string, int64, error) {
 		id, err := together.Leave(account, req.Room)
 		if err == nil {
-			h.Left(account, id, req.Room)
+			h.Left(account, id)
 		}
 		return "", id, err
 	})
