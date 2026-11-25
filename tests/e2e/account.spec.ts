@@ -17,7 +17,7 @@ test('join with an invite on A, sign in on B; a wrong password and a used invite
   await ready(b.page);
 
   await join(c.page, invite, username('again'));
-  await expect(c.page.getByRole('alert')).toHaveText('That invite is not known here, or it has been used. A code works once.');
+  await expect(c.page.getByRole('alert')).toHaveText('That invite is not known here, or it was used, taken back or ran out. A link works once.');
 
   // One account on both: a lap started on A is on B.
   await a.page.getByRole('button', { name: 'Start lap 1' }).click();
@@ -78,4 +78,31 @@ test('a page from another origin can sign in over the API and open the socket, a
   );
   expect(said).toEqual({ origin: `http://localhost:${ADDR.split(':')[1]}`, status: 200, username: name, first: 'welcome' });
   await context.close();
+});
+
+test('an invite link put into a sign-in tab that is already open opens the join form with the invite in hand', async ({ deviceA: a }) => {
+  await a.page.goto('/');
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
+  const invite = server.invite();
+  await a.page.evaluate((invite) => (location.hash = `#/join/${invite}`), invite);
+  await expect(a.page.getByRole('heading', { name: 'Join with an invite', level: 1 })).toBeVisible();
+  await expect(a.page.getByText(`This link is your invite to ${ADDR}. Choose a username and a password.`)).toBeVisible();
+  await expect(a.page.getByLabel('Invite', { exact: true })).toHaveCount(0);
+  await a.page.getByLabel('Username').fill(username('hashjoin'));
+  await a.page.getByLabel('Password').fill(PASSWORD);
+  await a.page.getByRole('button', { name: 'Join', exact: true }).click();
+  await ready(a.page);
+});
+
+test('the join form will not send an empty invite: spaces, or a link with nothing after join, are refused in words', async ({ deviceA: a }) => {
+  await a.page.goto('/');
+  await a.page.getByRole('button', { name: 'I have an invite' }).click();
+  await a.page.getByLabel('Username').fill(username('noinvite'));
+  await a.page.getByLabel('Password').fill(PASSWORD);
+  for (const empty of ['   ', `http://${ADDR}/#/join/`]) {
+    await a.page.getByLabel('Invite', { exact: true }).fill(empty);
+    await a.page.getByRole('button', { name: 'Join', exact: true }).click();
+    await expect(a.page.getByRole('alert')).toHaveText('There is no invite in that. Paste the whole link, or its last part.');
+    await expect(a.page.getByRole('heading', { name: 'Join with an invite', level: 1 })).toBeVisible();
+  }
 });

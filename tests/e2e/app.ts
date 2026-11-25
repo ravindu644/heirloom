@@ -21,7 +21,7 @@ export async function signIn(page: Page, name: string, password = PASSWORD) {
 export async function join(page: Page, invite: string, name: string) {
   await page.goto('/');
   await page.getByRole('button', { name: 'I have an invite' }).click();
-  await page.getByLabel('Invite code').fill(invite);
+  await page.getByLabel('Invite', { exact: true }).fill(invite);
   await page.getByLabel('Username').fill(name);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
