@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { say } from '../kit/said.tsx';
 import type { Progress, TimelineEntry } from '../../sync/progress.ts';
 import { Button } from '../kit/button.tsx';
 import { cx } from '../kit/cx.ts';
@@ -27,9 +27,6 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const entries = progress.timeline(day);
   const isToday = day === today;
 
-  // The lap last set aside here, for the one sentence a screen reader is told.
-  const [aside, setAside] = useState<string | null>(null);
-  useEffect(() => setAside(null), [day]);
 
   // The day's stretch: whole hours around what ran, never fewer than four.
   // Whole hours on the wall, which are not whole hours of UTC everywhere: Sri Lanka is half an hour off.
@@ -42,7 +39,6 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const x = (ms: number) => ((ms - from) / (until - from)) * 100;
   const two = entries.some((entry) => entry.row === 1);
 
-  const said = entries.find((entry) => entry.id === aside && entry.outcome === 'void');
   const act = (entry: TimelineEntry) => (entry.outcome === 'void' ? s.progress.countAgain : s.progress.setAside);
 
   const look = isToday ? progress.lookBack() : null;
@@ -79,9 +75,6 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               ))}
             </div>
           </div>
-          {/* The list and the line a screen reader is told are one part of the panel: the line is
-              out of the flow, and as a part of its own it would cost a gap. */}
-          <div>
           <ul class={css.list}>
             {entries.map((entry) => (
               <li key={entry.id}>
@@ -98,9 +91,13 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
                     kind="link"
                     aria-label={s.progress.forLap(act(entry), entry.started)}
                     onClick={() => {
-                      if (entry.outcome === 'void') progress.countAgain(entry.id);
-                      else progress.setAside(entry.id);
-                      setAside(entry.outcome === 'void' ? null : entry.id);
+                      if (entry.outcome === 'void') {
+                        progress.countAgain(entry.id);
+                        return say(null);
+                      }
+                      // Said on the bar, where eyes can read it, with the way to take it back.
+                      progress.setAside(entry.id);
+                      say({ lead: '', title: s.progress.asideSaid, tail: s.progress.asideAdds, undo: () => progress.countAgain(entry.id) });
                     }}
                   >
                     {act(entry)}
@@ -109,10 +106,6 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               </li>
             ))}
           </ul>
-          <p class="sr" role="status">
-            {said && s.progress.asideDone(said.started)}
-          </p>
-          </div>
         </>
       )}
       {look && (

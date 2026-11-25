@@ -9,7 +9,9 @@ import { Panel } from '../kit/panel.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Race } from '../kit/race.tsx';
 import { Fold, Kept } from '../kit/fold.tsx';
+import { hasMoved, useLift } from '../kit/lift.ts';
 import { say } from '../kit/said.tsx';
+import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
 import { Sheet } from '../kit/sheet.tsx';
 import * as s from '../strings.ts';
@@ -33,7 +35,7 @@ function cell(day: HabitDay, target: number) {
  * The routine. The heading is today's count; each habit is a row with the app's one box to check
  * in, its week as seven days, and its run. A habit opens in the sheet a task opens in.
  */
-export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; habits: Habits; onReminderSet?: () => void }) {
+export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Focus; habits: Habits; onReminderSet?: () => void; app?: boolean }) {
   useTick(focus);
   const list = habits.list.value;
   const archived = habits.archived.value;
@@ -43,7 +45,6 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
   const day = habits.day.value;
 
   const [open, setOpen] = useState<string | null>(null);
-  const [ordering, setOrdering] = useState(false);
   const [shelf, setShelf] = useState<'archived' | 'deleted' | null>(null);
   const opened = list.find((habit) => habit.id === open);
   // The open habit went away, here or on another device: its sheet must not come back by itself.
@@ -81,20 +82,21 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
     say({ lead: s.today.saidRemoved, title: habit.title, tail: s.today.keeps, undo: () => habits.restore(habit.id) });
   };
 
-  const moves = (habit: HabitView, at: number) => (
-    <span class={css.moves} data-moves>
-      <Button kind="link" aria-label={s.today.upLabel(habit.title)} disabled={at === 0} onClick={() => habits.move(habit.id, list[at - 1]!.id)}>
-        {s.today.up}
-      </Button>
-      <Button kind="link" aria-label={s.today.downLabel(habit.title)} disabled={at === list.length - 1} onClick={() => habits.move(habit.id, list[at + 2]?.id ?? null)}>
-        {s.today.down}
-      </Button>
-    </span>
-  );
+  // A habit is put in order by pressing and holding its row.
+  const lists = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState('');
+  useLift(lists, (id, before, at, of) => {
+    habits.move(id, before);
+    setPlaced(s.today.nowAt(list.find((habit) => habit.id === id)?.title ?? '', at, of));
+  });
+
+  // A shelf closes with its last row: there is nothing left on it to look at.
+  const shelved = shelf === 'archived' ? archived : deleted;
+  useEffect(() => {
+    if (shelf && shelved.length === 0) setShelf(null);
+  }, [shelf, shelved.length]);
 
   const most = Math.max(week.now, week.before, 1);
-  const shelved = shelf === 'archived' ? archived : deleted;
-
   return (
     <div class={cx(css.habits, said.room)}>
       <header class={css.head}>
@@ -102,9 +104,12 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
         <h1 id="habits-title" tabIndex={-1}>
           {s.habits.finding(today.done, today.planned, list.length > 0)}
         </h1>
+        <p class="sr" role="status">
+          {placed}
+        </p>
       </header>
 
-      <div class={css.cols}>
+      <div class={css.cols} ref={lists}>
         <Fold gap="md" data-said>
           <QuickAdd key="add" name="habit" label={s.habits.add} hint={s.habits.addHint} go={s.today.addGo} onAdd={(text) => habits.add(text, 127, 1) !== null} />
 
@@ -113,10 +118,10 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
               {s.habits.empty}
             </p>
           ) : (
-            <section key="list" aria-label={ordering ? s.habits.ordering : s.habits.list}>
+            <section key="list" aria-label={s.habits.list}>
               <Fold gap="sm">
-                {list.map((habit, at) => (
-                  <div key={habit.id} class={cx(css.row, ordering && css.ordering)} data-habit={habit.id}>
+                {list.map((habit) => (
+                  <div key={habit.id} class={css.row} data-habit={habit.id} data-lift={habit.id}>
                     <Check checked={habit.today.done} label={s.habits.check(habit.title)} onChange={() => check(habit)} />
                     {/* Everything of the row but its box and its count is one target: it opens the habit. */}
                     <button type="button" class={css.open} onClick={() => setOpen(habit.id)}>
@@ -144,20 +149,19 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
                         ))}
                       </span>
                     </button>
-                    {ordering && <div class={css.end}>{moves(habit, at)}</div>}
                   </div>
                 ))}
               </Fold>
             </section>
           )}
 
-          {(list.length > 1 || archived.length > 0 || deleted.length > 0) && (
+          {list.length > 1 && !hasMoved.value && (
+            <p key="hint" class={css.hint}>
+              {s.habits.holdHint}
+            </p>
+          )}
+          {(archived.length > 0 || deleted.length > 0) && (
           <div key="links" class={links.links}>
-            {list.length > 1 && (
-              <Button kind="link" onClick={() => setOrdering(!ordering)}>
-                {ordering ? s.today.orderKeep : s.today.order}
-              </Button>
-            )}
             {archived.length > 0 && (
               <Button kind="link" onClick={() => setShelf('archived')}>
                 {s.habits.archived(archived.length)}
@@ -195,6 +199,7 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
           onArchive={() => archive(opened)}
           onRemove={() => remove(opened)}
           onReminderSet={onReminderSet}
+          app={app}
         />
       )}
       {shelf && (
@@ -202,15 +207,17 @@ export function HabitsScreen({ focus, habits, onReminderSet }: { focus: Focus; h
           <p class={css.quiet}>{shelf === 'archived' ? s.habits.archivedNote : s.habits.binNote}</p>
           <Fold gap="sm">
             {shelved.map((habit) => (
-              <div key={habit.id} class={cx(css.row, css.plain)}>
+              <div key={habit.id} class={cx(css.row, css.plain, shelf === 'deleted' && css.shelved)}>
                 <div class={css.words}>
                   <span class={css.title}>{habit.title}</span>
                   <span class={css.meta}>{[s.habits.plan(habit.days), habit.deleted === null ? '' : s.today.gone(habit.deleted)].filter(Boolean).join(', ')}</span>
                 </div>
-                <div class={css.end}>
+                <div class={cx(css.end, links.links)}>
                   <Button kind="link" onClick={() => (shelf === 'archived' ? habits.edit(habit.id, { archived: false }) : habits.restore(habit.id))}>
-                    {shelf === 'archived' ? s.habits.bringBack : s.today.restore}
+                    {s.today.restore}
                   </Button>
+                  {/* It cannot be taken back, so it asks twice. */}
+                  {shelf === 'deleted' && <Twice words={s.today.purge} ask={s.today.purgeAsk} onDo={() => habits.purge(habit.id)} />}
                 </div>
               </div>
             ))}

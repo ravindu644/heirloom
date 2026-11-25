@@ -19,16 +19,18 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* A sheet is a dialog on the browser's top layer, and the browser's own sheet gives a modal
+   dialog `user-select: text`, whatever the page under it says: it is said again here, for it. */
+dialog { user-select: none; -webkit-user-select: none; }
 input, textarea, .copies { user-select: text; -webkit-user-select: text; }
+/* DESIGN.md, A keyboard is the phone's business: every field has room above and below when the
+   browser brings it into view, so one being typed in never touches the keyboard or the top of its sheet. */
+input, textarea { scroll-margin-block: var(--space-lg); }
 a { color: inherit; text-decoration: none; }
 button, input { font: inherit; color: inherit; }
 /* A hint in an empty field is muted text, in every field: the browser's own grey is not one of ours. */
 ::placeholder { color: var(--muted); opacity: 1; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
-/* The end a page is given when what was tapped could not otherwise stay under the finger
-   (kit/hold.ts): a clear edge under the screen's or the sheet's content, as tall as is needed. */
-main > div > *, dialog > * { border-bottom: var(--slack, 0px) solid transparent; }
 
 /* For a screen reader only. */
 .sr {

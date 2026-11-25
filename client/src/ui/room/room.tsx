@@ -43,7 +43,8 @@ function Doors({ rooms, onIn, inSheet }: { rooms: Rooms; onIn: (room?: string) =
     if (!typed) return;
     // A code read out over the phone comes with spaces and in small letters.
     const result = await (door === 'make' ? rooms.create(typed) : rooms.join(typed.replace(/\s/g, '').toUpperCase()));
-    setRefused({ make: '', join: '', [door]: why(result) });
+    // "Full" has two causes and each gets its own sentence: this person's five rooms, or that room's eight people.
+    setRefused({ make: '', join: '', [door]: !result.ok && result.error === 'full' && rooms.list.value.length >= 5 ? s.room.tooMany : why(result) });
     if (result.ok) onIn(result.room);
   };
   return (
@@ -76,12 +77,15 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
   const [said, setSaid] = useState('');
   const [copied, setCopied] = useState('');
   const [leaving, setLeaving] = useState(false);
+  const [renamed, setRenamed] = useState(false);
   const hours = Math.round(room.target_ms / HOUR);
   const change = async (fields: Parameters<Rooms['update']>[1]) => setSaid(why(await rooms.update(room.id, fields)));
   const copy = async () => setCopied((await copyText(room.code)) ? s.room.copied : s.room.copyFailed);
 
   return (
     <Sheet grows title={s.room.sheet} close={s.task.close} onClose={onClose}>
+      {/* Nothing here is this person's alone. */}
+      <p class={css.quiet}>{s.room.forAll}</p>
       <section class={form.group} aria-label={s.room.codeTitle}>
         <h3 class={css.legend}>{s.room.codeTitle}</h3>
         {/* Two groups of four: easier to read out, and to hear. */}
@@ -102,11 +106,15 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
         onSubmit={(event) => {
           event.preventDefault();
           const name = (event.currentTarget.elements.namedItem('name') as HTMLInputElement).value.trim();
-          if (name && name !== room.name) void change({ name });
+          // A rename is said: it changed the room's name for everyone in it.
+          if (name && name !== room.name) void rooms.update(room.id, { name }).then((result) => (result.ok ? (setSaid(''), setRenamed(true)) : (setRenamed(false), setSaid(why(result)))));
         }}
       >
         <Field label={s.room.name} name="name" maxLength={40} required autocomplete="off" defaultValue={room.name} />
-        <Button type="submit">{s.room.renameGo}</Button>
+        <div class={css.go}>
+          <Button type="submit">{s.room.renameGo}</Button>
+          <Fold role="status">{renamed && <p class={cx(css.quiet, css.told)}>{s.room.renamed}</p>}</Fold>
+        </div>
       </form>
 
       <fieldset class={form.group}>

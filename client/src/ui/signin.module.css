@@ -14,7 +14,6 @@
 .intro { color: var(--muted); }
 /* The error's space to the buttons is its own, so it opens and closes with it. */
 .error { padding-bottom: var(--space-md); }
-.form input { scroll-margin: var(--space-md) 0 calc(2 * var(--layout-touch) + var(--space-lg)); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 /* On a phone the two buttons fill the row, as every button row does. */
 .actions > * { flex: 1; }

@@ -1,4 +1,4 @@
-import { effect } from '@preact/signals-core';
+import { effect, signal } from '@preact/signals-core';
 import { render } from 'preact';
 import { onFront, startPlatform } from './platform/index.ts';
 import { serverChoice, startApp } from './sync/browser.ts';
@@ -23,9 +23,14 @@ async function start() {
   // The phone's WebView says it is visible right through screen off, so the browser's own
   // "visible again" never fires there. The platform knows when the app is really in front again:
   // reconnect then, and let everything that depends on the day look at the clock.
+  // Whether the device lets a bell through at all. Looked at again whenever the app comes to
+  // the front: the way to change it is in the device's own settings, outside the app.
+  const ringBlocked = signal(false);
+  let lookAtBell = () => {};
   onFront(() => {
     engine.wake();
     for (const part of [app.today, app.progress, app.habits]) part.wake();
+    lookAtBell();
   });
   // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
   // In a browser it also asks the server to push at a bell, for a tab that is closed or out of
@@ -49,6 +54,10 @@ async function start() {
       },
     },
   );
+  lookAtBell = () => void notifier.canRing().then((can) => (ringBlocked.value = !can));
+  lookAtBell();
+  // Asking is the moment it can turn to refused, so the answer is looked at straight after.
+  const allow = () => void notifier.allow().then(lookAtBell);
   // "Ring here" is this device's own switch; and the notifier is told who is signed in, so a
   // sign out stops this browser being pushed to.
   effect(() => notifier.ringHere(settings.ringHere.value));
@@ -97,13 +106,13 @@ async function start() {
   // it is for. Nowhere earlier: a prompt on the sign-in screen would be a stranger asking.
   const asking: Focus = {
     ...focus,
-    start: (task) => (void notifier.allow(), focus.start(task)),
-    skipBreak: (task) => (void notifier.allow(), focus.skipBreak(task)),
+    start: (task) => (allow(), focus.start(task)),
+    skipBreak: (task) => (allow(), focus.skipBreak(task)),
   };
 
   // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
   // The phone app's WebView is not trusted to save a file; Settings sends that to the browser.
-  render(<App {...app} focus={asking} onReminderSet={() => void notifier.allow()} canSave={!APP} server={server} />, root);
+  render(<App {...app} focus={asking} onReminderSet={allow} canSave={!APP} server={server} ringBlocked={ringBlocked} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

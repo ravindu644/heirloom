@@ -25,5 +25,14 @@ export function keep<V>(was: Part<V>[], now: Part<V>[]): Part<V>[] {
   return next;
 }
 
+// A list just put in order by hand (kit/lift.ts) already stands as it will be drawn: for that
+// one redraw nothing is kept, nothing arrives and nothing glides a second time.
+let byHand = false;
+export const placedByHand = () => {
+  byHand = true;
+  requestAnimationFrame(() => (byHand = false));
+};
+export const wasPlacedByHand = () => byHand;
+
 /** The keys that stand in both lists and are going in neither, in the first one's order: two different answers mean parts changed places. */
 export const staying = <V>(list: Part<V>[], among: Part<V>[]) => list.filter((part) => !part.going && among.some((other) => other.key === part.key && !other.going)).map((part) => part.key);

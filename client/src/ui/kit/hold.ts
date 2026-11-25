@@ -10,8 +10,6 @@ import { motion } from './ms.ts';
  * the browser bring into view themselves.
  */
 export function holdTaps() {
-  // A new screen starts with the page it has, and no more.
-  addEventListener('hashchange', () => document.querySelector('main')?.style.removeProperty('--slack'));
   addEventListener(
     'click',
     (event) => {
@@ -28,20 +26,17 @@ export function holdTaps() {
       // listeners, and the element tapped, alive for the life of the page.
       const ended = new AbortController();
       const free = () => ended.abort();
-      for (const type of ['wheel', 'touchmove', 'resize']) addEventListener(type, free, { passive: true, signal: ended.signal });
+      // So is anything pressed next, a key or a pointer: a new press is a new act (Page Down, an
+      // arrow, the scrollbar), and the hold of the last one must not pull its scroll back.
+      for (const type of ['wheel', 'touchmove', 'resize', 'keydown', 'pointerdown']) addEventListener(type, free, { passive: true, capture: true, signal: ended.signal });
       const off = () => tapped.getBoundingClientRect().top - top;
       const hold = () => {
         if (ended.signal.aborted) return;
         if (!tapped.isConnected) return free();
+        // Held by scrolling and by nothing else: the browser stops the scroll at the page's own
+        // ends, so a page is never scrolled past its content and one that fits is never scrolled.
+        // There the control moves with what opens or closes beside it, in time.
         scroller.scrollTop += off();
-        // Still too low: the page has come to its end and has nothing left to scroll. It is given
-        // that much more of an end. A row that moves up the list from the last screenful would
-        // otherwise push everything under the finger down by its own height.
-        const short = off();
-        if (short >= 1) {
-          slacken(scroller, short);
-          scroller.scrollTop += short;
-        }
         const now = performance.now();
         if (now < from + sheet || (now < from + 20 * sheet && scroller.getAnimations({ subtree: true }).length > 0)) requestAnimationFrame(hold);
         else free();
@@ -49,23 +44,5 @@ export function holdTaps() {
       requestAnimationFrame(hold);
     },
     true,
-  );
-}
-
-// The extra end a page was given (base.css draws it from `--slack`). It is taken back as the
-// person scrolls away from it, by as much as is out of sight below, so nothing is seen to go.
-const slack = (scroller: HTMLElement) => parseFloat(scroller.style.getPropertyValue('--slack')) || 0;
-const trimmed = new WeakSet<HTMLElement>();
-function slacken(scroller: HTMLElement, more: number) {
-  scroller.style.setProperty('--slack', `${slack(scroller) + more}px`);
-  if (trimmed.has(scroller)) return;
-  trimmed.add(scroller);
-  scroller.addEventListener(
-    'scroll',
-    () => {
-      const below = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-      if (below >= 1 && slack(scroller) > 0) scroller.style.setProperty('--slack', `${Math.max(0, slack(scroller) - below)}px`);
-    },
-    { passive: true },
   );
 }

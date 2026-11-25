@@ -10,6 +10,9 @@ interface Props {
   more: string;
   onLess: () => void;
   onMore: () => void;
+  /** The value is at its top, or at its floor: that button is shown as off. With `typed` this is read from its bounds. */
+  top?: boolean;
+  floor?: boolean;
   /** A figure large enough to be typed: its value, its bounds, its name for a screen reader, and what a typed value does. */
   typed?: { value: number; min: number; max: number; label: string; onSet: (value: number) => void };
 }
@@ -20,7 +23,7 @@ interface Props {
  * field is left or Enter is pressed, and a value that is not a whole number in its bounds is put
  * back. The caller names what is counted in the section it sits in.
  */
-export function Stepper({ text, less, more, onLess, onMore, typed }: Props) {
+export function Stepper({ text, less, more, onLess, onMore, typed, top = typed ? typed.value >= typed.max : false, floor = typed ? typed.value <= typed.min : false }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
   // A value that changed elsewhere (a button here, another device) replaces what was half typed.
   useEffect(() => setDraft(null), [typed?.value]);
@@ -34,7 +37,7 @@ export function Stepper({ text, less, more, onLess, onMore, typed }: Props) {
   return (
     <div class={css.stepper}>
       {/* The signs are drawings, like the tick in a box: the labels carry the words. */}
-      <Button aria-label={less} onClick={onLess}>
+      <Button aria-label={less} disabled={floor} onClick={onLess}>
         −
       </Button>
       {typed ? (
@@ -56,7 +59,7 @@ export function Stepper({ text, less, more, onLess, onMore, typed }: Props) {
           <span key={text}>{text}</span>
         </output>
       )}
-      <Button aria-label={more} onClick={onMore}>
+      <Button aria-label={more} disabled={top} onClick={onMore}>
         +
       </Button>
       {typed && <span>{text}</span>}

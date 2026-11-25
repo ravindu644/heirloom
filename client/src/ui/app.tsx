@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 // Imported for what it does: it teaches Preact to redraw a component when a signal it read changes.
 import '@preact/signals';
+import type { ReadonlySignal } from '@preact/signals';
 import './tokens.css';
 import './base.css';
 import type { Admins } from '../sync/admins.ts';
@@ -85,9 +86,11 @@ interface Props {
   admins: Admins;
   /** The phone app's server. Left out in a browser, where the page's own address is the server. */
   server?: ServerChoice;
+  /** True while the device will not let heirloom notify: Settings says so under the bell. */
+  ringBlocked?: ReadonlySignal<boolean>;
 }
 
-export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, server, onReminderSet, canSave }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, server, onReminderSet, canSave, ringBlocked }: Props) {
   const screen = useScreen();
   const invite = useInvite();
   const account = engine.account.value;
@@ -127,16 +130,16 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
       {screen === 'focus' ? (
         <FocusScreen engine={engine} focus={focus} today={today} rooms={rooms} settings={settings} />
       ) : screen === 'today' ? (
-        <TodayScreen focus={focus} today={today} settings={settings} app={canSave === false} onReminderSet={onReminderSet} />
+        <TodayScreen engine={engine} focus={focus} today={today} settings={settings} app={canSave === false} onReminderSet={onReminderSet} />
       ) : screen === 'progress' ? (
         <ProgressScreen focus={focus} progress={progress} />
       ) : screen === 'habits' ? (
-        <HabitsScreen focus={focus} habits={habits} onReminderSet={onReminderSet} />
+        <HabitsScreen focus={focus} habits={habits} onReminderSet={onReminderSet} app={canSave === false} />
       ) : screen === 'room' ? (
         <RoomScreen engine={engine} rooms={rooms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
-        <Settings engine={engine} settings={settings} invites={invites} admins={admins} server={server} canSave={canSave} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} invites={invites} admins={admins} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

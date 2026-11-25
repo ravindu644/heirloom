@@ -1,3 +1,4 @@
+import type { ReadonlySignal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Admins } from '../sync/admins.ts';
 import type { Engine } from '../sync/engine.ts';
@@ -20,7 +21,15 @@ import * as s from './strings.ts';
 
 const MIN = 60000;
 // The schema allows a lap of a whole day. These are where a stepper stops being the way to get there.
-const LENGTH_MAX = { work_ms: 180, short_ms: 60, long_ms: 60 };
+// Whether the app has moved from one screen to another since it was opened: then there is a step of its own to go back to.
+// Leaving an address with no screen named in it (the app's own first placing) is not such a move.
+let moved = false;
+addEventListener('hashchange', (event) => void (new URL(event.oldURL).hash && (moved = true)));
+const cameFrom = () => moved;
+
+// The longest a lap may be planned, in minutes: with its seconds it still fits the four digits of the clock. Focus offers no more minutes past it.
+export const LAP_MAX_MIN = 99;
+const LENGTH_MAX = { work_ms: LAP_MAX_MIN, short_ms: 60, long_ms: 60 };
 // More laps than this in a day target and its bar would be dust.
 const TARGET_MAX = 24;
 
@@ -37,10 +46,12 @@ interface Props {
   /** The phone app's server; left out in a browser. */
   server?: ServerChoice;
   canSave?: boolean;
+  /** True while the device will not let heirloom notify: the bell's switch then says why nothing would ring. */
+  ringBlocked?: ReadonlySignal<boolean>;
   onSignIn: () => void;
 }
 
-export function Settings({ engine, settings, invites, admins, server: choice, canSave = true, onSignIn }: Props) {
+export function Settings({ engine, settings, invites, admins, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -68,7 +79,9 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
   const refused = sync === 'signed-out';
 
   const length = (field: keyof typeof LENGTH_MAX, name: string) => {
-    const minutes = Math.round(all[field] / MIN);
+    // A length kept by an earlier build may be over today's top: it is shown and stepped from
+    // the top, and nothing is written until the person changes it.
+    const minutes = Math.min(LENGTH_MAX[field], Math.round(all[field] / MIN));
     const to = (next: number) => settings.set({ [field]: Math.min(LENGTH_MAX[field], Math.max(1, next)) * MIN } as Partial<SettingsView>);
     return (
       <fieldset class={form.group}>
@@ -136,6 +149,7 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
         {length('work_ms', s.settings.lap)}
         {length('short_ms', s.settings.short)}
         {length('long_ms', s.settings.long)}
+        <p class={css.note}>{s.settings.lengthsNote}</p>
       </Panel>
 
       <Panel title={s.settings.target}>
@@ -145,7 +159,10 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
           more={s.settings.targetMore}
           onLess={() => settings.set({ day_target: Math.max(0, all.day_target - 1) })}
           onMore={() => settings.set({ day_target: Math.min(TARGET_MAX, all.day_target + 1) })}
+          top={all.day_target >= TARGET_MAX}
+          floor={all.day_target <= 0}
         />
+        <p class={css.note}>{s.settings.targetNote}</p>
       </Panel>
 
       <Panel title={s.settings.auto}>
@@ -155,7 +172,7 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
       </Panel>
 
       <Panel title={s.settings.bell}>
-        <Switch label={s.settings.ringHere(s.device())} note={s.settings.ringHereNote(s.device())} on={settings.ringHere.value} onChange={(ring) => settings.setRingHere(ring)} />
+        <Switch label={s.settings.ringHere(s.device())} note={ringBlocked?.value ? s.settings.ringBlocked : s.settings.ringHereNote} on={settings.ringHere.value} onChange={(ring) => settings.setRingHere(ring)} />
       </Panel>
 
       <Panel title={s.settings.finish}>
@@ -196,7 +213,8 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
     <div class={css.settings}>
       <header>
         <h1>{s.settings.title}</h1>
-        <Button kind="link" class={links.end} onClick={() => history.back()}>
+        {/* Back is a step back in the app. Opened straight on Settings (a link, a reload) there is no such step: it goes to Focus. */}
+        <Button kind="link" class={links.end} onClick={() => (cameFrom() ? history.back() : location.replace('#/focus'))}>
           {s.settings.back}
         </Button>
       </header>

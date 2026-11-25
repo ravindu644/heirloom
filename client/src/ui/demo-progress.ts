@@ -83,6 +83,9 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     return out;
   };
 
+  // A day is kept by a lap that rang.
+  const kept = () => new Set(Object.entries(days()).filter(([, day]) => day.laps > 0).map(([day]) => day));
+
   // Today as it ran. A lap set aside, a lap stopped at twelve minutes, and the phone and the
   // laptop running at once after lunch.
   const lap = (id: string, h: number, m: number, more: Partial<TimelineEntry> = {}): TimelineEntry => ({
@@ -181,8 +184,8 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     }),
     today: signal(DAY),
     note: (day) => (day === DAY ? note.value : day === '2026-11-17' ? 'Arrays decay to pointers. Wrote that on my hand.' : ''),
-    streak: computed(() => streakView(days(), DAY)),
-    since: computed(() => since(days(), DAY)),
+    streak: computed(() => streakView(kept(), DAY)),
+    since: computed(() => since(days(), kept(), DAY)),
     bests: computed(() => bests(days())),
     estimates: signal(kind === 'weeks' || kind === 'year' ? guesses : NO_GUESSES),
     timeline,

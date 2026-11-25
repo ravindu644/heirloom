@@ -1,14 +1,15 @@
 import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { UNDO_MS } from '../../sync/focus.ts';
-import { COLORS } from '../../sync/today.ts';
+import { COLORS, ESTIMATE_MAX, PROJECT_NAME_MAX } from '../../sync/today.ts';
 import type { ProjectColor, SubtaskView, TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Check } from '../kit/check.tsx';
 import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import { Fold } from '../kit/fold.tsx';
-import { hexOf } from '../kit/hex.ts';
+import { hueHex, toneOf } from '../kit/hue.ts';
+import { Picker } from '../kit/picker.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Square } from '../kit/square.tsx';
 import { Sheet } from '../kit/sheet.tsx';
@@ -21,7 +22,6 @@ import css from './task-sheet.module.css';
 
 // PRODUCT: over this many laps a task wants breaking down.
 const NUDGE_OVER = 7;
-const ESTIMATE_MAX = 99;
 
 function Subtask({ sub, today, onRemove }: { sub: SubtaskView; today: Today; onRemove: () => void }) {
   // An empty title is not saved: the last one that said something stays.
@@ -52,13 +52,43 @@ interface Props {
 
 /** One task, open. Every edit is saved as it is made: there is no Save, and closing loses nothing. */
 export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false, onReminderSet }: Props) {
-  const [making, setMaking] = useState(false);
+  // The project form: for a new one, or filled in with the chosen one, where each change is kept as it is made.
+  const [making, setMaking] = useState<'new' | 'edit' | false>(false);
+  const editing = making === 'edit' ? task.project : null;
+  // The form is open for a new project, or for the chosen one while there is one: a project
+  // deleted or archived elsewhere answers the form from outside, and it closes.
+  const formOpen = making === 'new' || !!editing;
+  useEffect(() => {
+    if (making === 'edit' && !task.project) close();
+  }, [making, task.project]);
+  const projectName = useTyped(task.project?.name ?? '', (text) => task.project && text.trim() && today.editProject(task.project.id, { name: text }));
+  // A colour is kept at once when the project is being edited; a new one keeps it for its Add.
+  const paint = (next: ProjectColor, keep = true) => {
+    setColor(next);
+    if (editing && keep) today.editProject(editing.id, { color: next });
+  };
+  // A project deleted here can be had back for as long as any Undo lasts. Said in the sheet:
+  // the bar stands under an open sheet, where it cannot be read.
+  const [gone, setGone] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!gone) return;
+    const timer = setTimeout(() => setGone(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [gone]);
   const [color, setColor] = useState<ProjectColor>('you');
+  // The app's own picker, open under the squares, and where its two sliders stand.
+  const [picking, setPicking] = useState(false);
+  const [tone, setTone] = useState({ hue: 210, depth: 50 });
+  // What opened closes when it is answered: the form goes when a project is chosen some other
+  // way, and the picker goes with it.
+  const close = () => {
+    setMaking(false);
+    setPicking(false);
+  };
   const [chosen, setChosen] = useState(task.repeat?.every === 'week');
   const estimate = task.estimate ?? 0;
   const edit = today.edit.bind(today, task.id);
   const title = useTyped(task.title, (text) => text.trim() && edit({ title: text }));
-  const when = useTyped(task.when ?? '', (text) => edit({ when: text.trim() ? text : null }));
   const leave = (then: () => void) => () => {
     then();
     onClose();
@@ -74,17 +104,16 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
 
   const addProject = (event: TargetedSubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Enter in the form of a project being edited only closes it: everything is kept already.
+    if (editing) return close();
     const name = event.currentTarget.elements.namedItem('project') as HTMLInputElement;
     const id = today.addProject(name.value.trim(), color);
     if (!id) return;
     edit({ project: id });
-    setMaking(false);
+    close();
   };
   const days = task.repeat?.every === 'week' ? task.repeat.days : 0;
   const picked = color.startsWith('#');
-  // The device's picker opens on the colour chosen so far. Left to itself it opens on black, and
-  // black confirmed there is no change, so no event: black could not be picked on the first try.
-  const named = picked || !making ? undefined : hexOf(color);
 
   return (
     <Sheet grows title={s.task.sheet} close={s.task.close} onClose={onClose}>
@@ -94,38 +123,127 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
         <legend>{s.task.project}</legend>
         <Fold gap="sm">
           <div key="choices" class={form.choices}>
-            <button type="button" class={form.choice} aria-pressed={!task.project} onClick={() => edit({ project: null })}>
+            <button type="button" class={form.choice} aria-pressed={!task.project} onClick={() => (edit({ project: null }), close())}>
               {s.task.noProject}
             </button>
             {today.projects.value.map((project) => (
-              <button key={project.id} type="button" class={form.choice} aria-pressed={task.project?.id === project.id} onClick={() => edit({ project: project.id })}>
+              <button key={project.id} type="button" class={form.choice} aria-pressed={task.project?.id === project.id} onClick={() => (edit({ project: project.id }), close())}>
                 <Square color={project.color} />
                 {project.name}
               </button>
             ))}
-            {!making && (
-              <Button kind="link" onClick={() => setMaking(true)}>
+            {!formOpen && (
+              <Button kind="link" onClick={() => setMaking('new')}>
                 {s.task.newProject}
               </Button>
             )}
+            {!formOpen && task.project && (
+              <Button
+                kind="link"
+                onClick={() => {
+                  setColor(task.project!.color);
+                  setMaking('edit');
+                }}
+              >
+                {s.task.editProject}
+              </Button>
+            )}
           </div>
-          {making && (
+          {gone && (
+            <p key="gone" class={css.removed} role="status">
+              {s.today.saidProjectGone} {gone.name}. {s.today.projectKeeps}
+              <Button
+                kind="link"
+                onClick={() => {
+                  today.restoreProject(gone.id);
+                  setGone(null);
+                }}
+              >
+                {s.today.undo}
+              </Button>
+            </p>
+          )}
+          {formOpen && (
             <form key="making" class={css.making} onSubmit={addProject}>
-              <Field label={s.task.projectName} name="project" required autocomplete="off" />
-              {/* Twelve squares with names, and a thirteenth that opens the device's own picker. */}
-              <div class={css.squares} role="radiogroup" aria-label={s.task.projectSquare}>
-                {COLORS.map((name) => (
-                  <button key={name} type="button" role="radio" aria-checked={color === name} aria-label={s.task.colors[name]} onClick={() => setColor(name)}>
-                    <Square color={name} />
+              <Fold gap="md">
+                {editing ? (
+                  <Field key="name" label={s.task.projectName} maxLength={PROJECT_NAME_MAX} autocomplete="off" {...projectName} />
+                ) : (
+                  <Field key="name" label={s.task.projectName} name="project" required maxLength={PROJECT_NAME_MAX} autocomplete="off" />
+                )}
+                {/* Twelve squares with names and a thirteenth, "Pick", always last and never moving: it
+                    opens the app's own picker under the squares and then carries the picked colour itself. */}
+                <div key="squares" class={css.squares} role="radiogroup" aria-label={s.task.projectSquare}>
+                  {COLORS.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      role="radio"
+                      aria-checked={color === name}
+                      aria-label={s.task.colors[name]}
+                      onClick={() => {
+                        // A named colour answers what the picker was asking: it closes.
+                        paint(name);
+                        setPicking(false);
+                      }}
+                    >
+                      <Square color={name} />
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={picked}
+                    aria-expanded={picking}
+                    class={css.pick}
+                    onClick={() => {
+                      // Opening only opens. A colour already picked puts the sliders where it
+                      // is; nothing is chosen or written until a slider moves.
+                      if (picked) setTone(toneOf(color));
+                      setPicking(true);
+                    }}
+                  >
+                    {picked && <Square color={color} />}
+                    {s.task.pick}
                   </button>
-                ))}
-                <label class={cx(css.other, picked && css.on)}>
-                  <input type="color" name="color" aria-label={picked ? s.task.colorPicked : s.task.colorOther} value={picked ? color : named} onInput={(event) => setColor(event.currentTarget.value as ProjectColor)} />
-                  {picked && <Square color={color} />}
-                  {s.task.colorOther}
-                </label>
-              </div>
-              <Button type="submit">{s.task.addProject}</Button>
+                </div>
+                {picking && (
+                  <Picker
+                    key="picker"
+                    hue={tone.hue}
+                    depth={tone.depth}
+                    hueLabel={s.task.hue}
+                    depthLabel={s.task.depth}
+                    onPick={(hue, depth) => {
+                      // Shown as the finger moves, and written when it lifts.
+                      setTone({ hue, depth });
+                      paint(hueHex(hue, depth) as ProjectColor, false);
+                    }}
+                    onDone={(hue, depth) => paint(hueHex(hue, depth) as ProjectColor)}
+                  />
+                )}
+                {editing ? (
+                  <div key="ends" class={css.edits}>
+                    {/* Every change is already kept: this only closes. */}
+                    <Button onClick={close}>{s.task.editDone}</Button>
+                    <Button
+                      kind="link"
+                      class={links.end}
+                      onClick={() => {
+                        today.removeProject(editing.id);
+                        setGone({ id: editing.id, name: editing.name });
+                        close();
+                      }}
+                    >
+                      {s.task.deleteProject}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button key="add" type="submit">
+                    {s.task.addProject}
+                  </Button>
+                )}
+              </Fold>
             </form>
           )}
         </Fold>
@@ -141,6 +259,8 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
               more={s.task.more}
               onLess={() => edit({ estimate: estimate > 1 ? estimate - 1 : null })}
               onMore={() => edit({ estimate: Math.min(ESTIMATE_MAX, estimate + 1) })}
+              top={estimate >= ESTIMATE_MAX}
+              floor={estimate === 0}
             />
             <span>{s.task.count(task.laps, task.estimate)}</span>
           </div>
@@ -180,7 +300,6 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
           )}
         </p>
       </div>
-      <Field label={s.task.when} placeholder={s.task.whenHint} {...when} />
 
       <fieldset class={form.group}>
         <legend>{s.task.repeat}</legend>
@@ -208,8 +327,14 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
           >
             {s.task.everyDay}
           </button>
-          {/* Choosing days is not a rule until a day is chosen, so nothing is saved by this tap alone. */}
-          <button type="button" class={form.choice} aria-pressed={chosen && task.repeat?.every !== 'day'} onClick={() => setChosen(true)}>
+          {/* Chosen days with no day would be no rule at all, so this tap picks today's weekday at once: see its handler. */}
+          <button type="button" class={form.choice} aria-pressed={chosen && task.repeat?.every !== 'day'}
+            onClick={() => {
+              // Chosen days with no day chosen is no rule at all: today's weekday is picked at once.
+              setChosen(true);
+              if (task.repeat?.every !== 'week') edit({ repeat: { every: 'week', days: 1 << ((new Date(`${today.day.value}T00:00:00Z`).getUTCDay() + 6) % 7) } });
+            }}
+          >
             {s.task.someDays}
           </button>
         </div>
@@ -266,11 +391,15 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, app = false,
         </Fold>
       </fieldset>
 
-      <div class={form.ends}>
-        <Button onClick={leave(onDone)}>{task.done ? s.task.notDone : s.task.done}</Button>
-        <Button kind="quiet" onClick={leave(onRemove)}>
-          {s.task.delete}
-        </Button>
+      {/* There is no Save to look for. */}
+      <div class={form.group}>
+        <p class={css.saved}>{s.savedAsYouGo}</p>
+        <div class={form.ends}>
+          <Button onClick={leave(onDone)}>{task.done ? s.task.notDone : s.task.done}</Button>
+          <Button kind="quiet" onClick={leave(onRemove)}>
+            {s.task.delete}
+          </Button>
+        </div>
       </div>
     </Sheet>
   );

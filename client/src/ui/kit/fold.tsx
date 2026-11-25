@@ -4,7 +4,7 @@ import { useContext, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { cx } from './cx.ts';
 import css from './fold.module.css';
 import { motion } from './ms.ts';
-import { keep, staying } from './parts.ts';
+import { keep, staying, wasPlacedByHand } from './parts.ts';
 import type { Part as Kind } from './parts.ts';
 
 const Going = createContext(false);
@@ -46,19 +46,21 @@ function Parts({ children, fold, list, gap, class: extra, ...rest }: Omit<HTMLAt
   const [, redraw] = useState(0);
 
   const was = parts.current;
+  // Drawn as it is, with nothing in time: the page asks for no motion, or a hand has just set the rows where they go.
+  const plain = still() || wasPlacedByHand();
   const kinds = new Map<unknown, number>();
   const now = elements(children).map((vnode): Part => {
     const nth = kinds.get(vnode.type) ?? 0;
     kinds.set(vnode.type, nth + 1);
     const key = vnode.key ?? place(vnode.type, nth);
     const old = was.find((part) => part.key === key);
-    return { key, vnode, fresh: old && !old.going ? old.fresh : drawn.current, going: false, life: (old?.life ?? 0) + (old?.going ? 1 : 0) };
+    return { key, vnode, fresh: old && !old.going ? old.fresh : drawn.current && !plain, going: false, life: (old?.life ?? 0) + (old?.going ? 1 : 0) };
   });
   // What was here and is not given any more stays where it stood, until it has gone.
-  const next = still() ? now : keep(was, now);
+  const next = plain ? now : keep(was, now);
   // The same parts in another order: where each stood is read before the page is redrawn.
   const before = staying(was, next);
-  const moved = fold && !still() && staying(next, was).some((key, at) => key !== before[at]);
+  const moved = fold && !plain && staying(next, was).some((key, at) => key !== before[at]);
   const tops = moved ? new Map(before.map((key) => [key, nodes.current.get(key)?.getBoundingClientRect().top])) : null;
   parts.current = next;
 

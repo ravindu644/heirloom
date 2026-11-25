@@ -1,5 +1,7 @@
 .stepper { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 .stepper button { min-width: var(--layout-touch); padding: 0; }
+/* At its top or its floor a key is off: the quiet fill with no line, in both themes, and its sign muted. Every number a person can raise has a top. */
+.stepper button:disabled { border-color: transparent; background: var(--key-quiet); color: var(--muted); }
 .stepper output {
   min-width: 9ch;
   font: var(--type-figure-md);

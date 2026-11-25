@@ -105,6 +105,7 @@ export function demoHabits(seed: DemoHabit[]): Habits {
     undo: (id) => bump(id, -1),
     remove: (id) => change(id, { deleted: true }),
     restore: (id) => change(id, { deleted: false }),
+    purge: (id) => void (all.value = all.value.filter((habit) => habit.id !== id)),
     move(id, before) {
       const moving = all.value.find((habit) => habit.id === id)!;
       const rest = all.value.filter((habit) => habit.id !== id);

@@ -20,10 +20,14 @@ interface Props {
   checkLabel?: string;
   onDone?: (done: boolean) => void;
   onOpen?: () => void;
+  /** Two links or more for the row ("Restore", "Delete for good"): under the words where the row is narrow, at its end where there is room, so the title keeps the width. */
+  links?: ComponentChildren;
+  /** It can be put in order by pressing and holding (kit/lift.ts): the row is marked for it. */
+  lift?: boolean;
 }
 
 /** A task as a row: the box, the title, its project and laps, and the count. The words open it. */
-export function TaskRow({ task, of, note, next, end, checkLabel, onDone, onOpen }: Props) {
+export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, onOpen, lift }: Props) {
   // The laps as squares, with the count they picture. They sit at the row's right, apart from the
   // project's square: side by side the two would read as one more lap.
   const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />;
@@ -45,7 +49,9 @@ export function TaskRow({ task, of, note, next, end, checkLabel, onDone, onOpen 
     </>
   );
   return (
-    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed)}>
+    // The box round the row is what is measured, so the row itself can be laid out by its width: it wraps where it is very narrow.
+    <div class={css.measure}>
+    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked)} data-lift={lift ? task.id : undefined}>
       {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
       {onOpen ? (
         <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>
@@ -58,6 +64,8 @@ export function TaskRow({ task, of, note, next, end, checkLabel, onDone, onOpen 
       <div class={css.end}>
         {laps}
         {end}
+      </div>
+      {links && <div class={css.links}>{links}</div>}
       </div>
     </div>
   );

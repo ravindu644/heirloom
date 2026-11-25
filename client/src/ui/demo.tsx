@@ -27,7 +27,7 @@ import type { Invites } from '../sync/invites.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import { ServerStep } from './server.tsx';
 import { FirstRun } from './welcome.tsx';
-import { hexOf } from './kit/hex.ts';
+import { hueHex } from './kit/hue.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -39,7 +39,7 @@ interface Scene {
   /** The time on the wall, on Tuesday 24 November 2026. */
   at?: [hour: number, minute: number];
   /** The timer: the phase, which lap of the set (0 to 3), time left, and whether it is paused. `left` of 0 is over. */
-  run?: { phase: Phase; lap: number; left: number; paused?: boolean; task?: string };
+  run?: { phase: Phase; lap: number; left: number; paused?: boolean; task?: string; planned?: number };
   /** Idle, with this lap next. */
   next?: number;
   /** Focus today before the run in progress, and laps that rang. */
@@ -72,6 +72,8 @@ interface Scene {
   cheered?: string[];
   /** As the phone app is: a file cannot be saved from here. */
   phoneApp?: boolean;
+  /** The device will not let heirloom notify. */
+  ringBlocked?: boolean;
   /** The phone app's server step, alone, as it is before there is any engine. */
   serverStep?: DemoServer;
   /** The phone app with no server yet: the welcome, then the server step. */
@@ -99,9 +101,12 @@ const lap2 = { phase: 'work', lap: 1, left: 18 * MIN + 42000 } as const;
 const tuesday: [number, number] = [150 * MIN, 200 * MIN];
 
 // The day of the Today mockup: five laps done, ten planned and left, last Tuesday at 3h 20m.
-// A colour a person picked has no name, only its value. The demo takes the value of a pale token,
-// so no colour is written here and the hair line around a picked square has something to do.
-const PICKED = hexOf('heat-1') as ProjectColor;
+// A colour a person picked has no name, only its value. The demo picks a pale one with the app's
+// own picker function, so no colour is written here and the hair line round a picked square has something to do.
+const PICKED = hueHex(8, 12) as ProjectColor;
+
+// Sixty characters, every word short enough to break between.
+const SIXTY = 'Write up the lab report on sorting and send it to the group';
 
 const TASKS: DemoTask[] = [
   { id: 'kr', title: 'K&R 5.1 to 5.5: pointers and arrays', project: 'c', estimate: 4, squares: [1, 1], due: DAY },
@@ -115,7 +120,7 @@ const day = (tasks: DemoTask[] = TASKS, more: Partial<DemoDay> = {}): DemoDay =>
 const onKr = { ...lap2, task: 'kr' };
 const idleAt2: Scene = { about: '', next: 1, you: 125 * MIN, laps: 5, ghost: tuesday };
 const swap = (id: string, fields: Partial<DemoTask>) => TASKS.map((task) => (task.id === id ? { ...task, ...fields } : task));
-const READING: DemoTask = { id: 'read', title: 'Read one chapter of OSTEP', estimate: 1, due: DAY, when: 'before bed', repeat: { every: 'day' } };
+const READING: DemoTask = { id: 'read', title: 'Read one chapter of OSTEP', estimate: 1, due: DAY, repeat: { every: 'day' } };
 
 const TODAY: Record<string, Scene> = {
   'today-empty': { about: 'Today on a first day: nothing yet', next: 0, at: [9, 5], day: { tasks: [] } },
@@ -129,7 +134,7 @@ const TODAY: Record<string, Scene> = {
   'today-long': {
     ...idleAt2,
     about: 'The longest title and the longest project name',
-    day: day(swap('kr', { title: LONG_TITLE, project: 'long', when: 'after the lecture, if the lab is free' }), {
+    day: day(swap('kr', { title: LONG_TITLE, project: 'long' }), {
       projects: [...PROJECTS, { id: 'long', name: 'Operating systems: three easy pieces, the reading group', color: 'heat-2' }],
     }),
   },
@@ -148,14 +153,44 @@ const TODAY: Record<string, Scene> = {
       { id: 'app', title: 'Next.js: data fetching', project: 'next', estimate: 3, due: '2026-11-27', repeat: { every: 'week', days: 0b0010100 } },
     ]),
   },
-  'today-ordering': { ...idleAt2, about: 'Changing the order', day: day(), tap: 'Change the order' },
   'today-target': { ...idleAt2, about: 'Changing the day target', day: day(), tap: 'Change' },
   'today-untargeted': { ...idleAt2, about: 'The target removed on another device while its editor is open here: the way to set one is back', day: day(), tap: ['Change', 'demo:untarget'] },
+  'today-top': {
+    ...idleAt2,
+    about: 'Every row with its top in it: an estimate of 8, a task far past its estimate, a 60 character title, a target of 24',
+    day: day(
+      [
+        { id: 'top1', title: SIXTY, project: 'c', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1], due: DAY, time: '17:55' },
+        { id: 'top2', title: 'Q/A session', project: 'react', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 1], due: DAY, time: '09:00' },
+        { id: 'top3', title: SIXTY, project: 'uni', estimate: 8, due: DAY },
+        { id: 'top4', title: SIXTY, project: 'next', estimate: 8, squares: [1, 1, 1, 1, 1, 1, 1, 1], done: true, due: DAY },
+        { id: 'top5', title: SIXTY, project: 'c', estimate: 8, due: '2026-11-25', time: '23:59' },
+      ],
+      { target: 24, laps: 24, done_ms: 600 * MIN },
+    ),
+  },
+  'sheet-top': { ...idleAt2, about: 'The sheet of a task at the top of its estimate: the plus is off', day: day(swap('ex', { estimate: 8, title: SIXTY })), tap: SIXTY },
+  'today-stopped': { ...idleAt2, about: 'A day with a stopped lap: the target bar draws it as full as it ran', day: day(TASKS, { fills: [1, 1, 0.5, 1, 0.2] }) },
+  'today-zoom': { about: 'The smallest row there is: one task with a project and an estimate, for a phone at twice its type size (206 wide)', next: 0, at: [9, 5], day: { tasks: [{ id: 'draft', title: 'chapter 2 draft', project: 'thesis', estimate: 4, due: DAY }], projects: [{ id: 'thesis', name: 'Thesis', color: 'plum' }] } },
   'today-no-target': { ...idleAt2, about: 'No day target set', day: day(TASKS, { target: 0 }) },
   'today-added': { ...idleAt2, about: 'Just after quick add', day: day(), tap: 'demo:add' },
   'today-after-done': { ...idleAt2, about: 'Just after marking a task done: Undo', day: day(), tap: 'Done: Exercise 5-3' },
   'today-after-repeat': { ...idleAt2, about: 'A repeating task done: it says when it comes back', day: day([...TASKS, READING]), tap: 'Done: Read one chapter' },
   'today-after-delete': { ...idleAt2, about: 'Just after deleting a task: Undo', day: day(), tap: ['Exercise 5-3', 'Delete'] },
+  'today-purging': {
+    ...idleAt2,
+    about: 'Recently deleted: Delete for good, asked once more before it is done',
+    day: day([...TASKS, { id: 'old1', title: 'Install a C compiler', project: 'c', estimate: 1, squares: [1], deleted: new Date(2026, 10, 22, 21).getTime() }]),
+    tap: ['Recently deleted', 'Delete for good'],
+  },
+  'sheet-project-gone': { ...idleAt2, about: 'A project deleted on another device while it was being edited here: the form closes', day: day(), tap: ['Exercise 5-3', 'Edit project', 'demo:unproject'] },
+  'sheet-project-edit': { ...idleAt2, about: 'A project being edited where it is chosen: its name and colour, Done, and Delete project', day: day(), tap: ['Exercise 5-3', 'Edit project'] },
+  'today-subtasks': {
+    ...idleAt2,
+    about: 'A task with subtasks says so on its row',
+    day: day([...TASKS, { id: 'sub1', title: 'Write it with array indexes first', parent: 'ex', done: true }, { id: 'sub2', title: 'Rewrite with two pointers', parent: 'ex' }, { id: 'sub3', title: 'Test with an empty string', parent: 'ex' }]),
+  },
+  'today-99': { about: 'Today with the longest lap there is on its strip', run: { ...onKr, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-deleted': {
     ...idleAt2,
     about: 'Recently deleted, with Restore',
@@ -174,14 +209,14 @@ const TODAY: Record<string, Scene> = {
     ]),
     tap: 'Exercise 5-3',
   },
-  'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 9 })), tap: 'Exercise 5-3' },
+  'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 8 })), tap: 'Exercise 5-3' },
   'sheet-project': { ...idleAt2, about: 'The sheet making a new project', day: day(), tap: ['Exercise 5-3', 'New project'] },
-  'today-timed': { ...idleAt2, about: 'Tasks with a time: today at 16:40 with free words, and one tomorrow', day: day([...swap('ex', { time: '16:40', when: 'after dinner' }), { id: 'viva', title: 'Viva practice with Sachi', project: 'uni', estimate: 1, due: '2026-11-25', time: '09:30' }]) },
-  'sheet-time': { ...idleAt2, about: 'The sheet of a task with a time: the day, the time, and No time', day: day(swap('ex', { time: '16:40', when: 'after dinner' })), tap: 'Exercise 5-3' },
+  'today-timed': { ...idleAt2, about: 'Tasks with a time: today at 16:40, and one tomorrow', day: day([...swap('ex', { time: '16:40' }), { id: 'viva', title: 'Viva practice with Sachi', project: 'uni', estimate: 1, due: '2026-11-25', time: '09:30' }]) },
+  'sheet-time': { ...idleAt2, about: 'The sheet of a task with a time: the day, the time, and No time', day: day(swap('ex', { time: '16:40' })), tap: 'Exercise 5-3' },
   'sheet-time-app': { ...idleAt2, about: 'The same in the phone app, which reminds at that minute', phoneApp: true, day: day(swap('ex', { time: '16:40' })), tap: 'Exercise 5-3' },
   'today-picked': { ...idleAt2, about: 'A project in a colour the person picked: its square inside a hair line', day: day(TASKS, { projects: PROJECTS.map((project) => (project.id === 'c' ? { ...project, color: PICKED } : project)) }) },
-  'sheet-picked': { ...idleAt2, about: 'A new project in a picked colour: the thirteenth choice shows it', day: day(), tap: ['Exercise 5-3', 'New project', `fill:color=${PICKED}`] },
-  'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 }, when: 'after dinner' })), tap: 'Exercise 5-3' },
+  'sheet-picked': { ...idleAt2, about: 'A new project in a picked colour: Pick, the thirteenth square, carries it, and the two sliders stand under the squares', day: day(), tap: ['Exercise 5-3', 'New project', 'Pick', 'fill:hue=210'] },
+  'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 } })), tap: 'Exercise 5-3' },
   // An estimate of five here, so "lap 3 of 5 on this task" cannot be taken for the set of four above it.
   'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day(swap('kr', { estimate: 5 })) },
   'focus-task': { about: 'Focus with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5 })) },
@@ -220,12 +255,12 @@ const HABIT_SCENES: Record<string, Scene> = {
   habits: { ...week, about: 'Habits: six, three done, one counted through the day', habits: HABITS },
   'habits-checked': { ...week, about: 'Just after a check-in on a counted habit: Undo', habits: HABITS, tap: 'Check in: A glass of water' },
   'habits-all': { ...week, about: 'Every habit of today done', habits: HABITS.map((habit) => ({ ...habit, counts: { ...habit.counts, '2026-11-24': habit.target ?? 1 } })) },
-  'habits-ordering': { ...week, about: 'Changing the order of habits', habits: HABITS, tap: 'Change the order' },
   'habits-sheet': { ...week, about: 'A habit open: days, count, reminder, its record', habits: HABITS, tap: 'Push one commit' },
   'habits-sheet-new': { ...week, about: 'A habit open that has no check-in yet', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }], tap: 'Read 10 pages' },
   'habits-archived': { ...week, about: 'Archived habits, behind their link', habits: HABITS, tap: 'Archived' },
   'habits-deleted': { ...week, about: 'Recently deleted habits', habits: HABITS, tap: 'Recently deleted' },
   'habits-after-delete': { ...week, about: 'Just after deleting a habit: Undo', habits: HABITS, tap: ['Lights out', 'Delete'] },
+  'habits-top': { ...week, about: 'A habit at the top of its count, with a 60 character title', habits: [{ ...HABITS[0]!, title: SIXTY, target: 20, counts: { '2026-11-24': 20, '2026-11-23': 20 } }, ...HABITS.slice(1)] },
   'habits-many': { ...week, about: 'Ten habits, one with a very long title', habits: MANY_HABITS },
 };
 
@@ -249,6 +284,9 @@ const ROOM_SCENES: Record<string, Scene> = {
 // Settings in full, and the marks in their moments.
 const lapOver = { phase: 'work', lap: 1, left: 0 } as const;
 const MORE: Record<string, Scene> = {
+  'settings-ring-blocked': { ...idleAt2, about: 'Settings on a device that will not let heirloom notify: the bell says why it cannot ring', settings: true, day: day(), ringBlocked: true },
+  'settings-over': { ...idleAt2, about: 'A lap length kept by an earlier build, over the top there is now: shown and stepped from 99', settings: true, day: day(), prefs: { work_ms: 120 * MIN } },
+  'settings-top': { ...idleAt2, about: 'Settings with every number at its top: each plus is off', settings: true, day: day(), prefs: { work_ms: 99 * MIN, short_ms: 60 * MIN, long_ms: 60 * MIN, day_target: 24 } },
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
   'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
@@ -308,10 +346,15 @@ const SCENES: Record<string, Scene> = {
   'running-ahead': { about: 'Lap 2 running, 6 minutes ahead', run: lap2, you: 150 * MIN, laps: 6, ghost: tuesday },
   paused: { about: 'Lap 2, paused', run: { ...lap2, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday },
   'lap-level': { about: 'Lap 2 just over, level', run: { ...lap2, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday },
+  stopped: { about: 'Lap 2 just stopped at 6 minutes: one Stop, the line that says what it did, and its segment as full as it ran', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Stop' },
+  'lap-one-done': { about: 'Lap 1 just over: one segment full, and no second one begun', run: { phase: 'work', lap: 0, left: 0 }, you: 25 * MIN, laps: 1, ghost: tuesday },
   'lap-ahead': { about: 'Lap 2 just over, 6 minutes ahead', run: { ...lap2, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday },
   'lap-behind': { about: 'Lap 2 just over, 19 minutes behind', run: { ...lap2, left: 0 }, you: 106 * MIN, laps: 4, ghost: tuesday },
   'lap-first-day': { about: 'Lap 1 just over, no ghost yet', run: { phase: 'work', lap: 0, left: 0 } },
   'set-done': { about: 'The fourth lap just over: a set', run: { phase: 'work', lap: 3, left: 0 }, you: 175 * MIN, laps: 7, ghost: tuesday },
+  'done-for-now': { about: 'After a bell, Done for now: the timer at rest, and the line that says so', run: { ...lap2, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday, tap: 'Done for now' },
+  'break-done-for-now': { about: 'In a break, Done for now', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, tap: 'Done for now' },
+  'focus-99': { about: 'The longest lap there is: four wide digits, and no more minutes on offer', run: { ...lap2, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday },
   break: { about: 'A short break running', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday },
   'break-over': { about: 'A short break that is over', run: { phase: 'short', lap: 1, left: 0 }, you: 150 * MIN, laps: 6, ghost: tuesday },
   'long-break': { about: 'The long break running', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000 }, you: 200 * MIN, laps: 8, ghost: tuesday },
@@ -338,7 +381,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const now = () => start + Date.now() - opened;
 
   const run = scene.run;
-  const planned = run ? LENGTHS[`${run.phase}_ms`] : 0;
+  const planned = run ? (run.planned ?? LENGTHS[`${run.phase}_ms`]) : 0;
   const state = signal<TimerState>(
     run
       ? {
@@ -364,30 +407,43 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   };
   const over = () => view(state.value, now()).over;
   const lapOpen = () => state.value.phase === 'work';
-  // What the real one does when a run ends: a lap that rang counts, a stop keeps a minute or more.
-  const close = (keep: boolean) => {
-    if (!lapOpen() || !keep) return;
+  // How full each lap of this set that was stopped is, by its place in the set. One that rang is whole.
+  const part = new Map<number, number>();
+  // What the real one does when a run ends: a lap that rang counts, and a stopped one keeps its
+  // minutes and its place in the set, as full as it ran.
+  const close = () => {
+    if (!lapOpen()) return;
     const task = state.value.task;
     if (over()) laps++;
-    if (over() || ran() >= MIN) {
-      you += ran();
-      today.credit(task, ran() / state.value.planned_ms, ran());
-    }
+    else part.set(state.value.set_index, ran() / state.value.planned_ms);
+    you += ran();
+    today.credit(task, over() ? 1 : ran() / state.value.planned_ms, ran());
   };
   const begin = (phase: Phase, task: string | null = null) => {
     state.value = act(state.value, { do: 'start', phase, run: `demo-${++runs}`, task: phase === 'work' ? task : null, planned_ms: LENGTHS[`${phase}_ms`] }, now());
+    // A new set starts with nothing in it.
+    if (phase === 'work' && state.value.set_index === 0) part.clear();
   };
   const today = demoToday(scene.day ?? { tasks: [] }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: ran(), over: over() }), now);
 
-  // Ten seconds to take a stop or a set aside back, as the real one gives.
+  // Ten seconds to take a stop back, as the real one gives.
   const undoable = signal(false);
   let before: { state: TimerState; you: number; laps: number } | null = null;
-  const end = (keep: boolean) => {
+  const end = () => {
     before = { state: state.value, you, laps };
-    close(keep);
+    close();
     state.value = act(state.value, { do: 'stop' }, now());
     undoable.value = true;
     setTimeout(() => (undoable.value = false), 10000);
+  };
+
+  // Ticking the task a lap runs on ends that lap, and unticking it puts the lap back: the real
+  // facade does both in `setDone`.
+  const setDone = today.setDone.bind(today);
+  today.setDone = (id, done) => {
+    if (done && lapOpen() && !over() && state.value.task === id) end();
+    else if (!done && undoable.value && before?.state.task === id) focus.undo();
+    setDone(id, done);
   };
 
   const focus: Focus = {
@@ -408,23 +464,27 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     lapsToday: () => laps + (lapOpen() && over() ? 1 : 0),
     start(task) {
       const next = view(state.value, now()).next.phase;
-      close(true);
+      close();
       begin(next, task);
     },
     skipBreak(task) {
-      close(true);
+      close();
       begin('work', task);
     },
     pause: () => void (state.value = act(state.value, { do: 'pause' }, now())),
     resume: () => void (state.value = act(state.value, { do: 'resume' }, now())),
     extend: () => void (state.value = act(state.value, { do: 'extend', ms: EXTEND_MS }, now())),
-    stop: () => end(true),
-    setAside: () => end(false),
+    stop: () => end(),
+    fills() {
+      const ended = lapOpen() ? state.value.set_index + (over() ? 1 : 0) : view(state.value, now()).next.set_index;
+      return Array.from({ length: ended }, (_, at) => part.get(at) ?? 1);
+    },
     undoable,
     undo() {
       if (!before) return;
       ({ you, laps } = before);
       state.value = before.state;
+      part.delete(before.state.set_index);
       undoable.value = false;
     },
   };
@@ -509,7 +569,7 @@ render(
   ) : scene?.serverStep ? (
     <ServerStep choice={demoServer(scene.serverStep)} />
   ) : scene ? (
-    <App {...staged!} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
+    <App {...staged!} ringBlocked={signal(!!scene.ringBlocked)} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>
@@ -538,6 +598,9 @@ render(
       field.dispatchEvent(new Event('input', { bubbles: true }));
     } else if (words.startsWith('submit:')) {
       document.querySelector<HTMLInputElement>(`input[name="${words.slice(7)}"]`)!.form!.requestSubmit();
+    } else if (words === 'demo:unproject') {
+      // The chosen project deleted on another device, while its form is open here.
+      staged!.today.removeProject('c');
     } else if (words === 'demo:untarget') {
       // The day target taken away on another device, while this one has its editor open.
       staged!.today.setTarget(0);

@@ -1,18 +1,21 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { UNDO_MS } from '../../sync/focus.ts';
+import type { Engine } from '../../sync/engine.ts';
 import type { Focus } from '../../sync/focus.ts';
 import type { Settings } from '../../sync/settings.ts';
 import type { TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
 import { Fold, Kept } from '../kit/fold.tsx';
+import { hasMoved, useLift } from '../kit/lift.ts';
 import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
 import links from '../kit/links.module.css';
 import { Marks } from '../kit/marks.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { say } from '../kit/said.tsx';
+import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
@@ -28,7 +31,7 @@ const TARGET_MAX = 24;
 
 type List = 'next' | 'later' | 'upcoming' | 'done';
 
-export function TodayScreen({ focus, today, settings, app, onReminderSet }: { focus: Focus; today: Today; settings: Settings; app?: boolean; onReminderSet?: () => void }) {
+export function TodayScreen({ engine, focus, today, settings, app, onReminderSet }: { engine: Engine; focus: Focus; today: Today; settings: Settings; app?: boolean; onReminderSet?: () => void }) {
   useTick(focus);
   const day = today.day.value;
   const next = today.next.value;
@@ -44,7 +47,6 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
 
   const [open, setOpen] = useState<string | null>(null);
   const [bin, setBin] = useState(false);
-  const [ordering, setOrdering] = useState(false);
   const [targeting, setTargeting] = useState(false);
   // The editor is open only while there is a target to edit. One taken away on another device
   // closes it here, and the way to set one is offered again; it does not come back open by
@@ -72,12 +74,15 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
   };
 
   const setDone = (task: TaskView, isDone: boolean) => {
+    // Ticking the task a lap is running on ends that lap too: the bar says both, and its one
+    // Undo unticks the task, which puts the lap back as well.
+    const lapEnds = isDone && state.phase === 'work' && state.task === task.id && !view.over ? s.today.lapStopped(state.set_index + 1, focus.ran()) : undefined;
     today.setDone(task.id, isDone);
     if (!isDone) return say(null);
     // A repeating task has made its next one by now: say when that is, from the row itself.
     const series = task.id.replace(/-\d{8}$/, '');
     const again = task.repeat && today.upcoming.value.find((other) => other.id !== task.id && other.id.startsWith(`${series}-`));
-    say({ lead: s.today.saidDone, title: task.title, tail: again?.due ? s.today.comesBack(again.due, day) : undefined, undo: () => today.setDone(task.id, false) });
+    say({ lead: s.today.saidDone, title: task.title, tail: lapEnds ?? (again?.due ? s.today.comesBack(again.due, day) : undefined), undo: () => today.setDone(task.id, false) });
   };
   const remove = (task: TaskView) => {
     setOpen(null);
@@ -85,25 +90,21 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
     say({ lead: s.today.saidRemoved, title: task.title, tail: s.today.keeps, undo: () => today.restore(task.id) });
   };
 
-  // Today's open tasks in their true order. While the order is being changed the screen shows this
-  // one list, so that Up and Down move a row exactly where they seem to: the Next card and the
-  // list under it put the running task somewhere else than its place.
+  // Today's open tasks in their true order. On the screen the first one that is not running is
+  // the Next card and the rest follow under "Later": a row is put in order by pressing and
+  // holding it, across both, and set down before the row that then follows it.
   const movable = today.list.value;
-  const moves = (task: TaskView) => {
-    const at = movable.findIndex((other) => other.id === task.id);
-    return (
-      // The first has no way up and the last no way down. Their buttons keep their place, unseen.
-      // A tap here is a move: the row goes where it was sent, and is not held under the finger.
-      <span class={css.moves} data-moves>
-        <Button kind="link" aria-label={s.today.upLabel(task.title)} disabled={at === 0} onClick={() => today.move(task.id, movable[at - 1]!.id)}>
-          {s.today.up}
-        </Button>
-        <Button kind="link" aria-label={s.today.downLabel(task.title)} disabled={at === movable.length - 1} onClick={() => today.move(task.id, movable[at + 2]?.id ?? null)}>
-          {s.today.down}
-        </Button>
-      </span>
-    );
-  };
+  const lists = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState('');
+  useLift(lists, (id, before, at, of) => {
+    today.move(id, before);
+    setPlaced(s.today.nowAt(movable.find((task) => task.id === id)?.title ?? '', at, of));
+  });
+
+  // Recently deleted closes with its last row.
+  useEffect(() => {
+    if (bin && deleted.length === 0) setBin(false);
+  }, [bin, deleted.length]);
 
   // Where the focus goes when the sheet closes. The dialog hands it back to the row that opened
   // it; when that row has moved or gone, it is sent to the task's row where it now is, or, for a
@@ -128,7 +129,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
       key={task.id}
       task={task}
       of={s.today.of(task.estimate)}
-      note={[task.due && task.due !== day ? s.today.due(task.due, day) : '', task.time ?? '', task.when ?? ''].filter(Boolean).join(', ')}
+      note={[task.due && task.due !== day ? s.today.due(task.due, day) : '', task.time ?? '', task.subtasks.length ? s.today.subtasks(task.subtasks.filter((sub) => sub.done).length, task.subtasks.length) : ''].filter(Boolean).join(', ')}
       checkLabel={s.today.check(task.title)}
       onDone={(isDone) => setDone(task, isDone)}
       onOpen={() => {
@@ -136,13 +137,16 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
         setOpen(task.id);
       }}
       next={extra.next}
-      end={ordering && list !== 'upcoming' && list !== 'done' ? moves(task) : extra.end}
+      end={extra.end}
+      lift={list === 'next' || list === 'later'}
     />
   );
 
+  const loose = [next, ...later].filter((task) => task && task.estimate === null).length;
   const strip: Figure[] = [
     { label: s.today.done, figure: s.total(figures.done_ms), note: s.today.laps(figures.laps), yours: true },
-    { label: s.today.planned, figure: s.total(figures.left_ms), note: s.today.laps(figures.left_laps) },
+    // Open tasks with no estimate are not in the laps: the small line says how many there are.
+    { label: s.today.planned, figure: s.total(figures.left_ms), note: loose ? s.today.plannedWith(figures.left_laps, loose) : s.today.laps(figures.left_laps) },
   ];
   // On a first day there is no past you to show, and no hole where it would be.
   if (figures.ghost) {
@@ -153,6 +157,10 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
   // The bell has gone on a lap and its break has not been started.
   const rung = state.phase === 'work' && view.over;
   const running = today.running.value;
+  // A lap for a task that is not in today's open list (done since, due another day) is still a
+  // lap for that task: it is named from the task's own row, as Focus names it.
+  const lapRow = state.task ? engine.rows('task').value.get(state.task) : undefined;
+  const named = typeof lapRow?.title === 'string' ? lapRow.title : undefined;
   const leftInLater = later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
   return (
@@ -163,6 +171,10 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
           {s.today.title}
         </h1>
         <p>{s.today.date(day)}</p>
+        {/* Where a row now stands, for a screen reader, after the keyboard moved it. */}
+        <p class="sr" role="status">
+          {placed}
+        </p>
       </header>
 
       <Figures items={strip} />
@@ -171,7 +183,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
       <Fold class={css.target} role="group" aria-label={s.today.target}>
         {figures.target > 0 && (
           <div key="bar" class={css.lane}>
-            <LapBar done={figures.laps} of={figures.target} />
+            <LapBar fills={figures.fills} of={figures.target} />
           </div>
         )}
         <p key="words">
@@ -200,6 +212,8 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
                   more={s.today.targetMore}
                   onLess={() => today.setTarget(Math.max(1, figures.target - 1))}
                   onMore={() => today.setTarget(Math.min(TARGET_MAX, figures.target + 1))}
+                  top={figures.target >= TARGET_MAX}
+                  floor={figures.target <= 1}
                 />
                 {/* Every tap of the stepper is already kept: this only closes. */}
                 <Button onClick={() => setTargeting(false)}>{s.today.targetKeep}</Button>
@@ -221,7 +235,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
       </div>
 
       <div>
-      <div class={css.cols}>
+      <div class={css.cols} ref={lists}>
         <Fold gap="md" data-said>
           <QuickAdd key="add" name="task" label={s.today.add} hint={s.today.addHint} go={s.today.addGo} onAdd={add} />
 
@@ -234,7 +248,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
                 ) : (
                   <>
                     <b>{s.clock(view.left_ms)}</b>
-                    <span>{isBreak ? (state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak) : (running?.title ?? s.today.free)}</span>
+                    <span>{isBreak ? (state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak) : (running?.title ?? named ?? s.today.free)}</span>
                   </>
                 )}
               </a>
@@ -258,15 +272,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
             </div>
           )}
 
-          {ordering && (
-            <section key="ordering">
-              <h2 class={css.sect} id="list-later" tabIndex={-1}>
-                {s.today.ordering}
-              </h2>
-              <Fold gap="sm">{movable.map((task) => row(task, 'later', { next: task.id === next?.id }))}</Fold>
-            </section>
-          )}
-          {!ordering && next && (
+          {next && (
             <section key="next">
               <h2 class={css.sect} id="list-next" tabIndex={-1}>
                 {s.today.next}
@@ -284,7 +290,7 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
               </Fold>
             </section>
           )}
-          {!ordering && later.length > 0 && (
+          {later.length > 0 && (
             <section key="later">
               <h2 class={css.sect} id="list-later" tabIndex={-1}>
                 {s.today.later}
@@ -294,13 +300,14 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
             </section>
           )}
 
-          {(movable.length > 1 || deleted.length > 0) && (
+          {/* How rows are put in order, said once: until this device has moved one. */}
+          {movable.length > 1 && !hasMoved.value && (
+            <p key="hint" class={css.hint}>
+              {s.today.holdHint}
+            </p>
+          )}
+          {deleted.length > 0 && (
             <div key="links" class={links.links}>
-              {movable.length > 1 && (
-                <Button kind="link" onClick={() => setOrdering(!ordering)}>
-                  {ordering ? s.today.orderKeep : s.today.order}
-                </Button>
-              )}
               {deleted.length > 0 && (
                 <Button kind="link" onClick={() => setBin(true)}>
                   {s.today.bin(deleted.length)}
@@ -365,10 +372,14 @@ export function TodayScreen({ focus, today, settings, app, onReminderSet }: { fo
                   task={task}
                   of={s.today.of(task.estimate)}
                   note={task.deleted === null ? undefined : s.today.gone(task.deleted)}
-                  end={
-                    <Button kind="link" onClick={() => today.restore(task.id)}>
-                      {s.today.restore}
-                    </Button>
+                  links={
+                    <>
+                      <Button kind="link" onClick={() => today.restore(task.id)}>
+                        {s.today.restore}
+                      </Button>
+                      {/* It cannot be taken back, so it asks twice. */}
+                      <Twice words={s.today.purge} ask={s.today.purgeAsk} onDo={() => today.purge(task.id)} />
+                    </>
                   }
                 />
               ))}

@@ -86,6 +86,10 @@
 .main { display: flex; gap: var(--space-sm); }
 .main > * { flex: 1; }
 .quiet { display: flex; justify-content: space-between; gap: var(--space-lg); min-height: var(--layout-touch); }
+/* "Done for now" stands at the line's right end, in a break and after a bell alike. */
+.far { flex: none; margin-left: auto; }
+/* After a bell the line holds the sentence of what was done; the link sits on its last line. */
+.over { align-items: flex-end; }
 
 /* The result of a lap: the same column, the same edge. */
 .told { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
@@ -112,6 +116,7 @@
   .why { display: none; }
   .main > * { flex: none; }
   .quiet { justify-content: flex-start; min-height: 0; }
+  .far { margin-left: 0; }
   .upnext { display: block; }
   .digits { font: var(--type-figure-xl); }
   .facts { max-width: 60ch; }

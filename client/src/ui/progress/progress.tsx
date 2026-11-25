@@ -10,6 +10,8 @@ import { useWide } from '../kit/wide.ts';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
 import { Day } from './day.tsx';
+import { cx } from '../kit/cx.ts';
+import said from '../kit/said.module.css';
 import css from './progress.module.css';
 import { Guesses, WeekChart } from './week.tsx';
 
@@ -224,7 +226,7 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
   );
 
   return (
-    <div class={css.progress}>
+    <div class={cx(css.progress, said.room)}>
       <header class={css.head}>
         <p>{s.progress.weekOf(week.monday)}</p>
         <h1>{finding.join(' ')}</h1>

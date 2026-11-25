@@ -1,0 +1,3 @@
+.both { display: inline-grid; text-decoration: inherit; }
+.both > * { grid-area: 1 / 1; text-align: left; }
+.off { visibility: hidden; }

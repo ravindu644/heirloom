@@ -46,8 +46,6 @@
 .words .count { grid-row: 1 / span 2; grid-column: 2; }
 .count { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
 .count b { font: inherit; color: var(--ink); }
-.moves { display: flex; gap: var(--space-xs); }
-.moves button:disabled { visibility: hidden; }
 
 /* Seven days, Monday first: the letter, and under it the day as a short lane. */
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-xs); }
@@ -71,11 +69,17 @@
 /* The box the record's squares are sized against: large while every week fits it. */
 .record { container-type: inline-size; }
 
-/* On a phone, changing the order is about the names: the weeks step aside for Up and Down. */
-.ordering .week { display: none; }
+/* In the sheet: how far today has got, with the way to take one back at the line's end. */
+.sofar { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); font: var(--type-label); color: var(--muted); }
+/* A row of the deleted shelf ends in two links: under its words on a phone, at its end from 720px. */
+.shelved { grid-template-columns: minmax(0, 1fr); }
+.shelved .end { justify-content: flex-start; }
+/* The one quiet line that says how habits are put in order. */
+.hint { font: var(--type-label); color: var(--muted); }
 
 @media (min-width: 720px) {
-  .ordering .week { display: grid; }
+  .shelved { grid-template-columns: minmax(0, 1fr) auto; }
+  .shelved .end { justify-content: flex-end; }
   .habits { max-width: 80ch; }
   .quiet { max-width: 60ch; }
   .open { grid-template-columns: minmax(0, 1fr) calc(var(--layout-touch) * 5); gap: var(--space-md); align-items: center; }

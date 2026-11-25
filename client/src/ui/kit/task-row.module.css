@@ -15,7 +15,9 @@
 
 .words {
   display: grid;
-  flex: 1;
+  /* As wide as its words want, and no wider: the room that is left is the squares'. A long
+     title has the whole row but for the count and the control, and wraps there. */
+  flex: 0 1 auto;
   gap: var(--space-xs);
   min-width: 0;
   min-height: var(--layout-touch);
@@ -27,19 +29,43 @@
   cursor: pointer;
 }
 div.words { cursor: auto; }
-/* Three lines hold any title a person would write; the sheet shows the rest. */
-.title { display: -webkit-box; overflow: hidden; font: var(--type-body); text-decoration: line-through transparent; transition: color var(--motion-fill) var(--motion-ease), text-decoration-color var(--motion-fill) var(--motion-ease); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; text-wrap: pretty; }
-.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
-.project { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); overflow-wrap: anywhere; }
+/* The title always has its room. It breaks between words and never inside one (a word longer
+   than the whole line is the one thing that is cut), and runs to two lines; the sheet shows the
+   rest. `break-word`, not `anywhere`: with `anywhere` a title could be squeezed to one letter a
+   line by what stood at its right. */
+.title { display: -webkit-box; overflow: hidden; font: var(--type-body); text-decoration: line-through transparent; transition: color var(--motion-fill) var(--motion-ease), text-decoration-color var(--motion-fill) var(--motion-ease); overflow-wrap: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; text-wrap: pretty; }
+/* The line under it likewise: two lines at most. */
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); max-height: calc(2lh + var(--space-xs)); overflow: hidden; font: var(--type-label); color: var(--muted); }
+.project { display: inline-flex; align-items: center; gap: var(--space-xs); min-width: 0; color: var(--ink); overflow-wrap: break-word; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
 
-.end { display: flex; flex: none; align-items: center; gap: var(--space-md); }
+/* What is at the right gives way first: its count and its control keep their room, and its squares are drawn only in what the title leaves. */
+.end { position: relative; z-index: 1; display: flex; flex: 1 0 auto; align-items: center; justify-content: flex-end; gap: var(--space-md); }
+/* The words open the task, and so does the row's empty room: the target is laid over the whole row, under its box and what stands at its end. */
+.row { position: relative; }
+.row > :first-child:not(.words) { position: relative; z-index: 1; }
+button.words::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 /* A row that ends in a control and is narrower than 400px: the squares give way and the count
    stays. The title is worth more than the picture of a number already written. The row itself
    is measured, not the screen. */
-.row { container-type: inline-size; }
+.measure { container-type: inline-size; }
 @container (max-width: 400px) {
-  .trailed .end [aria-hidden="true"] { display: none; }
+  .trailed .end [data-squares] { display: none; }
+}
+
+/* A row with links of its own: at its end where there is room, and under the words in a narrow row. */
+.linked { flex-wrap: wrap; }
+.links { position: relative; z-index: 1; display: flex; flex: none; flex-wrap: wrap; gap: 0 var(--space-md); }
+@container (max-width: 400px) {
+  .linked .links { flex-basis: 100%; }
+}
+/* A row too narrow to hold its words beside what stands at its end (a phone at twice its type
+   size is 206px wide): the title always has its room, so the end goes under the words, at the
+   row's right edge as ever. There is no room there to stand it on the words' own edge. */
+@container (max-width: 280px) {
+  .row { flex-wrap: wrap; }
+  .words { flex: 1 1 0; }
+  .end { flex: 1 0 100%; }
 }
 
 .done .title { color: var(--muted); text-decoration-color: currentcolor; }

@@ -14,6 +14,7 @@ import { Marks } from '../kit/marks.tsx';
 import { Square } from '../kit/square.tsx';
 import { Panel } from '../kit/panel.tsx';
 import { Race, SplitChip } from '../kit/race.tsx';
+import { LAP_MAX_MIN } from '../settings.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
 import css from './focus.module.css';
@@ -37,7 +38,8 @@ function lanes(race: RaceNow, workMs: number, now: number) {
   return {
     day,
     you: { label: s.race.you, value: s.total(race.you_ms), share: race.you_ms / scale },
-    ghost: race.ghost && { label: s.race.ghost, value: s.total(race.ghost.ms), share: race.ghost.ms / scale },
+    // The second lane is named for the day it is, as Today names it: "Last Tue".
+    ghost: race.ghost && { label: s.today.ghostDay(race.ghost.day, dayOf(now)), value: s.total(race.ghost.ms), share: race.ghost.ms / scale },
     split,
     chip: { text, tone: split === 0 ? 'level' : split < 0 ? 'behind' : 'ahead' } as const,
     // Laps that close the gap, were the ghost to stand still.
@@ -121,13 +123,16 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   useEffect(() => {
     if (!ready) setNote('');
   }, [ready]);
-  const stop = () => {
-    setNote(s.focus.stopped(focus.ran()));
+  // After a bell and in a break both buttons start something: this is the way out for someone
+  // finished for the day. The timer comes to rest after the lap that last ended.
+  const doneForNow = () => {
+    setNote(s.focus.stoppedAfter(((nextLap + 2) % 4) + 1));
     focus.stop();
   };
-  const setAside = () => {
-    setNote(s.focus.setAsideDone);
-    focus.setAside();
+  // One Stop. It ends the lap where it is, and the line after says what that did.
+  const stop = () => {
+    setNote(s.focus.stopped(state.set_index + 1, focus.ran()));
+    focus.stop();
   };
 
   const lapLine = (
@@ -148,7 +153,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
     </p>
   );
   // Segments filled: the laps of this set that have rung. Ready, that is the index of the lap to come.
-  const done = ready ? view.next.set_index : state.phase === 'work' && !view.over ? state.set_index : lap;
   const share = state.phase === 'work' && !view.over ? 1 - view.left_ms / state.planned_ms : 0;
 
   if (result) {
@@ -168,7 +172,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         <h1 class="sr">{s.focus.title}</h1>
         <div class={css.laps}>
           {lapLine}
-          <LapBar done={done} big={set} lighting={live && set} />
+          <LapBar fills={focus.fills()} big={set} lighting={live && set} />
         </div>
         <div class={css.told}>
           <p class={cx(css.headline, css.words)} role="status">
@@ -184,6 +188,10 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         </div>
         {/* What to do next, and the line that explains it, travel together: on a phone they are the screen's lower group. */}
         <div class={css.next}>
+          {/* The line over the buttons, and at its right end the way out for someone finished for
+              the day: where the quiet line of every other state stands, so the buttons under it
+              keep the foot of the screen when a lap rings. */}
+          <div class={cx(css.quiet, css.over)}>
           <p class={css.facts}>
             {l.day && (
               <>
@@ -196,12 +204,16 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
               {s.result.take(breakMs)}
             </span>
           </p>
+            <Button kind="link" class={css.far} onClick={doneForNow}>
+              {s.focus.doneForNow}
+            </Button>
+          </div>
           <div class={css.main}>
             <Button kind="primary" onClick={() => focus.start()}>
               {s.focus.startBreak(breakMs)}
             </Button>
             <Button kind="quiet" onClick={() => focus.skipBreak(nextTask?.id)}>
-              {s.focus.skipBreak}
+              {s.focus.startLapNow(nextLap)}
             </Button>
           </div>
         </div>
@@ -241,7 +253,8 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
       <div class={css.clock}>
         <div>
           {lapLine}
-          <LapBar done={done} share={share} />
+          {/* Each ended lap as full as it ran: one that was stopped stays part filled. */}
+          <LapBar fills={focus.fills()} share={share} />
         </div>
         <div class={css.face}>
           {title && (
@@ -294,10 +307,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
                 {upNext.map((task) => (
                   <li key={task.id}>
                     <span>{task.title}</span>
-                    <b>
-                      {task.laps}
-                      {s.today.of(task.estimate)}
-                    </b>
+                    <b>{s.focus.upNextLaps(task.laps, task.estimate)}</b>
                   </li>
                 ))}
               </ul>
@@ -322,7 +332,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           )}
           {state.phase === 'work' && !ready && (
             <Button kind="quiet" onClick={stop}>
-              {s.focus.stop(focus.ran())}
+              {s.focus.stop}
             </Button>
           )}
           {/* Starting must not need planning: the lesser choice beside the task that is next. */}
@@ -334,14 +344,15 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         </div>
         <div class={css.quiet}>
           {ready && <p class={css.why}>{why}</p>}
-          {!ready && !view.paused && state.phase === 'work' && (
-            <Button kind="link" onClick={() => focus.extend()}>
-              {s.focus.extend(EXTEND_MS)}
+          {isBreak && !ready && (
+            <Button kind="link" class={css.far} onClick={doneForNow}>
+              {s.focus.doneForNow}
             </Button>
           )}
-          {!ready && state.phase === 'work' && (
-            <Button kind="link" onClick={setAside}>
-              {s.focus.setAside}
+          {/* Not offered when it would take the lap past the longest one there is. */}
+          {!ready && !view.paused && state.phase === 'work' && state.planned_ms + EXTEND_MS <= LAP_MAX_MIN * 60000 && (
+            <Button kind="link" onClick={() => focus.extend()}>
+              {s.focus.extend(EXTEND_MS)}
             </Button>
           )}
         </div>

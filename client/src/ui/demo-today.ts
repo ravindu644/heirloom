@@ -34,6 +34,8 @@ export interface DemoDay {
   tasks: DemoTask[];
   projects?: ProjectView[];
   target?: number;
+  /** How full each lap of today is, where one was stopped: left out, every lap rang. */
+  fills?: number[];
   /** Focus and laps today before the lap in progress. */
   done_ms?: number;
   laps?: number;
@@ -71,8 +73,11 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
   const target = signal(seed.target ?? 0);
   // The day's count: one source for the strip, the target and the squares, so a lap that has rung
   // counts everywhere at once, as the real one's does.
-  const day = { ms: seed.done_ms ?? 0, laps: seed.laps ?? 0 };
+  // One fill per lap of today: 1 for one that rang, less for one that was stopped.
+  const day = { ms: seed.done_ms ?? 0, fills: seed.fills ?? Array.from({ length: seed.laps ?? 0 }, () => 1) };
   let ids = 0;
+  // Projects that were removed, for their Undo.
+  const gone = new Map<string, ProjectView>();
 
   const change = (id: string, fields: Partial<DemoTask>) => void (tasks.value = tasks.value.map((task) => (task.id === id ? { ...task, ...fields } : task)));
   const view = (task: DemoTask): TaskView => {
@@ -86,7 +91,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       notes: task.notes ?? '',
       project: projects.value.find((project) => project.id === task.project) ?? null,
       estimate: task.estimate ?? null,
-      laps: squares.filter((square) => square === 1).length,
+      // A stopped lap is a lap too: it has its place on its task.
+      laps: squares.length,
       squares: running ? [...squares, lap().share] : squares,
       running,
       due: task.due ?? null,
@@ -119,7 +125,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       const left_laps = open.value.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
       return {
         done_ms: day.ms + (inLap?.ms ?? 0),
-        laps: day.laps + (inLap?.over ? 1 : 0),
+        laps: day.fills.length + (inLap?.over ? 1 : 0),
+        fills: [...day.fills, ...(inLap?.over ? [1] : [])],
         left_laps,
         left_ms: left_laps * 25 * MIN,
         target: target.value,
@@ -159,6 +166,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     },
     remove: (id) => change(id, { deleted: now() }),
     restore: (id) => change(id, { deleted: undefined }),
+    // For good: the task and its subtasks are on no screen again.
+    purge: (id) => void (tasks.value = tasks.value.filter((task) => task.id !== id && task.parent !== id)),
     move(id, before) {
       const moved = tasks.value.find((task) => task.id === id);
       if (!moved) return;
@@ -179,12 +188,23 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
       projects.value = [...projects.value, { id, name, color }];
       return id;
     },
+    // Its tasks keep it and show none, so putting it back gives each its project again.
+    removeProject(id) {
+      const one = projects.value.find((project) => project.id === id);
+      if (one) gone.set(id, one);
+      projects.value = projects.value.filter((project) => project.id !== id);
+    },
+    restoreProject(id) {
+      const one = gone.get(id);
+      if (one) projects.value = [...projects.value, one];
+      gone.delete(id);
+    },
     editProject: (id, fields) => void (projects.value = projects.value.map((project) => (project.id === id ? { ...project, ...fields } : project))),
     setTarget: (laps) => void (target.value = laps),
 
     credit(id, part, ms) {
       day.ms += ms;
-      if (part === 1) day.laps++;
+      day.fills.push(part);
       if (id) change(id, { squares: [...(tasks.value.find((task) => task.id === id)?.squares ?? []), part] });
     },
     rows: computed(() => new Map(tasks.value.map((task) => [task.id, { id: task.id, title: task.title, deleted: task.deleted ?? null }]))),

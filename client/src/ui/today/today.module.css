@@ -19,8 +19,6 @@
 /* Done stands apart from the stepper: beside its plus it would read as a fourth key. */
 .targeting > div > div { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-lg); }
 
-.moves { display: flex; gap: var(--space-xs); }
-.moves button:disabled { visibility: hidden; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 
@@ -41,9 +39,9 @@
 .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* "Lap 2 of 4, done" is the whole message: on a narrow phone it takes two lines rather than lose a word. */
 .bar .rung { white-space: normal; text-wrap: balance; }
-/* A button on the bar is an outline in the ground. */
-.bar .onBar { border-color: var(--ground); background: none; color: var(--ground); }
-.bar .onBar:hover { background: color-mix(in srgb, var(--ground) var(--state-hover), transparent); }
+/* The strip is the page turned inside out, and so is its button: filled with the ground, its words in ink. */
+.bar .onBar { border-color: var(--ground); background: var(--ground); color: var(--ink); }
+.bar .onBar:hover { background: color-mix(in srgb, var(--ground), var(--ink) var(--state-hover)); }
 
 .sect { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); font: var(--type-label); color: var(--muted); }
 .sect span { font-weight: inherit; }
@@ -51,6 +49,8 @@
 .sect:focus, .head h1:focus { outline: none; }
 
 .empty { color: var(--muted); }
+/* The one quiet line that says how rows are put in order. */
+.hint { font: var(--type-label); color: var(--muted); }
 
 
 /* What was just achieved, in sight over the place where the bar stands. The ground under it is

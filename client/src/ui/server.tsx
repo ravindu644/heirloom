@@ -46,6 +46,8 @@ export function ServerStep({ choice, onBack }: { choice: ServerChoice; onBack?: 
           autoCorrect="off"
           spellcheck={false}
         />
+        {/* For someone who was told of heirloom and given nothing to type here. */}
+        <p class={css.intro}>{s.server.noServer}</p>
         {/* Said where the address is typed, once, and as a fact. */}
         {choice.plain && <p>{s.server.plain}</p>}
         <div>

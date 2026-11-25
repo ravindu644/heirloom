@@ -31,7 +31,12 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
   // Asked again each time the panel comes on screen: links are used and run out elsewhere.
   useEffect(() => void invites.refresh(), []);
 
-  const copy = async (link: string) => setSaid((await copyText(link)) ? s.people.copied : s.people.copyFailed);
+  const copy = async (link: string) => {
+    const done = await copyText(link);
+    setSaid(done ? s.people.copied : s.people.copyFailed);
+    // The new link is shown once: copied, its block goes and it is a row like the others.
+    if (done && fresh?.link === link) setFresh(null);
+  };
   const make = async () => {
     const result = await invites.make();
     setSaid(result.ok ? '' : why(result.error, s.people.inviteErrors));
@@ -58,6 +63,8 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
       </Panel>
     );
 
+  // While a link stands above as the new one, its row is not drawn a second time.
+  const rows = (Array.isArray(open) ? open : []).filter((invite) => invite.invite !== fresh?.invite);
   const links3 = (invite: InviteView) => (
     <>
       <Button kind="link" aria-label={s.people.forInvite(s.people.copy, invite.invite)} onClick={() => copy(invite.link)}>
@@ -111,9 +118,9 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
           {s.people.none}
         </p>
       )}
-      {open && open.length > 0 && (
+      {rows.length > 0 && (
         <Fold key="rows" list class={css.rows}>
-          {open.map((invite) => (
+          {rows.map((invite) => (
             <div key={invite.invite} class={css.row}>
               <span class={css.what}>
                 <b>{s.people.ending(invite.invite)}</b>
