@@ -162,7 +162,7 @@
    }
   },
   {
-   "name": "a stop under 60 s of running leaves no row",
+   "name": "a lap stopped in its first minute leaves a row: it had its place in the set",
    "state": {
     "phase": "work",
     "run": "run-7f3a",
@@ -177,7 +177,82 @@
    "end": "stop",
    "now": 1800000059999,
    "device": "a1b2c3d4e5f60718",
-   "expect": null
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": "task-pointers",
+     "started": 1800000000000,
+     "ended": 1800000059999,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a lap stopped after three seconds leaves a row too",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "written": 1800000000000,
+   "end": "stop",
+   "now": 1800000003000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": null,
+     "started": 1800000000000,
+     "ended": 1800000003000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a lap replaced by another device in its first seconds leaves a row as well",
+   "state": {
+    "phase": "work",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "written": 1800000000000,
+   "end": "replaced",
+   "now": 1800000003000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "work",
+     "task": null,
+     "started": 1800000000000,
+     "ended": 1800000003000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
   },
   {
    "name": "a stop at 60 s leaves one",
@@ -211,69 +286,20 @@
    }
   },
   {
-   "name": "pauses do not count toward the 60 s",
+   "name": "a break's pauses do not count toward its 60 s",
    "state": {
-    "phase": "work",
+    "phase": "short",
     "run": "run-7f3a",
-    "task": "task-pointers",
+    "task": null,
     "started": 1800000000000,
     "paused_at": null,
     "paused_ms": 600000,
-    "planned_ms": 1500000,
+    "planned_ms": 300000,
     "set_index": 1
    },
    "written": 1800000000000,
    "end": "stop",
    "now": 1800000650000,
-   "device": "a1b2c3d4e5f60718",
-   "expect": null
-  },
-  {
-   "name": "set aside: kept for the timeline, counted nowhere",
-   "state": {
-    "phase": "work",
-    "run": "run-7f3a",
-    "task": "task-pointers",
-    "started": 1800000000000,
-    "paused_at": null,
-    "paused_ms": 0,
-    "planned_ms": 1500000,
-    "set_index": 1
-   },
-   "written": 1800000000000,
-   "end": "void",
-   "now": 1800000900000,
-   "device": "a1b2c3d4e5f60718",
-   "expect": {
-    "id": "run-7f3a",
-    "stamp_at": null,
-    "row": {
-     "kind": "work",
-     "task": "task-pointers",
-     "started": 1800000000000,
-     "ended": 1800000900000,
-     "planned_ms": 1500000,
-     "paused_ms": 0,
-     "outcome": "void",
-     "device": "a1b2c3d4e5f60718"
-    }
-   }
-  },
-  {
-   "name": "set aside under 60 s leaves no row either",
-   "state": {
-    "phase": "work",
-    "run": "run-7f3a",
-    "task": "task-pointers",
-    "started": 1800000000000,
-    "paused_at": null,
-    "paused_ms": 0,
-    "planned_ms": 1500000,
-    "set_index": 1
-   },
-   "written": 1800000000000,
-   "end": "void",
-   "now": 1800000030000,
    "device": "a1b2c3d4e5f60718",
    "expect": null
   },
@@ -304,37 +330,6 @@
      "planned_ms": 1500000,
      "paused_ms": 0,
      "outcome": "rang",
-     "device": "a1b2c3d4e5f60718"
-    }
-   }
-  },
-  {
-   "name": "set aside after the bell: the whole lap, set aside",
-   "state": {
-    "phase": "work",
-    "run": "run-7f3a",
-    "task": "task-pointers",
-    "started": 1800000000000,
-    "paused_at": null,
-    "paused_ms": 0,
-    "planned_ms": 1500000,
-    "set_index": 1
-   },
-   "written": 1800000000000,
-   "end": "void",
-   "now": 1800001620000,
-   "device": "a1b2c3d4e5f60718",
-   "expect": {
-    "id": "run-7f3a",
-    "stamp_at": null,
-    "row": {
-     "kind": "work",
-     "task": "task-pointers",
-     "started": 1800000000000,
-     "ended": 1800001500000,
-     "planned_ms": 1500000,
-     "paused_ms": 0,
-     "outcome": "void",
      "device": "a1b2c3d4e5f60718"
     }
    }
@@ -434,38 +429,6 @@
    }
   },
   {
-   "name": "extended after its bell, then set aside: set aside wins",
-   "state": {
-    "phase": "work",
-    "run": "run-7f3a",
-    "task": "task-pointers",
-    "started": 1800000000000,
-    "paused_at": null,
-    "paused_ms": 0,
-    "planned_ms": 1800000,
-    "set_index": 1
-   },
-   "written": 1800001560000,
-   "end": "void",
-   "now": 1800001620000,
-   "device": "a1b2c3d4e5f60718",
-   "rang": true,
-   "expect": {
-    "id": "run-7f3a",
-    "stamp_at": null,
-    "row": {
-     "kind": "work",
-     "task": "task-pointers",
-     "started": 1800000000000,
-     "ended": 1800001620000,
-     "planned_ms": 1800000,
-     "paused_ms": 0,
-     "outcome": "void",
-     "device": "a1b2c3d4e5f60718"
-    }
-   }
-  },
-  {
    "name": "extended after its bell and rung again: the second bell, stamped at the extension",
    "state": {
     "phase": "work",
@@ -498,7 +461,7 @@
    }
   },
   {
-   "name": "a lap of a few seconds that rang is a lap: the 60 s floor is for stops",
+   "name": "a lap of a few seconds that rang is a lap",
    "state": {
     "phase": "work",
     "run": "run-7f3a",
@@ -584,6 +547,55 @@
      "started": 1800000000000,
      "ended": 1800000240000,
      "planned_ms": 900000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   }
+  },
+  {
+   "name": "a break stopped under 60 s leaves no row: the floor is for breaks",
+   "state": {
+    "phase": "short",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 1
+   },
+   "written": 1800000000000,
+   "end": "stop",
+   "now": 1800000059999,
+   "device": "a1b2c3d4e5f60718",
+   "expect": null
+  },
+  {
+   "name": "a break stopped at 60 s leaves one",
+   "state": {
+    "phase": "short",
+    "run": "run-7f3a",
+    "task": null,
+    "started": 1800000000000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 1
+   },
+   "written": 1800000000000,
+   "end": "stop",
+   "now": 1800000060000,
+   "device": "a1b2c3d4e5f60718",
+   "expect": {
+    "id": "run-7f3a",
+    "stamp_at": null,
+    "row": {
+     "kind": "short",
+     "task": null,
+     "started": 1800000000000,
+     "ended": 1800000060000,
+     "planned_ms": 300000,
      "paused_ms": 0,
      "outcome": "stopped",
      "device": "a1b2c3d4e5f60718"

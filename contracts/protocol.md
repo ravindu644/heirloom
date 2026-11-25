@@ -157,15 +157,16 @@ Actions, each a pure function of the state, the action and `now`:
 
 | Action | New state |
 |---|---|
-| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap that is over or a short break; 0 after a long break; the same when it restarts a lap that is not over |
+| `start` (`phase`, `run`, `task`, `planned_ms`, and `new_set` when wanted) | That phase, `started = now`, no pause. With `new_set: true` a lap is lap one (index 0), whatever came before: a device asks for it when the last run belongs to an earlier local day (the day of its bell if it rang, else of the timer cell's stamp), so yesterday's half set does not decide today's long break. A break keeps the `set_index`. A lap takes the index of the next lap: the idle state's own; one more (wrapping after 3) when the state is a lap, over or not, or a short break; 0 after a long break |
 | `pause` | `paused_at = now`. Nothing when idle, paused or over |
 | `resume` | `paused_ms += now - paused_at`, `paused_at = null`. Nothing unless paused |
 | `extend` (`ms`) | `planned_ms += ms`. Nothing when idle. After the bell it reopens the lap if the new end is still ahead of `now`; if not, nothing: minutes nobody worked are not added |
-| `stop` | Idle, every other field as the schema's idle state, `set_index` the next lap's index by the same rule as `start` |
+| `stop` | Idle, every other field as the schema's idle state, `set_index` the next lap's index by the same rule as `start`. A lap that is stopped has had its place in the set: after lap 1 is stopped, the next start is lap 2. Stopping lap 4 starts a new set at lap 1 and earns no long break: a break is what a bell gives |
 
-Setting a lap aside (void) changes the timer exactly as `stop` does; the difference is the
-session's outcome. The session row is written by whoever sees the run end or ends it. Those rules
-get their own fixture in roadmap section 2.
+There is one way to end a lap before its bell, and it is `stop`. (Until 2026-11-25 a stopped lap
+gave its place back and a second button set a lap aside; the user's second hour with the app
+found two stops that nobody could tell apart.) A lap is set aside afterwards, from the timeline
+(section 13). The session row is written by whoever sees the run end or ends it (section 11).
 
 Fixture: `timer.json`.
 
@@ -177,10 +178,20 @@ From `session` rows and the viewer's offset from UTC in minutes.
   count nowhere.
 - Its counted interval is `[started + paused_ms, ended]`. Its day is the local day of `started`.
 - A day's `focus_ms` is the length of the union of its counted intervals, so minutes that ran on
-  two devices at once count once. Its `laps` is the number of `rang` sessions.
+  two devices at once count once. Its `laps` is the number of counted sessions: a lap that was
+  stopped is a lap, a short one.
+- A lap's `fill` is how much of it ran: 1 for `rang`, else `(ended - started - paused_ms) /
+  planned_ms`, never over 1. Wherever laps are drawn (the set of four, a task's squares, the day's
+  target), each is drawn that full, so a count of laps never says more than the picture does.
+- What is earned needs the bell: the streak's kept day (section 8), a mark for a number of laps
+  (section 16) and a cheer (section 15) count only laps that rang.
 - `overlaps` lists each pair of counted sessions from different devices whose intervals share more
   than an instant: the "ran on two devices" mark. Each pair is sorted by id, and so is the list.
 - A day with nothing counted is not in `days`.
+- **The set on screen.** The laps of the set that have ended are `set_index` of them while a lap
+  runs or the timer is idle, and one more once the lap's bell has gone and during a break. They are the last that many work
+  sessions that started today, oldest first, `void` ones included and drawn empty. Where fewer
+  rows are held (a bell not yet written), the earliest are drawn full.
 - An interval that would end before it begins counts as 0. Two overlapping laps that started on
   different local days each count in their own day; the mark still shows the pair.
 
@@ -227,6 +238,8 @@ Fixture: `streak.json`.
 | `timer.json` | Starts each case from `from`, or idle at index 0. A step with `do` applies that action at `at`; a step with `expect` compares only the keys it lists. A key is a field of the state, one of section 6's worked-out values, or `state` for the whole state |
 | `stats.json` `cases` | Computes from `sessions` and `utc_offset_min` and must equal `expect` |
 | `stats.json` `race` | Computes from `sessions`, `state` (the timer), `now` and `utc_offset_min` and must equal `expect` |
+| `stats.json` `fill` | One fill per session row in `sessions`, in order, must equal `expect`. Read by the TS tests only |
+| `stats.json` `set` | The set on screen from `sessions`, `state`, `now` and `utc_offset_min` must equal `expect`. Read by the TS tests only |
 | `streak.json` | Computes from `today`, `kept`, `days_mask` and `window` and must equal `expect` |
 
 `tools/contracts-check.mjs` checks every cell, session and timer state in these files against the
@@ -326,18 +339,15 @@ already held:
 |---|---|
 | The bell (the run is over) | `outcome: rang`, `ended` the planned end (`ends_at`). Every cell of the row is stamped at the time the timer cell was last written, counter 0, with the writer's device id, not at the time of writing |
 | Stop, before the bell | `outcome: stopped`, `ended` now, or the moment the pause began if it is paused |
-| Set aside (void), before or after the bell | `outcome: void`, `ended` as above, or the planned end if the bell has gone |
 | Replaced: a newer timer state for another run arrives while this device's run is open | As stop |
 | Stop or replaced, after the bell | It rang: the row of the first line |
 | Stop or replaced, on a run that rang once and was then extended | Still `rang`: a lap that reached its bell stays a lap. `ended` as for stop, an ordinary stamp |
 
-A run that holds a rang row counts as over for the set of four as well: after it, the next lap is
-the next lap of the set, extended or not.
-
 - `kind`, `task`, `started`, `planned_ms` and `paused_ms` are the state's; `device` is the writer.
-- A run that did not reach the bell and had under 60000 ms of running time (`ended - started -
-  paused_ms`) leaves no row. A run that rang always leaves one, however short.
-- Stopped and void rows are things a person did, so their cells take ordinary stamps from the clock.
+- A lap always leaves a row, however short: it had its place in the set, and the row is what
+  shows it. A break that did not reach the bell and had under 60000 ms of running time (`ended -
+  started - paused_ms`) leaves none.
+- A stopped row is something a person did, so its cells take ordinary stamps from the clock.
 - Starting a run while another is open closes the open one first, as stop.
 
 Why a rang row is stamped when the timer cell was written, and not when the row is: it is the
@@ -355,7 +365,7 @@ last to write the timer cell (the cell's stamp ends in its own device id). A dev
 offline with another device's timer waits: that lap may have been stopped where it was running.
 
 Fixture: `session.json`. `close` cases call the closing rule with `state`, `end` (`bell`, `stop`,
-`void`, `replaced`), `now`, `device`, `written` (the time in the timer cell's stamp) and `rang`
+`replaced`), `now`, `device`, `written` (the time in the timer cell's stamp) and `rang`
 (true when a rang row is already held), and expect `null` or the row, its `id`, and `stamp_at`
 (`written` for a bell's row, or `null` for an ordinary stamp). `bell` cases ask whether to write, from the
 timer cell's stamp, the device, `in_step` and `has_row`.
@@ -366,7 +376,8 @@ The rules behind the Today screen. They are worked out on the device from `task`
 `session` and `settings` rows; the server knows none of them.
 
 **Quick add.** One line of text makes one task. If the trimmed text ends in a space, `~` and a
-number from 1 to 99, that number is the estimate in laps and the rest, trimmed, is the title.
+number from 1 to 99, that number is the estimate in laps, 8 at most (a larger one is taken as 8),
+and the rest, trimmed, is the title.
 Anything else is all title. An empty title adds nothing.
 
 **Repeat.** `repeat` is `null`, `{"every":"day"}`, or `{"every":"week","days":<mask>}` (bit 0
@@ -398,6 +409,28 @@ value that is not a time of day is kept and sent on, and shown and reminded as n
 device clears the day while another sets a time on the day it still saw, both cells are kept
 and the task has a time with no day: it shows and reminds as none until a day is set again.
 
+**Done while its lap runs.** Marking a task done while a lap is running or paused on it ends that
+lap as `stop` does (section 6), in the same turn as the `done`: the work is finished, so the lap
+is, and a timer left counting for a task that is ticked off was read as a bug (the user,
+2026-11-25: the strip went on as "a lap for nothing in particular"). The device that writes the
+`done` writes the stop. A lap whose bell has already gone is left alone: it rang, and its break
+is still offered. Taking the `done` back while the stop can still be undone (section 11's ten
+seconds, and the timer cell untouched since) puts the lap back as well; later, or from another
+device, only the task opens again. A subtask done ends nothing.
+
+**Deleting for good.** `deleted` is a time, and a row is restorable while that time is in the
+last 30 days. A person who wants it gone now writes `deleted: 1577836800000` (the first moment of
+2020, the earliest time any build takes for a real one): long past the window, so the row is on
+no screen in any build, old ones included, and nothing new has to be learned by anyone. (A `1`
+would have been read by every older build as no time at all, and the row would have come back.) The cells stay on the server like those of any row whose 30 days ran out. It holds for a
+task, a habit and a project alike, and it is the one write here with no way back, so a screen
+asks twice.
+
+**A project's name and its end.** `name` is edited like any field. Deleting a project writes its
+`deleted` as now and is offered an Undo (which writes `null`); there is no shelf of deleted
+projects. Its tasks keep their `project` id and show no project, as they do for an archived one,
+so an Undo, here or on another device, gives every task its project back.
+
 **A project's colour.** `color` is one of the twelve names DESIGN.md gives its project colours,
 or `#` and six hex digits for a colour the person picked: written in lowercase, read in either
 case. A build that does not know a
@@ -419,9 +452,17 @@ by `order`, then by row id, so two devices that picked the same key still agree.
 
 A subtask shows inside its parent only.
 
+**An estimate** is offered from 1 to 8 laps. Past that a task is several tasks, and a row of
+forty squares is no picture of anything. A larger number in a row from an older build is kept and
+shown as it is; the first edit of the estimate brings it to 8.
+
+**The free words for when** (`when`) are no longer shown or edited: with a clock time beside
+them nobody could say what they were for (the user, 2026-11-25). The field stays in the schema and
+is still copied to the next of a repeating task, so no build drops what an older one wrote.
+
 **Laps on a task.** From the work sessions of that task, oldest first: a `rang` session is one lap
-and one whole square; a `stopped` one is a part square, its running time over its planned length;
-a `void` one is nothing. The lap in progress on the task adds a part square that fills as it runs,
+and one whole square; a `stopped` one is one lap and a part square, as full as its `fill`
+(section 7); a `void` one is nothing. The lap in progress on the task adds a part square that fills as it runs,
 unless its row is already there; once its bell has gone it is a lap and a whole square, row or no
 row, so the count never trails the day's. "2 of 4" counts laps; the squares may pass the estimate.
 
@@ -450,8 +491,8 @@ each day of last week, the same. The ghost's figure "by now" is last week's tota
 weekday and time of day. The split is this week's total less that.
 
 **The year.** One cell per local day from the first day with a counted session to today. A cell's
-level comes from the laps that rang that day: 0 none, 1 for 1 to 3, 2 for 4 to 6, 3 for 7 or 8, 4
-for 9 or more. A day with counted minutes and no lap is level 1. A rest day (section 8) carries
+level comes from that day's laps: 0 none, 1 for 1 to 3, 2 for 4 to 6, 3 for 7 or 8, 4
+for 9 or more. A rest day (section 8) carries
 the rest mark.
 
 **Since the first lap.** Total focus and laps; the days kept (at least one lap that rang) of the
@@ -626,7 +667,8 @@ break: after a long break's bell nothing starts by itself.
 
 **Marks.** A mark is for something achieved, never for opening the app. Three kinds: the total of
 laps that rang reaching 1, 4, 25, 100, 250, 500, 1000 or 2500; a task marked done with its laps at
-or under its estimate; a week's focus passing the best week before it (only once there is a week
+or under its estimate, at least one of them a lap that rang (what is earned needs the bell: a task
+ticked five seconds into its only lap earns nothing); a week's focus passing the best week before it (only once there is a week
 before it). A mark is for what was done on this device (the lap's bell, the task's done, the week's latest
 lap was written here), and is shown once per account: the device that shows it writes
 `settings/current` field `marks`, an object of mark keys to the time shown (`laps-25`,

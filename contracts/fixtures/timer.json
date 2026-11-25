@@ -465,7 +465,7 @@
    ]
   },
   {
-   "name": "stopped mid-lap: idle, and the next start is a fresh lap in the same place",
+   "name": "stopped mid-lap: idle, and the set moves on: the next start is the next lap",
    "from": {
     "phase": "idle",
     "run": null,
@@ -519,7 +519,7 @@
       "over": false,
       "next": {
        "phase": "work",
-       "set_index": 1
+       "set_index": 2
       },
       "state": {
        "phase": "idle",
@@ -529,7 +529,7 @@
        "paused_at": null,
        "paused_ms": 0,
        "planned_ms": 0,
-       "set_index": 1
+       "set_index": 2
       }
      }
     },
@@ -553,7 +553,136 @@
        "paused_at": null,
        "paused_ms": 0,
        "planned_ms": 1500000,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "stopped in its first seconds, and while paused: the lap has had its place all the same",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 0
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000005000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000005000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
        "set_index": 1
+      }
+     }
+    },
+    {
+     "at": 1800000010000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-2",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000070000,
+     "do": "pause"
+    },
+    {
+     "at": 1800000600000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000600000,
+     "expect": {
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 2
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "stop on lap four before its bell: a new set, idle at lap one",
+   "from": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 3
+   },
+   "steps": [
+    {
+     "at": 1800000000000,
+     "do": "start",
+     "phase": "work",
+     "run": "run-1",
+     "task": null,
+     "planned_ms": 1500000
+    },
+    {
+     "at": 1800000000000,
+     "expect": {
+      "set_index": 3,
+      "next": {
+       "phase": "long",
+       "set_index": 3
+      }
+     }
+    },
+    {
+     "at": 1800000900000,
+     "do": "stop"
+    },
+    {
+     "at": 1800000900000,
+     "expect": {
+      "next": {
+       "phase": "work",
+       "set_index": 0
+      },
+      "state": {
+       "phase": "idle",
+       "run": null,
+       "task": null,
+       "started": null,
+       "paused_at": null,
+       "paused_ms": 0,
+       "planned_ms": 0,
+       "set_index": 0
       }
      }
     }
@@ -911,7 +1040,7 @@
    ]
   },
   {
-   "name": "a lap restarted before the bell keeps its place",
+   "name": "a lap started over one that has not rung is the next lap: the first had its place",
    "from": {
     "phase": "idle",
     "run": null,
@@ -942,7 +1071,7 @@
     {
      "at": 1800000600000,
      "expect": {
-      "set_index": 2,
+      "set_index": 3,
       "left_ms": 1500000,
       "state": {
        "phase": "work",
@@ -952,7 +1081,7 @@
        "paused_at": null,
        "paused_ms": 0,
        "planned_ms": 1500000,
-       "set_index": 2
+       "set_index": 3
       }
      }
     }

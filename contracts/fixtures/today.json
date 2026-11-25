@@ -26,7 +26,28 @@
    "text": "exercise 5-3 ~12",
    "expect": {
     "title": "exercise 5-3",
-    "estimate": 12
+    "estimate": 8
+   }
+  },
+  {
+   "text": "eight is the most ~8",
+   "expect": {
+    "title": "eight is the most",
+    "estimate": 8
+   }
+  },
+  {
+   "text": "nine is taken as eight ~9",
+   "expect": {
+    "title": "nine is taken as eight",
+    "estimate": 8
+   }
+  },
+  {
+   "text": "and so is ninety-nine ~99",
+   "expect": {
+    "title": "and so is ninety-nine",
+    "estimate": 8
    }
   },
   {
@@ -992,7 +1013,7 @@
    }
   },
   {
-   "name": "a stopped lap is a part square and not a lap",
+   "name": "a stopped lap is a lap and a part square",
    "task": "task-pointers",
    "now": 1795494600000,
    "state": {
@@ -1030,7 +1051,7 @@
     }
    ],
    "expect": {
-    "laps": 1,
+    "laps": 2,
     "squares": [
      1,
      0.6

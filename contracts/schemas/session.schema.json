@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "session",
-  "description": "One row per pomodoro or break that ran for 60 s or more. The row id is the timer's run id, so two devices that saw the same interval end write the same row. Created once; only task, note and outcome change later.",
+  "description": "One row per lap, however short, and per break that ran for 60 s or more. The row id is the timer's run id, so two devices that saw the same interval end write the same row. Created once; only task, note and outcome change later.",
   "type": "object",
   "additionalProperties": false,
   "required": ["kind", "task", "started", "ended", "planned_ms", "paused_ms", "outcome", "device"],
@@ -12,7 +12,7 @@
     "ended": { "type": "integer", "description": "Server-time ms: the planned end if it rang, the moment it was stopped otherwise." },
     "planned_ms": { "type": "integer", "minimum": 0 },
     "paused_ms": { "type": "integer", "minimum": 0 },
-    "outcome": { "enum": ["rang", "stopped", "void"], "description": "rang: minutes and a lap. stopped: minutes, no lap. void: set aside, the timeline only." },
+    "outcome": { "enum": ["rang", "stopped", "void"], "description": "rang: minutes and a whole lap. stopped: minutes and a lap that ended early. void: not counted, the timeline only." },
     "device": { "type": "string", "pattern": "^[0-9a-f]{16}$", "description": "The device that wrote the row." },
     "note": { "type": "string" }
   }

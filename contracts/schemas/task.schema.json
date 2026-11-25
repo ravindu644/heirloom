@@ -8,7 +8,7 @@
     "project": { "type": ["string", "null"] },
     "title": { "type": "string" },
     "notes": { "type": "string" },
-    "estimate": { "type": ["integer", "null"], "minimum": 1, "description": "Whole pomodoros. Laps done may pass it." },
+    "estimate": { "type": ["integer", "null"], "minimum": 1, "description": "Whole laps, offered from 1 to 8. Laps done may pass it." },
     "parent": { "type": ["string", "null"], "description": "The task this is a subtask of. One level." },
     "due": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Local day." },
     "repeat": {
@@ -19,7 +19,7 @@
         { "type": "object", "additionalProperties": false, "required": ["every", "days"], "properties": { "every": { "const": "week" }, "days": { "type": "integer", "minimum": 1, "maximum": 127, "description": "Weekday mask. Bit 0 is Monday, bit 6 is Sunday." } } }
       ]
     },
-    "when": { "type": ["string", "null"], "maxLength": 80, "description": "Free words for when in the day: after dinner." },
+    "when": { "type": ["string", "null"], "maxLength": 80, "description": "Free words for when in the day: after dinner. No longer shown or edited; kept so older rows are not dropped." },
     "time": { "type": ["string", "null"], "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$", "description": "Local time of day on its due day, 24 hour, 15:30. Null for none. Means nothing without a due day." },
     "done": { "type": ["integer", "null"], "description": "Server-time ms it was done, null while open." },
     "order": { "type": "string", "description": "Fractional index. Ties break by row id." },

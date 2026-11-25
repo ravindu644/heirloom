@@ -1,5 +1,5 @@
 {
- "about": "Totals from sessions. Rules: contracts/protocol.md section 7. Sri Lanka time (+05:30) throughout; 04:30Z is 10:00 there.",
+ "about": "Totals from sessions. Rules: contracts/protocol.md section 7. Sri Lanka time (+05:30) throughout; 04:30Z is 10:00 there. `fill`: session rows in, one fill each out. `set`: the set on screen, from the timer state, `now` and session rows: the fills of the laps of the set that have ended, oldest first.",
  "cases": [
   {
    "name": "one lap that rang",
@@ -28,7 +28,7 @@
    }
   },
   {
-   "name": "rang, stopped and set aside: the minutes of two, the lap of one",
+   "name": "rang, stopped and set aside: the minutes of two, and both are laps",
    "utc_offset_min": 330,
    "sessions": [
     {
@@ -69,7 +69,7 @@
     "days": {
      "2026-11-24": {
       "focus_ms": 2400000,
-      "laps": 1
+      "laps": 2
      }
     },
     "overlaps": []
@@ -97,7 +97,7 @@
    }
   },
   {
-   "name": "a stopped lap gives minutes and no lap",
+   "name": "a stopped lap is a lap, a short one",
    "utc_offset_min": 330,
    "sessions": [
     {
@@ -116,7 +116,55 @@
     "days": {
      "2026-11-24": {
       "focus_ms": 900000,
-      "laps": 0
+      "laps": 1
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "a day of laps that were all stopped, one after twenty seconds: three laps, and their minutes",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495200000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795495800000,
+     "ended": 1795495820000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795496700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 920000,
+      "laps": 3
      }
     },
     "overlaps": []
@@ -295,7 +343,7 @@
     "days": {
      "2026-11-24": {
       "focus_ms": 1500000,
-      "laps": 1
+      "laps": 2
      }
     },
     "overlaps": [
@@ -411,7 +459,7 @@
     "days": {
      "2026-11-24": {
       "focus_ms": 1980000,
-      "laps": 1
+      "laps": 2
      }
     },
     "overlaps": []
@@ -847,6 +895,1019 @@
     },
     "split_ms": 1500000
    }
+  }
+ ],
+ "fill": [
+  {
+   "name": "a lap that rang is full",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "a lap that rang is full whatever its row says it ran: an extension stopped short still rang",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496220000,
+     "planned_ms": 1800000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "a stopped lap is as full as it ran: 15 of 25 minutes",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    0.6
+   ]
+  },
+  {
+   "name": "paused minutes did not run",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795495800000,
+     "planned_ms": 1500000,
+     "paused_ms": 600000,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    0.4
+   ]
+  },
+  {
+   "name": "a lap stopped after three seconds is nearly empty, and not nothing",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795494603000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    0.002
+   ]
+  },
+  {
+   "name": "never over 1: a stopped row that says it ran past its plan",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795497000000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "never under 0: a row that would end before it began",
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795494300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    0
+   ]
+  }
+ ],
+ "set": [
+  {
+   "name": "before the first lap of a set, none has ended",
+   "utc_offset_min": 330,
+   "now": 1795494600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 0
+   },
+   "sessions": [],
+   "expect": []
+  },
+  {
+   "name": "lap three is running: the two before it, one that rang and one stopped at 15 of 25",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "idle after lap two was stopped: the same two",
+   "utc_offset_min": 330,
+   "now": 1795497360000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "in the break after a lap, that lap has ended too",
+   "utc_offset_min": 330,
+   "now": 1795496160000,
+   "state": {
+    "phase": "short",
+    "run": "rest",
+    "task": null,
+    "started": 1795496100000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "the long break: all four, each as full as it ran",
+   "utc_offset_min": 330,
+   "now": 1795499760000,
+   "state": {
+    "phase": "long",
+    "run": "rest",
+    "task": null,
+    "started": 1795499700000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 300000,
+    "set_index": 3
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795499100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-4",
+     "kind": "work",
+     "task": null,
+     "started": 1795499400000,
+     "ended": 1795499700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6,
+    1,
+    0.2
+   ]
+  },
+  {
+   "name": "a lap that is not counted keeps its place and is drawn empty",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0
+   ]
+  },
+  {
+   "name": "a bell whose row is not written yet: fewer rows than laps, and the earliest are drawn full",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "breaks are not laps of the set",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "rest-1",
+     "kind": "short",
+     "task": null,
+     "started": 1795497300000,
+     "ended": 1795497600000,
+     "planned_ms": 300000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "a lap that started yesterday is not one of today's: its place in the set is drawn full, as a row not held is",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-0",
+     "kind": "work",
+     "task": null,
+     "started": 1795408200000,
+     "ended": 1795408800000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "a second set in one day: only the laps of this one, the last that many",
+   "utc_offset_min": 330,
+   "now": 1795502100000,
+   "state": {
+    "phase": "work",
+    "run": "run-6",
+    "task": null,
+    "started": 1795501800000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795499100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-4",
+     "kind": "work",
+     "task": null,
+     "started": 1795499400000,
+     "ended": 1795499700000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-5",
+     "kind": "work",
+     "task": null,
+     "started": 1795500900000,
+     "ended": 1795501500000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    0.4
+   ]
+  },
+  {
+   "name": "a row the run in progress left at a stop that was taken back is not a lap that has ended",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795497720000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "rows in any order: oldest first on screen",
+   "utc_offset_min": 330,
+   "now": 1795498200000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "lap one has just rung: it has ended, and is full",
+   "utc_offset_min": 330,
+   "now": 1795496160000,
+   "state": {
+    "phase": "work",
+    "run": "run-1",
+    "task": null,
+    "started": 1795494600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "lap one has just rung and its row is not written yet: full all the same",
+   "utc_offset_min": 330,
+   "now": 1795496160000,
+   "state": {
+    "phase": "work",
+    "run": "run-1",
+    "task": null,
+    "started": 1795494600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [],
+   "expect": [
+    1
+   ]
+  },
+  {
+   "name": "one millisecond before its bell lap one has not ended",
+   "utc_offset_min": 330,
+   "now": 1795496099999,
+   "state": {
+    "phase": "work",
+    "run": "run-1",
+    "task": null,
+    "started": 1795494600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 0
+   },
+   "sessions": [],
+   "expect": []
+  },
+  {
+   "name": "lap four has just rung: all four, before the long break is begun",
+   "utc_offset_min": 330,
+   "now": 1795500960000,
+   "state": {
+    "phase": "work",
+    "run": "run-4",
+    "task": null,
+    "started": 1795499400000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 3
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795499100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-4",
+     "kind": "work",
+     "task": null,
+     "started": 1795499400000,
+     "ended": 1795500900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6,
+    1,
+    1
+   ]
+  },
+  {
+   "name": "the lap that has just rung is the last of them, row or no row: lap three, after one stopped",
+   "utc_offset_min": 330,
+   "now": 1795499160000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6,
+    1
+   ]
+  },
+  {
+   "name": "rung, and then not counted before its break was begun: empty, in its place",
+   "utc_offset_min": 330,
+   "now": 1795499160000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795499100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "void",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6,
+    0
+   ]
+  },
+  {
+   "name": "rung after a stop that was taken back, the row of that stop still held: the lap rang, and is full",
+   "utc_offset_min": 330,
+   "now": 1795499160000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-3",
+     "kind": "work",
+     "task": null,
+     "started": 1795497600000,
+     "ended": 1795497720000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6,
+    1
+   ]
+  },
+  {
+   "name": "a paused lap has no bell: it has not ended, however long ago it would have rung",
+   "utc_offset_min": 330,
+   "now": 1795506600000,
+   "state": {
+    "phase": "work",
+    "run": "run-3",
+    "task": null,
+    "started": 1795497600000,
+    "paused_at": 1795498200000,
+    "paused_ms": 0,
+    "planned_ms": 1500000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795494600000,
+     "ended": 1795496100000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795496400000,
+     "ended": 1795497300000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "stopped",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": [
+    1,
+    0.6
+   ]
   }
  ]
 }
