@@ -143,7 +143,7 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [ui] The server step, "Set up this server", joining from a link, the Invites and Admins panels
 - [ ] [android] Plain http to any host from the app
 - [x] [qa] Setup, a link from make to join, raise and lower, the app build's server step
-- [ ] [lead] The S10 listens on the home network; the APK that asks
+- [x] [lead] The S10 listens on the home network; the APK that asks
 - [ ] Gate (the user sets up the S10 from the phone, makes a link, a second device joins with it)
 
 ## 11. Release 1.0
