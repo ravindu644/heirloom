@@ -111,3 +111,40 @@ test('at 471 px, the sign-in fields and buttons run margin to margin, and the ti
   console.log(`timer digits: ${at412.toFixed(1)} px wide at 412, ${at471.toFixed(1)} px at 471`);
   expect(at471).toBeGreaterThan(at412);
 });
+
+// DESIGN.md, Layout: "The keyboard takes the bottom bar's place." A keyboard is something typed
+// into with the focus, and the window clearly shorter than it has been at this width.
+test('on a phone, the keyboard takes the bottom bar\'s place: the bar goes while a field has the focus and the window is shorter, and comes back', async ({ deviceA: a }) => {
+  const name = username('keys');
+  await accountWith(name);
+  await a.page.setViewportSize({ width: 471, height: 1020 });
+  await signIn(a.page, name);
+  await ready(a.page);
+  await person(a.page, name).click();
+  const nav = a.page.getByRole('navigation', { name: 'Screens' });
+  const lap = a.page.getByRole('spinbutton', { name: 'A lap' });
+  await lap.focus();
+  await expect(nav).toBeVisible();
+
+  await a.page.setViewportSize({ width: 471, height: 600 });
+  await expect(nav).toBeHidden();
+  await expect(lap).toBeFocused();
+
+  await a.page.setViewportSize({ width: 471, height: 1020 });
+  await expect(lap).toBeFocused();
+  await expect(nav).toBeVisible();
+});
+
+test('a window that was never taller is not a keyboard: at 600 by 500 from the start, the bar stays with a field focused', async ({ deviceB: b }) => {
+  const name = username('nokeys');
+  await accountWith(name);
+  // Before the first load, so the page has only ever been this tall.
+  await b.page.setViewportSize({ width: 600, height: 500 });
+  await signIn(b.page, name);
+  await ready(b.page);
+  await person(b.page, name).click();
+  const lap = b.page.getByRole('spinbutton', { name: 'A lap' });
+  await lap.focus();
+  await expect(lap).toBeFocused();
+  await expect(b.page.getByRole('navigation', { name: 'Screens' })).toBeVisible();
+});
