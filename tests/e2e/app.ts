@@ -32,10 +32,10 @@ export const startButton = (page: Page) => page.getByRole('button', { name: 'Sta
 /** After a bell or in a break: the lap that comes next, started at once. */
 export const startNow = (page: Page) => page.getByRole('button', { name: 'Start the next lap now', exact: true });
 
-/** What a ready Focus screen shows: its start, under the line that names the lap a tap starts. */
+/** What a ready Focus screen shows: its start, under the line that names today's lap a tap starts ("Lap 2 today", "Lap 2 of 5 today", "Lap 6 today, past your target of 5"). */
 export async function ready(page: Page, lap = 1) {
   await expect(startButton(page)).toBeVisible();
-  await expect(page.getByText(`Lap ${lap} of 4 in this set, next`).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText(new RegExp(`^Lap ${lap}( of \\d+)? today(, past your target of \\d+)?, next$`)).filter({ visible: true }).first()).toBeVisible();
 }
 
 /**
@@ -56,7 +56,8 @@ export async function signedInto(d: { page: Page }, tag: string, seed: (node: De
   seed(node);
   await until(() => node.engine.unsent.value === 0 && node.engine.sync.value === 'in-step', 10000, 'not sent');
   await signIn(d.page, name);
-  await ready(d.page);
+  // Ready for whichever lap of today the seed leaves next.
+  await expect(startButton(d.page)).toBeVisible();
   return { name, node };
 }
 
@@ -167,7 +168,8 @@ export const taskRow = (page: Page, title: string) =>
 
 /** A task row's squares, oldest first: 1 for a lap that rang, a share for one stopped or running, 0 for one to come. */
 export const squaresOf = (row: ReturnType<typeof taskRow>) =>
-  row.locator('i[style*="--share"]').evaluateAll((els) => els.map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
+  // The row draws the pair in two places, beside the words and under them, and shows one.
+  row.locator('i[style*="--share"]').evaluateAll((els) => els.filter((el) => el.checkVisibility()).map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
 
 /** The titles of every task row on the screen, top to bottom. */
 export const titles = (page: Page) =>

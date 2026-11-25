@@ -42,11 +42,11 @@ test('a lap started on A shows on B within a second; pause, resume and five more
   const within = { timeout: 1000 };
 
   await seen(test, 'start on A, seen on B', () => startButton(a.page).click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
-  await expect(b.page.getByText('Lap 1 of 4 in this set, focus')).toBeVisible();
+  await expect(b.page.getByText('Lap 1 today, focus')).toBeVisible();
   await sameSecond(a.page, b.page);
 
   await seen(test, 'pause on B, seen on A', () => button(b.page, 'Pause').click(), () => expect(button(a.page, 'Resume')).toBeVisible(within));
-  await expect(a.page.getByText('Lap 1 of 4 in this set, paused')).toBeVisible();
+  await expect(a.page.getByText('Lap 1 today, paused')).toBeVisible();
   await sameSecond(a.page, b.page);
 
   await seen(test, 'resume on A, seen on B', () => button(a.page, 'Resume').click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
@@ -64,7 +64,7 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   const name = await twoLaptops(a, b, 'rings', { work_ms: 4000, short_ms: 60000 });
   await startButton(a.page).click();
   for (const d of [a, b]) {
-    await expect(d.page.getByText('Lap 1 of 4 in this set, done')).toBeVisible({ timeout: 8000 });
+    await expect(d.page.getByText('Lap 1 today, done')).toBeVisible({ timeout: 8000 });
     await expect(button(d.page, 'Start 1 min break')).toBeVisible();
     await expect(startNow(d.page)).toBeVisible();
   }
@@ -76,23 +76,23 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   expect((row!.ended as number) - (row!.started as number)).toBe(4000);
 
   await button(b.page, 'Start 1 min break').click();
-  await expect(a.page.getByText('Short break, after lap 1 of 4 in this set')).toBeVisible({ timeout: 1000 });
+  await expect(a.page.getByText('lap 2 today next')).toBeVisible({ timeout: 1000 });
   await expect(startNow(a.page)).toBeVisible();
   // A break is not stretched: the offer is for laps.
   for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);
 });
 
-test('stop under a minute still leaves a stopped row, says which lap stopped, and lap 2 is next on both', async ({ deviceA: a, deviceB: b }) => {
+test('a stop in the first minute is a start taken back: no row, and lap 1 is still next on both', async ({ deviceA: a, deviceB: b }) => {
   const name = await twoLaptops(a, b, 'short');
   await startButton(a.page).click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
   // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
-  await expect(a.page.getByText('Lap 1 stopped in its first minute. Lap 2 is next.').filter({ visible: true })).toBeVisible();
-  for (const d of [a, b]) await ready(d.page, 2);
-  const rows = await sessionsWhen(name, (list) => list.length > 0);
-  expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({ kind: 'work', outcome: 'stopped' });
+  await expect(a.page.getByText('Stopped in its first minute. Not counted as a lap.').filter({ visible: true })).toBeVisible();
+  // Protocol section 6: under 60000 ms of running it keeps its index, and section 11 writes no row.
+  for (const d of [a, b]) await ready(d.page, 1);
+  await b.page.waitForTimeout(1000);
+  expect(await sessions(name)).toEqual([]);
 });
 
 test('undo after a stop brings the lap back on both laptops, and it then rings as a full lap', async ({ deviceA: a, deviceB: b }) => {
@@ -100,7 +100,8 @@ test('undo after a stop brings the lap back on both laptops, and it then rings a
   await startButton(a.page).click();
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
-  await ready(b.page, 2);
+  // Stopped in its first seconds: a start taken back, so lap 1 is next again.
+  await ready(b.page, 1);
   await button(a.page, 'Undo').click();
   for (const d of [a, b]) await expect(button(d.page, 'Pause')).toBeVisible({ timeout: 1000 });
   await sameSecond(a.page, b.page);

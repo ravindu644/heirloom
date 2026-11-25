@@ -26,7 +26,7 @@ test('a minute in, Stop keeps a stopped row on both laptops; it is a lap on its 
   await expect(a.page.getByRole('button', { name: "Don't count this lap" })).toHaveCount(0);
 
   await stop.click();
-  await expect(a.page.getByText('Lap 1 stopped at 1 min. Lap 2 is next.').filter({ visible: true })).toBeVisible();
+  await expect(a.page.getByText('Lap 1 today stopped at 1 min.').filter({ visible: true })).toBeVisible();
   for (const d of [a, b]) await ready(d.page, 2);
   const [kept] = await sessionsWhen(name, (rows) => rows.length > 0);
   expect(kept).toMatchObject({ kind: 'work', outcome: 'stopped', paused_ms: 0, task: 'proofs' });

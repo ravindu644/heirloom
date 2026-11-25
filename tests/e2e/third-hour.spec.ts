@@ -13,10 +13,10 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
 const rowOf = async (name: string, dataset: string, id: string) => (await serverRows(server, name, dataset)).get(id);
 const timer = async (name: string) => (await serverRows(server, name, 'timer')).get('current')?.state as { phase: string; task: string | null } | undefined;
 
-/** A second browser of the same account, signed in and ready. */
+/** A second browser of the same account, signed in and ready for whichever lap of today is next. */
 async function also(d: { page: Page }, name: string) {
   await signIn(d.page, name);
-  await ready(d.page);
+  await expect(startButton(d.page)).toBeVisible();
 }
 
 // 1. Adding puts the keyboard away.
@@ -189,10 +189,11 @@ test('squares at 1, 8, 9, 16, 17, 32 and 33 laps beside a 60 character title, at
         const r = el.getBoundingClientRect();
         const pad = parseFloat(getComputedStyle(el).paddingRight);
         const edge = r.right - pad;
-        const squares = [...el.querySelectorAll('[data-squares] i')].map((i) => i.getBoundingClientRect());
+        // The pair is drawn beside the words and under them, one of the two shown.
+        const squares = [...el.querySelectorAll('[data-squares] i')].filter((i) => i.checkVisibility()).map((i) => i.getBoundingClientRect());
         const tops = [...new Set(squares.map((s) => Math.round(s.top)))];
         const lines = tops.map((top) => squares.filter((s) => Math.round(s.top) === top));
-        const count = el.querySelector('[class*="count"]')?.getBoundingClientRect();
+        const count = [...el.querySelectorAll('[class*="count"]')].find((c) => c.checkVisibility())?.getBoundingClientRect();
         const control = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Start');
         const controlBox = control ? control.getBoundingClientRect() : null;
         const title = el.querySelector('[class*="title"]') as HTMLElement;
@@ -248,7 +249,7 @@ test('squares at 1, 8, 9, 16, 17, 32 and 33 laps beside a 60 character title, at
 
 // 4. A task's own lengths.
 
-test('a task\'s own lengths: set in its sheet, shown on Focus before a start, on a second device, and cleared by My usual lengths; a lap on it rings at its own length and offers its own break; a task on the usual lengths keeps the account\'s; neither sheet nor Settings takes a lap over 99', async ({ deviceA: a, deviceB: b }) => {
+test('a task\'s own lengths: set in its sheet, shown on Focus before a start, on a second device, and cleared by My usual lengths; a lap on it rings at its own length and offers its own break; a task on the usual lengths keeps the account\'s; neither sheet nor Settings takes a lap over 360: a figure past it comes to 360', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await signedInto(a, 'own', (node) => {
     node.engine.write('task', 'own', { title: 'proofs', estimate: 2, order: 'A' });
     node.engine.write('task', 'usual', { title: 'reading', estimate: 2, order: 'B' });
@@ -289,12 +290,15 @@ test('a task\'s own lengths: set in its sheet, shown on Focus before a start, on
     const row = await rowOf(name, 'task', 'own');
     return [row?.work_ms, row?.short_ms, row?.long_ms];
   }).toEqual([600000, 180000, 1200000]);
-  // Over 99 for a lap is not taken: the field goes back, nothing is written.
+  // Over 360 for a lap comes to 360, the top (section 15); then back to 10.
   const lap = sheet.getByRole('spinbutton', { name: 'A lap' });
-  await lap.fill('120');
+  await lap.fill('361');
   await lap.press('Enter');
-  await expect(lap).toHaveValue('10');
-  expect((await rowOf(name, 'task', 'own'))?.work_ms).toBe(600000);
+  await expect(lap).toHaveValue('360');
+  await expect.poll(async () => (await rowOf(name, 'task', 'own'))?.work_ms).toBe(360 * 60000);
+  await lap.fill('10');
+  await lap.press('Enter');
+  await expect.poll(async () => (await rowOf(name, 'task', 'own'))?.work_ms).toBe(600000);
   await sheet.getByRole('button', { name: 'Close' }).click();
 
   // B: the same lengths in its sheet.
@@ -340,16 +344,14 @@ test('a task\'s own lengths: set in its sheet, shown on Focus before a start, on
   await expect(back.getByRole('button', { name: 'My usual lengths' })).toHaveAttribute('aria-pressed', 'true');
   await back.getByRole('button', { name: 'Close' }).click();
 
-  // Settings: 120 typed for a lap is put back, and the plus stops at 99.
+  // Settings: 361 typed for a lap comes to 360, and the plus stops there.
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   const account = a.page.getByRole('spinbutton', { name: 'A lap' });
-  await account.fill('120');
+  await account.fill('361');
   await account.press('Enter');
-  await expect(account).toHaveValue('25');
-  await account.fill('99');
-  await account.press('Enter');
+  await expect(account).toHaveValue('360');
   await expect(a.page.getByRole('button', { name: 'A lap, one minute more' })).toBeDisabled();
-  await expect.poll(async () => (await rowOf(name, 'settings', 'current'))?.work_ms).toBe(99 * 60000);
+  await expect.poll(async () => (await rowOf(name, 'settings', 'current'))?.work_ms).toBe(360 * 60000);
 });
 
 // 5. The hint is an example.
@@ -486,43 +488,39 @@ test('with automatic starts, the lap after the break is on the task of the last 
 
 // 7. A count says of what.
 
-test('a count says of what: Focus says "in this set" and nothing there is a bare "of 4"; Today says "laps today"; the row "of 3"; Focus\'s bar has a fifth, short mark Today\'s target bar has not; the room row says "in a set of 4"', async ({ deviceA: a }) => {
+test('a count says of what: with a target of 2 Focus says "Lap 1 of 2 today" and its bar has the target\'s two segments, as Today\'s has; Today says "laps today"; the row "of 3"; no bare "of 4" and no set anywhere on Focus; the room row says "Focusing"', async ({ deviceA: a }) => {
   await a.page.setViewportSize(PHONE);
   const { name } = await signedInto(a, 'ofwhat', (node) => {
     node.engine.write('settings', 'current', { day_target: 2 });
     node.engine.write('task', 'essay', { title: 'essay', estimate: 3, order: 'V' });
   });
-  const bare = () =>
+  const stray = () =>
     a.page.locator('main').evaluate((main: HTMLElement) =>
       main.innerText
         .split('\n')
         .map((line: string) => line.trim())
-        .filter((line: string) => /\bof 4\b/.test(line) && !/\bset\b/.test(line)),
+        .filter((line: string) => /\bof 4\b|\bset\b/.test(line)),
     );
-  await expect(a.page.getByText(/in this set/).filter({ visible: true }).first()).toBeVisible();
-  expect(await bare(), 'a bare "of 4" on Focus').toEqual([]);
-  // Focus's bar: four laps and a short fifth mark for the long break.
-  const focusBar = await a.page.locator('main [aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--i:"]') }).first().evaluate((bar) => {
-    const marks = [...bar.children].map((i) => i.getBoundingClientRect().width);
-    return { n: marks.length, last: marks.at(-1)!, first: marks[0]! };
-  });
-  expect(focusBar.n, 'Focus\'s bar has no fifth mark').toBe(5);
-  expect(focusBar.last, 'the fifth mark is not shorter than a lap').toBeLessThan(focusBar.first);
+  await expect(a.page.getByText('Lap 1 of 2 today, next').filter({ visible: true }).first()).toBeVisible();
+  expect(await stray(), 'Focus counts the set').toEqual([]);
+  const bar = () => a.page.locator('main [aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--i:"]') }).first().evaluate((el) => el.children.length);
+  expect(await bar(), 'Focus\'s bar is not the day\'s target').toBe(2);
   await startButton(a.page).click();
-  await expect(a.page.getByText('Lap 1 of 4 in this set, focus')).toBeVisible();
-  expect(await bare(), 'a bare "of 4" on Focus during a lap').toEqual([]);
+  await expect(a.page.getByText('Lap 1 of 2 today, focus').filter({ visible: true }).first()).toBeVisible();
+  expect(await stray(), 'Focus counts the set during a lap').toEqual([]);
 
   await go(a.page, 'Today');
   const target = a.page.getByRole('group', { name: 'Day target' });
   await expect(target).toContainText('0 of 2 laps today');
-  const targetBar = await target.locator('[aria-hidden="true"]').first().evaluate((bar) => bar.children.length);
-  expect(targetBar, 'Today\'s target bar has a mark past its laps').toBe(2);
+  expect(await target.locator('[aria-hidden="true"]').first().evaluate((el) => el.children.length)).toBe(2);
   await expect(taskRow(a.page, 'essay')).toContainText('0 of 3');
 
   await go(a.page, 'Room');
   await a.page.getByLabel('Its name').fill('reading room');
   await button(a.page, 'Make the room').click();
-  await expect(a.page.getByText('Focusing, lap 1 in a set of 4')).toBeVisible({ timeout: 3000 });
+  const me = a.page.getByRole('region', { name: 'Who is focusing now' }).locator('article').filter({ hasText: 'You' }).first();
+  await expect(me).toContainText('Focusing', { timeout: 3000 });
+  await expect(me).not.toContainText(/\blap \d|set of/);
 });
 
 // 8. No work lost, through two real devices against the server.

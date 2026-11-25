@@ -50,7 +50,9 @@ test('presence: a lap on A shows on B and C within a second with the same time l
   await go(a.page, 'Focus');
   const start = Date.now();
   await startButton(a.page).click();
-  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Focusing, lap 1 in a set of 4', { timeout: 1000 });
+  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Focusing', { timeout: 1000 });
+  // The set is on no screen: the row says Focusing and the time left, no lap number.
+  for (const d of [b, c]) await expect(lane(d.page, nameA!)).not.toContainText(/\blap \d|set of/);
   console.log(`start on A, seen on B and C: ${Date.now() - start} ms`);
   // Time left on the lane, against A's own digits: within a second.
   const seconds = (text: string) => Number(text.split(':')[0]) * 60 + Number(text.split(':')[1]);
@@ -60,7 +62,7 @@ test('presence: a lap on A shows on B and C within a second with the same time l
     expect(Math.abs(theirs - mine), `${theirs} s on the lane, ${mine} s on A`).toBeLessThanOrEqual(1);
   }
   await button(a.page, 'Pause').click();
-  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Paused, lap 1 in a set of 4', { timeout: 1000 });
+  for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Paused', { timeout: 1000 });
   await button(a.page, 'Resume').click();
   await a.page.getByRole('button', { name: 'Stop', exact: true }).click();
   for (const d of [b, c]) await expect(lane(d.page, nameA!)).toContainText('Not on a lap', { timeout: 1000 });
@@ -182,10 +184,15 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await target.fill('20');
   await target.press('Enter');
   await expect(b.page.getByText('0m of 20h together this week.')).toBeVisible({ timeout: 2000 });
-  for (const wrong of ['2.5', '201', '-1']) {
-    await target.fill(wrong);
+  // A fraction is put back; past either end a figure comes to the nearest one it can be (DESIGN.md).
+  await target.fill('2.5');
+  await target.press('Enter');
+  await expect(target, '"2.5" was kept').toHaveValue('20');
+  for (const [typed, kept, said] of [['201', '200', '0m of 200h together this week.'], ['-1', '0', '0m together this week.'], ['20', '20', '0m of 20h together this week.']] as const) {
+    await target.fill(typed);
     await target.press('Enter');
-    await expect(target, `"${wrong}" was kept`).toHaveValue('20');
+    await expect(target, `"${typed}" typed`).toHaveValue(kept);
+    await expect(b.page.getByText(said), `"${typed}" typed`).toBeVisible({ timeout: 2000 });
   }
   // An emptied field is put back too: it must not wipe the room's target for everyone.
   await target.fill('');

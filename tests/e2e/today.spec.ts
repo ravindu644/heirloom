@@ -508,7 +508,7 @@ test('at 412 wide, a row that ends in a control keeps its count and its squares,
   await expect(next).toContainText('0 of 4');
   // Squares never hide now (DESIGN.md, Task row): where the title leaves no room they take a line
   // of their own under the count and the button, still inside the row.
-  const squares = next.locator('[data-squares] i');
+  const squares = next.locator('[data-squares] i').filter({ visible: true });
   await expect(squares).toHaveCount(4);
   const row = (await next.boundingBox())!;
   for (const box of await squares.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()))) {

@@ -205,10 +205,11 @@ test('4. the same lap stopped on two devices, each offline, at different moments
   assert.equal(b.engine.timer.value.run, 'run-shared');
   offline(a);
   offline(b);
-  // A stops at twenty seconds, B, not knowing, at thirty-five: both under a minute, and a lap leaves a row however short.
-  a.skew.ms = 20000;
+  // A stops at seventy seconds, B, not knowing, at eighty-five: both past the first minute, so each
+  // is a lap that leaves a row (under a minute a stop is a start taken back, and leaves none).
+  a.skew.ms = 70000;
   fa.stop();
-  b.skew.ms = 35000;
+  b.skew.ms = 85000;
   fb.stop();
   // A's stop reaches the server first, so the later stop has to win on its stamp, not on arriving last.
   online(a);
@@ -220,7 +221,7 @@ test('4. the same lap stopped on two devices, each offline, at different moments
   const kept = rows.get('run-shared')!;
   assert.equal(kept.outcome, 'stopped');
   const ran = (kept.ended as number) - (kept.started as number);
-  assert.ok(ran >= 35000 && ran < 40000, `the row kept ${ran} ms, not B's 35 s`);
+  assert.ok(ran >= 85000 && ran < 90000, `the row kept ${ran} ms, not B's 85 s`);
   for (const d of [a, b]) {
     assert.deepEqual(d.engine.rows('session').value.get('run-shared'), kept);
     assert.equal(d.engine.timer.value.phase, 'idle');

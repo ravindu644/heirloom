@@ -3,6 +3,7 @@
 // is the phone's business"), "It is an app, not a page", and the component bullets.
 import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
+import { welcome as about } from '../../client/src/ui/strings.ts';
 import { serverRows, until } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
 import { accountWith, colourOf, go, midScreen, quickAdd, ready, selectable, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow, token, username } from './app.ts';
@@ -413,23 +414,104 @@ test('a project\'s colour: two of the new named colours and a picked one fill th
   expect((await serverRows(server, name, 'project')).get('future')?.color).toBe('chartreuse-ish');
 });
 
-// 8. The welcome, in the browser: the same lines beside the form from 720px, under it below.
+// 8. The welcome, in the browser: beside the form from 720px, under it below. Section 14: shown,
+// not explained: one sentence, one drawing with its key, two small drawings.
 
-test('the browser\'s signed-out screen carries the welcome: beside the form at 1440, under it at 412', async ({ deviceA: a }) => {
-  const title = 'Work in laps. Race the you of last week.';
+/** The welcome's section, wherever it stands. */
+const welcomeOf = (page: Page) => page.locator('section').filter({ has: page.getByRole('heading', { name: /^Work in laps\./ }) });
+
+test('the browser\'s signed-out screen carries the welcome: beside the form at 1440, under it at 412; its one sentence, three drawings read once each, a key of four read once each, the old sentences gone; at 1440 the form stands where it would without it and nothing scrolls', async ({ deviceA: a }) => {
   for (const [size, place] of [[{ width: 1440, height: 900 }, 'beside'], [PHONE, 'under']] as const) {
     await a.page.setViewportSize(size);
     await a.page.goto('/');
     await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
-    const welcome = a.page.getByText(title, { exact: true });
+    const welcome = welcomeOf(a.page);
     await expect(welcome).toBeVisible();
-    for (const line of ['A lap is one stretch of focus', 'Plan the day in laps', 'Habits get a box to tick', 'In a room, friends see', 'It is free. Everything you do is kept on a server']) {
-      await expect(a.page.getByText(new RegExp(`^${line}`))).toHaveCount(1);
+    await expect(welcome.getByText(about.what, { exact: true })).toBeVisible();
+    await expect(a.page.getByText(/^It is free\. Everything you do is kept on a server/)).toHaveCount(1);
+    for (const gone of ['A lap is one stretch of focus', '25 minutes unless you change it', 'Plan the day in laps', 'Habits get a box to tick', 'In a room, friends see']) {
+      await expect(a.page.getByText(gone), `"${gone}" is still there`).toHaveCount(0);
+    }
+    // The pictures, each said once by its own words, and nothing inside them said again.
+    const images = welcome.getByRole('img');
+    expect(await images.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([about.drawn, about.weekDrawn, about.tasksDrawn, about.roomDrawn]);
+    // The key: its entries, each a list item, each said once.
+    const key = welcome.getByRole('listitem');
+    await expect(key).toHaveCount(Object.keys(about.key).length);
+    // What a screen reader reads of each: the words, without the drawn mark (hidden from it).
+    const heard = await key.evaluateAll((items) =>
+      items.map((li) => {
+        const copy = li.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
+        return copy.textContent?.trim();
+      }),
+    );
+    expect(heard).toEqual(Object.values(about.key));
+    for (const entry of Object.values(about.key)) {
+      await expect(a.page.getByText(entry), `"${entry}" is read more than once`).toHaveCount(1);
     }
     const [w, f] = [(await welcome.boundingBox())!, (await a.page.locator('form').boundingBox())!];
-    if (place === 'beside') expect(w.x + w.width <= f.x || f.x + f.width <= w.x, 'the welcome is not beside the form').toBe(true);
-    else expect(w.y >= f.y + f.height, 'the welcome is not under the form').toBe(true);
+    if (place === 'beside') {
+      expect(w.x + w.width <= f.x || f.x + f.width <= w.x, 'the welcome is not beside the form').toBe(true);
+      const scrolls = await a.page.evaluate(() => [document.scrollingElement!, document.querySelector('main')].filter((el) => el && el.scrollHeight > el.clientHeight + 1).length);
+      expect(scrolls, 'at 1440 by 900 the signed-out screen scrolls').toBe(0);
+      // Where the form would stand with no welcome beside it.
+      const alone = await a.page.evaluate(() => {
+        const section = [...document.querySelectorAll('section')].find((el) => el.querySelector('h1, h2')?.textContent?.startsWith('Work in laps.'))!;
+        section.style.display = 'none';
+        const r = document.querySelector('form')!.getBoundingClientRect();
+        section.style.display = '';
+        return { x: r.x, y: r.y };
+      });
+      expect([Math.round(f.x), Math.round(f.y)], 'the welcome moved the form').toEqual([Math.round(alone.x), Math.round(alone.y)]);
+    } else {
+      expect(w.y >= f.y + f.height, 'the welcome is not under the form').toBe(true);
+    }
   }
+});
+
+/**
+ * When the sixth lap of the welcome's race first stood in the page, and when its fill reached
+ * its end, in ms: read every frame from the first script on, so a test's own latency adds nothing.
+ */
+const watchRace = () => {
+  const seen: { first: number | null; done: number | null; last: string | null } = { first: null, done: null, last: null };
+  (window as unknown as { race: typeof seen }).race = seen;
+  const look = () => {
+    const lap = [...document.querySelectorAll<HTMLElement>('[role="img"] span:not([class*="past"]) > i')].find((i) => i.style.getPropertyValue('--i').trim() === '5' && i.style.getPropertyValue('--share').trim() === '0.6');
+    if (lap) {
+      seen.first ??= performance.now();
+      const now = getComputedStyle(lap, '::after').transform;
+      if (now !== seen.last) seen.done = null;
+      if (/^matrix\(0\.6, 0, 0, 1, 0, 0\)$/.test(now)) seen.done ??= performance.now();
+      seen.last = now;
+    }
+    requestAnimationFrame(look);
+  };
+  requestAnimationFrame(look);
+};
+
+test('the welcome\'s race: with reduced motion it stands in its end state at once; with motion its sixth lap has filled within 2 s and nothing moves for a second after', async ({ deviceA: a }) => {
+  await a.page.addInitScript(watchRace);
+  const read = () => a.page.evaluate(() => (window as unknown as { race: { first: number | null; done: number | null; last: string | null } }).race);
+  await a.page.emulateMedia({ reducedMotion: 'reduce' });
+  await a.page.goto('/');
+  await expect(welcomeOf(a.page).getByRole('img').first()).toBeVisible();
+  await expect.poll(async () => (await read()).done).not.toBeNull();
+  let race = await read();
+  expect(race.done! - race.first!, 'under reduced motion the race moved').toBeLessThanOrEqual(100);
+
+  await a.page.emulateMedia({ reducedMotion: 'no-preference' });
+  await a.page.reload();
+  await expect(welcomeOf(a.page).getByRole('img').first()).toBeVisible();
+  await expect.poll(async () => (await read()).done, { timeout: 3000 }).not.toBeNull();
+  race = await read();
+  expect(race.done! - race.first!, 'the race took more than 2 s to fill').toBeLessThanOrEqual(2000);
+  const settled = race.last;
+  await a.page.waitForTimeout(1000);
+  race = await read();
+  expect(race.last, 'the race moved again after it filled').toBe(settled);
+  expect(await a.page.evaluate(() => document.getAnimations().filter((x) => x.playState === 'running').length), 'something in the welcome is still moving').toBe(0);
 });
 
 // 9. Nothing selects, but fields and what is there to be copied.
@@ -451,7 +533,7 @@ test('nothing selects: a heading, a task title, a button\'s words and a sentence
   expect(await a.page.evaluate(() => String(getSelection()))).toBe('');
 
   await go(a.page, 'Focus');
-  for (const l of [a.page.getByText(/^Lap 1 of 4/).first(), startButton(a.page)]) expect(await selectable(l), 'Focus selects').toBe(false);
+  for (const l of [a.page.getByText(/^Lap 1 today/).first(), startButton(a.page)]) expect(await selectable(l), 'Focus selects').toBe(false);
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   // Not "keeps step with the server at ...": the address in it is there to be copied.
   expect(await selectable(a.page.getByRole('heading', { name: 'Settings', level: 1 })), 'Settings: the heading selects').toBe(false);
@@ -598,7 +680,8 @@ test('with motion, a row that changes place glides there in the fill time, 160 m
 // guess; Restore, never bring back; a lap reaches its bell, never rings or rang; not counted,
 // never void; and the buttons that went: Skip break, Stop and log, Don't count this lap, the free
 // "when", the order mode, Another colour, Ghost. Section 13: the old hint and the second start button.
-const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b|Skip break|Stop and log|Don't count this lap|\b[Gg]uess|[Bb]ring back|\brings\b|\brang\b|\b[Vv]oid\b|When in the day|Change the order|Keep this order|Another colour|\bGhost\b|No target today|End with ~3 for three laps|Start without a task/;
+// Sections 14 and 15: the set of four on any screen, and the welcome's old sentences.
+const GONE = /[Ss]et aside|[Cc]ounts? nowhere|\bKeep it\b|Skip break|Stop and log|Don't count this lap|\b[Gg]uess|[Bb]ring back|\brings\b|\brang\b|\b[Vv]oid\b|When in the day|Change the order|Keep this order|Another colour|\bGhost\b|No target today|End with ~3 for three laps|Start without a task|in this set|\bset of\b|of 4 in|A full set|25 minutes unless you change it/;
 
 test('the words that went are nowhere: not in any demo state, not on the live screens', async ({ deviceA: a }) => {
   test.setTimeout(180000);
@@ -611,7 +694,8 @@ test('the words that went are nowhere: not in any demo state, not on the live sc
   const states = await a.page.locator('a[href*="state="]').evaluateAll((as) => as.map((x) => x.getAttribute('href')!));
   expect(states.length, 'the demo lists no states').toBeGreaterThan(10);
   for (const href of states) {
-    await a.page.goto(`${demoUrl()}/demo.html${href.replace(/^.*\?/, '?')}`);
+    // A demo state may set its own address as it opens, which aborts the navigation that led there.
+    await a.page.goto(`${demoUrl()}/demo.html${href.replace(/^.*\?/, '?')}`).catch(() => a.page.waitForLoadState());
     await a.page.waitForTimeout(150);
     await scan(`demo ${href}`);
   }

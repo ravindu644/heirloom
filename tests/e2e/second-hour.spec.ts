@@ -23,20 +23,22 @@ async function also(d: { page: Page }, name: string) {
 
 // 1. One Stop.
 
-test('Stop mid-lap: lap 2 is next, the first segment stays part filled after a reload and on a second device; a stop in the first seconds still leaves a row on both', async ({ deviceA: a, deviceB: b }) => {
-  const { name } = await signedInto(a, 'onestop', undefined, { work_ms: 20000 });
+test('Stop past the first minute: lap 2 is next, the first segment stays part filled after a reload and on a second device; a stop in the first seconds is a start taken back, no row, lap 2 still next', async ({ deviceA: a, deviceB: b }) => {
+  test.setTimeout(150000);
+  // A day target of 4, so Focus draws a bar (the day's target is the only bar it has). A lap of two
+  // minutes, stopped a little over one in: past the minute a stopped lap is a lap (protocol section 6).
+  const { name } = await signedInto(a, 'onestop', (node) => node.engine.write('settings', 'current', { day_target: 4 }), { work_ms: 120000 });
   await also(b, name);
   await startButton(a.page).click();
-  // Eight seconds of twenty: two fifths.
-  await expect(a.page.getByText('00:12', { exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(a.page.getByText('00:55', { exact: true })).toBeVisible({ timeout: 80000 });
   await expect(button(a.page, 'Stop + log')).toHaveCount(0);
   await button(a.page, 'Stop').click();
   await ready(a.page, 2);
-  await expect(a.page.getByText('Lap 1 stopped in its first minute. Lap 2 is next.').filter({ visible: true })).toBeVisible();
+  await expect(a.page.getByText('Lap 1 today stopped at 1 min.').filter({ visible: true })).toBeVisible();
   await expect(button(a.page, "Don't count this lap")).toHaveCount(0);
   const [fill] = await setBar(a.page);
-  expect(fill, 'the stopped lap is drawn as far as it ran').toBeGreaterThan(0.3);
-  expect(fill).toBeLessThan(0.8);
+  expect(fill, 'the stopped lap is drawn as far as it ran').toBeGreaterThan(0.5);
+  expect(fill).toBeLessThan(0.7);
   const rows = await sessionsWhen(name, (r) => r.length === 1);
   expect(rows[0]).toMatchObject({ outcome: 'stopped', kind: 'work' });
 
@@ -46,35 +48,36 @@ test('Stop mid-lap: lap 2 is next, the first segment stays part filled after a r
   await ready(a.page, 2);
   await expect.poll(async () => (await setBar(a.page))[0]).toBeCloseTo(fill!, 2);
 
-  // Lap 2 stopped in its first second: a lap however short, a row on both devices, lap 3 next.
+  // Lap 2 stopped in its first second: a start taken back. No row, nothing drawn, lap 2 still next.
   await startButton(a.page).click();
   await button(a.page, 'Stop').click();
-  await ready(a.page, 3);
-  await expect(a.page.getByText('Lap 2 stopped in its first minute. Lap 3 is next.').filter({ visible: true })).toBeVisible();
-  const two = await sessionsWhen(name, (r) => r.length === 2);
-  expect(two.every((row) => row.outcome === 'stopped')).toBe(true);
+  await expect(a.page.getByText('Stopped in its first minute. Not counted as a lap.').filter({ visible: true })).toBeVisible();
   for (const d of [a, b]) {
-    await ready(d.page, 3);
-    await expect.poll(async () => (await setBar(d.page))[1], { message: 'the short lap is not drawn' }).toBeGreaterThan(0);
+    await ready(d.page, 2);
+    expect((await setBar(d.page))[1] ?? 0, 'a start taken back is drawn').toBe(0);
   }
-  expect((await timer(name))?.set_index).toBe(2);
+  await b.page.waitForTimeout(1000);
+  expect(await sessionsWhen(name, (r) => r.length === 1)).toHaveLength(1);
+  expect((await timer(name))?.set_index).toBe(1);
 });
 
 test('ticking the running task ends its lap: the timer is at rest, the lap is a part square on the task, and the one Undo brings back both, the same run', async ({ deviceA: a, deviceB: b }) => {
-  const { name } = await signedInto(a, 'tickrun', tasks('alpha'), { work_ms: 60000 });
+  test.setTimeout(150000);
+  // Ticked a little over a minute in: under a minute it would be a start taken back, and no lap at all.
+  const { name } = await signedInto(a, 'tickrun', tasks('alpha'), { work_ms: 180000 });
   await also(b, name);
   for (const d of [a, b]) await go(d.page, 'Today');
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
   const strip = (page: Page) => page.getByRole('link', { name: 'Open Focus' });
   await expect(strip(b.page)).toContainText('alpha', { timeout: 2000 });
   const run = (await timer(name))!.run;
-  await a.page.waitForTimeout(3000);
+  await expect(strip(a.page).locator('b')).toHaveText('01:58', { timeout: 80000 });
   await taskRow(a.page, 'alpha').getByRole('checkbox').click();
 
   for (const d of [a, b]) await expect(strip(d.page), 'the lap kept running for a ticked task').toHaveCount(0, { timeout: 3000 });
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
   const bar = a.page.getByRole('status').filter({ hasText: 'Done: alpha' });
-  await expect(bar).toContainText('Done: alpha. Lap 1 stopped in its first minute.');
+  await expect(bar).toContainText('Done: alpha. Lap 1 today stopped at 1 min.');
   const [square] = await squaresOf(taskRow(a.page, 'alpha'));
   expect(square, 'the lap is not on the task as a part square').toBeGreaterThan(0);
   expect(square).toBeLessThan(0.5);
@@ -84,9 +87,9 @@ test('ticking the running task ends its lap: the timer is at rest, the lap is a 
   await expect(list(a.page, 'Done')).toHaveCount(0);
   const back = (await timer(name))!;
   expect(back).toMatchObject({ phase: 'work', run });
-  // The same run: its time left goes on from where it was, not from a fresh 01:00.
+  // The same run: its time left goes on from where it was, not from a fresh 03:00.
   const left = await strip(a.page).locator('b').innerText();
-  expect(left < '00:58', `the strip says ${left}`).toBe(true);
+  expect(left <= '01:58', `the strip says ${left}`).toBe(true);
 });
 
 test('"Done for now" after a bell and in a break: the timer rests, nothing starts, and the next lap is the right one', async ({ deviceA: a }) => {
@@ -97,7 +100,7 @@ test('"Done for now" after a bell and in a break: the timer rests, nothing start
   await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
   await ready(a.page, 2);
-  await expect(a.page.getByText('Stopped after lap 1. Lap 2 is next.').filter({ visible: true })).toBeVisible();
+  await expect(a.page.getByText('Stopped after lap 1 today.').filter({ visible: true })).toBeVisible();
   await a.page.waitForTimeout(1500);
   await ready(a.page, 2);
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
@@ -109,7 +112,7 @@ test('"Done for now" after a bell and in a break: the timer rests, nothing start
   await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
   await ready(a.page, 3);
-  await expect(a.page.getByText('Stopped after lap 2. Lap 3 is next.').filter({ visible: true })).toBeVisible();
+  await expect(a.page.getByText('Stopped after lap 2 today.').filter({ visible: true })).toBeVisible();
   await a.page.waitForTimeout(1500);
   await ready(a.page, 3);
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
@@ -683,9 +686,9 @@ test('the picker: Pick stands where it was as it opens, as the sliders move and 
 
 // 7. What the code review found after 127 green tests: each, as the person would meet it.
 
-test('the set on the result: after lap 1 rings one segment is full and three empty, on both devices; after lap 4 the set moment has four full', async ({ deviceA: a, deviceB: b }) => {
+test('the day\'s bar on the result, with a target of 4: after lap 1 rings one segment is full and three empty, on both devices; after lap 4 all four are full', async ({ deviceA: a, deviceB: b }) => {
   test.setTimeout(90000);
-  const { name } = await signedInto(a, 'setbar', undefined, { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
+  const { name } = await signedInto(a, 'setbar', (node) => node.engine.write('settings', 'current', { day_target: 4 }), { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
   await also(b, name);
   await startButton(a.page).click();
   for (const d of [a, b]) {
@@ -696,7 +699,7 @@ test('the set on the result: after lap 1 rings one segment is full and three emp
   for (const lap of [2, 3, 4]) {
     await startNow(a.page).click();
     await expect(button(a.page, 'Pause')).toBeVisible();
-    if (lap < 4) await expect(a.page.getByText(`Lap ${lap} of 4 in this set, done`).filter({ visible: true }).first()).toBeVisible({ timeout: 8000 });
+    if (lap < 4) await expect(a.page.getByText(new RegExp(`^Lap ${lap}( of \\d+)? today, done$`)).filter({ visible: true }).first()).toBeVisible({ timeout: 8000 });
   }
   for (const d of [a, b]) {
     await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
@@ -830,11 +833,16 @@ test('leaving Today with a row lifted and coming back before letting go: nothing
   await expect(a.page.getByRole('dialog', { name: 'Task', exact: true })).toBeVisible();
 });
 
-test('a lap of 120 minutes from an older build: Settings shows 99 with its plus off, and the first minus writes 98', async ({ deviceA: a }) => {
-  const { name } = await signedInto(a, 'lap120', undefined, { work_ms: 120 * 60000 });
+test('a lap of 120 minutes is kept as it is: Settings shows 120 with its plus on and the first minus writes 119; one of 400 from an older build is read and run as it is', async ({ deviceA: a }) => {
+  const { name, node } = await signedInto(a, 'lap120', undefined, { work_ms: 120 * 60000 });
+  await expect(a.page.locator('[class*="digits"]').first()).toHaveText('2:00:00');
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
-  await expect(a.page.getByRole('spinbutton', { name: 'A lap' })).toHaveValue('99');
-  await expect(a.page.getByRole('button', { name: 'A lap, one minute more' })).toBeDisabled();
+  await expect(a.page.getByRole('spinbutton', { name: 'A lap' })).toHaveValue('120');
+  await expect(a.page.getByRole('button', { name: 'A lap, one minute more' })).toBeEnabled();
   await a.page.getByRole('button', { name: 'A lap, one minute less' }).click();
-  await expect.poll(async () => (await serverRows(server, name, 'settings')).get('current')?.work_ms).toBe(98 * 60000);
+  await expect.poll(async () => (await serverRows(server, name, 'settings')).get('current')?.work_ms).toBe(119 * 60000);
+  // Past the top, from a build that allowed it: run as it is.
+  node.engine.write('settings', 'current', { work_ms: 400 * 60000 });
+  await go(a.page, 'Focus');
+  await expect(a.page.locator('[class*="digits"]').first()).toHaveText('6:40:00', { timeout: 3000 });
 });

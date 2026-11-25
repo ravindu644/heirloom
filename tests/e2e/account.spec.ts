@@ -44,7 +44,7 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
   // Signing in again opens where signing out was done, Settings; the lap is on Focus.
   await go(a.page, 'Focus');
   await expect(a.page.getByRole('button', { name: 'Resume' })).toBeVisible({ timeout: 5000 });
-  await expect(a.page.getByText('Lap 1 of 4 in this set, paused')).toBeVisible();
+  await expect(a.page.getByText('Lap 1 today, paused')).toBeVisible();
 });
 
 test('a page from another origin can sign in over the API and open the socket, as the phone app will', async ({ browser }) => {

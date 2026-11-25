@@ -1,6 +1,7 @@
 // The phone app's build in a browser: it is not served by its server, so it asks which one
 // (protocol section 10). The build and its static server are made by the run's globalSetup.
 import type { Page } from '@playwright/test';
+import { welcome } from '../../client/src/ui/strings.ts';
 import { PASSWORD } from '../sync/harness.ts';
 import { startServer } from '../server.ts';
 import type { Server } from '../server.ts';
@@ -152,12 +153,33 @@ test('the phone app keeps a pasted link\'s invite across a restart, until it is 
   await expect(startButton(a.page)).toBeVisible();
 });
 
-test('the welcome: the phone app\'s first screen says what heirloom is; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {
+test('the welcome: the phone app\'s first screen shows what heirloom is in one sentence and three drawings, fits a 412 by 915 phone with no scroll and cuts nothing at 206; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {
+  await a.page.setViewportSize({ width: 412, height: 915 });
   await a.page.goto(appUrl());
   await expect(a.page.getByRole('heading', { name: WELCOME })).toBeVisible();
-  for (const line of ['A lap is one stretch of focus', 'Plan the day in laps', 'Habits get a box to tick', 'In a room, friends see', 'It is free. Everything you do is kept on a server']) {
-    await expect(a.page.getByText(new RegExp(`^${line}`))).toBeVisible();
-  }
+  await expect(a.page.getByText(welcome.what, { exact: true })).toBeVisible();
+  await expect(a.page.getByText(/^It is free\. Everything you do is kept on a server/)).toBeVisible();
+  for (const gone of ['A lap is one stretch of focus', '25 minutes unless you change it', 'Plan the day in laps']) await expect(a.page.getByText(gone)).toHaveCount(0);
+  expect(await a.page.getByRole('img').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([welcome.drawn, welcome.weekDrawn, welcome.tasksDrawn, welcome.roomDrawn]);
+  await expect(a.page.getByRole('listitem')).toHaveCount(Object.keys(welcome.key).length);
+  // The whole of it, button and all, on one phone screen.
+  const scroll = () => a.page.evaluate(() => [document.scrollingElement!, ...document.querySelectorAll('main')].filter((el) => el.scrollHeight > el.clientHeight + 1).map((el) => `${el.tagName} ${el.scrollHeight} in ${el.clientHeight}`));
+  expect(await scroll(), 'the welcome does not fit a 412 by 915 phone').toEqual([]);
+  await expect(button(a.page, 'Connect to a server')).toBeInViewport();
+  // At 206 (a phone at 200%): nothing wider than the box it stands in.
+  await a.page.setViewportSize({ width: 206, height: 457 });
+  await a.page.waitForTimeout(200);
+  const cut = await a.page.evaluate(() =>
+    [...document.querySelectorAll('main *')]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        const p = el.parentElement!.getBoundingClientRect();
+        return r.width > 0 && (r.right > p.right + 0.5 || r.left < p.left - 0.5 || (el as HTMLElement).scrollWidth > (el as HTMLElement).clientWidth + 1);
+      })
+      .map((el) => `${el.tagName.toLowerCase()} "${(el.textContent ?? '').trim().slice(0, 30)}"`),
+  );
+  expect(cut, 'at 206 something stands wider than its box').toEqual([]);
+  await a.page.setViewportSize({ width: 412, height: 915 });
   await button(a.page, 'Connect to a server').click();
   await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
   await button(a.page, 'Back').click();

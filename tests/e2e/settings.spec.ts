@@ -23,7 +23,7 @@ const openSettings = async (page: Page, name: string) => {
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 };
 
-test('lengths: typed, refused when not a whole number in bounds, nudged by minus and plus, and the next lap\'s on B; the day target shows on Today', async ({ deviceA: a, deviceB: b }) => {
+test('lengths: typed, a fraction or nothing put back, past an end brought to it, nudged by minus and plus, and the next lap\'s on B; the day target shows on Today', async ({ deviceA: a, deviceB: b }) => {
   const name = await signedInto([a, b], 'slengths');
   await openSettings(a.page, name);
   const lap = a.page.getByRole('spinbutton', { name: 'A lap' });
@@ -32,13 +32,19 @@ test('lengths: typed, refused when not a whole number in bounds, nudged by minus
   await lap.fill('30');
   await lap.press('Enter');
   await expect(digits(b.page)).toHaveText('30:00', { timeout: 2000 });
-  // Each refusal puts the last value back: a fraction, nothing, past the bounds.
-  for (const wrong of ['2.5', '', '0', '181']) {
+  // A fraction or nothing is put back; past either end a figure comes to the nearest one it can be.
+  for (const wrong of ['2.5', '']) {
     await lap.fill(wrong);
     await lap.press('Enter');
     await expect(lap, `"${wrong}" was kept`).toHaveValue('30');
   }
   await expect(digits(b.page)).toHaveText('30:00');
+  for (const [typed, kept, shown] of [['0', '1', '01:00'], ['400', '360', '6:00:00'], ['30', '30', '30:00']] as const) {
+    await lap.fill(typed);
+    await lap.press('Enter');
+    await expect(lap, `"${typed}" typed`).toHaveValue(kept);
+    await expect(b.page.locator('[class*="digits"]').first()).toHaveText(shown, { timeout: 2000 });
+  }
   // Minus and plus still nudge.
   await a.page.getByRole('button', { name: 'A lap, one minute less', exact: true }).click();
   await expect(lap).toHaveValue('29');
@@ -48,11 +54,13 @@ test('lengths: typed, refused when not a whole number in bounds, nudged by minus
   await short.fill('7');
   await short.press('Tab');
   await expect(short).toHaveValue('7');
+  // Past its top it comes to 60, and the plus is off there.
   await short.fill('61');
   await short.press('Tab');
-  await expect(short).toHaveValue('7');
-  await a.page.getByRole('button', { name: 'A short break, one minute more', exact: true }).click();
-  await expect(short).toHaveValue('8');
+  await expect(short).toHaveValue('60');
+  await expect(a.page.getByRole('button', { name: 'A short break, one minute more', exact: true })).toBeDisabled();
+  await a.page.getByRole('button', { name: 'A short break, one minute less', exact: true }).click();
+  await expect(short).toHaveValue('59');
   await expect(a.page.getByRole('spinbutton', { name: 'The long break, after four laps' })).toHaveValue('15');
 
   const target = panel(a.page, 'Day target');
@@ -73,8 +81,8 @@ test('auto-start: with both switches on, the break starts when a lap reaches its
   }
   await go(a.page, 'Focus');
   await startButton(a.page).click();
-  await expect(a.page.getByText('Short break, after lap 1 of 4 in this set')).toBeVisible({ timeout: 6000 });
-  await expect(a.page.getByText('Lap 2 of 4 in this set, focus')).toBeVisible({ timeout: 6000 });
+  await expect(a.page.getByText('lap 2 today next')).toBeVisible({ timeout: 6000 });
+  await expect(a.page.getByText('Lap 2 today, focus')).toBeVisible({ timeout: 6000 });
 });
 
 test('"Ring on this laptop" stays this laptop\'s own, across a reload', async ({ deviceA: a, deviceB: b }) => {
