@@ -196,9 +196,8 @@ export function plan(
   }
   return {
     today: open.filter((t) => t.due === null || t.due <= day).sort(byOrder),
-    upcoming: open
-      .filter((t) => t.due !== null && t.due > day)
-      .sort((a, b) => (a.due !== b.due ? (a.due! < b.due! ? -1 : 1) : byOrder(a, b))),
+    // In the person's order, as Today is: the day is what a row says, not where it stands.
+    upcoming: open.filter((t) => t.due !== null && t.due > day).sort(byOrder),
     done: top
       .filter((t) => t.deleted === null && t.done !== null && localDay(t.done, utcOffsetMin) === day)
       .sort((a, b) => a.done! - b.done! || byOrder(a, b)),

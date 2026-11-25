@@ -73,7 +73,7 @@ describe('settings', () => {
       { work_ms: 999 },
       { work_ms: 86400001 },
       { work_ms: LAP_MAX_MS + 1 },
-      { work_ms: 100 * MIN },
+      { work_ms: 361 * MIN },
       { short_ms: 86400001 },
       { long_ms: 86400001 },
       { long_ms: 900000.5 },
@@ -87,14 +87,15 @@ describe('settings', () => {
       assert.equal(s.set(bad as never), false, JSON.stringify(bad));
     }
     assert.deepEqual(d.engine.cells(), cells);
-    // A lap is 99 minutes at most, a break a day, and a second is the shortest of any.
-    assert.equal(LAP_MAX_MS, 99 * MIN);
+    // A lap is 360 minutes at most, a break a day, and a second is the shortest of any.
+    assert.equal(LAP_MAX_MS, 360 * MIN);
+    assert.equal(s.set({ work_ms: 100 * MIN }), true);
     assert.equal(s.set({ work_ms: LAP_MAX_MS, short_ms: 1000, long_ms: 86400000 }), true);
     assert.equal(s.set({ work_ms: 1000 }), true);
     // A longer lap another build wrote is read and run as it is.
-    d.engine.write('settings', 'current', { work_ms: 120 * MIN });
-    assert.equal(s.all.value.work_ms, 120 * MIN);
-    assert.equal(d.focus.lengths.value.work_ms, 120 * MIN);
+    d.engine.write('settings', 'current', { work_ms: 400 * MIN });
+    assert.equal(s.all.value.work_ms, 400 * MIN);
+    assert.equal(d.focus.lengths.value.work_ms, 400 * MIN);
   });
 
   it('a row with something this build cannot use still reads: each such field as its default', async () => {
@@ -180,13 +181,13 @@ describe('marks', () => {
     assert.deepEqual(s.marks.value, [{ key: `estimate-${within}`, kind: 'estimate', task: within, title: 'within', estimate: 2, laps: 2 }]);
   });
 
-  it('keeping an estimate needs a bell: a task ticked done seconds into its only lap earns nothing, and one whose lap rang does', async () => {
+  it('keeping an estimate needs a bell: a task ticked done two minutes into its only lap earns nothing, and one whose lap rang does', async () => {
     const { w, d, s } = await one();
     const [quick, real] = ['quick ~1', 'real ~2'].map((line) => d.today.add(line)!);
     // Four laps from another day and another device, so no lap tier is in the way here.
     for (let n = 0; n < 4; n++) theirLap(d, T0 - 3 * DAY + n * HOUR);
     d.focus.start(quick);
-    w.time.advance(5000);
+    w.time.advance(2 * MIN);
     d.today.setDone(quick!, true);
     assert.equal(d.today.done.value[0]?.laps, 1, 'a lap, 1 of 1 on the task');
     assert.deepEqual(s.marks.value, []);
@@ -194,7 +195,7 @@ describe('marks', () => {
     d.focus.start(real);
     w.time.advance(LAP);
     d.focus.skipBreak(real);
-    w.time.advance(5000);
+    w.time.advance(2 * MIN);
     d.today.setDone(real!, true);
     assert.deepEqual(s.marks.value, [{ key: `estimate-${real}`, kind: 'estimate', task: real, title: 'real', estimate: 2, laps: 2 }]);
   });

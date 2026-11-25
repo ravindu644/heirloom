@@ -4,6 +4,7 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { follows } from '../core/hlc.ts';
 import { GONE, isDay, isLength, isTime } from '../core/real.ts';
 import { localDay } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
@@ -74,6 +75,11 @@ export interface DayFigures {
   laps: number;
   /** One fill per lap of today, oldest first, for the day target's bar: 1 for a lap that rang, less for one stopped. As many as `laps`. */
   fills: number[];
+  /**
+   * How full the lap in progress is, 0 to 1, to draw after `fills`: null when there is none to
+   * add. A lap whose bell has gone, or that rang and runs on in an extension, is in `fills` already.
+   */
+  open: number | null;
   /** Laps still planned on today's list, and how long they would take, each task's at its own lap length. */
   left_laps: number;
   left_ms: number;
@@ -111,7 +117,7 @@ export interface Today {
   readonly later: ReadonlySignal<TaskView[]>;
   /** All of today's open tasks in order: `next` and the running one each in its place. For knowing where `next` sits. */
   readonly list: ReadonlySignal<TaskView[]>;
-  /** Open tasks due after today, by day. */
+  /** Open tasks due after today, in the person's order, as Today is: not by day. */
   readonly upcoming: ReadonlySignal<TaskView[]>;
   /** Tasks done today, in the order they were done. */
   readonly done: ReadonlySignal<TaskView[]>;
@@ -144,8 +150,20 @@ export interface Today {
   restore(id: string): void;
   /** Deletes for good a task that is in Recently deleted, its subtasks with it: on no screen again, and no way back. Anything else is left alone. */
   purge(id: string): void;
-  /** Puts a task just before another in its list, or at the end with null. */
+  /**
+   * Puts a task just before another in its list, or at the end with null. Its list is Today's
+   * open tasks, or all of Upcoming whatever their days. It never changes the task's day.
+   */
   move(id: string, before: string | null): void;
+  /**
+   * Carries a task out of Upcoming into Today, just before `before` (a task of Today) or at the
+   * end with null: its day becomes today and its place is among today's, in one write. Its time
+   * stays as it is. Returns where it stood, for `moveBack`; null, and nothing written, when the
+   * task is not in Upcoming. Nothing is carried from Today into Upcoming: a day is given in the task.
+   */
+  moveToToday(id: string, before: string | null): TaskPlace | null;
+  /** The Undo of `moveToToday`: the day and the place it had, in one write. Whatever else was edited since stays. */
+  moveBack(id: string, was: TaskPlace): void;
   addSubtask(parent: string, title: string): string | null;
   /** A subtask's title, or done. Removing one is `remove`. */
   editSubtask(id: string, fields: { title?: string; done?: boolean }): void;
@@ -159,6 +177,12 @@ export interface Today {
   restoreProject(id: string): void;
   /** The day target in laps. 0 clears it. */
   setTarget(laps: number): void;
+}
+
+/** Where a task stood before it was carried into Today: what `moveBack` puts back. */
+export interface TaskPlace {
+  due: string | null;
+  order: string;
 }
 
 export interface TodayEnv {
@@ -293,11 +317,20 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   // A key after the last of a list: where a new row goes.
   const atEnd = (list: readonly { order: string }[]) => keyBetween(list.at(-1)?.order || null, null);
 
-  // The rows a task is ordered among: its parent's subtasks, today's list, or the tasks due the same day.
+  // The rows a task is ordered among: its parent's subtasks, today's list, or all of Upcoming, whatever their days.
   function siblings(t: Task): Task[] {
     const { lists } = model.peek();
     if (t.parent !== null) return lists.subtasks.get(t.parent) ?? [];
-    return lists.today.includes(t) ? lists.today : lists.upcoming.filter((other) => other.due === t.due);
+    return lists.today.includes(t) ? lists.today : lists.upcoming;
+  }
+
+  // The keys to write so that a task given the day `due`, a day after today, stands by its day
+  // in Upcoming: after the last row whose day is not later than its own. So Upcoming reads by
+  // day until a hand moves a row, and a row a hand has moved stays where it was put.
+  function byDay(id: string, due: string): [id: string, order: string][] {
+    const rows = model.peek().lists.upcoming.filter((other) => other.id !== id);
+    const after = rows.findLastIndex((other) => other.due! <= due);
+    return moveKeys(rows, id, rows[after + 1]?.id ?? null);
   }
 
   // The next task of the series is still exactly the copy that was made: nobody has edited it,
@@ -305,7 +338,10 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
   function untouched(next: Task, of: Task, due: string): boolean {
     const copied = next.project === of.project && next.title === of.title && next.notes === of.notes && next.estimate === of.estimate;
     const lengths = next.work_ms === of.work_ms && next.short_ms === of.short_ms && next.long_ms === of.long_ms;
-    const placed = lengths && next.when === of.when && next.time === of.time && next.order === of.order && sameRule(next.repeat, of.repeat) && next.due === due;
+    // Its place is the one it was made with when its key and its day are still the two cells of that one write, one after the other.
+    const [key, day] = [engine.stamp('task', next.id, 'order'), engine.stamp('task', next.id, 'due')];
+    const unmoved = key !== undefined && day !== undefined && follows(key, day);
+    const placed = lengths && next.when === of.when && next.time === of.time && unmoved && sameRule(next.repeat, of.repeat) && next.due === due;
     const used = next.done !== null || model.peek().lists.subtasks.has(next.id) || engine.timer.peek().task === next.id;
     return copied && placed && !used && !counts.sessions.peek().some((s) => s.task === next.id);
   }
@@ -337,6 +373,7 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         done_ms: you_ms,
         laps: fills.length,
         fills,
+        open: counts.fillOpen(),
         left_laps: left,
         left_ms: plannedLeftMs(todays, lapLengths(settings()).work_ms),
         target: typeof target === 'number' && Number.isInteger(target) && target > 0 ? target : 0,
@@ -386,7 +423,18 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         const length = fields[name];
         if (length === null || (isLength(length) && (name !== 'work_ms' || length <= LAP_MAX_MS))) write[name] = length;
       }
-      if (Object.keys(write).length) engine.write('task', id, write);
+      if (!Object.keys(write).length) return;
+      // Given a day after today, or another one: it goes by its day among Upcoming's rows, in the same transaction.
+      const dated = typeof write.due === 'string' && write.due > dayNow() && write.due !== t.due && t.parent === null;
+      batch(() => {
+        if (dated) {
+          for (const [row, order] of byDay(id, write.due as string)) {
+            if (row === id) write.order = order;
+            else engine.write('task', row, { order });
+          }
+        }
+        engine.write('task', id, write);
+      });
     },
 
     setDone(id, done) {
@@ -409,12 +457,23 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
         if (lapBack) env.focus?.undo();
         if (!t.repeat || t.parent !== null) return;
         // Undoing finds the row by the day the task was done on, which may not be today any more.
-        const next = nextTask(id, t.due, done ? dayNow() : localDay(t.done!, env.utcOffsetMin()), t.repeat);
+        let next = nextTask(id, t.due, done ? dayNow() : localDay(t.done!, env.utcOffsetMin()), t.repeat);
+        // A row carried to an earlier day keeps the id of the day it was made for, so the day
+        // after may be a day the series has had already: this very row, or one done before it.
+        // The next is then the first day it has not had. Without this the id is taken, nothing
+        // is written, and the series ends without a word.
+        const doneAt = done ? now : t.done!;
+        const had = (row: Task | undefined) => row !== undefined && (row.id === id || (row.done !== null && row.done <= doneAt));
+        while (had(tasks.get(next.id))) next = nextTask(id, next.due, next.due, t.repeat);
         const held = tasks.get(next.id);
         if (!held) {
           if (!done) return;
-          const { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms, order } = t;
-          engine.write('task', next.id, { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms, order, due: next.due });
+          const { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms } = t;
+          // Its day is after today, so it stands by its day in Upcoming. `order` then `due`, last: `untouched` reads that pair.
+          for (const [row, order] of byDay(next.id, next.due)) {
+            if (row !== next.id) engine.write('task', row, { order });
+            else engine.write('task', row, { project, title, notes, estimate, repeat, when, time, work_ms, short_ms, long_ms, order, due: next.due });
+          }
         } else if ((held.deleted === null) !== done && untouched(held, t, next.due)) {
           engine.write('task', next.id, { deleted: done ? null : now });
         }
@@ -442,6 +501,23 @@ export function createToday(engine: Engine, env: TodayEnv): Today & { close(): v
       batch(() => {
         for (const [row, order] of moveKeys(siblings(t), id, before)) engine.write('task', row, { order });
       });
+    },
+
+    moveToToday(id, before) {
+      const t = task(id);
+      const { lists } = model.peek();
+      if (!t || !lists.upcoming.includes(t)) return null;
+      // The day it really is: a list still showing yesterday must not date it then.
+      if (day.peek() !== dayNow()) turn();
+      // One turn, so one store transaction: the day and the place together, and a neighbour's key when one has to make room.
+      batch(() => {
+        for (const [row, order] of moveKeys(model.peek().lists.today, id, before)) engine.write('task', row, row === id ? { due: dayNow(), order } : { order });
+      });
+      return { due: t.due, order: t.order };
+    },
+
+    moveBack(id, was) {
+      if (task(id) && (was.due === null || isDay(was.due)) && typeof was.order === 'string') engine.write('task', id, { due: was.due, order: was.order });
     },
 
     addSubtask(parent, title) {

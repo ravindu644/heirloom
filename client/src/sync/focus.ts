@@ -38,11 +38,6 @@ export interface Focus {
   race(): Race;
   /** Today's laps (local day): those that rang and those that were stopped. One not counted is not in it. */
   lapsToday(): number;
-  /**
-   * The laps of this set that have ended, oldest first, each as full as it ran: 1 for one that
-   * rang, less for one stopped, 0 for one not counted. Not the lap in progress. Call it on every tick.
-   */
-  fills(): number[];
 
   /** Starts what `view().next` names: the next lap, or the break a finished lap has earned. */
   start(task?: string | null): void;
@@ -54,10 +49,19 @@ export interface Focus {
   extend(): void;
   /**
    * Ends the run where it is. A lap stopped before its bell is a lap that ended early: it keeps
-   * its minutes and its place in the set, however short, and the next start is the next lap.
-   * After the bell it rang. A break under 60 s leaves nothing.
+   * its minutes and its place in the set, and the next start is the next lap. But one stopped
+   * within its first minute of running was a start taken back: no lap, nothing kept, and the
+   * next start is the same lap. After the bell it rang. A break under a minute leaves nothing either.
    */
   stop(): void;
+  /**
+   * What the stop that can still be undone ended; null whenever `undoable` is false. `ran_ms`
+   * is the running time at the stop, pauses left out. `counted` is true when the stop left a lap
+   * of the day (a lap of a minute or more, or one that had rung); false for a start taken back
+   * and for any break. The screen's line about a stop reads this, not the newest row: a lap
+   * stopped in its first minute leaves no row, and the newest row is then another lap.
+   */
+  readonly lastStop: ReadonlySignal<{ phase: 'work' | 'short' | 'long'; task: string | null; started: number; ran_ms: number; counted: boolean } | null>;
   /**
    * True for ten seconds after `stop()` on this device, while the timer cell is
    * still the idle state that stop wrote. Any other write to the timer, here or elsewhere, ends it.
@@ -111,9 +115,11 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
   // The timer last did something on an earlier local day: its bell if it rang, else the last
   // time someone touched it. Then the next lap is lap one, and yesterday's half set earns no break.
+  // Not while a lap or a break is counting: a lap of some hours begun before midnight is this
+  // sitting still, and the break it is earning is its own.
   function newDay(s: TimerState, v: TimerView, now: number): boolean {
     const stamp = timerStamp();
-    if (!stamp) return false;
+    if (!stamp || (s.phase !== 'idle' && !v.over && !v.paused)) return false;
     return today(v.over && v.ends_at !== null ? v.ends_at : stampMs(stamp)) < today(now);
   }
 
@@ -124,12 +130,13 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
   // Closes a run as protocol section 11 says and writes the row it leaves, if any. `written` is
   // the time in the stamp of the timer cell that held `s`.
-  function keep(s: TimerState, how: End, now: number, written: number) {
+  // Says whether the run leaves a row at all, written now or held already.
+  function keep(s: TimerState, how: End, now: number, written: number): boolean {
     const closed = closeRun(s, how, { now, device: me, written, rang: rangOnce(s) });
-    if (!closed) return;
+    if (!closed) return false;
     // The same rang row twice is harmless, but it is a push for nothing.
-    if (closed.stamp_at !== null && covered(closed.id, closed.row.ended, written)) return;
-    engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
+    if (closed.stamp_at === null || !covered(closed.id, closed.row.ended, written)) engine.write('session', closed.id, closed.row, closed.stamp_at ?? undefined);
+    return true;
   }
 
   // The run this device wrote last and has not seen end, and when it wrote it. If another
@@ -175,24 +182,35 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
   let undone: { before: TimerState; stamp: string | undefined } | null = null;
   let cancelUndo = () => {};
   const undoable = signal(false);
+  const lastStop = signal<Focus['lastStop']['value']>(null);
 
   function forget() {
     cancelUndo();
     undone = null;
-    undoable.value = false;
+    batch(() => {
+      undoable.value = false;
+      lastStop.value = null;
+    });
   }
 
   function stop() {
     const s = state.peek();
-    if (s.phase === 'idle') return;
+    const phase = s.phase;
+    if (phase === 'idle') return;
     const now = engine.now();
     // One turn, so one store transaction: the row of the lap that ends here and the timer cell that ends it.
+    let row = false;
     batch(() => {
-      keep(s, 'stop', now, written());
+      row = keep(s, 'stop', now, written());
       put(act(s, { do: 'stop' }, now));
     });
+    cancelUndo();
     undone = { before: s, stamp: timerStamp() };
-    undoable.value = true;
+    batch(() => {
+      // A break's row is no lap, and a lap that leaves no row was a start taken back.
+      lastStop.value = { phase, task: s.task, started: s.started ?? now, ran_ms: s.planned_ms - view(s, now).left_ms, counted: phase === 'work' && row };
+      undoable.value = true;
+    });
     cancelUndo = env.schedule(forget, UNDO_MS);
   }
 
@@ -290,12 +308,6 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
     race: counts.race,
     lapsToday: counts.lapsToday,
-    fills() {
-      const s = state.value;
-      const now = engine.now();
-      // A set left over from an earlier day is not this day's: the next lap is lap one, and none have ended.
-      return newDay(s, view(s, now), now) ? [] : counts.setFills(s, now);
-    },
 
     start: (task) => begin(false, task),
     skipBreak: (task) => begin(true, task),
@@ -303,6 +315,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     resume: () => change({ do: 'resume' }),
     extend: () => change({ do: 'extend', ms: EXTEND_MS }),
     stop,
+    lastStop,
     undoable,
     undo,
 

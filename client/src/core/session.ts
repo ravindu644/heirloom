@@ -3,7 +3,7 @@
 import { stampDevice } from './hlc.ts';
 import type { Stamp } from './hlc.ts';
 import type { Session } from './stats.ts';
-import { view } from './timer.ts';
+import { FLOOR_MS, view } from './timer.ts';
 import type { TimerState } from './timer.ts';
 
 /** What ended the run. `replaced`: another device's run took the timer while this one was open. */
@@ -31,17 +31,15 @@ export interface Closing {
   rang?: boolean;
 }
 
-const FLOOR_MS = 60000;
-
 /** The row a run leaves when it ends this way, or null when it leaves none. */
 export function closeRun(state: TimerState, end: End, { now, device, written, rang = false }: Closing): Closed | null {
   if (state.phase === 'idle' || state.run === null || state.started === null) return null;
   const { over, ends_at } = view(state, now);
   if (end === 'bell' && !over) return null;
   const ended = over && ends_at !== null ? ends_at : (state.paused_at ?? now);
-  // The floor is for breaks someone cut short. A lap always leaves a row: it had its place in the
-  // set, and the row is what shows it. A run that reached a bell is kept too, however short.
-  if (state.phase !== 'work' && !over && !rang && ended - state.started - state.paused_ms < FLOOR_MS) return null;
+  // A run ended before its bell within its first minute of running leaves nothing, a lap as a
+  // break: a start taken back is not a lap of the day. A run that reached a bell is kept, however short.
+  if (!over && !rang && ended - state.started - state.paused_ms < FLOOR_MS) return null;
   return {
     id: state.run,
     // Only the row of a bell that has just gone is the bell's own. A stop during an extension is a person's edit.

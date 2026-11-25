@@ -651,6 +651,9 @@ export async function createEngine(env: Env): Promise<Engine> {
       if (!r) throw new Error('write before sign in: there is no account to write to');
       const made: Cell[] = [];
       let clock = r.clock;
+      // Read once: the cells of one write are then stamps one after another, whatever the
+      // millisecond does meanwhile, and a reader can tell two fields were written together.
+      const moment = at === undefined ? now() : at;
       for (const [field, given] of Object.entries(fields)) {
         // Checked here, before anything changes: the server would refuse it, and a cell the
         // server refuses would sit in the outbox for good.
@@ -660,7 +663,7 @@ export async function createEngine(env: Env): Promise<Engine> {
         const json = JSON.stringify(given);
         if (json === undefined) throw new Error(`${dataset}/${row}/${field}: write null to clear a field`);
         // An event stamp says when the thing happened, not when it is written down: the clock is not asked and does not move.
-        const next = at === undefined ? stamp(clock, now(), me) : { clock, stamp: eventStamp(at, me, counter) };
+        const next = at === undefined ? stamp(clock, moment, me) : { clock, stamp: eventStamp(at, me, counter) };
         clock = next.clock;
         // Through JSON and back: what is held here is exactly what the server will get, and the
         // caller changing its object afterwards changes nothing.

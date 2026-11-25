@@ -4,7 +4,7 @@
 import { computed } from '@preact/signals-core';
 import { stampMs } from '../core/hlc.ts';
 import { isLength, isMoment } from '../core/real.ts';
-import { fill, focusOf, localDay, race, setFills } from '../core/stats.ts';
+import { fill, focusOf, localDay, race } from '../core/stats.ts';
 import type { Race, Session } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
 import type { TimerState } from '../core/timer.ts';
@@ -14,10 +14,10 @@ const DAY_MS = 86400000;
 const LENGTHS = { work_ms: 1500000, short_ms: 300000, long_ms: 900000 };
 
 /**
- * The longest lap that is offered: 99 minutes, the most the clock face draws. A longer one that
- * a row already holds (an earlier build, another client) is read and run as it is.
+ * The longest lap that is offered, in settings and on a task: 360 minutes, the user's hard
+ * limit. A longer one that a row already holds (another client) is read and run as it is.
  */
-export const LAP_MAX_MS = 99 * 60000;
+export const LAP_MAX_MS = 360 * 60000;
 
 /**
  * The lengths a lap and the breaks get from a row, each by itself: the row's where it holds a
@@ -137,6 +137,19 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     return fills;
   }
 
+  /**
+   * How full the lap in progress is, when it is not yet one of today's laps: null when no lap is
+   * on, when its bell has gone or it rang once already (then it is in `fillsToday`), or when it
+   * began on an earlier day and so is that day's.
+   */
+  function fillOpen(): number | null {
+    const s = state.value;
+    const now = engine.now();
+    const { over, left_ms } = view(s, now);
+    if (s.phase !== 'work' || s.started === null || over || rangOnce(s) || today(s.started) !== today(now)) return null;
+    return s.planned_ms > 0 ? Math.min(1, Math.max(0, (s.planned_ms - left_ms) / s.planned_ms)) : 0;
+  }
+
   return {
     rows,
     sessions,
@@ -168,10 +181,8 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
 
     lapsOn,
     fillsToday,
+    fillOpen,
     /** Today's laps: as many as there are fills. */
     lapsToday: (): number => fillsToday().length,
-
-    /** The set on screen (protocol section 7), from today's rows. */
-    setFills: (s: TimerState, now: number): number[] => setFills(byDay.value.get(today(now)) ?? [], s, now, utcOffsetMin()),
   };
 }

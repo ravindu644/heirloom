@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { follows, stampCounter, stampMs } from '../core/hlc.ts';
 import { GONE, isMoment } from '../core/real.ts';
 import type { Write } from '../store/store.ts';
 import { T0 } from './fakes.ts';
@@ -101,7 +102,107 @@ describe('the lists', () => {
     d.today.edit(soon!, { due: TOMORROW });
     d.today.edit(alsoSoon!, { due: TOMORROW });
     assert.deepEqual(open(d), ['overdue', 'no day']);
+    // Each was put by its day as its day was given: Upcoming reads by day until a hand moves a row.
     assert.deepEqual(titles(d.today.upcoming.value), ['tomorrow', 'also tomorrow', 'in a week']);
+    assert.deepEqual(d.today.upcoming.value.map((t) => t.due), [TOMORROW, TOMORROW, '2026-12-01']);
+  });
+
+  it('a task given a day after today is put by its day in the same store transaction: after the last row whose day is not later than its own', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const ids = ['the 30th', 'the 26th', 'the 28th', 'the 26th again', 'the 2nd'].map((t) => d.today.add(t)!);
+    const days = ['2026-11-30', '2026-11-26', '2026-11-28', '2026-11-26', '2026-12-02'];
+    await d.engine.saved();
+    log.length = 0;
+    ids.forEach((id, n) => d.today.edit(id, { due: days[n]! }));
+    await d.engine.saved();
+    assert.equal(log.length, 1, 'five edits in one turn');
+    assert.deepEqual(log[0]!.cells!.map((c) => c.field), Array(5).fill(['due', 'order']).flat());
+    assert.deepEqual(titles(d.today.upcoming.value), ['the 26th', 'the 26th again', 'the 28th', 'the 30th', 'the 2nd']);
+    // Given another day, it goes by that one; given the day it has, or an edit of something else, it stays and its key is not written.
+    d.today.edit(ids[0]!, { due: '2026-11-27' });
+    assert.deepEqual(titles(d.today.upcoming.value), ['the 26th', 'the 26th again', 'the 30th', 'the 28th', 'the 2nd']);
+    const key = d.engine.stamp('task', ids[0]!, 'order');
+    d.today.edit(ids[0]!, { due: '2026-11-27', title: 'the 27th' });
+    d.today.edit(ids[0]!, { estimate: 2 });
+    assert.equal(d.engine.stamp('task', ids[0]!, 'order'), key);
+    // A day of today or none is no place in Upcoming: the key is left alone.
+    const held = d.engine.stamp('task', ids[4]!, 'order');
+    d.today.edit(ids[4]!, { due: TODAY });
+    d.today.edit(ids[4]!, { due: null });
+    assert.equal(d.engine.stamp('task', ids[4]!, 'order'), held);
+  });
+
+  it('a row a hand has moved stays where it was put: dragged above an earlier day, it is still there when another task is given a day', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [a, b, c] = ['the 26th', 'the 28th', 'the 30th'].map((t) => d.today.add(t)!);
+    d.today.edit(a!, { due: '2026-11-26' });
+    d.today.edit(b!, { due: '2026-11-28' });
+    d.today.edit(c!, { due: '2026-11-30' });
+    d.today.move(c!, a!);
+    assert.deepEqual(titles(d.today.upcoming.value), ['the 30th', 'the 26th', 'the 28th']);
+    const fourth = d.today.add('the 27th')!;
+    d.today.edit(fourth, { due: '2026-11-27' });
+    // After the last row whose day is not later than its own, which is the 26th: the dragged row is not moved back.
+    assert.deepEqual(titles(d.today.upcoming.value), ['the 30th', 'the 26th', 'the 27th', 'the 28th']);
+    const fifth = d.today.add('the 25th')!;
+    d.today.edit(fifth, { due: TOMORROW });
+    assert.deepEqual(titles(d.today.upcoming.value), ['the 25th', 'the 30th', 'the 26th', 'the 27th', 'the 28th']);
+    const last = d.today.add('the 31st of December')!;
+    d.today.edit(last, { due: '2026-12-31' });
+    assert.equal(titles(d.today.upcoming.value).at(-1), 'the 31st of December');
+  });
+
+  it('given a day between two rows that hold the same key: the one after makes room in the same transaction', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const [a, b] = ['a', 'b'].map((t) => d.today.add(t)!);
+    d.today.edit(a!, { due: '2026-11-26' });
+    d.today.edit(b!, { due: '2026-11-30' });
+    d.engine.write('task', a!, { order: 'V' });
+    d.engine.write('task', b!, { order: 'V' });
+    const [first, second] = titles(d.today.upcoming.value);
+    const between = d.today.add('between')!;
+    await d.engine.saved();
+    log.length = 0;
+    d.today.edit(between, { due: first === 'a' ? '2026-11-28' : '2026-12-05' });
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => c.field).toSorted(), first === 'a' ? ['due', 'order', 'order'] : ['due', 'order']);
+    assert.deepEqual(titles(d.today.upcoming.value).slice(0, 2), [first, first === 'a' ? 'between' : second]);
+  });
+
+  it('two devices each give a task a day, offline: when they meet Upcoming is in one order on both', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const [x, y, held] = ['dated on a', 'dated on b', 'already there'].map((t) => a.today.add(t)!);
+    a.today.edit(held!, { due: '2026-11-27' });
+    w.exchange(a, b);
+    a.disconnect();
+    b.disconnect();
+    a.today.edit(x!, { due: '2026-11-26' });
+    w.time.advance(1000);
+    b.today.edit(y!, { due: '2026-11-26' });
+    w.exchange(a, b);
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    assert.deepEqual(titles(a.today.upcoming.value), titles(b.today.upcoming.value));
+    assert.equal(titles(a.today.upcoming.value).at(-1), 'already there', 'both went before the 27th, on both');
+    assert.equal(a.today.upcoming.value.length, 3);
+  });
+
+  it('a subtask given a day has no place in Upcoming: its key is left alone', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const parent = d.today.add('parent')!;
+    const sub = d.today.addSubtask(parent, 'a step')!;
+    const key = d.engine.stamp('task', sub, 'order');
+    d.today.edit(sub, { due: TOMORROW });
+    assert.equal(d.engine.stamp('task', sub, 'order'), key);
+    assert.equal(row(d, sub)?.due, TOMORROW);
   });
 
   it('the task the timer is on is "running", and the first of the others is "next"', async () => {
@@ -596,6 +697,8 @@ describe('figures', () => {
       done_ms: 35 * MIN,
       laps: 1,
       fills: [1],
+      // Ten minutes into a lap of twenty-five: the bar's last, growing segment.
+      open: 0.4,
       left_laps: 3 + 2,
       left_ms: 5 * LAP,
       target: 8,
@@ -607,6 +710,7 @@ describe('figures', () => {
     const after = d.today.figures();
     assert.equal(after.laps, 2);
     assert.deepEqual(after.fills, [1, 1]);
+    assert.equal(after.open, null, 'its bell has gone: it is one of the fills now, not drawn twice');
     assert.equal(after.done_ms, 50 * MIN);
     assert.equal(after.left_laps, 3 + 1);
   });
@@ -641,6 +745,58 @@ describe('figures', () => {
     assert.deepEqual(rung(), [2, [1, 1], 2, 2, [1, 1]]);
   });
 
+  it('open is the lap in progress, to draw after the fills: none when idle, when its bell has gone, when it rang and runs on, or when it began yesterday', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const open = () => d.today.figures().open;
+    assert.equal(open(), null);
+    d.focus.start();
+    await d.settle();
+    assert.equal(open(), 0);
+    w.time.advance(5 * MIN);
+    assert.equal(open(), 0.2);
+    d.focus.pause();
+    w.time.advance(30 * MIN);
+    assert.equal(open(), 0.2, 'paused, it does not grow');
+    d.focus.resume();
+    w.time.advance(20 * MIN);
+    assert.deepEqual([open(), d.today.figures().fills], [null, [1]]);
+    w.time.advance(MIN);
+    d.focus.extend();
+    w.time.advance(MIN);
+    assert.deepEqual([open(), d.today.figures().fills], [null, [1]], 'in its extension it is the lap it already was');
+    // In a break there is no lap.
+    d.focus.stop();
+    d.focus.start();
+    w.time.advance(LAP);
+    d.focus.start();
+    assert.equal(d.focus.state.peek().phase, 'short');
+    assert.equal(open(), null);
+    // A lap begun at 23:50 is yesterday's lap at 00:05: not one of today's, growing or whole.
+    d.focus.stop();
+    w.time.advance(T0 + 14 * HOUR - 10 * MIN - d.engine.now());
+    d.focus.start();
+    w.time.advance(5 * MIN);
+    assert.equal(open(), 0.2, 'at 23:55 it is today\'s lap in progress');
+    w.time.advance(10 * MIN);
+    assert.deepEqual([open(), d.today.figures().fills], [null, []]);
+  });
+
+  it('a lap whose bell this device heard and may not write is one of the fills, and not drawn again as the lap in progress', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    b.disconnect();
+    w.time.advance(LAP - MIN);
+    assert.deepEqual([b.today.figures().fills, b.today.figures().open], [[], 0.96]);
+    w.time.advance(2 * MIN);
+    assert.deepEqual(b.sessions(), [], 'offline with another device\'s timer, b writes no bell');
+    assert.deepEqual([b.today.figures().fills, b.today.figures().open], [[1], null]);
+  });
+
   it('fills are today\'s laps, oldest first, each as full as it ran: a lap not counted is not among them', async () => {
     const w = world();
     const d = await w.device('a');
@@ -658,7 +814,7 @@ describe('figures', () => {
     const d = await w.device('a');
     d.today.add('pointers ~3');
     d.engine.write('settings', 'current', { work_ms: 50 * MIN });
-    assert.deepEqual(d.today.figures(), { done_ms: 0, laps: 0, fills: [], left_laps: 3, left_ms: 150 * MIN, target: 0, ghost: null });
+    assert.deepEqual(d.today.figures(), { done_ms: 0, laps: 0, fills: [], open: null, left_laps: 3, left_ms: 150 * MIN, target: 0, ghost: null });
     d.today.setTarget(6.9);
     assert.equal(d.today.figures().target, 6);
     d.today.setTarget(0);
@@ -771,6 +927,111 @@ describe('repeating tasks', () => {
     assert.equal(row(d, next)?.deleted, null);
   });
 
+  it('a repeating task carried into today and done: the next is the first day the series has not had, not the day it was carried from, and the series goes on', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    // Ahead of itself: today's done, and tomorrow's done today as well. The one for the 26th is in Upcoming.
+    d.today.setDone(id, true);
+    w.time.advance(MIN);
+    d.today.setDone(`${id}-20261125`, true);
+    w.time.advance(MIN);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.id, t.due]), [[`${id}-20261126`, '2026-11-26']]);
+    // Carried into today, and done too. The day after today has its row, done; the day after that is this very row.
+    const carried = `${id}-20261126`;
+    d.today.moveToToday(carried, null);
+    w.time.advance(MIN);
+    d.today.setDone(carried, true);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.id, t.due, t.title]), [[`${id}-20261127`, '2026-11-27', 'read']]);
+    assert.deepEqual(titles(d.today.done.value), ['read', 'read', 'read']);
+    // Taken back, the one it made goes; done again, it is back, and never two.
+    d.today.setDone(carried, false);
+    assert.deepEqual(d.today.upcoming.value, []);
+    assert.equal(row(d, `${id}-20261125`)?.deleted, undefined, 'the one that was done before it is not this done\'s to take away');
+    d.today.setDone(carried, true);
+    assert.deepEqual(d.today.upcoming.peek().map((t) => t.id), [`${id}-20261127`]);
+    // And the series goes on from there.
+    w.time.advance(3 * DAY);
+    d.today.setDone(`${id}-20261127`, true);
+    assert.deepEqual(d.today.upcoming.peek().map((t) => t.due), ['2026-11-28']);
+  });
+
+  it('a weekly task carried in from next week and done today: the next is the week after, not the day it was carried from', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('review the week')!;
+    // Tuesdays. Done today, so next Tuesday's is in Upcoming; that one is carried into today and done as well.
+    d.today.edit(id, { repeat: { every: 'week', days: 2 } });
+    d.today.setDone(id, true);
+    const next = `${id}-20261201`;
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.id, t.due]), [[next, '2026-12-01']]);
+    w.time.advance(MIN);
+    d.today.moveToToday(next, null);
+    d.today.setDone(next, true);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.id, t.due]), [[`${id}-20261208`, '2026-12-08']]);
+  });
+
+  it('undone does not reach past a next one that was done since: the one after it belongs to that done', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    d.today.setDone(id, true);
+    w.time.advance(MIN);
+    d.today.setDone(`${id}-20261125`, true);
+    assert.deepEqual(d.today.upcoming.value.map((t) => t.id), [`${id}-20261126`]);
+    d.today.setDone(id, false);
+    assert.deepEqual(d.today.upcoming.value.map((t) => t.id), [`${id}-20261126`]);
+    assert.equal(row(d, `${id}-20261125`)?.deleted, undefined);
+  });
+
+  it('the next of a repeat stands by its day in Upcoming, between what is due before it and after', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    const [soon, far] = ['due tomorrow', 'due next week'].map((t) => d.today.add(t)!);
+    d.today.edit(far!, { due: '2026-12-01' });
+    d.today.edit(soon!, { due: TOMORROW });
+    // Its own place in Today is the last: its key is no guide to where its next one belongs.
+    d.today.add('another of today');
+    d.today.move(id, null);
+    assert.ok(row(d, id)!.order! > row(d, far!)!.order!);
+    d.today.setDone(id, true);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.title, t.due]), [['due tomorrow', TOMORROW], ['read', TOMORROW], ['due next week', '2026-12-01']]);
+    // Taken back while it stands where it was made, it goes; done again, it is back.
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), ['due tomorrow', 'due next week']);
+    d.today.setDone(id, true);
+    assert.deepEqual(titles(d.today.upcoming.value), ['due tomorrow', 'read', 'due next week']);
+  });
+
+  it('the cells of one write are stamps one after another though the clock moves on between fields: the next copy made as a millisecond turned is still taken back with the done', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    // Every look at the clock finds it a millisecond later, as a real one may between two fields.
+    w.drift.ms = 1;
+    d.today.setDone(id, true);
+    w.drift.ms = 0;
+    const next = `${id}-20261125`;
+    const stamps = d.engine.cells().filter((c) => c.row === next).map((c) => c.stamp).sort();
+    assert.equal(stamps.length, 12);
+    assert.equal(new Set(stamps.map((s) => s.slice(0, 24))).size, 1, 'one reading of the clock for the whole write');
+    stamps.slice(1).forEach((s, n) => assert.equal(follows(stamps[n]!, s), true));
+    w.time.advance(MIN);
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), [], 'not two open rows of one series');
+    assert.equal(typeof row(d, next)?.deleted, 'number');
+  });
+
+  it('the next copy made as the clock\'s counter ran full: its key and its day fall either side of the roll, and it is still taken back with the done', async () => {
+    const w = world();
+    const { d, id } = await daily(w);
+    // Another device's cell leaves this device's clock eleven stamps short of full, in this very millisecond.
+    d.receive([{ stamp: `${new Date(d.engine.now()).toISOString()}-fff3-b2c3d4e5f6071829`, dataset: 'mood', row: 'x', field: 'y', value: 1 }]);
+    d.today.setDone(id, true);
+    const next = `${id}-20261125`;
+    const [key, day] = [d.engine.stamp('task', next, 'order')!, d.engine.stamp('task', next, 'due')!];
+    assert.deepEqual([stampCounter(key), stampCounter(day), stampMs(day) - stampMs(key)], [0xffff, 0, 1], 'the roll is between the two: recount the fields before it if this moves');
+    d.today.setDone(id, false);
+    assert.deepEqual(titles(d.today.upcoming.value), []);
+  });
+
   it('undone does not take away a next one that has been moved, broken down, or has a lap on it', async () => {
     for (const touch of ['moved', 'subtask', 'lap'] as const) {
       const w = world();
@@ -861,6 +1122,27 @@ describe('done while its lap runs', () => {
       assert.equal(d.focus.lapsToday(), 1);
     }
     assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+  });
+
+  it('ticked within the lap\'s first minute: a start taken back, so no row and no lap, the timer idle at the same lap; the one Undo opens the task and puts the run back', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const id = d.today.add('Q/A session ~2')!;
+    d.engine.write('timer', 'current', { state: { ...d.focus.state.value, set_index: 1 } });
+    d.focus.start(id);
+    await d.settle();
+    w.time.advance(20000);
+    const before = d.focus.state.value;
+    d.today.setDone(id, true);
+    assert.deepEqual(d.focus.state.value, { ...IDLE, set_index: 1 });
+    assert.deepEqual(d.sessions(), []);
+    assert.deepEqual([titles(d.today.done.value), d.today.done.value[0]!.laps, d.focus.lapsToday()], [['Q/A session'], 0, 0]);
+    w.time.advance(3000);
+    d.today.setDone(id, false);
+    assert.deepEqual(d.focus.state.value, before);
+    assert.equal(d.focus.ran(), 23000);
+    assert.deepEqual([open(d), d.today.running.value?.id], [['Q/A session'], id]);
+    assert.deepEqual(d.sessions(), []);
   });
 
   it('a paused lap is ended too, where its pause began', async () => {
@@ -1218,9 +1500,9 @@ describe('a task\'s own lengths', () => {
     assert.equal(row(d, id)?.short_ms, null);
     // A lap of 99 minutes at most; a break up to a day, as in settings; a second at least.
     d.today.edit(id, { work_ms: LAP_MAX_MS, short_ms: 1000, long_ms: 86400000 });
-    assert.deepEqual(lengths(d, id), { work_ms: 99 * MIN, short_ms: 1000, long_ms: 86400000 });
+    assert.deepEqual(lengths(d, id), { work_ms: 360 * MIN, short_ms: 1000, long_ms: 86400000 });
     const cells = d.engine.cells();
-    for (const bad of [{ work_ms: LAP_MAX_MS + 1 }, { work_ms: 100 * MIN }, { work_ms: 999 }, { work_ms: 1500000.5 }, { work_ms: '25' }, { short_ms: 0 }, { short_ms: -1 }, { long_ms: 86400001 }, { long_ms: NaN }, {}]) {
+    for (const bad of [{ work_ms: LAP_MAX_MS + 1 }, { work_ms: 361 * MIN }, { work_ms: 999 }, { work_ms: 1500000.5 }, { work_ms: '25' }, { short_ms: 0 }, { short_ms: -1 }, { long_ms: 86400001 }, { long_ms: NaN }, {}]) {
       d.today.edit(id, bad as never);
     }
     assert.deepEqual(d.engine.cells(), cells, 'what is no length is ignored, as other bad input is');
@@ -1237,9 +1519,9 @@ describe('a task\'s own lengths', () => {
       assert.equal(lengths(d, id).work_ms, null, String(odd));
       assert.equal(d.focus.lengthsFor(id).work_ms, LAP);
     }
-    d.engine.write('task', id, { work_ms: 120 * MIN });
-    assert.equal(lengths(d, id).work_ms, 120 * MIN);
-    assert.deepEqual(d.focus.lengthsFor(id), { work_ms: 120 * MIN, short_ms: 5 * MIN, long_ms: 120 * MIN });
+    d.engine.write('task', id, { work_ms: 400 * MIN });
+    assert.equal(lengths(d, id).work_ms, 400 * MIN);
+    assert.deepEqual(d.focus.lengthsFor(id), { work_ms: 400 * MIN, short_ms: 5 * MIN, long_ms: 120 * MIN });
     d.today.edit(id, { title: 'read on' });
     assert.equal(row(d, id)?.short_ms, 5, 'not rewritten by an edit of something else');
   });
@@ -1889,17 +2171,182 @@ describe('moving', () => {
     assert.deepEqual(['a', 'm', 'b'].map((id) => row(d, id)?.order), ['V', 'W', 'X']);
   });
 
-  it('upcoming tasks are moved among those due the same day, and subtasks among their parent\'s', async () => {
+  it('upcoming tasks are moved among all of Upcoming, across days, with one key and no change of day; subtasks among their parent\'s', async () => {
     const w = world();
-    const d = await w.device('a');
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
     const ids = ['one', 'two', 'three'].map((t) => d.today.add(t)!);
-    for (const id of ids) d.today.edit(id, { due: TOMORROW });
+    const days = [TOMORROW, '2026-11-30', '2026-12-05'];
+    ids.forEach((id, n) => d.today.edit(id, { due: days[n]! }));
+    await d.engine.saved();
+    log.length = 0;
+    // The one due last goes to the top.
     d.today.move(ids[2]!, ids[0]!);
-    assert.deepEqual(titles(d.today.upcoming.value), ['three', 'one', 'two']);
+    await d.engine.saved();
+    assert.deepEqual(log.flatMap((write) => write.cells!.map((c) => [c.row, c.field])), [[ids[2], 'order']]);
+    assert.deepEqual(d.today.upcoming.value.map((t) => [t.title, t.due]), [['three', '2026-12-05'], ['one', TOMORROW], ['two', '2026-11-30']]);
+    d.today.move(ids[2]!, null);
+    assert.deepEqual(titles(d.today.upcoming.value), ['one', 'two', 'three']);
+    // By its place a row never changes list: set before a row of Today, or the other way, it goes to the end of its own.
+    const mine = d.today.add('today\'s')!;
+    d.today.move(ids[0]!, mine);
+    assert.deepEqual(titles(d.today.upcoming.value), ['two', 'three', 'one']);
+    d.today.move(mine, ids[1]!);
+    assert.deepEqual([open(d), d.today.list.value[0]!.due], [['today\'s'], TODAY]);
+    d.today.remove(mine);
     const parent = d.today.add('parent')!;
     const subs = ['s1', 's2', 's3'].map((t) => d.today.addSubtask(parent, t)!);
     d.today.move(subs[0]!, null);
     assert.deepEqual(d.today.next.value?.subtasks.map((s) => s.title), ['s2', 's3', 's1']);
+  });
+
+  it('carried into Today: its day becomes today and its place is among today\'s, in one store transaction; its time stays; and it can be put back as it was', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const [first, second] = ['first', 'second'].map((t) => d.today.add(t)!);
+    const later = d.today.add('thesis outline')!;
+    d.today.edit(later, { due: '2026-11-30', time: '15:30' });
+    const before = row(d, later)!;
+    await d.engine.saved();
+    log.length = 0;
+    const was = d.today.moveToToday(later, second!);
+    await d.engine.saved();
+    assert.deepEqual(was, { due: '2026-11-30', order: before.order });
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.row, c.field]), [[later, 'due'], [later, 'order']]);
+    assert.deepEqual(open(d), ['first', 'thesis outline', 'second']);
+    assert.deepEqual(d.today.upcoming.value, []);
+    const moved = d.today.list.value[1]!;
+    assert.deepEqual([moved.due, moved.time], [TODAY, '15:30']);
+    assert.deepEqual(d.today.timed.value, [{ id: later, title: 'thesis outline', day: TODAY, time: '15:30' }]);
+    // Undo: the day and the place it had, in one write, and nothing else.
+    log.length = 0;
+    d.today.moveBack(later, was!);
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => [c.row, c.field, c.value]), [[later, 'due', '2026-11-30'], [later, 'order', before.order]]);
+    assert.deepEqual(open(d), ['first', 'second']);
+    assert.deepEqual(d.today.upcoming.peek().map((t) => [t.title, t.due, t.time]), [['thesis outline', '2026-11-30', '15:30']]);
+    // To the end with null, and with a `before` that is not one of today's.
+    d.today.moveToToday(later, null);
+    assert.deepEqual(open(d), ['first', 'second', 'thesis outline']);
+    d.today.moveBack(later, was!);
+    d.today.moveToToday(later, 'nobody');
+    assert.deepEqual(open(d), ['first', 'second', 'thesis outline']);
+    // To the top: it is Next, and what was Next is the first of the rest.
+    d.today.moveBack(later, was!);
+    d.today.moveToToday(later, first!);
+    assert.equal(d.today.next.value?.title, 'thesis outline');
+    assert.deepEqual(titles(d.today.later.value), ['first', 'second']);
+  });
+
+  it('only a task in Upcoming is carried: one of Today, a done one, a subtask, a deleted one and nobody are left alone, and nothing is returned', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const [mine, done, gone, parent] = ['mine', 'done', 'gone', 'parent'].map((t) => d.today.add(t)!);
+    const sub = d.today.addSubtask(parent!, 'a step')!;
+    for (const id of [done, gone]) d.today.edit(id!, { due: TOMORROW });
+    d.today.setDone(done!, true);
+    d.today.remove(gone!);
+    const cells = d.engine.cells();
+    for (const id of [mine, done, gone, sub, 'nobody']) assert.equal(d.today.moveToToday(id!, null), null, id!);
+    // And a place that is no place puts nothing back.
+    d.today.moveBack('nobody', { due: TOMORROW, order: 'V' });
+    d.today.moveBack(mine!, { due: '2026-02-31', order: 'V' });
+    d.today.moveBack(mine!, { due: TOMORROW, order: 7 as never });
+    assert.deepEqual(d.engine.cells(), cells);
+  });
+
+  it('carried in between two of today\'s that hold the same key: the one after makes room in the same transaction, and the day is written once', async () => {
+    const w = world();
+    const log: Write[] = [];
+    const d = await w.device('a', { log });
+    const a = d.today.add('a')!;
+    const b = d.today.add('b')!;
+    d.engine.write('task', b, { order: row(d, a)!.order });
+    const later = d.today.add('later')!;
+    d.today.edit(later, { due: TOMORROW });
+    await d.engine.saved();
+    log.length = 0;
+    const second = open(d)[1]!;
+    d.today.moveToToday(later, [a, b].find((id) => row(d, id)!.title === second)!);
+    await d.engine.saved();
+    assert.equal(log.length, 1);
+    assert.deepEqual(log[0]!.cells!.map((c) => c.field).toSorted(), ['due', 'order', 'order']);
+    assert.equal(open(d)[1], 'later');
+    assert.equal(open(d).length, 3);
+  });
+
+  it('carried in after the device slept over midnight: the day it is given is the real one', async () => {
+    const w = world();
+    const d = await w.device('a');
+    const later = d.today.add('later')!;
+    d.today.edit(later, { due: '2026-11-30' });
+    w.time.jump(DAY);
+    d.today.moveToToday(later, null);
+    assert.equal(row(d, later)?.due, TOMORROW);
+    assert.equal(d.today.day.value, TOMORROW);
+  });
+
+  it('carried into today on one device while a second, offline, retitles it and a third, offline, moves it within Upcoming: one day, one place, both edits kept, the same on all three', async () => {
+    for (const lastToMove of ['a', 'c'] as const) {
+      const w = world();
+      const a = await w.device('a');
+      const b = await w.device('b');
+      const c = await w.device('c');
+      const mine = a.today.add('today\'s own')!;
+      const [first, id] = ['next week', 'thesis outline'].map((t) => a.today.add(t)!);
+      a.today.edit(first!, { due: '2026-11-30' });
+      a.today.edit(id!, { due: '2026-12-02' });
+      for (const d of [b, c]) w.exchange(a, d);
+      for (const d of [a, b, c]) d.disconnect();
+      const moves = { a: () => void a.today.moveToToday(id!, mine!), c: () => c.today.move(id!, first!) };
+      moves[lastToMove === 'a' ? 'c' : 'a']();
+      w.time.advance(2000);
+      b.today.edit(id!, { title: 'thesis outline, second draft' });
+      w.time.advance(2000);
+      moves[lastToMove]();
+      // They meet, in a ring and back, so every device has every cell.
+      for (const [x, y] of [[a, b], [b, c], [c, a], [a, b]] as const) w.exchange(x, y);
+      const held = row(a, id!)!;
+      for (const d of [a, b, c]) {
+        const where = `${lastToMove} moved last, on ${d.name}`;
+        assert.deepEqual(w.sorted(d.engine), w.sorted(a.engine), where);
+        assert.equal(row(d, id!)?.due, TODAY, where);
+        assert.equal(row(d, id!)?.title, 'thesis outline, second draft', where);
+        assert.deepEqual(titles(d.today.upcoming.value), ['next week'], where);
+        assert.equal(open(d).filter((title) => title === 'thesis outline, second draft').length, 1, where);
+      }
+      // The place is the later of the two moves, whole: a's key among today's, or c's among what was Upcoming.
+      assert.equal(held.order, row(lastToMove === 'a' ? a : c, id!)!.order);
+      assert.equal(open(a).length, 2);
+    }
+  });
+
+  it('the move undone on one device after another had already edited the title: the day and the place go back, the title stays, on both', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    a.today.add('today\'s own');
+    const id = a.today.add('thesis outline')!;
+    a.today.edit(id, { due: '2026-11-30', time: '09:00' });
+    w.exchange(a, b);
+    const before = row(a, id)!;
+    const was = a.today.moveToToday(id, null)!;
+    w.exchange(a, b);
+    w.time.advance(2000);
+    b.today.edit(id, { title: 'thesis outline, second draft', estimate: 3 });
+    w.exchange(a, b);
+    w.time.advance(2000);
+    a.today.moveBack(id, was);
+    w.exchange(a, b);
+    for (const d of [a, b]) {
+      assert.deepEqual(row(d, id), { ...before, title: 'thesis outline, second draft', estimate: 3 }, d.name);
+      assert.deepEqual(d.today.upcoming.value.map((t) => [t.title, t.due, t.time]), [['thesis outline, second draft', '2026-11-30', '09:00']]);
+      assert.deepEqual(open(d), ['today\'s own']);
+    }
+    assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 
   it('two devices moving the same task offline settle on one order', async () => {

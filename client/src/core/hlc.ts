@@ -49,6 +49,16 @@ export const eventStamp = (ms: number, device: string, counter = 0): Stamp => wr
 /** The counter of a stamp. */
 export const stampCounter = (stamp: Stamp): number => read(stamp).counter;
 
+/**
+ * Whether `b` is the very next stamp its device made after `a` within one write: one more on
+ * the counter, or, when the counter was full, the first of the next millisecond, as `stamp` rolls it.
+ */
+export function follows(a: Stamp, b: Stamp): boolean {
+  if (stampDevice(a) !== stampDevice(b)) return false;
+  const [from, to] = [read(a), read(b)];
+  return from.counter === 0xffff ? to.ms === from.ms + 1 && to.counter === 0 : to.ms === from.ms && to.counter === from.counter + 1;
+}
+
 /** A stamp of exactly the shape section 2 gives: what the server will take. */
 export const isStamp = (v: unknown): v is Stamp => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z-[0-9a-f]{4}-[0-9a-f]{16}$/.test(v) && !Number.isNaN(read(v).ms);
 

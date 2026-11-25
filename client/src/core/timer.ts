@@ -64,11 +64,21 @@ export interface TimerView {
   next: { phase: Phase; set_index: number };
 }
 
+/**
+ * Under this much running time, a run that ends before its bell leaves no row, and a lap that
+ * does was a start taken back: it keeps its place in the set for the next start.
+ */
+export const FLOOR_MS = 60000;
+
 // The index of the lap a tap on start begins: the one rule start, stop and next share. A lap
-// has had its place in the set whether it reached its bell or was stopped before it.
-const nextLap = (state: TimerState): number => {
+// has had its place in the set whether it reached its bell or was stopped before it, but for
+// one ended within its first minute of running: three slips of the thumb are not three laps.
+const nextLap = (state: TimerState, now: number): number => {
   if (state.phase === 'idle') return state.set_index;
-  return state.phase === 'long' ? 0 : (state.set_index + 1) % 4;
+  if (state.phase === 'long') return 0;
+  const { over, left_ms } = view(state, now);
+  const takenBack = state.phase === 'work' && !over && state.planned_ms - left_ms < FLOOR_MS;
+  return takenBack ? state.set_index : (state.set_index + 1) % 4;
 };
 
 /** The state after an action at `now` (server time). An action with nothing to act on returns the state it got. */
@@ -84,7 +94,7 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
         paused_at: null,
         paused_ms: 0,
         planned_ms: action.planned_ms,
-        set_index: action.phase !== 'work' ? state.set_index : action.new_set ? 0 : nextLap(state),
+        set_index: action.phase !== 'work' ? state.set_index : action.new_set ? 0 : nextLap(state, now),
       };
     case 'pause':
       return state.phase === 'idle' || paused || over ? state : { ...state, paused_at: now };
@@ -99,7 +109,7 @@ export function act(state: TimerState, action: TimerAction, now: number): TimerS
       return over && view(longer, now).over ? state : longer;
     }
     case 'stop':
-      return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state) };
+      return state.phase === 'idle' ? state : { ...IDLE, set_index: nextLap(state, now) };
   }
 }
 
@@ -110,9 +120,10 @@ export function view(state: TimerState, now: number): TimerView {
   const paused = state.paused_at !== null;
   const ends_at = paused ? null : state.started + state.paused_ms + state.planned_ms;
   const ran = (state.paused_at ?? now) - state.started - state.paused_ms;
+  // After a break the next lap is the one after the lap before it, whatever the clock says.
   const next: TimerView['next'] =
     state.phase === 'work'
       ? { phase: state.set_index === 3 ? 'long' : 'short', set_index: state.set_index }
-      : { phase: 'work', set_index: nextLap(state) };
+      : { phase: 'work', set_index: state.phase === 'long' ? 0 : (state.set_index + 1) % 4 };
   return { left_ms: Math.max(0, state.planned_ms - ran), ends_at, over: ends_at !== null && now >= ends_at, paused, next };
 }
