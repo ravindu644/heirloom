@@ -394,7 +394,7 @@ The completion moment is flat and in the page.
 ## Shapes
 
 Lanes and bars are square ended: a track has no rounded corners. Rows and buttons take 4 to 8px
-(`rounded.sm`, `rounded.md`). People and the rest mark are circles. Nothing else is round.
+(`rounded.sm`, `rounded.md`). People, the rest mark and the count of waiting notes are circles. Nothing else is round.
 
 ## Components
 
@@ -534,15 +534,56 @@ Built once in `client/src/ui/kit/` and reused.
   of twelve short tries was a wall of rows before the first figure.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
-- **A person's circle** carries the first letter of their username everywhere, also where the
-  words beside it say "You".
-- **Room member:** a circle initial, the name, phase ("Focusing", "Paused"; no lap number: the set is on no screen), time left in
-  figure-md (in `rest` on a break), the task only if shared, today and the week in `label`, who
-  cheered, and a Cheer button: full width on a phone, its own width on a laptop. Side by side on
-  a laptop the panels of a row are equally tall and each button is pinned to its panel's foot,
-  so a row's buttons share one line. The room's own settings are an underlined link at the right
-  end of the line that names the room, never a button between the finding and the week.
-- **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
+- **A person's circle** carries their picture where they set one, and otherwise the first letter
+  of their username, everywhere, also where the words beside it say "You". A picture is cut
+  round, never framed, and drawn the same in both themes.
+- **The Room screen** (chosen from drawn options, `reviews/22/`): the line that names the room
+  ("Study club, kept by lina", with "Code and settings" at its right end), the finding ("1 of 4
+  focusing now."), then **tabs**: People, Notes, Week. The call strip stands outside the tabs.
+  - **Tabs** are the bottom bar's rule one level down: three labels in `body-strong`, 48px tall,
+    equal shares on a phone and each its own width (at least 128px) from the left edge on a
+    laptop; the chosen one in `ink` over a `stroke` line of `ink`, the others `muted`; a `hair`
+    of `line` under the row. No fill, no pill. The row stays under the header while its panel
+    scrolls. They are a tablist to a screen reader, moved through with the arrow keys.
+  - **The count of waiting notes** is a 20px circle of `you` with its figure in `figure-sm`
+    `on-you` ("9+" past nine), 4px after "Notes", hung outside the label so neither the label
+    nor the tab moves when it comes or goes; it fades in `motion-fill`. None at 0. A screen
+    reader hears "Notes, 2 new"; the circle is hidden from it. It counts notes written since
+    Notes was last open while you were not on a lap. It is on that tab only, never on the
+    bottom bar.
+  - **People: the track.** One row a member, in the live order (on a lap, on a break, the rest,
+    each by this week; strictly by this week when the room is ranked): the circle (48px on a
+    phone), the name and phase ("Focusing", "Short break", "Away"), time left in `figure-md`
+    (in `rest` on a break), the task only if shared, today and the week in `label`, who cheered,
+    and Cheer as before. Under the words, the lane: one grey (`raised`) across the whole window,
+    a phone's four hours with now 5/8 across, a laptop's 08:00 to 20:00. A lap that ran is a
+    filled block, yours `you` and everyone else's `muted`; the lap running is filled as far as
+    now. A break is a gap. Nothing else is drawn in a lane: no line of now, no break marks.
+    **The hours carry now:** one row of hours over the lanes, in `ink` over a `stroke` line of
+    `ink` up to now and in `muted` over a `hair` of `line` after, with "now" where the heavy
+    line ends; an hour label within 44px of "now" steps aside. While a lap is called, each person
+    who is in has their circle (24px, a 2px `surface` ring) standing in their lane at the call's
+    start, ahead of now.
+  - **The call strip** stands above the bottom bar on a phone, a band under the finding on a
+    laptop, while a call is open: "15:00 lina calls a lap" over "Starts in 7:42. lina is in.",
+    and "I'm in" as the screen's one primary button ("I'm out" in quiet once you are). When it
+    starts, People opens with "lina and you started together at 15:00." and the link "Call a
+    lap together". The bar that says what the last tap did rises above the strip.
+  - **Notes:** the field "A line for the room" first, then "Kept for a week. Notes fold away while
+    you are on a lap.", then the notes, newest first: the circle (24px), the name and time in
+    `label`, the line in `body`. On a lap the panel says only "2 new notes. They open when this
+    lap ends, at 15:25."
+  - **Week:** "The room is 4h ahead of last week at this time." Then a panel: "22h 55m of 30h
+    together this week" (the figure in `figure-lg`) over Progress's week chart (this week solid
+    `you` to a dot with its figure, last week dashed `ghost` to its end figure, the target the
+    top line labelled "target", today bold on the axis) and "Solid is this week, dashed is last
+    week. The top line is the room's target." Then the streak: "12 days in a row, everyone in"
+    over the dots (kept `you`, rest ring, today open) and what today still needs. Then **Your
+    part**: "5h 50m of the room's 22h 55m this week" over an 8px bar of the room's week with your
+    part in `you` and the rest `raised`, and whether you count for today's streak yet. Only your
+    own figure is in it: it ranks no one. On a laptop the chart takes eight of twelve columns,
+    the streak and your part the other four.
+- **Buttons:**- **Buttons:** every button has a fill, so it reads as something to press: primary is `you` with
   `on-you` text, one per screen at most; secondary is `key` with a `hair` line of `key-edge`;
   quiet is `key-quiet` with no line, for the lesser choice beside another button ("Skip break",
   "I have an invite", "Stop"). **Secondary always outweighs quiet,** in both themes

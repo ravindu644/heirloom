@@ -173,7 +173,10 @@ export function columns(els) {
     // streak's number leads a row ("60 days"), and it is the number that starts the column.
     for (const b of blocks) {
       let at = b;
-      while (!at.figure && !at.textFirst && kids.get(at.i)?.length) at = kids.get(at.i)[0];
+      // A padded panel is a column of its own, however deep it stands: a figure leading it is
+      // measured inside it, not against the column the panel stands in.
+      const inset = (e) => e.content && e.content.left > e.rect.x + 0.5;
+      while (!inset(at) && !at.figure && !at.textFirst && kids.get(at.i)?.length) at = kids.get(at.i)[0];
       b.lead = at !== b && at.figure ? at : null;
     }
     out.push({ box, blocks });

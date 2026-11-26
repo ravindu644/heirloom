@@ -312,9 +312,12 @@ On the third build the user found no glitches; four things about how it reads an
 
 - [x] [lead] PRODUCT rows: live order, start together, break notes, pictures, the room's streak,
       the room against its last week, removing a member
-- [ ] [lead] Three room layouts drawn as options; the user picks one; DESIGN.md and the protocol
-- [ ] [server] [core] [ui] [qa] Built as chosen
-- [ ] Gate
+- [x] [lead] Room layouts drawn as options (three rounds); the user picked C, T2b, with tabs and
+      a count on Notes; DESIGN.md and protocol section 15 written
+- [x] [server] [core] [ui] [android] [qa] Built as chosen: tabs, the track, start together, break
+      notes, pictures, the room's week and streak, your part, removing a member
+- [ ] Gate: built, code-reviewed and checked (190 browser tests); waiting on the user's try.
+      Never run by us on a phone: the called lap's notification with the screen off
 
 ## 23. Release 1.0
 

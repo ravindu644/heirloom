@@ -100,3 +100,4 @@ when it is done.
 - [19] Room's own lane counts today and the week without the lap in progress, while Today, Focus and Progress count it: 1h 15m beside 1h 26m at the same moment.
 - [19] Two every-day habits made at the same moment read "of the last 34 planned days" and "of the last 35": the window starts at each habit's first check-in.
 - [20] A friend's lane in a room leaves out their lap in progress: the room message carries phase, ends_at and paused but not how far the lap has run. Fix: the server sends the run so far at server_time (e.g. run_ms) in protocol section 15, and the client adds the time since while not paused.
+- [22] Your own picture is known to the device only through your member in a room: with no room, it shows until a reload. A `picture` hash in `welcome` (or the account call's reply) would carry it.
