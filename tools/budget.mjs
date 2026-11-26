@@ -14,8 +14,9 @@ const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
 const KB = 1024, bin = 'server/bin/heirloomd-arm64';
 
 const rows = [
-  // ponytail: every chunk counts as first load. Read Vite's manifest once a lazy chunk exists.
-  ['JS, gzipped', sum('.js', gz), 90 * KB],
+  // First load is what index.html names. The lazy chunks are Capacitor's, which only the phone
+  // app imports (platform/index.ts), and sw.js is the worker, not the page.
+  ['JS, gzipped', [...html.matchAll(/<script\b[^>]*\bsrc="\/([^"]+\.js)"/g)].reduce((n, m) => n + gz(path.join(dist, m[1])), 0), 90 * KB],
   ['CSS, gzipped', sum('.css', gz), 20 * KB],
   // Each tag on its own, attributes in any order or quoting, so a new preload cannot slip past.
   ['fonts preloaded', (html.match(/<link\b[^>]*>/g) ?? []).filter((l) => /rel=["']?preload/.test(l) && /as=["']?font/.test(l)).length, 2],
