@@ -50,7 +50,8 @@ async function seeded(devices: Device[], tag: string, seed: (node: Node) => void
   await sent(node);
   for (const d of devices) {
     await signIn(d.page, name);
-    await ready(d.page);
+    // Ready for whichever lap of today the seed leaves next: `ready` alone means lap 1, true only of a frame before catching up.
+    await expect(startButton(d.page)).toBeVisible();
     await go(d.page, 'Progress');
     await expect(d.page.getByText(/^Progress, week of /)).toBeVisible();
   }
