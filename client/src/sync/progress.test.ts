@@ -550,6 +550,62 @@ describe('a day\'s timeline', () => {
     void w;
   });
 
+  it('a task deleted while its lap runs: the lap goes on, named with its project in the day until the task is gone for good; its minutes stay in the day and the project', async () => {
+    const { w, d, p } = await one();
+    const programming = d.today.addProject('Programming', 'you')!;
+    const view = { id: programming, name: 'Programming', color: 'you' };
+    const task = d.today.add('Q/A heirloom')!;
+    d.today.edit(task, { project: programming });
+    const share = () => p.projects().find((s) => s.project?.id === programming);
+    const loose = () => p.projects().find((s) => s.project === null);
+    const day = () => p.timeline('2026-11-24').map((e) => ({ task: e.task?.title ?? null, project: e.project?.id ?? null, ran: e.ran_ms, live: e.live ?? null }));
+
+    d.focus.start(task);
+    w.time.advance(5 * MIN);
+    d.today.remove(task);
+    w.time.advance(15 * MIN);
+    // (a) Running: the lap is the task's still, on every screen that names it.
+    assert.equal(d.focus.state.value.task, task, 'the delete leaves the lap as it is');
+    // Not one of today's open tasks now: the strip names the lap from the task's own row (ui/today/today.tsx).
+    assert.equal(d.today.running.value, null);
+    assert.deepEqual([share()?.focus_ms, share()?.all_ms], [20 * MIN, 20 * MIN]);
+    assert.equal(loose(), undefined, 'none of it is for no project');
+    assert.equal(p.week().you_ms, 20 * MIN);
+    assert.deepEqual(day(), [{ task: 'Q/A heirloom', project: programming, ran: 20 * MIN, live: 'running' }], 'the day has the lap as far as it has run');
+    // Paused, it says so and ends where it stopped.
+    d.focus.pause();
+    w.time.advance(3 * MIN);
+    assert.deepEqual(day(), [{ task: 'Q/A heirloom', project: programming, ran: 20 * MIN, live: 'paused' }]);
+    d.focus.resume();
+
+    // (b) Stopped: its row names the task, and the minutes are the project's.
+    d.focus.stop();
+    assert.deepEqual(day(), [{ task: 'Q/A heirloom', project: programming, ran: 20 * MIN, live: null }]);
+    assert.deepEqual(share(), { project: view, focus_ms: 20 * MIN, laps: 1, before_ms: 0, all_ms: 20 * MIN });
+    assert.equal(loose(), undefined);
+
+    // Gone for good: named by nothing, task or project, and the minutes are still the day's, the week's and the project's.
+    d.today.purge(task);
+    assert.deepEqual(day(), [{ task: null, project: null, ran: 20 * MIN, live: null }]);
+    assert.equal(p.week().you_ms, 20 * MIN);
+    assert.deepEqual(share(), { project: view, focus_ms: 20 * MIN, laps: 1, before_ms: 0, all_ms: 20 * MIN });
+    assert.equal(loose(), undefined);
+  });
+
+  it('a lap past its bell with no row yet, on a device offline with another device\'s timer, is in the day as rang, ending at its bell', async () => {
+    const { w, d: a } = await one();
+    const b = await w.device('b');
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    b.disconnect();
+    w.time.advance(LAP + MIN);
+    assert.deepEqual(
+      b.progress.timeline('2026-11-24').map((e) => [e.outcome, e.ran_ms, e.live]),
+      [['rang', LAP, 'rang']],
+    );
+  });
+
   it('a lap that overlaps one two starts further on is still marked: a long lap here, a short one here, and one elsewhere', async () => {
     const { d, p } = await one();
     const long = lap(d, '2026-11-23', 9, 0, { ended: at('2026-11-23', 9, 40), planned_ms: 40 * MIN });

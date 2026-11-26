@@ -52,6 +52,12 @@ export interface TimelineEntry {
   overlap: boolean;
   /** Which of two rows it is drawn on: 1 for an entry that began while the one it overlaps was on row 0, else 0. */
   row: 0 | 1;
+  /**
+   * Only on the lap in progress, which has no row yet, so nothing to set aside or count again:
+   * `running` while it counts, `paused`, or `rang` when its bell has gone and its row is not
+   * written yet. It ends where it has got to.
+   */
+  live?: 'running' | 'paused' | 'rang';
 }
 
 export interface LookBack {
@@ -149,7 +155,14 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     return all;
   });
   const projects = computed(() => new Map(projectViews(engine.rows('project').value).map((p) => [p.id, p])));
-  // The project a task is shown under: none for no task, a task with none, or a project archived or deleted.
+  // The task a lap is named for: one still to be seen somewhere, deleted ones while they are in
+  // Recently deleted. The lap itself is the day's whatever became of its task.
+  const named = (task: string | null): Task | undefined => {
+    const held = task === null ? undefined : tasks.value.get(task);
+    return held && (held.deleted === null || engine.now() - held.deleted < KEPT_MS) ? held : undefined;
+  };
+  // The project a lap's minutes are counted under: none for no task, a task with none, or a
+  // project archived or deleted. A task deleted, even for good, keeps its time in its project.
   const projectOf = (task: string | null): ProjectView | null => {
     const project = task === null ? null : tasks.value.get(task)?.project;
     return (project && projects.value.get(project)) || null;
@@ -235,15 +248,17 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
 
     timeline(day) {
       const { byDay, overlapping } = history.value;
+      // The lap in progress is in its day as far as it has run, in the place of any row it has outgrown.
+      const open = counts.open(engine.now());
+      const rows = byDay.get(day) ?? [];
+      const sessions = open && localDay(open.started, offset()) === day ? [...rows.filter((session) => session.id !== open.id), open] : rows;
       // The first of a pair to start is on row 0 and the one that began during it on row 1, here
       // and nowhere else, so every screen draws the pair the same way.
       let upper = -Infinity;
-      return (byDay.get(day) ?? [])
+      return sessions
         .toSorted((a, b) => a.started - b.started)
         .map((session) => {
-          const held = session.task === null ? undefined : tasks.value.get(session.task);
-          // The lap stays in the day. The task it was for is named only while the task can still be seen somewhere.
-          const task = held && (held.deleted === null || engine.now() - held.deleted < KEPT_MS) ? held : undefined;
+          const task = named(session.task);
           const overlap = overlapping.has(session.id);
           const row = overlap && session.started < upper ? 1 : 0;
           if (overlap && row === 0) upper = session.ended;
@@ -255,9 +270,11 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
             ended: session.ended,
             ran_ms: Math.max(0, session.ended - session.started - session.paused_ms),
             task: task ? { id: task.id, title: task.title } : null,
-            project: projectOf(session.task),
+            // Named only with its task: purged, the lap is named by nothing, though its minutes stay in the project's totals.
+            project: task ? projectOf(task.id) : null,
             overlap,
             row,
+            ...(session === open && { live: open.outcome === 'rang' ? ('rang' as const) : engine.timer.value.paused_at !== null ? ('paused' as const) : ('running' as const) }),
           };
         });
     },
