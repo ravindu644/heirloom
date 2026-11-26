@@ -76,11 +76,15 @@ test('the first screen asks which server; a bad string, a dead port and somethin
   await a.page.reload();
   await expect(a.page.getByText(`Server: ${ADDR}`)).toBeVisible();
 
-  // Change opens the step again with the address in hand; Back returns.
+  // Change opens the step again with the address in hand; Back leads to the welcome and keeps the
+  // server, so the app opened again is on Sign in for it (the next test follows that path through).
   await button(a.page, 'Change').click();
   await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
   await expect(field(a.page, 'Server')).toHaveValue(`http://${ADDR}`);
   await button(a.page, 'Back').click();
+  await expect(a.page.getByRole('heading', { name: WELCOME, level: 1 })).toBeVisible();
+  await a.page.reload();
+  await expect(a.page.getByText(`Server: ${ADDR}`)).toBeVisible();
 
   // Signed in, nothing offers to change the server.
   const name = username('appuser');
@@ -95,6 +99,30 @@ test('the first screen asks which server; a bad string, a dead port and somethin
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   await expect(a.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
   await expect(button(a.page, 'Change')).toHaveCount(0);
+});
+
+test('Change on Sign in, then Back: the welcome, whose Connect returns to the held address still in the field; nothing is changed until "Use this server", so the app opened again is on Sign in for the held server', async ({ deviceA: a }) => {
+  await toServerStep(a.page);
+  await choose(a.page, ADDR);
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible({ timeout: 10000 });
+  await expect(a.page.getByText(`Server: ${ADDR}`)).toBeVisible();
+
+  await button(a.page, 'Change').click();
+  await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
+  await expect(field(a.page, 'Server')).toHaveValue(`http://${ADDR}`);
+  await button(a.page, 'Back').click();
+  await expect(a.page.getByRole('heading', { name: WELCOME, level: 1 })).toBeVisible();
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toHaveCount(0);
+  await button(a.page, 'Connect to a server').click();
+  await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
+  await expect(field(a.page, 'Server'), 'the held address is not in the field').toHaveValue(`http://${ADDR}`);
+
+  // Left by Back, and the app closed and opened again: Sign in, for the server it held.
+  await button(a.page, 'Back').click();
+  await a.page.reload();
+  await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
+  await expect(a.page.getByText(`Server: ${ADDR}`)).toBeVisible();
+  await expect(a.page.getByRole('heading', { name: WELCOME })).toHaveCount(0);
 });
 
 test('a pasted invite link sets the server and opens the join form with the invite in hand', async ({ deviceA: a }) => {
@@ -126,7 +154,11 @@ test('plain http is said once on the server step, once on the app\'s sign in, an
   await button(a.page, 'Change').click();
   await expect(a.page.getByRole('heading', { name: 'Which server?', level: 1 })).toBeVisible();
   await expect(a.page.getByText(plain)).toHaveCount(1);
+  // Back leads to the welcome; the server is still the one held, and the app opened again sets it up.
   await button(a.page, 'Back').click();
+  await expect(a.page.getByRole('heading', { name: WELCOME, level: 1 })).toBeVisible();
+  await a.page.reload();
+  await expect(a.page.getByRole('heading', { name: 'Set up this server', level: 1 })).toBeVisible();
 
   await field(a.page, 'Username').fill('owner');
   await field(a.page, 'Password').fill(PASSWORD);
