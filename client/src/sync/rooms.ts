@@ -34,6 +34,8 @@ export interface MemberView {
   week_ms: number;
   /** Their laps of today that have ended, `[started, ended]` in server ms, oldest first: for their lane. Empty from an older server and for someone away. */
   laps: [number, number][];
+  /** Their week against their last, for their report: as `RoomView.week`, today being their `week_ms` (yours with your lap in progress). Null for someone away and from an older server. */
+  week: MemberWeek | null;
   /** When the lap they are on began, in server ms, so the lane fills it from there to now; null with none. Paused time is not in it. */
   runStart: number | null;
   /** Their latest lap that rang today, who cheered it, and whether you have. */
@@ -84,13 +86,16 @@ export interface RoomView {
   newNotes: number;
 }
 
-export interface RoomWeek {
-  /** The room's week so far, added up day by day, Monday first: today is `RoomView.week_ms`, laps in progress in it; days to come are null. */
+export interface MemberWeek {
+  /** The week so far, added up day by day, Monday first: today is the `week_ms` shown, laps in progress in it; days to come are null. */
   days: (number | null)[];
   /** Last week the same way, all seven days. */
   last: number[];
-  /** The room's week less last week's as far as the same weekday and time: "4h ahead" when positive. Null when the server did not say. */
+  /** The week less last week's as far as the same weekday and time: "4h ahead" when positive. Null when the server did not say. */
   ahead_ms: number | null;
+}
+
+export interface RoomWeek extends MemberWeek {
   /** Your part of the room's week: your own `week_ms`. */
   you_ms: number;
 }
@@ -326,20 +331,21 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
 
   // The room's week day by day, this week to today and last week whole, from the server's rows
   // per day. Today is the room's week as shown, so the chart ends where the figure stands.
-  function weekOf(msg: RoomNow, week_ms: number, you_ms: number, now: number): RoomWeek | null {
-    const days = seven(msg.days);
+  // The same for one member, from their own `days` (their calendar, read at this device's weekday).
+  function weekOf(of: Record<string, unknown>, week_ms: number, now: number): MemberWeek | null {
+    const days = seven(of.days);
     if (!days) return null;
     const today = weekday(Date.parse(counts.today(now)));
     let sum = 0;
     let before = 0;
     return {
       days: days.map((ms, i) => (i < today ? (sum += ms) : i === today ? week_ms : null)),
-      last: (seven(msg.last_days) ?? [0, 0, 0, 0, 0, 0, 0]).map((ms) => (before += ms)),
+      last: (seven(of.last_days) ?? [0, 0, 0, 0, 0, 0, 0]).map((ms) => (before += ms)),
       // ponytail: last week "at this time" is as of the server's message; it moves on at the next one.
-      ahead_ms: typeof msg.last_at_ms === 'number' ? week_ms - msg.last_at_ms : null,
-      you_ms,
+      ahead_ms: typeof of.last_at_ms === 'number' ? week_ms - of.last_at_ms : null,
     };
   }
+
 
   // A friend's lap in progress: how far the server said it had run at `server_time`, and on since
   // then while it is not paused, up to its bell. Nothing when the message has no `run` (an older server).
@@ -400,6 +406,8 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           week_ms,
           laps: lap.laps,
           runStart: lap.runStart,
+          // Yours too: the server's rows, with your lap in progress counted here as in `week_ms`.
+          week: away ? null : weekOf(member, week_ms, now),
           last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you), cheerers: cheers.flatMap((cheerer) => (names.has(cheerer) ? [{ id: cheerer, name: names.get(cheerer)! }] : [])) } : null,
         };
       });
@@ -431,7 +439,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         youKeep: keeper === null || (you !== '' && keeper === you),
         // The sort is stable: members level on it stay in the order they joined.
         members: members.toSorted((a, b) => (ranked ? 0 : GROUP[a.phase] - GROUP[b.phase]) || b.week_ms - a.week_ms),
-        week: weekOf(msg, week_ms, members.find((member) => member.you)?.week_ms ?? 0, now),
+        week: ((series) => series && { ...series, you_ms: members.find((member) => member.you)?.week_ms ?? 0 })(weekOf(msg, week_ms, now)),
         streak:
           streak && typeof streak.run === 'number' && Array.isArray(streak.marks)
             ? { run: streak.run, marks: streak.marks.filter((mark): mark is (typeof MARKS)[number] => MARKS.includes(mark)) }

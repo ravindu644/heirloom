@@ -45,10 +45,10 @@ describe('the list', () => {
       id: 'r_1', name: 'Sachi and me', code: 'K7QW3RXM', target_ms: 600 * MIN, week_ms: 660 * MIN, ranked: false, keeper: null, youKeep: true,
       // Sachi is on a lap: she comes first.
       members: [
-        { id: SACHI, name: 'sachi', you: false, picture: null, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN, laps: [], runStart: null,
+        { id: SACHI, name: 'sachi', you: false, picture: null, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN, laps: [], runStart: null, week: null,
           // Nimal cheered and is not in this room: counted in `cheers`, and not among the names.
           last: { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [NIMAL], cheered: false, cheerers: [] } },
-        { id: ME, name: 'ravi', you: true, picture: null, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, laps: [], runStart: null, last: null },
+        { id: ME, name: 'ravi', you: true, picture: null, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, laps: [], runStart: null, week: null, last: null },
       ],
       // An older server: no week by day, no streak, no call, no notes.
       week: null, streak: null, call: null, notes: [], newNotes: 0,
@@ -654,6 +654,25 @@ describe('lanes', () => {
     w.time.advance(15 * MIN);
     // The bell: a lap of today, and nothing running.
     assert.deepEqual([lane(r, ME).laps, lane(r, ME).runStart], [[[T0, T0 + 25 * MIN]], null]);
+  });
+});
+
+describe('a member\'s week, for their report', () => {
+  it('their days to today, last week whole, ahead of their last week at this time; your own today with your lap in progress; none for someone away', async () => {
+    const { w, d, r } = await one();
+    const theirs = { days: [40, 20, 0, 0, 0, 0, 0].map((m) => m * MIN), last_days: Array(7).fill(10 * MIN), last_at_ms: 15 * MIN };
+    say(d, room('r_1', [
+      member(ME, 'ravi', { week_ms: 60 * MIN, ...theirs }),
+      member(SACHI, 'sachi', { phase: 'work', ends_at: T0 + 20 * MIN, week_ms: 60 * MIN, run: { ms: 5 * MIN, today: true, week: true }, ...theirs }),
+      member(NIMAL, 'nimal', { away: true, ...theirs }),
+    ]));
+    // Tuesday: Monday's 40, then today their week as shown, her 5 minutes of a lap in it.
+    assert.deepEqual(lane(r, SACHI).week, { days: [40 * MIN, 65 * MIN, null, null, null, null, null], last: [10, 20, 30, 40, 50, 60, 70].map((m) => m * MIN), ahead_ms: 50 * MIN });
+    d.focus.start();
+    w.time.advance(10 * MIN);
+    assert.deepEqual(lane(r, ME).week?.days.slice(0, 3), [40 * MIN, 70 * MIN, null], 'yours: your rows as the server counts them, and your lap as this device does');
+    assert.equal(lane(r, ME).week?.ahead_ms, 55 * MIN);
+    assert.equal(lane(r, NIMAL).week, null);
   });
 });
 

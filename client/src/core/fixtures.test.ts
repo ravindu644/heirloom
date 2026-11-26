@@ -8,6 +8,7 @@ import { ZERO, acceptable, see, stamp } from './hlc.ts';
 import type { Stamp } from './hlc.ts';
 import { applyCell } from './merge.ts';
 import type { Cell, Cells } from './merge.ts';
+import { HUES, avatar } from './avatar.ts';
 import { closeRun, mayWriteBell } from './session.ts';
 import type { Closed, End } from './session.ts';
 import { fill, race, stats } from './stats.ts';
@@ -214,5 +215,13 @@ describe('streak.json', () => {
       const got = streak({ today: c.today, kept: c.kept, window: c.window, daysMask: c.days_mask });
       assert.deepEqual(got, c.expect);
     });
+  }
+});
+
+describe('avatar.json', () => {
+  const fixture: { hues: string[]; cases: { username: string; hue: string; letters: string }[] } = load('avatar.json');
+  it('the hues in the order the fixture names them', () => assert.deepEqual([...HUES], fixture.hues));
+  for (const { username, hue, letters } of fixture.cases) {
+    it(username, () => assert.deepEqual(avatar(username), { hue, letters }));
   }
 });
