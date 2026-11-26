@@ -48,6 +48,11 @@ export function createPush(env: PushEnv) {
     queue = queue.then(step).catch(env.warn);
     return queue;
   };
+  // Set when the server may have dropped this browser's row: at an unsubscribe, and at a new
+  // session (the row goes with the old token). What is remembered cannot be trusted then: at sign
+  // out remember(null) lands after the account's database has closed, and a token the server
+  // refused is replaced by a sign in that never goes out at all.
+  let gone = false;
 
   return {
     /** Subscribes if it can, and tells the server only what it does not already have. */
@@ -67,13 +72,19 @@ export function createPush(env: PushEnv) {
         subscription ??= await manager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
         const body = { subscription: subscription.toJSON(), words: env.words() };
         const sent = JSON.stringify(body);
-        if (sent === env.remembered()) return;
+        if (!gone && sent === env.remembered()) return;
         // Offline or signed out: nothing is remembered, so the next start tries again.
-        if ((await env.request('/api/push/subscribe', body)).ok) env.remember(sent);
+        if ((await env.request('/api/push/subscribe', body)).ok) {
+          env.remember(sent);
+          gone = false;
+        }
       }),
+    /** A new session: the next subscribe tells the server whatever is remembered. In the queue, so an earlier subscribe does not clear it. */
+    renew: () => run(async () => void (gone = true)),
     /** Stops push to this browser. `server` too while signed in; at sign out the server drops the row with the token. */
     unsubscribe: (server: boolean) =>
       run(async () => {
+        gone = true;
         env.remember(null);
         if (server) await env.request('/api/push/unsubscribe', {});
         const subscription = await (await env.manager())?.getSubscription();

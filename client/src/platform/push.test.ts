@@ -314,6 +314,70 @@ describe('ring here, and the account', () => {
   });
 });
 
+describe('a sign out the database never heard', () => {
+  it('signed in again as the same account, the server is told again; a reload after is quiet', async () => {
+    // A reset signs the browser out and the server drops the push row with the token, but the
+    // remember(null) at sign out lands after the account's database closed: the old value is back.
+    const memory = { value: undefined as unknown };
+    const browser = { endpoint: 'https://push.example/new' as string | null };
+    const { notifier, done, subscribes } = rig({ memory, browser });
+    await done();
+    assert.equal(subscribes().length, 1);
+    const kept = memory.value;
+    notifier.account('out');
+    await done();
+    memory.value = kept;
+    notifier.account('in');
+    await done();
+    assert.equal(subscribes().length, 2);
+    assert.deepEqual(subscribes()[1], subscribes()[0]);
+    assert.equal(memory.value, kept);
+
+    const reload = rig({ memory, browser });
+    await reload.done();
+    assert.equal(reload.subscribes().length, 0);
+  });
+
+  it('a refused token signed in again says in twice with no out between: the server is told again', async () => {
+    const memory = { value: undefined as unknown };
+    const browser = { endpoint: 'https://push.example/a' as string | null };
+    const { notifier, done, subscribes } = rig({ memory, browser });
+    await done();
+    assert.equal(subscribes().length, 1);
+    notifier.account('in');
+    await done();
+    assert.equal(subscribes().length, 2);
+    assert.deepEqual(subscribes()[1], subscribes()[0]);
+    notifier.reword();
+    await done();
+    assert.equal(subscribes().length, 2);
+  });
+
+  it('the first in at load still trusts what is remembered', async () => {
+    const memory = { value: undefined as unknown };
+    const browser = { endpoint: 'https://push.example/a' as string | null };
+    await rig({ memory, browser }).done();
+    const load = rig({ memory, browser, told: false });
+    load.notifier.account('in');
+    load.notifier.ringHere(true);
+    await load.done();
+    assert.equal(load.subscribes().length, 0);
+  });
+
+  it('out and in again quickly ends subscribed and remembered', async () => {
+    const memory = { value: undefined as unknown };
+    const { notifier, done, subscribes, browser } = rig({ memory, browser: { endpoint: 'https://push.example/new' } });
+    await done();
+    const kept = memory.value;
+    notifier.account('out');
+    notifier.account('in');
+    await done();
+    assert.equal(subscribes().length, 2);
+    assert.equal(browser.endpoint, 'https://push.example/new');
+    assert.equal(memory.value, kept);
+  });
+});
+
 describe('what the code review found', () => {
   it('a subscription made with another server key is replaced, not sent again for ever', async () => {
     const { done, unsubscribed, asked, subscribes } = rig({ browser: { endpoint: 'https://push.example/old', key: [9, 9, 9] } });

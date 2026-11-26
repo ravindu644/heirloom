@@ -72,6 +72,7 @@ export function createWebNotifier(env: WebEnv): Notifier {
   // device with "ring here" off is never subscribed for a moment at load.
   let told = false;
   let signedIn = false;
+  let said = false;
   let cancel = () => {};
   const push = env.push && createPush(env.push);
   const granted = () => env.Notification?.permission === 'granted';
@@ -199,6 +200,10 @@ export function createWebNotifier(env: WebEnv): Notifier {
       }
     },
     account(change) {
+      // Main says 'in' again for every new session (engine.account is set only when one opens),
+      // even one with no 'out' between: a refused token signed in again. Only the first is the load.
+      if (change === 'in' && said) void push?.renew();
+      said = true;
       signedIn = change === 'in';
       if (signedIn) subscribe();
       else void push?.unsubscribe(false);
