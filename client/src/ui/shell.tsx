@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { Brand } from './kit/brand.tsx';
 import { holdTaps } from './kit/hold.ts';
 import { useKeyboard } from './kit/keyboard.ts';
@@ -40,6 +40,14 @@ export function Shell({ person, at, page = at, without, status = '', keepStatus,
   const sidebar = useSidebar();
   // What the last tap did was said of the screen it was made on.
   useEffect(() => () => say(null), [page]);
+  // A screen changed (the bar, the sidebar, a link, Back) opens at its top, wherever the last one
+  // was scrolled: the one scroller is the frame's and outlives the screens in it. Before the
+  // paint, so the new screen is never seen part way down. Nothing within a screen changes `page`,
+  // so a tap there, a sheet or a row set down keeps its scroll.
+  const main = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (main.current) main.current.scrollTop = 0;
+  }, [page]);
   // While the keyboard is up on a phone the tab bar is not drawn: it would ride on the keys and
   // take a row of the little that is left. It is back the moment the keyboard goes.
   const typing = useKeyboard() && !sidebar;
@@ -58,7 +66,7 @@ export function Shell({ person, at, page = at, without, status = '', keepStatus,
     </nav>
   );
   const screen = (
-    <main key="main" class={css.main}>
+    <main key="main" ref={main} class={css.main}>
       {/* Keyed by the screen: a new one is a new element, and fades in and rises. */}
       <div key={page} class={css.canvas}>
         {children}

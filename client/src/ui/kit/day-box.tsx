@@ -1,3 +1,4 @@
+import { cx } from './cx.ts';
 import css from './day-box.module.css';
 
 /**
@@ -7,9 +8,9 @@ import css from './day-box.module.css';
  */
 export function DayBox({ done, rest, share, off }: { done?: boolean; rest?: boolean; share?: number; off?: boolean }) {
   if (done) return <i class={`${css.box} ${css.done}`} />;
-  if (rest) return <i class={`${css.box} ${css.rest}`} />;
-  if (share) return <i class={`${css.box} ${css.part}`} style={`--share:${Math.min(1, share)}`} />;
-  return <i class={off ? `${css.box} ${css.off}` : css.box} />;
+  // A count on its way is filled as far as it went on any day, past days as today: 1 of 2 is half
+  // a box, never an empty one, also on a day the streak counts as rest, which keeps its ring over it.
+  return <i class={cx(css.box, !!share && css.part, rest && css.rest, !share && !rest && off && css.off)} style={share ? `--share:${Math.min(1, share)}` : undefined} />;
 }
 
 /** A day of a week: its one-letter name, what its box shows, and whether it is today. */
