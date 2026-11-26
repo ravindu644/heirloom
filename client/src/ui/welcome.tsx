@@ -68,12 +68,13 @@ export function About({ first }: { first?: boolean }) {
 }
 
 /**
- * The phone app before it has a server: the welcome, then the server step, whose Back returns
- * here. It is shown until a server is chosen, which is once: from then on the app starts on
- * its server and never comes this way again.
+ * The phone app's way to a server: the welcome, then the server step, whose Back returns here.
+ * The app opens on it until a server is chosen; after that it is where "Change" under Sign in
+ * leads, opened on the step (`asking`) with the address held in its field, so Back is always the
+ * welcome. Nothing is changed until a server is chosen, and choosing one restarts the app on it.
  */
-export function FirstRun({ choice }: { choice: ServerChoice }) {
-  const [asking, setAsking] = useState(false);
+export function FirstRun({ choice, asking: opened = false }: { choice: ServerChoice; asking?: boolean }) {
+  const [asking, setAsking] = useState(opened);
   if (asking) return <ServerStep choice={choice} onBack={() => setAsking(false)} />;
   return (
     <Shell page="welcome">

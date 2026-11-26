@@ -8,11 +8,10 @@ import { Field } from './kit/field.tsx';
 import { first } from './kit/first.ts';
 import { Fold } from './kit/fold.tsx';
 import links from './kit/links.module.css';
-import { ServerStep } from './server.tsx';
 import { Shell } from './shell.tsx';
 import css from './signin.module.css';
 import * as s from './strings.ts';
-import { About } from './welcome.tsx';
+import { About, FirstRun } from './welcome.tsx';
 
 interface Props {
   engine: Engine;
@@ -59,7 +58,8 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
 
   // The frame fills the screen whatever is in it, so nothing jumps when the form arrives.
   if (held) return <Shell page="held">{null}</Shell>;
-  if (changing && server) return <ServerStep choice={server} onBack={() => setChanging(false)} />;
+  // Its Back is the welcome, as it is for the step opened from there: one way back, wherever it was opened.
+  if (changing && server) return <FirstRun choice={server} asking />;
 
   const submit = async (event: TargetedSubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
