@@ -321,6 +321,41 @@ is `unknown`, and bringing one that had run out back while 50 are open is `full`
 A device signs out only after its outbox is empty, and refuses, with the reason, while it is
 offline with unsent work. Otherwise signing out would be a way to lose a lap.
 
+**A way back in.** A password is never read back or sent anywhere, only replaced, and only with
+the say of whoever runs the server: there is no email here and nothing to recover by.
+
+| Request | Body | 200 reply | Who |
+|---|---|---|---|
+| `/api/resets/create` | `{"username":"sam"}` | `{"reset":{"reset":"q7Xk...","username":"sam","created":1795494600150,"expires":1795581000150}}` | owner |
+| `/api/resets/list` | | `{"resets":[{"username":"sam","created":...,"expires":...}]}`: every reset not used and not run out, oldest first, without its `reset` | owner |
+| `/api/resets/revoke` | `{"username":"sam"}` | `{}`. None open for that name is `{}` too | owner |
+| `POST /api/reset/look` | `{"reset":"q7Xk..."}`, no token | `{"username":"sam"}` | whoever holds the link |
+| `POST /api/reset` | `{"reset":"q7Xk...","password":"...","device":"a1b2c3d4e5f60718"}`, no token | as `login`: `{"token":"...","account":"...","username":"sam"}` | whoever holds the link |
+
+- A reset is a link, `<server>/#/reset/<reset>`. It sets a new password for one account, once,
+  and is good for 24 hours. `reset` is 32 random bytes as text; the server keeps only its hash,
+  so the link is shown once, when it is made, and never again.
+- One account has one open reset: `create` for a name that has one makes a new link and the old
+  one is dead from that moment.
+- `create` naming the owner is `bad_request`, as `set` is: nobody signed in as the owner can
+  change the owner's password from the app, so a device left open is not a way to take the
+  server. The owner's way back is `heirloomd -data <dir> -reset <username>`, which prints a link
+  for any account, the owner's too, and exits; it works while the server is running, as `-invite`
+  does. Whoever can run it already holds the data.
+- `POST /api/reset` sets the password (the rule of `register`), uses the reset up, and signs
+  every device of the account out: every token it had stops working at once, and its open
+  sockets are cut with `bye`, reason `token`. The reply signs in the device that asked, as
+  `login` does. All of it is one transaction: a reset is never used up without the password
+  having changed, and never the other way round.
+- A device signed out this way keeps what it had not yet sent. When the same account signs in on
+  it again, with the new password, it sends it: a reset is not a way to lose a lap either.
+- `look` and `reset` with a reset that is unknown, used, taken back or run out are 403 `reset`,
+  and say no more than that. `create` and `revoke` for a username the server does not have are
+  404 `unknown`. `reset` waits in the same line as sign-ins (one password is hashed at a time)
+  and may answer 429 `slow_down` with `Retry-After`, as `login` does when nothing was wrong.
+- The server writes a reset's making, its use and its taking back to its log with the username
+  and the time, never the `reset` itself.
+
 ## 11. Sessions
 
 A run of the timer becomes a `session` row (id: the run id) when it ends. How it ended decides the
