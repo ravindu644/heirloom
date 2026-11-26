@@ -693,6 +693,12 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
+- **Rest days** are a panel in Settings, after the day's target: the seven weekdays as one row of
+  choices (as a habit's days), any two of which may be on; with two on, the other five take no
+  press. Under it, a note: "Two days a week may stay empty without breaking your streak. Pin one
+  or both to a weekday; any left come on the first days you miss." Progress's streak line then
+  names them: "Sundays are your rest day, and one more comes when you need it." / "Saturdays and
+  Sundays are your rest days." Nothing else changes on a pinned day: nothing asks, nothing nags.
 - **A way back in** is the owner's to give, in Settings beside Admins: a username, one button
   ("Make a reset link"), and the link shown once in the same block an invite's new link has,
   with Copy, and it stays after a copy: it can never be shown again. Under it the open ones by
@@ -807,6 +813,7 @@ found none of this and called it the one thing that makes the rest feel finished
 | Something opens in place (an editor, a form, a panel's extra lines, an error) | `fill` 160ms | Its height opens; what is under it glides |
 | A box ticked, a switch thrown, a figure stepped, a lap segment filling | `fill` 160ms | The mark draws, the knob slides, the fill runs |
 | A row picked up to be moved | `hold` 350ms | How long a finger or the mouse rests on a row, without moving 8px, before the row lifts. Shorter and a slow tap lifts it; longer and nobody finds it |
+| A room's live order changes | `hold` 350ms, then `fill` 160ms | The order shown waits until the members' changes have stopped for `hold`, then the panels glide once to the new order. Two people starting a lap a moment apart move the list once, not twice. Someone joining or leaving shows at once |
 | A sheet or menu | `sheet` 200ms | It slides `rise` and more from the bottom on a phone, fades and rises on a laptop; its scrim fades |
 | What the last tap did | `sheet` 200ms | Rises `rise` in, fades out |
 | The timer | none | Digits change; nothing animates |

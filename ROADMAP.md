@@ -331,7 +331,15 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [server] [ui] A room holds 16 people, the user's number
 - [ ] Gate: the user tries it on the phone and the laptop
 
-## 24. Release 1.0
+## 24. Rest days you pin
+
+- [x] [lead] The rule (protocol section 8, `settings.rest_days`, five fixture cases), PRODUCT and DESIGN
+- [ ] [core] The streak takes the pinned days; Progress's figures and the dots follow
+- [ ] [ui] The Rest days panel in Settings and Progress's line
+- [ ] [qa] A pinned Sunday on two devices; a kept pinned day gives its place back
+- [ ] Gate
+
+## 25. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the server with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

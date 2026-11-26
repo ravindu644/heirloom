@@ -66,7 +66,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | Time per project, this week and all time | The most praised Focus To-Do report |
 | Estimate accuracy over time | Cirillo's record of over- and under-estimation |
 | A day timeline of sessions, with interrupted and "ran on two devices" marks | The honest record |
-| A forgiving streak: a day counts with one pomodoro that rang; two rest days a week (Monday to Sunday) do not break it; after a miss it shows days kept ("41 of the last 45") | Streaks help while intact and people quit when they break (Silverman & Barasch); slack keeps them going (Sharif & Shu) |
+| A forgiving streak: a day counts with one pomodoro that rang; two rest days a week (Monday to Sunday) do not break it, and either or both can be pinned to a weekday in Settings (a Sunday off), the rest coming on the first days missed; after a miss it shows days kept ("41 of the last 45") | Streaks help while intact and people quit when they break (Silverman & Barasch); slack keeps them going (Sharif & Shu) |
 | Personal bests: best day, best week | Achievement, not activity |
 | A short end-of-day look back: what got done, one line to note | Cirillo's daily record, at most one pomodoro long |
 
@@ -163,3 +163,4 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-26 | The room's second pass, chosen by the user from a list: a live member order, start together, break notes, pictures, the room's streak, the room against its last week, removing a member. Badges and a ranked board by default were left out |
 | 2026-11-26 | A lap stopped within its first minute is a start taken back: no row, no lap of the day, no place in the four. (For one build every stopped lap counted, and the day's bar on Focus filled with slips of the thumb.) A lap stopped after a minute is still a lap that ended early |
 | 2026-11-27 | A room holds 16 people, up from 8: the user wants to invite more friends. The server sends the whole room to everyone at each change, about 400 bytes a person, so 16 is light for the server; past about 25 the People tab would want the people not on a lap folded away |
+| 2026-11-27 | Rest days can be pinned: the user wants a whole Sunday to be a rest day by plan. Still two a week; a pinned day holds its place, the rest stay automatic so a bad day is still covered, and a pinned day kept gives its place back. Only the focus streak: habits rest on the days they are not planned, and a room keeps its own automatic two |
