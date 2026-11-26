@@ -463,6 +463,16 @@ Built once in `client/src/ui/kit/` and reused.
   overlap, and the place it would land is always open; the carried card itself passes over
   whatever is under the finger, headings included. Carried back to where it was picked up, the
   list is as it was.
+  **While a lap runs, its task is in the strip at the top and nowhere else on Today:** its row
+  leaves Next and Later today for the lap's length and comes back to its place when the lap
+  ends; Next is the first open task that is not running. The task's title in the strip opens its
+  sheet, as its row would, so it can be edited, done or deleted while it runs. **A task deleted while its lap runs**
+  keeps its lap (the minutes are the person's) and is still named on Focus (with its project),
+  in the strip and in Progress's day, with its minutes under its project, for as long as it is in
+  Recently deleted, where Undo brings it back. Purged, it is named nowhere; its minutes stay in
+  the day, and in its project's totals, which never lose time because a task went. The lap in
+  progress is in Progress's day as it counts, said as running; paused, or past its bell and not
+  yet saved, it says so and ends where it stopped.
   A row with nowhere to go does not lift: the only open task stays where it is. (Upcoming
   could not be put in order at all, and the one task under Next lifted to go nowhere.)
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
