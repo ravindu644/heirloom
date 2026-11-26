@@ -5,6 +5,7 @@
 
 import { render } from 'preact';
 import { signal } from '@preact/signals';
+import { GONE } from '../core/real.ts';
 import { IDLE, act, view } from '../core/timer.ts';
 import type { Phase, TimerState } from '../core/timer.ts';
 import type { AccountResult, Engine, Role, Row, SyncState } from '../sync/engine.ts';
@@ -153,7 +154,13 @@ const ONE = day([...TASKS.filter((task) => task.id === 'kr'), { id: 'quiz', titl
 const TODAY: Record<string, Scene> = {
   'today-empty': { about: 'Today on a first day: nothing yet', next: 0, at: [9, 5], day: { tasks: [] } },
   today: { ...idleAt2, about: 'Today, the day of the mockup, nothing running', day: day() },
-  'today-running': { about: 'Today with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-running': { about: 'Today with a lap running on its first task: the task is in the strip and in no list', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-running-later': { about: 'A lap running on a task further down: Later closes over its place', run: { ...lap2, task: 'react' }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
+  'today-running-carry': { about: 'A lap running, a Later row carried over the Next card: it is Next before the release', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'demo:carry:Thinking in React' },
+  'today-running-deleted': { about: 'The task of a running lap deleted: the strip still names it, and its title opens Recently deleted', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { deleted: new Date(2026, 10, 24, 16, 39).getTime() })) },
+  'today-running-gone': { about: 'The task of a running lap deleted for good: the strip says the lap, without the name it had', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { deleted: GONE })) },
+  'focus-running-gone': { about: 'The task of a running lap deleted for good: Focus says so, and not its old title', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { deleted: GONE })) },
+  'focus-running-deleted': { about: 'The task of a running lap deleted: the lap goes on, named with its project, while it is in Recently deleted', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { deleted: new Date(2026, 10, 24, 16, 39).getTime() })) },
   'today-paused': { about: 'Today with that lap paused', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-lap-over': { about: 'Today just after the bell: the lap counts everywhere, and the break is one tap away', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-break': { about: 'Today during a short break', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] }), { done_ms: 150 * MIN, laps: 6 }) },
@@ -289,9 +296,11 @@ const PROGRESS: Record<string, Scene> = {
   'progress-year': { ...week, about: 'A year and a week of record: the grid opens on its newest weeks', record: { history: 'year' } },
   'progress-run': { ...week, about: 'A streak with no rest day in its last fortnight', record: { fill: ['2026-11-11', '2026-11-19'] } },
   'progress-miss': { ...week, about: 'A miss inside the last 45 days: days kept of days, not the run', record: { empty: ['2026-11-12'] } },
+  'progress-running': { about: 'Progress with a lap running: the day list ends on it, running and growing, with nothing to set aside', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {} },
+  'progress-paused': { about: 'Progress with the lap paused: the day list ends on it, said as paused, up to the pause', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: { live: 'paused' } },
   'progress-day': { ...week, about: 'A day chosen in the year: its timeline, and the way back to today', record: {}, tap: 'demo:day' },
-  'progress-earlier': { about: 'The twelve sessions of today opened from the five latest', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {}, tap: '7 earlier today' },
-  'progress-aside': { ...week, about: 'Just after a lap is set aside in the timeline: Undo', record: {}, tap: 'Set aside' },
+  'progress-earlier': { about: 'The twelve sessions of today and the lap in progress, opened from the five latest', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {}, tap: '8 earlier today' },
+  'progress-aside': { ...week, about: 'Just after a lap is set aside in the timeline: Undo', record: {}, tap: "Don't count it" },
   'progress-note': { ...week, about: 'The look back with a note at its longest', record: { note: 'Pointers finally clicked once I drew the array as boxes and stopped reading a[i] as magic. The second lap after lunch went on two devices by mistake, the laptop was still running. Tomorrow: exercise 5-3 first, before the lecture, while the picture of the boxes is still in my head.' } },
   'progress-long-project': { ...week, about: 'A long project name, and time under no project', record: { projects: 'long' } },
   'progress-many-projects': { ...week, about: 'Nine rows by project', record: { projects: 'many' } },
@@ -442,7 +451,7 @@ const SCENES: Record<string, Scene> = {
   'focus-yesterday-done': { about: 'A lap begun before midnight whose bell has gone: it is said as yesterday\'s, and the day\'s count is not said beside it', at: [0, 10], run: { ...onKr, left: 0 }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
   'focus-yesterday-stopped': { about: 'That long lap stopped: the line names it as yesterday\'s and says how far it ran as the clock would', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }), tap: 'Stop' },
   'focus-taken-back': { about: 'A lap stopped twenty seconds in: a start taken back, said as that and never numbered', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'Stop' },
-  'today-taken-back': { about: 'The task ticked twenty seconds into its lap: the bar says it is done and that the lap was not counted', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), today: true, tap: 'css:[role=checkbox][aria-label^="Done: K&R"]' },
+  'today-taken-back': { about: 'The task marked done twenty seconds into its lap, from its sheet opened by the strip: the bar says it is done and that the lap was not counted', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), today: true, tap: ['K&R 5.1', 'Mark done'] },
   'stopped-elsewhere': { about: 'A lap stopped from the notification: Focus says so and offers Undo, as after its own Stop', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'demo:stop' },
   'running-task': { about: 'A lap running on a task: the two lines are words', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'break-task': { about: 'A short break with tasks: the lines name the task the next lap is for', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day() },
@@ -456,7 +465,6 @@ const SCENES: Record<string, Scene> = {
   refused: { about: 'The server signed this device out', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, sync: 'signed-out' },
   'long-title': { about: 'A lap on the longest task title', run: { ...lap2, task: 'long' }, you: 125 * MIN, laps: 5, ghost: tuesday },
   'undo-stop': { about: 'Just stopped: the sentence, and Undo for ten seconds', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Stop' },
-  'undo-aside': { about: 'Just set aside, with Undo', run: lap2, you: 125 * MIN, laps: 5, ghost: tuesday, tap: 'Set aside' },
   elsewhere: { about: 'A second tab of the same browser', elsewhere: true },
   settings: { ...idleAt2, about: 'Settings: the account', settings: true, day: day() },
   'settings-refused': { ...idleAt2, about: 'Settings after the server signed this device out', settings: true, sync: 'signed-out', day: day() },
@@ -699,6 +707,13 @@ render(
   ),
   document.getElementById('app')!,
 );
+// What a tap word names, or a loud failure that says which state and which word: a demo state
+// whose screen has changed under it is found at once, not as a null somewhere later.
+const find = <T extends Element>(selector: string, words: string): T => {
+  const one = document.querySelector<T>(selector);
+  if (!one) throw new Error(`demo state "${name}": nothing matches "${selector}" for the tap "${words}"`);
+  return one;
+};
 // After the first paint, as a person would: the screen has settled before anyone can tap.
 [scene?.tap ?? []].flat().forEach((words, i) =>
   setTimeout(() => {
@@ -710,17 +725,17 @@ render(
     } else if (words.startsWith('fill:')) {
       // Typed, as a person would: `fill:<field's name>=<what is typed>`.
       const [, name, typed] = words.match(/^fill:([^=]+)=(.*)$/)!;
-      const field = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+      const field = find<HTMLInputElement>(`input[name="${name}"]`, words);
       field.value = typed!;
       field.dispatchEvent(new Event('input', { bubbles: true }));
     } else if (words.startsWith('focus:')) {
       // The field taken up, nothing typed yet.
-      document.querySelector<HTMLInputElement>(`input[name="${words.slice(6)}"]`)!.focus();
+      find<HTMLInputElement>(`input[name="${words.slice(6)}"]`, words).focus();
     } else if (words.startsWith('css:')) {
       // A press on what has no words of its own to find it by.
-      document.querySelector<HTMLElement>(words.slice(4))!.click();
+      find<HTMLElement>(words.slice(4), words).click();
     } else if (words.startsWith('submit:')) {
-      document.querySelector<HTMLInputElement>(`input[name="${words.slice(7)}"]`)!.form!.requestSubmit();
+      find<HTMLInputElement>(`input[name="${words.slice(7)}"]`, words).form!.requestSubmit();
     } else if (words === 'demo:start') {
       // A lap started where this screen was not looking: Today's row on another device.
       staged!.focus.start('ex');
@@ -744,6 +759,10 @@ render(
     } else if (words === 'demo:day') {
       // A week back in the year, by the keyboard.
       document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-    } else [...document.querySelectorAll('button')].find((button) => (button.textContent || button.ariaLabel)?.startsWith(words))?.click();
+    } else {
+      const button = [...document.querySelectorAll('button')].find((one) => (one.textContent || one.ariaLabel)?.startsWith(words));
+      if (!button) throw new Error(`demo state "${name}": no button starts with "${words}"`);
+      button.click();
+    }
   }, 100 * (i + 1)),
 );

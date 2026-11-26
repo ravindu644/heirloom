@@ -99,8 +99,9 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   const stale = state.phase === 'work' && !ready && state.started !== null && dayOf(state.started) !== dayOf(now);
 
   // The task this lap is for, and the one the next lap will be for. Starting needs no task: with
-  // none next, a lap is for nothing in particular.
-  const tasks = [today.running.value, today.next.value, ...today.later.value, ...today.done.value, ...today.upcoming.value];
+  // none next, a lap is for nothing in particular. One deleted while its lap runs keeps the lap,
+  // and its name and project, for as long as it is in Recently deleted (the core's KEPT_MS).
+  const tasks = [today.running.value, today.next.value, ...today.later.value, ...today.done.value, ...today.upcoming.value, ...today.deleted.value];
   const lapTask = (state.task && tasks.find((task) => task?.id === state.task)) || null;
   const nextTask = today.next.value;
   // The task the next lap is for: the one chosen here or the one the last lap was on, while it
@@ -186,9 +187,14 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // itself. They are there in every state or in none, so the digits never move: a lap for nothing
   // says so in the same two lines.
   const named = barTask;
-  const row = (inLap || result) && !named && state.task ? engine.rows('task').value.get(state.task) : undefined;
+  // Named from its row only while the task is alive: one deleted for good, or out of Recently
+  // deleted, is said as gone, and its old title is not shown again.
+  const raw = (inLap || result) && !named && state.task ? engine.rows('task').value.get(state.task) : undefined;
+  const row = raw && (raw.deleted === null || raw.deleted === undefined) ? raw : undefined;
+  // Gone only when its row says it was deleted: a live task whose title has not arrived yet is not.
+  const gone = !!raw && !row;
   // Before a start there is a choice to show whenever there is a task to choose.
-  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : (inLap || result ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
+  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : gone ? s.focus.lapGone : (inLap || result ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
   const upNext = open.filter((task) => task !== named).slice(0, 3);
   // The first row says what the digits cannot, in the project's place: a break and its name, a
   // lap that began yesterday. Otherwise the task's project. A lap held is said once, under the
@@ -210,7 +216,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         </span>
       ) : (
         // How far the task is, the bar says: the words would only repeat it. With nothing on the list, nothing is said.
-        title && !named && !row && s.focus.freeLabel
+        title && !named && !raw && s.focus.freeLabel
       )}
       {/* The one word drawn as a link: the two lines are pressed as one. */}
       {ready && title && <u class={css.change}>{s.focus.change}</u>}

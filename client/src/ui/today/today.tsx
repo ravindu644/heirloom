@@ -40,6 +40,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   const day = today.day.value;
   const next = today.next.value;
   const later = today.later.value;
+  // While a lap runs its task is the strip's at the top and in no list here: it leaves Next and
+  // Later for the lap's length and is back in its place when the lap ends (the bell, or a stop).
+  const shownLater = later.filter((task) => !task.running);
   const upcoming = today.upcoming.value;
   const done = today.done.value;
   const deleted = today.deleted.value;
@@ -60,7 +63,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     if (!figures.target) setTargeting(false);
   }, [figures.target]);
 
-  // Every task the screen shows. The running one is in `later`, in its place.
+  // Every task the screen can open. The running one is in `later`, in its place, though no list draws it while its lap runs.
   const all = [next, ...later, ...upcoming, ...done].filter((task): task is TaskView => task !== null);
   const opened = all.find((task) => task.id === open);
   // The open task went away, deleted here or on another device: its sheet must not come back
@@ -101,6 +104,11 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   // running is the Next card, the rest follow under "Later"), then Upcoming under its heading,
   // which is the edge between them. A row is set down before the row that then follows it.
   const movable = today.list.value;
+  // Today's rows as they are drawn and carried: the Next card, then Later in its order, without
+  // the lap's task, which is the strip's while it runs. Its place in the list is kept, so it is
+  // back there when the lap ends, and a row set down among the others lands where the hand
+  // showed it whatever side of it the running one is on.
+  const drawn = [next, ...shownLater].filter((task): task is TaskView => task !== null);
   const lists = useRef<HTMLDivElement>(null);
   const [placed, setPlaced] = useState('');
   // Where the row in the hand would land, while it is carried.
@@ -133,9 +141,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     // Within today's rows the edge is their end; within Upcoming there is no edge under a row.
     today.move(id, before || null);
     followNext(id);
-    const list = (ahead ? upcoming : movable).filter((task) => task.id !== id);
+    const list = (ahead ? upcoming : drawn).filter((task) => task.id !== id);
     const at = before ? list.findIndex((task) => task.id === before) : list.length;
-    setPlaced(s.today.nowAt([...movable, ...upcoming].find((task) => task.id === id)?.title ?? '', at + 1, list.length + 1));
+    setPlaced(s.today.nowAt([...drawn, ...upcoming].find((task) => task.id === id)?.title ?? '', at + 1, list.length + 1));
     },
     // A row of today let go inside Upcoming, or stepped at it with the keys: it stays, and the bar says why.
     () => say({ lead: '', title: s.today.staysToday }),
@@ -145,9 +153,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   // the row in the hand is let go. The rows stay in their lists until then; the hand moves them.
   const lapOn = today.running.value?.id ?? null;
   const shown = (() => {
-    const open = [...movable, null, ...upcoming];
+    const open = [...drawn, null, ...upcoming];
     const moving = carry && open.find((task) => task?.id === carry.id);
-    if (!carry || !moving) return { next, later, upcoming };
+    if (!carry || !moving) return { next, later: shownLater, upcoming };
     const rest = open.filter((task) => task !== moving);
     // Before a row, before the edge between today and Upcoming (''), or at the very end (null).
     const at = carry.before === null ? -1 : rest.findIndex((task) => (carry.before === '' ? task === null : task?.id === carry.before));
@@ -230,9 +238,24 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   const rung = state.phase === 'work' && view.over;
   const running = today.running.value;
   // A lap for a task that is not in today's open list (done since, due another day) is still a
-  // lap for that task: it is named from the task's own row, as Focus names it.
+  // lap for that task: it is named from the task's own row, as Focus names it. One deleted is
+  // named while it is in Recently deleted, whose sheet its title opens; after that, or deleted
+  // for good, the lap is said without it.
   const lapRow = state.task ? engine.rows('task').value.get(state.task) : undefined;
-  const named = typeof lapRow?.title === 'string' ? lapRow.title : undefined;
+  const binned = deleted.find((task) => task.id === state.task);
+  const alive = !!lapRow && (lapRow.deleted === null || lapRow.deleted === undefined);
+  const named = binned?.title ?? (alive && typeof lapRow?.title === 'string' ? lapRow.title : undefined);
+  // Gone only when its row says it was deleted: a live task whose title has not arrived yet is not.
+  const lapName = named ?? (lapRow && !alive ? s.focus.lapGone : s.today.free);
+  // What the title in the strip opens: the task's sheet, or Recently deleted for one deleted.
+  const lapOpens = running
+    ? () => {
+        from.current = { id: running.id, list: 'later' };
+        setOpen(running.id);
+      }
+    : binned
+      ? () => setBin(true)
+      : null;
   const leftInLater = shown.later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
   return (
@@ -317,16 +340,28 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
           {state.phase !== 'idle' && !(isBreak && view.over) && (
             <div key="bar" class={css.bar}>
               <i class={isBreak ? css.rest : undefined} />
+              {!rung && !isBreak && lapOpens ? (
+                <>
+                  <a href="#/focus" class={css.clockOnly} aria-label={s.today.toFocus}>
+                    <b>{s.clock(view.left_ms)}</b>
+                  </a>
+                  {/* The lap's task is in no list while it runs: its title here opens it, as its row would. */}
+                  <button type="button" class={css.lapTitle} data-task={state.task ?? undefined} onClick={lapOpens}>
+                    {running?.title ?? named}
+                  </button>
+                </>
+              ) : (
               <a href="#/focus" aria-label={s.today.toFocus}>
                 {rung ? (
                   <span class={css.rung}>{s.today.lapDone}</span>
                 ) : (
                   <>
                     <b>{s.clock(view.left_ms)}</b>
-                    <span>{isBreak ? (state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak) : (running?.title ?? named ?? s.today.free)}</span>
+                    <span>{isBreak ? (state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak) : lapName}</span>
                   </>
                 )}
               </a>
+              )}
               {/* Its button is an outline on the bar. When the lap has rung, the break is what comes
                   next, here as on Focus: its button takes the fill and the list's Start steps down. */}
               {rung ? (
@@ -367,11 +402,12 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
                 {s.today.later}
                 <span>{s.today.laterCount(shown.later.length, leftInLater)}</span>
               </h2>
-              <Fold gap="sm">{later.map((task) => row(task, 'later', look(task)))}</Fold>
+              <Fold gap="sm">{shownLater.map((task) => row(task, 'later', look(task)))}</Fold>
             </section>
           )}
 
-          {!next && later.length === 0 && (
+          {/* Said only when nothing is open: a lap's task alone is in the strip, and is not "nothing planned". */}
+          {movable.length === 0 && (
             <p key="empty" class={css.empty}>
               {done.length ? s.today.allDone : s.today.empty}
             </p>
@@ -390,7 +426,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
           )}
 
           {/* How rows are put in order, said once: until this device has moved one, and only where one can be. */}
-          {(movable.length > 1 || upcoming.length > 0) && !hasMoved.value && (
+          {(drawn.length > 1 || upcoming.length > 0) && !hasMoved.value && (
             <p key="hint" class={css.hint}>
               {s.today.holdHint}
             </p>

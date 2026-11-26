@@ -4,6 +4,7 @@
 
 import { computed, signal } from '@preact/signals';
 import type { ReadonlySignal } from '@preact/signals';
+import { GONE } from '../core/real.ts';
 import type { TimerState } from '../core/timer.ts';
 import type { Row } from '../sync/engine.ts';
 import type { ProjectView, Repeat, TaskView, Today } from '../sync/today.ts';
@@ -29,7 +30,7 @@ export interface DemoTask {
   repeat?: Repeat;
   notes?: string;
   done?: boolean;
-  /** When it was deleted, in ms. */
+  /** When it was deleted, in ms; GONE once deleted for good, as the core writes it: the row stays, on no list. */
   deleted?: number;
   parent?: string;
 }
@@ -123,7 +124,7 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     // In the person's order, as Today is: not by day.
     upcoming: computed(() => top.value.filter((task) => !task.done && task.due && task.due > DAY).map(view)),
     done: computed(() => top.value.filter((task) => task.done).map(view)),
-    deleted: computed(() => tasks.value.filter((task) => task.deleted && !task.parent).map(view)),
+    deleted: computed(() => tasks.value.filter((task) => task.deleted && task.deleted !== GONE && !task.parent).map(view)),
     projects,
     // Nothing in the demo reminds: the platform reads this, not a screen.
     timed: signal([]),
@@ -177,7 +178,7 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     remove: (id) => change(id, { deleted: now() }),
     restore: (id) => change(id, { deleted: undefined }),
     // For good: the task and its subtasks are on no screen again.
-    purge: (id) => void (tasks.value = tasks.value.filter((task) => task.id !== id && task.parent !== id)),
+    purge: (id) => void (tasks.value = tasks.value.filter((task) => task.parent !== id).map((task) => (task.id === id ? { ...task, deleted: GONE } : task))),
     move(id, before) {
       const moved = tasks.value.find((task) => task.id === id);
       if (!moved) return;

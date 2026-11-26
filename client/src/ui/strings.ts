@@ -116,6 +116,8 @@ export const focus = {
   // A lap for no task, said in the two lines a task would have, so nothing moves.
   freeLabel: 'This lap is for',
   freeTitle: 'Nothing in particular',
+  // The lap's task deleted for good, or long enough ago to be out of Recently deleted: the lap stays, its name does not.
+  lapGone: 'A deleted task',
   // Before a start the two lines over the digits are a button: it opens today's open tasks.
   // "Change" alone, after "4 estimated", read as changing the estimate.
   change: 'Change task',
@@ -605,9 +607,12 @@ export const progress = {
   lap: 'Lap',
   stopped: 'Stopped lap',
   aside: 'Lap, not counted',
+  running: 'Lap, running',
+  paused: 'Lap, paused',
   shortBreak: 'Short break',
   longBreak: 'Long break',
   span: (start: number, end: number) => `${wall(start)} to ${wall(end)}`,
+  spanNow: (start: number) => `${wall(start)} to now`,
   ran: (ms: number) => (ms < MIN ? 'under a minute' : length(ms)),
   twoDevices: 'ran on two devices',
   setAside: "Don't count it",

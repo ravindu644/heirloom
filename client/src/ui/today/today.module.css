@@ -37,6 +37,26 @@
 .bar > i.rest { background: var(--rest); }
 .bar a { display: flex; flex: 1; align-items: center; gap: var(--space-md); min-width: 0; min-height: var(--layout-touch); }
 .bar b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+/* With a task the lap is on, the clock alone goes to Focus and the title opens the task: two
+   targets, the title underlined as a link in a line is, since its row is not on the list meanwhile. */
+.bar a.clockOnly { flex: none; }
+.lapTitle {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--layout-touch);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
 .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* "Lap 2 of 4, done" is the whole message: on a narrow phone it takes two lines rather than lose a word. */
 .bar .rung { white-space: normal; text-wrap: balance; }

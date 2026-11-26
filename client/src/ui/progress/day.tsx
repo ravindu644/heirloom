@@ -18,8 +18,10 @@ const NOTE_NEAR = 40;
 // How many of a day's sessions its list shows before it is asked for the rest.
 const LATEST = 5;
 
+// The lap in progress is said as running or paused, whatever the core's outcome for it reads
+// meanwhile; one whose bell has gone and whose row is not written yet is a lap like the others.
 const kind = (entry: TimelineEntry) =>
-  entry.kind === 'short' ? s.progress.shortBreak : entry.kind === 'long' ? s.progress.longBreak : entry.outcome === 'void' ? s.progress.aside : entry.outcome === 'stopped' ? s.progress.stopped : s.progress.lap;
+  entry.kind === 'short' ? s.progress.shortBreak : entry.kind === 'long' ? s.progress.longBreak : entry.live === 'running' ? s.progress.running : entry.live === 'paused' ? s.progress.paused : entry.outcome === 'void' ? s.progress.aside : entry.outcome === 'stopped' ? s.progress.stopped : s.progress.lap;
 
 /**
  * One day, hour by hour: every session as a block on the day's own stretch of hours, then the
@@ -93,7 +95,7 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
           <Fold list class={css.list}>
             {(all ? entries : entries.slice(-LATEST)).map((entry) => (
               <div key={entry.id} class={css.entry}>
-                <span class={css.when}>{s.progress.span(entry.started, entry.ended)}</span>
+                <span class={css.when}>{entry.live === 'running' ? s.progress.spanNow(entry.started) : s.progress.span(entry.started, entry.ended)}</span>
                 <span class={css.what}>
                   <b>{kind(entry)}</b>
                   {entry.task && <span>{entry.task.title}</span>}
@@ -101,7 +103,9 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
                 </span>
                 <span class={css.length}>{entry.outcome === 'void' ? s.progress.ranAside(entry.ran_ms) : s.progress.ran(entry.ran_ms)}</span>
                 {/* The way back is where the finger already is, under the one name it has on every row: Count again. */}
-                {entry.kind === 'work' && (
+                {/* The lap in progress has no row yet: nothing to set aside until it ends. Keyed by its
+                    run, it becomes its saved row in place when it does, never two. */}
+                {entry.kind === 'work' && !entry.live && (
                   <Button
                     kind="link"
                     aria-label={s.progress.forLap(act(entry), entry.started)}

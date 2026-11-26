@@ -29,6 +29,8 @@ export interface DemoRecord {
   note?: string;
   /** False: today's timeline is plain laps, not the scripted one with a break, a lap set aside, a stopped lap and a pair on two devices. */
   scripted?: boolean;
+  /** How the lap in progress stands, when one runs: counting (the default) or held. */
+  live?: 'running' | 'paused';
 }
 
 // The reference's days: the ones its words talk about are fixed, the rest come from the same
@@ -166,7 +168,9 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   const note = signal((record.note ?? '').slice(0, 280));
   // What a tap in the timeline made of a lap, on any day, over what the day was written with.
   const turned = signal(new Map<string, TimelineEntry['outcome']>());
-  const timeline = (day: string) => (day === DAY && record.scripted !== false ? scripted.value : plain(day)).map((entry) => ({ ...entry, outcome: turned.value.get(entry.id) ?? entry.outcome }));
+  // The lap in progress, after the scripted day's last break, as far as it has run: no row yet, so the core says it is live.
+  const open = (): TimelineEntry[] => (lapNow() > 0 ? [lap('run', 16, 40, { outcome: 'stopped', ended: at(DAY, 16, 40) + lapNow(), ran_ms: lapNow(), live: record.live ?? 'running' })] : []);
+  const timeline = (day: string) => [...(day === DAY && record.scripted !== false ? scripted.value : plain(day)), ...(day === DAY && record.scripted !== false ? open() : [])].map((entry) => ({ ...entry, outcome: turned.value.get(entry.id) ?? entry.outcome }));
   const turn = (id: string, to: 'void' | null) => {
     const entry = timeline(DAY).find((one) => one.id === id);
     if (entry) moved.value += (to ? -1 : 1) * Math.round(entry.ran_ms / MIN);
