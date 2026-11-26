@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { firstRow, go, lapSaid, list, server, settle, signedInto, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { firstRow, go, lapSaid, list, server, settle, signedInto, startButton, startNow, staysPut, strip, taskRow, titles } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -320,4 +320,205 @@ test('Focus\'s first row starts at the top Today\'s heading starts at: 56px at 4
   await expect.poll(() => lapSaid(a.page)).toBe('Short break');
   await settle(a.page);
   expect(await top(firstRow(a.page)), 'Focus\'s first row in a break').toBe(56);
+});
+
+// 4. Today's day bar fills as the lap runs.
+
+/** Today's day-target bar as drawn: how full each segment is. */
+const dayBar = (page: Page) =>
+  page
+    .getByRole('group', { name: 'Day target' })
+    .locator('[aria-hidden="true"] > i')
+    .evaluateAll((els) => els.map((el) => Number((el as HTMLElement).style.getPropertyValue('--share'))));
+
+test('the day bar fills as the lap runs: with a target of 4, a 2 minute lap grows Today\'s first segment while it runs; stopped past its first minute it stays part filled and does not empty, at the same share as Focus\'s task bar', async ({ deviceA: a }) => {
+  test.setTimeout(150000);
+  await a.page.setViewportSize(PHONE);
+  await signedInto(
+    a,
+    'daybar',
+    (node: Node) => {
+      node.engine.write('settings', 'current', { day_target: 4 });
+      node.engine.write('task', 'essay', { title: 'essay', estimate: 4, order: 'V' });
+    },
+    { work_ms: 120000 },
+  );
+  await startButton(a.page).click();
+  await expect(button(a.page, 'Pause')).toBeVisible();
+  await go(a.page, 'Today');
+  await expect.poll(async () => (await dayBar(a.page)).length).toBe(4);
+  await expect.poll(async () => (await dayBar(a.page))[0], { message: 'the running lap does not fill its segment', timeout: 6000 }).toBeGreaterThan(0);
+  const early = (await dayBar(a.page))[0]!;
+  await expect.poll(async () => (await dayBar(a.page))[0], { message: 'the running lap\'s segment stopped growing', timeout: 6000 }).toBeGreaterThan(early);
+  expect((await dayBar(a.page)).slice(1), 'the laps to come are drawn').toEqual([0, 0, 0]);
+
+  // Past the first minute, stopped on Focus: a lap, kept as far as it ran.
+  await expect(strip(a.page).locator('b')).toHaveText('00:55', { timeout: 80000 });
+  await go(a.page, 'Focus');
+  await button(a.page, 'Stop').click();
+  await expect(startButton(a.page)).toBeVisible();
+  const [focus] = await bar(a.page);
+  expect(focus, 'Focus\'s task bar after the stop').toBeGreaterThan(0.5);
+  expect(focus).toBeLessThan(0.7);
+  await go(a.page, 'Today');
+  await expect.poll(async () => (await dayBar(a.page))[0], { message: 'Today\'s day bar is not at Focus\'s share' }).toBeCloseTo(focus!, 2);
+  await a.page.waitForTimeout(1500);
+  expect((await dayBar(a.page))[0], 'the stopped lap\'s segment emptied').toBeCloseTo(focus!, 2);
+});
+
+// 5. While a lap runs, its task is in the strip and nowhere else on Today.
+
+for (const [tag, orders, when] of [
+  ['runcarry', { a: 'A', b: 'B', c: 'C' }, 'the running task second'],
+  ['runfirst', { a: 'B', b: 'A', c: 'C' }, 'the running task first in the list order'],
+] as const) {
+  test(`while a lap runs on bravo (${when}), bravo is in the strip only; charlie carried over the Next place is Next before the release and alpha goes under "Later today"; letting go moves nothing, the server puts charlie before alpha, and the lap stopped brings bravo's row back to its place`, async ({ deviceA: a }) => {
+    await a.page.setViewportSize(PHONE);
+    const { name } = await signedInto(a, tag, (node: Node) => {
+      node.engine.write('task', 'a', { title: 'alpha', order: orders.a });
+      node.engine.write('task', 'b', { title: 'bravo', order: orders.b });
+      node.engine.write('task', 'c', { title: 'charlie', order: orders.c });
+    });
+    // A lap on bravo, chosen on Focus.
+    await a.page.getByRole('button', { name: /^This lap is for / }).click();
+    await a.page.getByRole('dialog', { name: 'This lap is for' }).getByRole('button', { name: /^bravo/ }).click();
+    await expect(a.page.getByRole('button', { name: /^This lap is for bravo\./ })).toBeVisible();
+    await startButton(a.page).click();
+    await expect(button(a.page, 'Pause')).toBeVisible();
+    await go(a.page, 'Today');
+    const lapStrip = strip(a.page);
+    await expect(lapStrip).toContainText('bravo');
+    await expect.poll(() => rowsIn(a.page, 'Next')).toEqual(['alpha']);
+    expect(await rowsIn(a.page, 'Later today')).toEqual(['charlie']);
+    await expect(taskRow(a.page, 'bravo'), 'the running task has a row on Today as well as the strip').toHaveCount(0);
+    await settle(a.page);
+
+    const two = ['alpha', 'charlie'];
+    const next = await boxOf(taskRow(a.page, 'alpha'));
+    const held = await lift(a.page, 'charlie');
+    await holdAt(a.page, held.x, next.y + held.box.height / 2);
+    expect(await isNext(a.page, 'charlie'), 'charlie over the Next place has not the Next outline').toBe(true);
+    expect(await isNext(a.page, 'alpha'), 'alpha still wears the Next outline').toBe(false);
+    const [head, alpha] = [await boxOf(laterHead(a.page)), await boxOf(taskRow(a.page, 'alpha'))];
+    expect(head.y + head.height, '"Later today" is not over alpha').toBeLessThanOrEqual(alpha.y + 1);
+    expect(await overlaps(a.page, { ...next, height: held.box.height }), 'resting cards overlap, or the Next place is not open').toEqual([]);
+    await expect(lapStrip).toContainText('bravo');
+    const during = await where(a.page, two);
+
+    await a.page.mouse.up();
+    await expect.poll(() => rowsIn(a.page, 'Next')).toEqual(['charlie']);
+    expect(await rowsIn(a.page, 'Later today')).toEqual(['alpha']);
+    await settle(a.page);
+    stoodStill(during, await where(a.page, two));
+    await expect(taskRow(a.page, 'bravo')).toHaveCount(0);
+    await expect(lapStrip).toContainText('bravo');
+    const rows = async () => (await serverRows(server, name, 'task')) as Map<string, { title?: string; order?: string }>;
+    await expect.poll(async () => {
+      const r = await rows();
+      return r.get('c')!.order! < r.get('a')!.order!;
+    }, { message: 'the server does not put charlie before alpha' }).toBe(true);
+
+    // The lap stopped: bravo's row is back, in its place by the list's order.
+    await a.page.waitForTimeout(400);
+    await go(a.page, 'Focus');
+    await button(a.page, 'Stop').click();
+    await go(a.page, 'Today');
+    await expect(taskRow(a.page, 'bravo')).toBeVisible();
+    const byOrder = [...(await rows()).values()].sort((x, y) => (x.order! < y.order! ? -1 : 1)).map((t) => t.title);
+    await expect.poll(() => titles(a.page)).toEqual(byOrder);
+  });
+}
+
+test('a running task deleted from its sheet, opened by its title in Today\'s strip: the lap goes on and is still named, in the strip and on Focus; Undo from the bar, and once the lap rings its row is back on Today with the lap', async ({ deviceA: a }) => {
+  test.setTimeout(90000);
+  await a.page.setViewportSize(PHONE);
+  await signedInto(
+    a,
+    'rundel',
+    (n: Node) => {
+      n.engine.write('project', 'thesis', { name: 'Thesis', color: 'you', order: 'V' });
+      n.engine.write('task', 't', { title: 'chapter 2', project: 'thesis', estimate: 2, order: 'V' });
+      n.engine.write('task', 'o', { title: 'other', order: 'W' });
+    },
+    { work_ms: 20000, short_ms: 5 * 60000 },
+  );
+  await startButton(a.page).click();
+  await expect(button(a.page, 'Pause')).toBeVisible();
+  await go(a.page, 'Today');
+  const lapStrip = strip(a.page);
+  await expect(lapStrip).toContainText('chapter 2');
+  // The strip's title opens the running task's sheet: its row is nowhere else on Today.
+  await a.page.getByRole('button', { name: 'chapter 2', exact: true }).click();
+  const sheet = a.page.getByRole('dialog', { name: 'Task' });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Delete', exact: true }).click();
+  const bar = a.page.getByRole('status').filter({ hasText: 'Deleted: chapter 2' });
+  await expect(bar.locator('p').first()).toBeVisible();
+  // The lap goes on, on the task it was for.
+  await expect(lapStrip, 'the lap stopped, or lost its task, when the task was deleted').toContainText('chapter 2');
+  await expect(a.page.getByRole('button', { name: /^Recently deleted, 1/ })).toBeVisible();
+  await bar.getByRole('button', { name: 'Undo' }).click();
+  await expect(a.page.getByRole('button', { name: /^Recently deleted/ })).toHaveCount(0);
+  await expect(lapStrip).toContainText('chapter 2');
+  await go(a.page, 'Focus');
+  await expect(a.page.locator('main')).toContainText('chapter 2');
+  await expect(firstRow(a.page)).toContainText('Thesis');
+  await expect(startNow(a.page)).toBeVisible({ timeout: 30000 });
+  await go(a.page, 'Today');
+  await expect(taskRow(a.page, 'chapter 2')).toBeVisible();
+  await expect(taskRow(a.page, 'chapter 2')).toContainText('1 of 2');
+});
+
+test('a task deleted on another device while its lap runs keeps its lap: named with its project on Focus, in the strip and in Progress\'s day list, its minute in its project\'s total, while it is in Recently deleted; restored, it is back on Today; purged, its lap stays in the project\'s total', async ({ deviceA: a }) => {
+  test.setTimeout(150000);
+  await a.page.setViewportSize(PHONE);
+  const { name, node } = await signedInto(
+    a,
+    'rungone',
+    (n: Node) => {
+      n.engine.write('project', 'thesis', { name: 'Thesis', color: 'you', order: 'V' });
+      n.engine.write('task', 't', { title: 'chapter 2', project: 'thesis', estimate: 2, order: 'V' });
+      n.engine.write('task', 'o', { title: 'other', order: 'W' });
+    },
+    { work_ms: 60000, short_ms: 5 * 60000 },
+  );
+  await expect(a.page.getByRole('button', { name: /^This lap is for chapter 2\./ })).toBeVisible();
+  await startButton(a.page).click();
+  await expect(button(a.page, 'Pause')).toBeVisible();
+  // Deleted from the account's other device while the lap runs.
+  node.engine.write('task', 't', { deleted: node.engine.now() });
+  await go(a.page, 'Today');
+  await expect(a.page.getByRole('button', { name: /^Recently deleted, 1/ })).toBeVisible({ timeout: 5000 });
+  const lapStrip = strip(a.page);
+  await expect(lapStrip, 'the strip lost the deleted task\'s name').toContainText('chapter 2');
+  await go(a.page, 'Focus');
+  await expect(a.page.locator('main')).toContainText('chapter 2');
+  await expect(firstRow(a.page), 'Focus lost the deleted task\'s project').toContainText('Thesis');
+
+  // The bell: the lap is the task's, deleted or not.
+  await expect(startNow(a.page)).toBeVisible({ timeout: 80000 });
+  await expect.poll(async () => [...(await serverRows(server, name, 'session')).values()].filter((r) => r.kind === 'work' && r.task === 't').length).toBe(1);
+  await go(a.page, 'Progress');
+  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, hour by hour', level: 2 }) });
+  await expect(day, 'Progress\'s day list does not name the deleted task').toContainText('chapter 2');
+  const projects = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Last 7 days by project', level: 2 }) });
+  await expect(projects.getByRole('listitem').filter({ hasText: 'Thesis' }), 'the project\'s total lost the deleted task\'s lap').toContainText('1 lap');
+
+  // Restored from Recently deleted: back on Today.
+  await go(a.page, 'Today');
+  await button(a.page, 'Recently deleted, 1').click();
+  await a.page.getByRole('dialog', { name: 'Recently deleted' }).getByRole('button', { name: 'Restore' }).click();
+  await expect(taskRow(a.page, 'chapter 2')).toBeVisible();
+  await expect(taskRow(a.page, 'chapter 2')).toContainText('1 of 2');
+
+  // Deleted again and then for good: its lap stays in its project's total.
+  await taskRow(a.page, 'chapter 2').getByRole('button', { name: /chapter 2/ }).click();
+  await a.page.getByRole('dialog', { name: 'Task' }).getByRole('button', { name: 'Delete', exact: true }).click();
+  await button(a.page, 'Recently deleted, 1').click();
+  const bin = a.page.getByRole('dialog', { name: 'Recently deleted' });
+  await bin.getByRole('button', { name: 'Delete for good', exact: true }).click();
+  await bin.getByRole('button', { name: 'Delete for good?', exact: true }).click();
+  await expect(a.page.getByRole('button', { name: /^Recently deleted/ })).toHaveCount(0);
+  await go(a.page, 'Progress');
+  await expect(projects.getByRole('listitem').filter({ hasText: 'Thesis' }), 'a purged task\'s lap left its project\'s total').toContainText('1 lap');
 });

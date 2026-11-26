@@ -5,10 +5,15 @@ import type { CDPSession, Page } from '@playwright/test';
 import { hueHex } from '../../client/src/ui/kit/hue.ts';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { colourOf, go, list, quickAdd, ready, selectable, server, sessionsWhen, settle, signedInto, signIn, squaresOf, startButton, startNow, taskRow, titles } from './app.ts';
+import { colourOf, go, list, quickAdd, ready, selectable, server, sessionsWhen, settle, signedInto, signIn, squaresOf, startButton, startNow, strip, taskRow, titles } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
+/** Marks the task a lap runs on done, from its sheet, opened by its title in Today's strip. */
+async function markRunningDone(page: Page, title: string) {
+  await strip(page).getByRole('button', { name: title, exact: true }).click();
+  await page.getByRole('dialog', { name: 'Task' }).getByRole('button', { name: 'Mark done', exact: true }).click();
+}
 const timer = async (name: string) => (await serverRows(server, name, 'timer')).get('current')?.state as { phase: string; run: string | null; set_index: number } | undefined;
 const tasks = (...names: string[]) => (node: Node) => names.forEach((title, i) => node.engine.write('task', `t${i}`, { title, order: `V${String(i).padStart(2, '0')}` }));
 
@@ -68,11 +73,11 @@ test('ticking the running task ends its lap: the timer is at rest, the lap is a 
   await also(b, name);
   for (const d of [a, b]) await go(d.page, 'Today');
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
-  const strip = (page: Page) => page.getByRole('link', { name: 'Open Focus' });
   await expect(strip(b.page)).toContainText('alpha', { timeout: 2000 });
   const run = (await timer(name))!.run;
   await expect(strip(a.page).locator('b')).toHaveText('01:58', { timeout: 80000 });
-  await taskRow(a.page, 'alpha').getByRole('checkbox').click();
+  // The running task is in the strip and no list: its title opens its sheet, where it is marked done.
+  await markRunningDone(a.page, 'alpha');
 
   for (const d of [a, b]) await expect(strip(d.page), 'the lap kept running for a ticked task').toHaveCount(0, { timeout: 3000 });
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
@@ -763,18 +768,18 @@ test('the within-estimate mark: not for a task ticked a few seconds into its lap
   }, { work_ms: 4000, short_ms: 60000 });
   await go(a.page, 'Today');
   const marks = async () => Object.keys(((await serverRows(server, name, 'settings')).get('current')?.marks ?? {}) as Record<string, number>);
-  const strip = a.page.getByRole('link', { name: 'Open Focus' });
+  const lapStrip = strip(a.page);
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(strip).toContainText('early');
+  await expect(lapStrip).toContainText('early');
   await a.page.waitForTimeout(1500);
-  await taskRow(a.page, 'early').getByRole('checkbox').click();
-  await expect(strip).toHaveCount(0);
+  await markRunningDone(a.page, 'early');
+  await expect(lapStrip).toHaveCount(0);
   await a.page.waitForTimeout(2000);
   await expect(a.page.getByText(/^early: done in/)).toHaveCount(0);
   expect(await marks(), 'a stopped lap earned the mark').not.toContain('estimate-early');
 
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(strip).toContainText('rung');
+  await expect(lapStrip).toContainText('rung');
   await expect(a.page.getByText('Lap done', { exact: true })).toBeVisible({ timeout: 8000 });
   await taskRow(a.page, 'rung').getByRole('checkbox').click();
   await expect(a.page.getByText('rung: done in 1 lap. You estimated 2.')).toBeVisible({ timeout: 3000 });
@@ -782,7 +787,7 @@ test('the within-estimate mark: not for a task ticked a few seconds into its lap
   expect(await marks()).not.toContain('estimate-early');
 });
 
-test('after a bell, "5 more minutes": Today\'s laps and the task\'s count stay what they were at the bell while the extension runs', async ({ deviceA: a, deviceB: b }) => {
+test('after a bell, "5 more minutes": Today\'s laps stay what they were at the bell while the extension runs, its task in the strip; stopped, the task\'s count is the bell\'s', async ({ deviceA: a, deviceB: b }) => {
   const { name, node } = await signedInto(a, 'extend', (n) => n.engine.write('task', 't0', { title: 'alpha', estimate: 2, order: 'V' }), { work_ms: 3000, short_ms: 60000 });
   await also(b, name);
   await go(b.page, 'Today');
@@ -801,13 +806,21 @@ test('after a bell, "5 more minutes": Today\'s laps and the task\'s count stay w
   await expect.poll(() => node.engine.timer.value.phase).toBe('work');
   focus.extend();
   await expect.poll(async () => (await timer(name))?.phase).toBe('work');
-  await expect(a.page.getByRole('link', { name: 'Open Focus' })).toBeVisible({ timeout: 3000 });
+  await expect(strip(a.page)).toBeVisible({ timeout: 3000 });
   for (let i = 0; i < 4; i++) {
     for (const d of [a, b]) {
       await expect(focused(d.page), 'the day lost the lap that rang').toContainText('1 lap');
-      await expect(taskRow(d.page, 'alpha'), 'the task lost the lap that rang').toContainText('1 of 2');
+      // While the extension runs its task is in the strip and no list.
+      await expect(strip(d.page)).toContainText('alpha');
     }
     await a.page.waitForTimeout(700);
+  }
+  // Stopped: the row is back, with the one lap the bell counted, not two and not none.
+  focus.stop();
+  for (const d of [a, b]) {
+    await expect(strip(d.page)).toHaveCount(0, { timeout: 3000 });
+    await expect(taskRow(d.page, 'alpha'), 'the task lost the lap that rang, or counted the extension again').toContainText('1 of 2');
+    await expect(focused(d.page)).toContainText('1 lap');
   }
   focus.close();
 });

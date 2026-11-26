@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, signedIn } from '../sync/harness.ts';
-import { accountWith, go, list, quickAdd, ready, server, signIn, squaresOf, statusLine, taskRow, titles, username } from './app.ts';
+import { accountWith, go, list, quickAdd, ready, server, signIn, squaresOf, statusLine, strip, taskRow, titles, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -78,7 +78,7 @@ test('a lap started from the Next row is named on both laptops; it rings, counts
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
 
   // Today's bar on A names it; Focus on B names it, and its bar is the task's four laps.
-  await expect(a.page.getByRole('link', { name: 'Open Focus' })).toContainText('essay');
+  await expect(strip(a.page)).toContainText('essay');
   await go(b.page, 'Focus');
   await expect(b.page.locator('main i[style*="--i:"]')).toHaveCount(4);
   await expect(b.page.getByText('essay', { exact: true })).toBeVisible();
@@ -427,29 +427,46 @@ test('typed key by key, the spaces stay while typing; the title and a subtask ar
   expect([...rows.values()].find((row) => row.parent === task.id)).toMatchObject({ title: 'outline the argument' });
 });
 
-test('the task a lap runs on keeps its row in today\'s list, in its place, its square filling; a sheet open on it stays open when another laptop starts the lap', async ({ deviceA: a, deviceB: b }) => {
+test('the task a lap runs on is in the strip and in no list, its order kept; its title there opens its sheet and has the focus back when it closes; a sheet open on it stays open when another laptop starts the lap; at the bell its row is back in its place with its square whole', async ({ deviceA: a, deviceB: b }) => {
+  test.setTimeout(90000);
   const name = await onToday([a, b], 'running', { work_ms: 30000, short_ms: 60000 });
   for (const t of ['alpha ~2', 'bravo ~1', 'charlie ~1']) await quickAdd(a.page, t);
   await expect.poll(() => titles(b.page)).toEqual(['alpha', 'bravo', 'charlie']);
 
   const sheet = await openSheet(a.page, 'alpha');
   await list(b.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(a.page.getByRole('link', { name: 'Open Focus' })).toContainText('alpha', { timeout: 1000 });
+  await expect(strip(a.page)).toContainText('alpha', { timeout: 1000 });
   await a.page.waitForTimeout(1000);
   await expect(sheet).toBeVisible();
   await expect(sheet.getByLabel('Title')).toHaveValue('alpha');
   await sheet.getByRole('button', { name: 'Close' }).click();
 
-  // Next is the first task not running; alpha is still on the list, and in the true order it is first.
-  await expect(list(a.page, 'Next')).toContainText('bravo');
-  await expect(list(a.page, 'Later today')).toContainText('alpha');
+  // Next is the first task not running; alpha is in the strip and no list, and in the true order it is still first.
+  for (const d of [a, b]) {
+    await expect(list(d.page, 'Next')).toContainText('bravo');
+    await expect(taskRow(d.page, 'alpha')).toHaveCount(0);
+    await expect(strip(d.page)).toContainText('alpha');
+  }
+  expect(await titles(a.page)).toEqual(['bravo', 'charlie']);
   const order = [...(await waitRows(name, (all) => all.size === 3)).values()].sort((x, y) => (String(x.order) < String(y.order) ? -1 : 1)).map((row) => row.title);
   expect(order).toEqual(['alpha', 'bravo', 'charlie']);
 
-  // The running lap's square fills as it runs: it is redrawn every few seconds.
-  const first = (await squaresOf(taskRow(a.page, 'alpha')))[0]!;
-  await expect.poll(async () => (await squaresOf(taskRow(a.page, 'alpha')))[0], { timeout: 20000 }).toBeGreaterThan(first);
-  expect(first).toBeGreaterThan(0);
+  // Its title in the strip opens its sheet, as its row would, and the focus comes back to it.
+  const title = strip(a.page).getByRole('button', { name: 'alpha', exact: true });
+  await title.click();
+  const again = a.page.getByRole('dialog', { name: 'Task' });
+  await expect(again.getByLabel('Title')).toHaveValue('alpha');
+  await again.getByRole('button', { name: 'Close' }).click();
+  await expect(again).toBeHidden();
+  await expect(title, 'closing the sheet did not hand the focus back to the strip\'s title').toBeFocused();
+
+  // At the bell its row is back, first as the true order has it, with its square whole.
+  await expect(strip(a.page)).toContainText('Lap done', { timeout: 35000 });
+  for (const d of [a, b]) {
+    await expect.poll(() => titles(d.page)).toEqual(['alpha', 'bravo', 'charlie']);
+    await expect.poll(() => squaresOf(taskRow(d.page, 'alpha'))).toEqual([1, 0]);
+    await expect(taskRow(d.page, 'alpha')).toContainText('1 of 2');
+  }
 });
 
 test('delete from the sheet and Undo: the task is back, and its sheet does not pop open again', async ({ deviceA: a }) => {

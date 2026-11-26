@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, lapSaid, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { go, lapSaid, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, strip, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -505,6 +505,10 @@ test('a count says of what: with a target of 2 and a task of 3, Focus\'s bar has
   expect(await stray(), 'Focus counts the set').toEqual([]);
   const bar = () => a.page.locator('main [aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--i:"]') }).first().evaluate((el) => el.children.length);
   expect(await bar(), 'Focus\'s bar is not the task\'s estimate').toBe(3);
+  // The row says "of 3" while no lap runs: a running task is in Today's strip and no list.
+  await go(a.page, 'Today');
+  await expect(taskRow(a.page, 'essay')).toContainText('0 of 3');
+  await go(a.page, 'Focus');
   await startButton(a.page).click();
   await expect(a.page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect.poll(() => lapSaid(a.page)).toBe('');
@@ -514,7 +518,7 @@ test('a count says of what: with a target of 2 and a task of 3, Focus\'s bar has
   const target = a.page.getByRole('group', { name: 'Day target' });
   await expect(target).toContainText('0 of 2 laps today');
   expect(await target.locator('[aria-hidden="true"]').first().evaluate((el) => el.children.length)).toBe(2);
-  await expect(taskRow(a.page, 'essay')).toContainText('0 of 3');
+  await expect(strip(a.page)).toContainText('essay');
 
   await go(a.page, 'Room');
   await a.page.getByLabel('Its name').fill('reading room');

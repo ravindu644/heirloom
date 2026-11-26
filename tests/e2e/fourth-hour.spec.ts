@@ -7,7 +7,7 @@ import { localDay } from '../../client/src/core/stats.ts';
 import * as words from '../../client/src/ui/strings.ts';
 import { serverCells, serverRows, table } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, lapSaid as lapLine, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { go, lapSaid as lapLine, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, strip, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -193,7 +193,7 @@ test('a lap of up to 360 minutes: Settings and the task sheet take 360 and bring
   await a.page.setViewportSize(PHONE);
   await expect(a.page.getByText(/^of 6:00:00, ends at \d\d:\d\d$/).filter({ visible: true })).toBeVisible();
   await go(a.page, 'Today');
-  await expect(a.page.getByRole('link', { name: 'Open Focus' }).locator('b')).toHaveText(/^5:5\d:\d\d$/);
+  await expect(strip(a.page).locator('b')).toHaveText(/^5:5\d:\d\d$/);
   await go(a.page, 'Focus');
   await button(a.page, 'Stop').click();
 

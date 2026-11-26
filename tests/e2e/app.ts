@@ -93,6 +93,9 @@ export async function sessionsWhen(name: string, ok: (rows: Record<string, unkno
   }
 }
 
+/** Today's strip of the lap in progress: its clock (the link to Focus) and the task's title, the one place a running task is on Today. */
+export const strip = (page: Page) => page.getByRole('link', { name: 'Open Focus' }).locator('..');
+
 /** The big digits: "24:59". */
 export const digits = (page: Page) => page.getByText(/^\d\d:\d\d$/);
 
