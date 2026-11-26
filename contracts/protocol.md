@@ -209,12 +209,17 @@ weeks, projects, estimates and bests to it.
 
 One function serves the focus streak and every habit. In: `today`, the days that were kept (a day
 with at least one `rang` lap; for a habit, a day whose live check-ins reach its target), a weekday
-mask (bit 0 Monday to bit 6 Sunday, all seven when left out) and a `window` in days.
+mask (bit 0 Monday to bit 6 Sunday, all seven when left out), a `window` in days, and for the
+focus streak alone the pinned rest days (`settings.rest_days`, the same bits, none when left out;
+more than two set: the first two from Monday).
 
 - Only days in the mask exist. A kept day outside it is ignored.
 - The record runs from the first kept day to today, or to yesterday while today is not kept yet:
   a day that is not over is not empty.
-- In each Monday to Sunday week the first two empty days are rest days. A third is a miss.
+- In each Monday to Sunday week two days may be rest. A pinned day that is empty, or still to
+  come this week, holds one of the two; the rest go to the first other empty days. A pinned day
+  that is kept holds nothing, so its place goes back to the week, and an earlier empty day may
+  turn from a miss into a rest. Any further empty day is a miss.
 - `streak` is the kept days since the last miss. Rest days do not add to it and do not end it.
 - `rest` is every rest day in the record, oldest first.
 - `kept` of `of`: the last `window` calendar days of the record, and in them the days in the mask

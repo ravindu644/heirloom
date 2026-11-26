@@ -15,6 +15,7 @@
     "day_target": { "type": "integer", "minimum": 0, "default": 0, "description": "Pomodoros a day. 0 is no target." },
     "share_task": { "type": "boolean", "default": false, "description": "Rooms may see the title of the task in progress." },
     "rooms_hidden": { "type": "boolean", "default": false },
+    "rest_days": { "type": "integer", "minimum": 0, "maximum": 127, "default": 0, "description": "Weekdays pinned as rest for the focus streak, bit 0 Monday to bit 6 Sunday, at most two. protocol.md section 8." },
     "marks": { "type": "object", "additionalProperties": { "type": "integer" }, "description": "Marks already shown, by key, with the time. protocol.md section 16." }
   }
 }

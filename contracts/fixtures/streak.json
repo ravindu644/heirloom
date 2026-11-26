@@ -1,5 +1,5 @@
 {
- "about": "The forgiving streak. Rules: contracts/protocol.md section 8. 2026-11-16 and 2026-11-23 are Mondays. \"kept\" in is the days that count (one rang lap, or a habit at its target); \"window\" is how many days back \"kept of\" looks.",
+ "about": "The forgiving streak. Rules: contracts/protocol.md section 8. 2026-11-16 and 2026-11-23 are Mondays. \"kept\" in is the days that count (one rang lap, or a habit at its target); \"window\" is how many days back \"kept of\" looks. \"pinned_mask\" is the weekdays the person pinned as rest (bit 0 Monday to bit 6 Sunday), none when left out; 2026-11-29 is a Sunday.",
  "cases": [
   {
    "name": "nothing yet",
@@ -313,6 +313,112 @@
     ],
     "kept": 2,
     "of": 3
+   }
+  },
+  {
+   "name": "a pinned Sunday holds its place while the week runs, so only one other empty day is rest",
+   "today": "2026-11-27",
+   "pinned_mask": 64,
+   "kept": [
+    "2026-11-23",
+    "2026-11-26",
+    "2026-11-27"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 2,
+    "rest": [
+     "2026-11-24"
+    ],
+    "kept": 3,
+    "of": 5
+   }
+  },
+  {
+   "name": "the same week with nothing pinned rests both empty days",
+   "today": "2026-11-27",
+   "kept": [
+    "2026-11-23",
+    "2026-11-26",
+    "2026-11-27"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 3,
+    "rest": [
+     "2026-11-24",
+     "2026-11-25"
+    ],
+    "kept": 3,
+    "of": 5
+   }
+  },
+  {
+   "name": "a pinned Sunday that is kept gives its place back to the week",
+   "today": "2026-11-30",
+   "pinned_mask": 64,
+   "kept": [
+    "2026-11-23",
+    "2026-11-26",
+    "2026-11-27",
+    "2026-11-28",
+    "2026-11-29",
+    "2026-11-30"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 6,
+    "rest": [
+     "2026-11-24",
+     "2026-11-25"
+    ],
+    "kept": 6,
+    "of": 8
+   }
+  },
+  {
+   "name": "a pinned Sunday left empty is rest, and the week's other rest goes to the first empty day",
+   "today": "2026-11-30",
+   "pinned_mask": 64,
+   "kept": [
+    "2026-11-23",
+    "2026-11-24",
+    "2026-11-26",
+    "2026-11-27",
+    "2026-11-28",
+    "2026-11-30"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 6,
+    "rest": [
+     "2026-11-25",
+     "2026-11-29"
+    ],
+    "kept": 6,
+    "of": 8
+   }
+  },
+  {
+   "name": "two pinned days take both rests, and any other empty day is a miss",
+   "today": "2026-11-30",
+   "pinned_mask": 96,
+   "kept": [
+    "2026-11-23",
+    "2026-11-24",
+    "2026-11-26",
+    "2026-11-27",
+    "2026-11-30"
+   ],
+   "window": 45,
+   "expect": {
+    "streak": 3,
+    "rest": [
+     "2026-11-28",
+     "2026-11-29"
+    ],
+    "kept": 5,
+    "of": 8
    }
   }
  ]
