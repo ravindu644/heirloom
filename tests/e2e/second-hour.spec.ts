@@ -258,7 +258,8 @@ const page_ = (page: Page) =>
   });
 
 test('a page that fits is at the top after every tap on Today, Habits and Settings; at the end of a long page no tap leaves a blank end', async ({ deviceA: a }) => {
-  await a.page.setViewportSize({ width: 412, height: 2400 });
+  // Tall enough that every page fits: Settings at 412 wide is 2288px since About was added.
+  await a.page.setViewportSize({ width: 412, height: 3000 });
   await signedInto(a, 'fits', tasks('alpha', 'bravo'));
   const unmoved = async (what: string) => {
     await settle(a.page);
