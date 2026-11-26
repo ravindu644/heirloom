@@ -40,7 +40,7 @@ describe('the list', () => {
       member(SACHI, 'sachi', { phase: 'work', set_index: 1, ends_at: T0 + 10 * MIN, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN, last: lastLap([NIMAL]) }),
     ], { target_ms: 600 * MIN }));
     assert.deepEqual(r.list.value, [{
-      id: 'r_1', name: 'Sachi and me', code: 'K7QW3RXM', target_ms: 600 * MIN, week_ms: 660 * MIN, ranked: false,
+      id: 'r_1', name: 'Sachi and me', code: 'K7QW3RXM', target_ms: 600 * MIN, week_ms: 660 * MIN, ranked: false, keeper: null, youKeep: true,
       members: [
         { id: ME, name: 'ravi', you: true, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, last: null },
         { id: SACHI, name: 'sachi', you: false, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN,
@@ -125,6 +125,19 @@ describe('the list', () => {
     assert.equal(changes, 6);
     assert.equal(w.time.waiting(), 0);
     stop();
+  });
+
+  it('the keeper: named, and only they may change the room; an older server names none, and then anyone may', async () => {
+    const { d, r } = await one();
+    const two = [member(ME, 'ravi'), member(SACHI, 'sachi')];
+    const keeping = () => [r.list.value[0]!.keeper, r.list.value[0]!.youKeep];
+    say(d, room('r_1', two, { keeper: SACHI }));
+    assert.deepEqual(keeping(), ['sachi', false]);
+    // Sachi leaves; the server hands the room to the member there longest, you, and says so.
+    say(d, room('r_1', [member(ME, 'ravi')], { keeper: ME }));
+    assert.deepEqual(keeping(), ['ravi', true]);
+    say(d, room('r_1', two));
+    assert.deepEqual(keeping(), [null, true]);
   });
 
   it('`gone` removes the room; two rooms are two entries, each its own', async () => {
@@ -286,6 +299,9 @@ describe('room requests', () => {
     fail(404, 'room');
     assert.deepEqual(await r.leave('r_gone'), { ok: false, error: 'room' });
     assert.deepEqual(await r.update('r_gone', { name: 'x' }), { ok: false, error: 'room' });
+    // Not the keeper.
+    fail(403, 'forbidden');
+    assert.deepEqual(await r.update('r_1', { ranked: true }), { ok: false, error: 'forbidden' });
     fail(400, 'bad_request');
     assert.deepEqual(await r.create(''), { ok: false, error: 'bad_request' });
     w.server.reply = () => 'unreachable';

@@ -81,11 +81,14 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
   const hours = Math.round(room.target_ms / HOUR);
   const change = async (fields: Parameters<Rooms['update']>[1]) => setSaid(why(await rooms.update(room.id, fields)));
   const copy = async () => setCopied((await copyText(room.code)) ? s.room.copied : s.room.copyFailed);
+  // The name, the target and the order are the keeper's to change; `youKeep` is also true where
+  // an older server names no keeper, and everyone has the controls, as before.
+  const keeps = room.youKeep;
 
   return (
     <Sheet grows title={s.room.sheet} close={s.task.close} onClose={onClose}>
       {/* Nothing here is this person's alone. */}
-      <p class={css.quiet}>{s.room.forAll}</p>
+      {keeps && <p class={css.quiet}>{s.room.forAll}</p>}
       <section class={form.group} aria-label={s.room.codeTitle}>
         <h3 class={css.legend}>{s.room.codeTitle}</h3>
         {/* Two groups of four: easier to read out, and to hear. */}
@@ -101,6 +104,8 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
         </div>
       </section>
 
+      {keeps ? (
+        <>
       <form
         class={css.rename}
         onSubmit={(event) => {
@@ -133,6 +138,28 @@ function RoomSheet({ room, rooms, onClose }: { room: RoomView; rooms: Rooms; onC
         <Switch label={s.room.ranked} note={s.room.rankedNote} on={room.ranked} onChange={(ranked) => change({ ranked })} />
         <Fold role="alert">{said && <p class={css.told}>{said}</p>}</Fold>
       </div>
+        </>
+      ) : (
+        // To anyone but the keeper the same three, as words, and who can change them.
+        <div class={form.group}>
+          <dl class={css.values}>
+            <div>
+              <dt>{s.room.name}</dt>
+              <dd>{room.name}</dd>
+            </div>
+            <div>
+              <dt>{s.room.target}</dt>
+              <dd>{s.room.targetSaid(hours)}</dd>
+            </div>
+            <div>
+              <dt>{s.room.ranked}</dt>
+              <dd>{s.room.rankedSaid(room.ranked)}</dd>
+            </div>
+          </dl>
+          <p class={css.quiet}>{s.room.onlyKeeper(room.keeper)}</p>
+          <Fold role="alert">{said && <p class={css.told}>{said}</p>}</Fold>
+        </div>
+      )}
 
       {/* Leaving cannot be undone from here, and the last one out ends the room: it takes a second tap, in the page, not in a box. */}
       <Fold>

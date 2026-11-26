@@ -778,6 +778,11 @@ export const room = {
   targetMore: 'One hour more',
   ranked: 'Order by this week',
   rankedNote: 'Most focus first, for everyone in this room. Off, people stay in the order they joined.',
+  // To anyone but the room's keeper, the same three as words, and who can change them.
+  targetSaid: (hours: number) => (hours === 0 ? 'No target' : `${plural(hours, 'hour', 'hours')} a week together`),
+  rankedSaid: (on: boolean) => (on ? 'On: most focus first.' : 'Off: in the order people joined.'),
+  // A keeper the server does not name (not among the members any more) is still someone.
+  onlyKeeper: (name: string | null) => (name ? `Only ${name} can change these.` : "Only the room's keeper can change these."),
   codeTitle: 'The code to share',
   codeNote: 'Whoever has it can join. Read it out, or copy it.',
   // The sheet's first line, and what a rename did.

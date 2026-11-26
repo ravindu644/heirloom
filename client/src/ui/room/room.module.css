@@ -49,6 +49,11 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 
 /* In the room's sheet. */
 .legend { font: var(--type-label); color: var(--muted); }
+/* What only the keeper changes, said to everyone else: each its name, as a legend is, over its value. */
+.values { display: grid; gap: var(--space-md); }
+.values div { display: grid; gap: var(--space-xs); }
+.values dt { font: var(--type-label); color: var(--muted); }
+.values dd { margin: 0; overflow-wrap: anywhere; }
 /* Its ink on the sheet's edge, as every large figure's is. */
 .code { margin-left: var(--layout-figure-bearing); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); user-select: all; }
 .rename { display: grid; gap: var(--space-md); }

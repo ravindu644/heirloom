@@ -50,6 +50,13 @@ export interface RoomView {
   week_ms: number;
   /** When true the members are listed by their week, most first; otherwise in the order they joined. */
   ranked: boolean;
+  /**
+   * The name of the member who keeps the room: only they may change its name, target and
+   * ranking. Null from an older server, which names no keeper: then anyone may, as before.
+   */
+  keeper: string | null;
+  /** You may change the room's name, target and ranking: you keep it, or the server names no keeper. */
+  youKeep: boolean;
   members: MemberView[];
 }
 
@@ -71,6 +78,7 @@ export interface Rooms {
   create(name: string): Promise<RoomResult>;
   join(code: string): Promise<RoomResult>;
   leave(room: string): Promise<RoomResult>;
+  /** The keeper's only: anyone else is answered `forbidden`. */
   update(room: string, fields: { name?: string; target_ms?: number; ranked?: boolean }): Promise<RoomResult>;
   /** Cheers a member's latest lap. Shown at once; sent now, or kept and sent when there is a connection again. */
   cheer(room: string, member: string): void;
@@ -225,6 +233,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         };
       });
       const ranked = msg.ranked === true;
+      const keeper = typeof msg.keeper === 'string' ? msg.keeper : null;
       return {
         id: msg.room,
         name: text(msg.name),
@@ -232,6 +241,8 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         target_ms: amount(msg.target_ms),
         week_ms: members.reduce((sum, member) => sum + member.week_ms, 0),
         ranked,
+        keeper: keeper === null ? null : (names.get(keeper) ?? null),
+        youKeep: keeper === null || (you !== '' && keeper === you),
         // The sort is stable: members level on the week stay in the order they joined.
         members: ranked ? members.toSorted((a, b) => b.week_ms - a.week_ms) : members,
       };

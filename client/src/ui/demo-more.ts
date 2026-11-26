@@ -134,6 +134,8 @@ export interface DemoRoom {
   ranked?: boolean;
   stale?: boolean;
   target?: number;
+  /** Who keeps the room: you (the default), a friend by name, or nobody named (an older server). */
+  keeper?: 'you' | string | null;
   /** Who cheered your latest lap, for the Focus result. */
   cheered?: string[];
 }
@@ -201,6 +203,8 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     target_ms: target * HOUR,
     week_ms: people.reduce((sum, m) => sum + m.week_ms, 0),
     ranked: seed.ranked ?? false,
+    keeper: seed.keeper === undefined || seed.keeper === 'you' ? 'ravi' : seed.keeper,
+    youKeep: seed.keeper === undefined || seed.keeper === 'you' || seed.keeper === null,
     members: seed.ranked ? people.toSorted((a, b) => b.week_ms - a.week_ms) : people,
   });
   const list = signal<RoomView[]>(
