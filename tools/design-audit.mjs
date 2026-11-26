@@ -2,11 +2,11 @@
 // Opens every state of client/demo.html in Chromium at 412x915, 471x1020 (the first real phone)
 // and 1440x900, reads what was drawn and holds it to DESIGN.md: type, colour (light and dark),
 // shape, space, one left edge, rhythm, touch targets, the header, a page that scrolls, columns
-// that run margin to margin under 720px, and each job of words (a name, a note, a switch's words,
-// a heading, a person) at the one size DESIGN.md gives it. Prints each violation once with every
-// state it shows in, exits 1 if there is any. Builds the demo once with Vite into a temporary
-// folder, serves it, and ends the server and the browser and removes the folder, also on failure
-// or Ctrl-C.
+// that run margin to margin under 720px, each job of words (a name, a note, a switch's words,
+// a heading, a person) at the one size DESIGN.md gives it, and a ticking number in words that
+// moves nothing as its digits change. Prints each violation once with every state it shows in,
+// exits 1 if there is any. Builds the demo once with Vite into a temporary folder, serves it, and
+// ends the server and the browser and removes the folder, also on failure or Ctrl-C.
 // The rules are pure functions over collected data, so tools/design-audit.test.mjs runs them with
 // no browser.
 import { createHash } from 'node:crypto';
@@ -498,6 +498,25 @@ export function collect(colours) {
   return { els: out, head, doc };
 }
 
+// In the page. 12. A number that ticks inside words (`data-live`) is drawn with its digits at
+// both ends of their widths, all ones and then all zeros, and nothing on the screen that can be
+// pressed, nor the line itself, may move or change size between the two: a countdown whose line
+// wraps on one second and not the next makes the button beside it dance. The words are put back.
+export function wobble() {
+  const live = [...document.querySelectorAll('[data-live]')].filter((e) => e.checkVisibility());
+  if (!live.length) return [];
+  const nodes = live.flatMap((e) => { const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); const out = []; while (w.nextNode()) if (/\d/.test(w.currentNode.data)) out.push([w.currentNode, w.currentNode.data]); return out; });
+  const watched = [...live, ...document.querySelectorAll('button, a[href], input, [role=button], [role=switch]')].filter((e) => e.checkVisibility());
+  const boxes = (digit) => {
+    for (const [n, was] of nodes) n.data = was.replace(/\d/g, digit);
+    return watched.map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map((n) => Math.round(n * 2) / 2).join(' '); });
+  };
+  const ones = boxes('1'), zeros = boxes('0');
+  for (const [n, was] of nodes) n.data = was;
+  const name = (e) => e.tagName.toLowerCase() + (e.classList[0] ? '.' + e.classList[0].replace(/__[0-9a-f]{5}$/, '') : '');
+  return watched.flatMap((e, i) => (ones[i] === zeros[i] ? [] : [{ rule: 'live', path: [e.parentElement, e].map(name).join(' > '), text: (e.textContent || '').trim().slice(0, 30), what: `moves as a ticking number's digits change: ${ones[i]} with ones, ${zeros[i]} with zeros`, allowed: 'a number that updates is tabular (data-live), and nothing beside it moves' }]));
+}
+
 // In the page: resolves once nothing has changed for 150ms, or after a second whatever happens
 // (the clock ticks each second, which is not a tap landing).
 function settled() {
@@ -574,6 +593,7 @@ async function main() {
           // As one string: Playwright checks a returned object field by field, which was most of the run.
           const read = async (colours) => JSON.parse(await page.evaluate(`JSON.stringify((${collect})(${colours}))`));
           const { els, head, doc } = await read(false);
+          for (const x of await page.evaluate(wobble)) found.push({ ...x, state, size });
           await page.emulateMedia({ colorScheme: 'dark' });
           const dark = (await read(true)).els;
           heads[size][state] = head;
