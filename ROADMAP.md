@@ -324,8 +324,12 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [lead] Drawn in rounds four and five from the user's try (reviews/23/): a panel per person,
       W1 upright and W2 sideways and on the laptop, six hours, a person's report, Cheer as 🎉,
       flat coloured pictures; DESIGN.md, the protocol (members' week by day) and the avatar fixture
-- [ ] [server] [core] [ui] [qa] Built as drawn
-- [ ] Gate
+- [x] [server] [core] [ui] [qa] Built as drawn
+- [x] [ui] [qa] From the user's try: the browser's sign-in in two halves (S1, chosen from three),
+      a kept picture drawn at the first paint with no letter before it, the hours clear of the
+      first panel, "Call a lap together" beside "Make or join another room"
+- [x] [server] [ui] A room holds 16 people, the user's number
+- [ ] Gate: the user tries it on the phone and the laptop
 
 ## 24. Release 1.0
 

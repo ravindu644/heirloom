@@ -162,6 +162,8 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
   extra that does something once is dropped when a saved state or `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY` is there.
 - @preact/signals 2 redraws in the next animation frame: a flag covering that redraw (`placedByHand`) must outlast it, and
   a class added by hand to an element Preact renders is wiped when its `class` changes (use a `data-` attribute).
+- `make deploy` and `make release-apk` build from the working tree: while a lane is editing, build
+  from a clean `git worktree` of HEAD (copy `release.keystore` in), or half-made work ships.
 - Chrome throttles timers in background tabs. The laptop's end-of-phase alert comes from Web Push,
   not from a `setTimeout` in the page.
 - Cloudflare closes idle WebSockets and restarts its servers: ping every 25 s and always reconnect.

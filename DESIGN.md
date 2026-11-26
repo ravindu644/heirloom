@@ -573,7 +573,12 @@ Built once in `client/src/ui/kit/` and reused.
     Nothing else is drawn in a lane. **The hours carry now:** one row of hours over the first
     panel's lane, `ink` over a `stroke` line of `ink` up to now and `muted` over a `hair` of `line`
     after, "now" where the heavy line ends; hour names at least 56px apart, and the one within
-    44px of "now" steps aside. While a lap is called, each person who is in has their circle
+    44px of "now" steps aside; the row stands `space-sm` above the first panel, never touching it.
+    "Call a lap together" is a link at the right end of the row under the last panel, with "Make
+    or join another room" at its left; its picker opens in place of that row and is brought into
+    view, above the bottom bar. Nothing stands between the tabs and the hours but, while a lap
+    started together runs, the line that says so. While a lap
+    is called, each person who is in has their circle
     (24px, a 2px `surface` ring) standing in their lane at the call's start.
     **Cheer** is a 40px round button with 🎉 at the end of the person's top line (`key` fill, a
     `hair` of `key-edge`, named "Cheer lina's lap" to a screen reader), there only while a lap of
@@ -592,8 +597,7 @@ Built once in `client/src/ui/kit/` and reused.
   - **The call strip** stands above the bottom bar on a phone, a band under the finding on a
     laptop, while a call is open: "15:00 lina calls a lap" over "Starts in 7:42. lina is in.",
     and "I'm in" as the screen's one primary button ("I'm out" in quiet once you are). When it
-    starts, People opens with "lina and you started together at 15:00." and the link "Call a
-    lap together". The bar that says what the last tap did rises above the strip.
+    starts, People opens with "lina and you started together at 15:00." The bar that says what the last tap did rises above the strip.
   - **Notes:** the field "A line for the room" first, then "Kept for a week. Notes fold away while
     you are on a lap.", then the notes, newest first: the circle (24px), the name and time in
     `label`, the line in `body`. On a lap the panel says only "2 new notes. They open when this
@@ -712,7 +716,10 @@ Built once in `client/src/ui/kit/` and reused.
     half is a `surface` area its full height holding the form at its 44ch. The drawing's top and
     the form's heading stand on one line (112px down); each half's block is centred in its half;
     the free space falls at the bottom. Under 720px the form comes first and the drawing, title
-    and sentence under it, as before.
+    and sentence under it, as before. Where the left half is shown the form's intro does not say
+    again that laps live on the server: "Sign in and this laptop keeps step with your other
+    devices." Every signed-out screen's left edge is the mark's (`layout.gap`, 24px). The reset
+    page is one column on that edge, its heading on the same 112px line.
 - **The launcher icon** is the mark at three quarters of the adaptive icon's safe circle (about
   47 of 108dp tall), so no launcher's mask crowds it; the splash uses the same drawing.
   - (It was first four sentences about a lap and its 25 minutes, then a day drawn as a race with

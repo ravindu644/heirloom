@@ -101,3 +101,6 @@ when it is done.
 - [19] Two every-day habits made at the same moment read "of the last 34 planned days" and "of the last 35": the window starts at each habit's first check-in.
 - [20] A friend's lane in a room leaves out their lap in progress: the room message carries phase, ends_at and paused but not how far the lap has run. Fix: the server sends the run so far at server_time (e.g. run_ms) in protocol section 15, and the client adds the time since while not paused.
 - [22] Your own picture is known to the device only through your member in a room: with no room, it shows until a reload. A `picture` hash in `welcome` (or the account call's reply) would carry it.
+- [23] Copy pass: "You started this lap together at 16:34." does not say who with (DESIGN.md wants "lina and you started together at 15:00."); the forgot-password note runs three lines where one muted line is asked.
+- [23] design-audit never runs at 720 or 1024 and opens no picker at a page's end: the S1 edge and the picker behind the bar were found by hand.
+- [23] first-hour.spec.ts:589 (reduced motion, habit sheet on Enter) failed once in a full run, not reproduced in 23 tries; likely the row re-rendered on the server's ack under the focused button.
