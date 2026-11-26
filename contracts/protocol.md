@@ -674,6 +674,7 @@ name: it was not there to hear `gone`.
       "phase": "work", "set_index": 1, "ends_at": 1795495265000, "paused": false,
       "task": "Thinking in React, steps 1 to 3",
       "today_ms": 4500000, "today_laps": 3, "week_ms": 21600000,
+      "run": { "ms": 840000, "today": true, "week": true },
       "last": { "run": "run-7f3a", "ended": 1795493100000, "cheers": ["a_02b7"] } } ] }
 ```
 
@@ -692,7 +693,15 @@ name: it was not there to hear `gone`.
 - `today_ms`, `today_laps` and `week_ms` are section 7's counting over that member's session rows
   (work, not `void`, overlapping minutes once), for their local day and their Monday to Sunday
   week, by the latest `utc_offset_min` any device of theirs sent. The lap in progress is not in
-  them; a screen adds it from `ends_at` if it wants the figure to move.
+  them: it is in `run`.
+- `run` is the member's work lap in progress, so their totals can move as it runs: `ms` is how far
+  it had run at `server_time`, its paused time not counted, as section 7 counts a lap; `today` and
+  `week` say whether it began on the member's current local day and in their current week, as
+  the same offset reads them. A screen adds `ms` to `today_ms` when `today` and to `week_ms` (and
+  the room's week) when `week`, plus the time since `server_time` while `paused` is false. `run`
+  is `null` when the phase is not `work`, when the run's bell has gone (its row is coming), and
+  when the member is `away`. A device that does not know `run` ignores it and shows the rows alone.
+  The member who is `you` is counted from the device's own timer instead, which knows it exactly.
 - `last` is the member's most recent work session that rang today: its run id, when it ended, and
   the ids of the members who cheered it. `null` when there is none. A cheer belongs to two people
   and a lap, not to a room: it shows in every room the two share. Only a lap that rang can be
