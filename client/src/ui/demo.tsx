@@ -358,7 +358,7 @@ const LAN = 'http://192.168.1.20:8787';
 const asked = (typed: string) => [`fill:server=${typed}`, 'submit:server'];
 const owner: Scene = { ...idleAt2, about: '', settings: true, day: day(), role: 'owner' };
 const SERVER: Record<string, Scene> = {
-  welcome: { about: 'The phone app, first opened: what heirloom is, and the way to a server', welcome: true },
+  welcome: { about: 'The phone app, first opened: seven weeks drawn, why it asks for a server, and the way to one', welcome: true },
   'welcome-server': { about: 'From the welcome to the server step, which has the way back', welcome: true, tap: 'Connect to a server' },
   'signin-wrong': { about: 'A wrong password: the error on its own line above the buttons, the intro untouched', signedOut: true, tap: ['fill:username=sachi', 'fill:password=credentials', 'submit:username'] },
   'join-wrong': { about: 'Joining with an invite the server does not know: the error above the buttons, every hint still there', signedOut: true, tap: ['I have an invite', 'fill:invite=k3J9xQ7mPa2f8Lw0', 'fill:username=sachi', 'fill:password=invite', 'submit:username'] },

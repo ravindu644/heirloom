@@ -1,61 +1,36 @@
-/* The phone app's first screen: what it says at the top, what to do next at the bottom, the
-   free space between them. */
-.welcome { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto; gap: var(--space-lg); min-height: 100%; }
-.first, .about { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
-/* The app's one loud line. Each sentence starts a line of its own; the second may wrap, and is balanced when it does. */
-.first h1 { margin-bottom: var(--space-sm); font: var(--type-headline-lg); }
+/* The phone app's first screen: the drawing at the top, under the header line every screen
+   starts with; the free space; then the title, its sentence and the button together at the foot,
+   in reach of a thumb, clear of the gesture bar. */
+.welcome { display: flex; flex-direction: column; gap: var(--space-lg); min-height: 100%; padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom)); }
+/* The drawing keeps its 48px squares where the column has room for them, and shrinks whole where it has not. */
+.days { display: block; flex: none; max-width: 100%; height: auto; fill: none; }
+.h0 { fill: var(--raised); }
+.h1 { fill: var(--heat-1); }
+.h2 { fill: var(--heat-2); }
+.h3 { fill: var(--heat-3); }
+.h4 { fill: var(--you); }
+.rest { fill: none; stroke: var(--rest); stroke-width: var(--layout-stroke); }
+.today { fill: none; stroke: var(--ink); stroke-width: var(--layout-hair); }
+
+.words { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+.welcome .words { margin-top: auto; }
+.words p { color: var(--muted); text-wrap: pretty; }
+.welcome h1 { font: var(--type-headline-lg); letter-spacing: var(--tracking-headline-lg); text-wrap: balance; }
+.go { display: grid; grid-template-columns: minmax(0, 1fr); }
+
+/* Beside the sign-in form, or under it: the drawing, then the title and its sentence, the
+   title a step under the page's own heading. */
+.about { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 .about h2 { font: var(--type-title); }
-.first h1 span, .about h2 span { display: block; text-wrap: balance; }
-.first p, .about p { text-wrap: pretty; }
-.where { color: var(--muted); text-wrap: pretty; }
-/* The key is the race's caption: one line, or two where it must break, each mark with its words
-   and no entry broken in two. The marks are as tall as the letters, so it reads as a line of
-   words and not as a second drawing. It stands close under the race it explains. */
-.race { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-.key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); padding: 0; list-style: none; font: var(--type-label); color: var(--muted); }
-.key li { display: flex; align-items: center; gap: var(--space-sm); white-space: nowrap; }
-.mark { display: flex; align-items: center; }
-/* A mark keeps to its words here, whatever it does in a row of its own screen. */
-.mark > :first-child { margin: 0; }
 
-/* Two small drawings side by side, their tops on one edge, each with its line close under it:
-   the room is taller than the week, and a caption held down to the other's line would stand far
-   from the drawing it names. They are a block of their own, a block's gap under the race. */
-.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); padding-top: var(--space-sm); }
-/* The left column holds two, a block's gap apart. The pair stands at the foot of a box two of
-   the captions' lines tall, on its caption as the week stands on its own: that is what the
-   left column lacked of the right, so the two end on one line. */
-.stack { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
-/* A task's squares with its count, on the column's edge whatever the pair does in a row. */
-.task { display: grid; align-items: end; justify-items: start; min-height: 2lh; font: var(--type-label); }
-.task > :first-child { margin: 0; }
-.pair figure { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); margin: 0; }
-.pair figcaption { font: var(--type-label); color: var(--muted); text-wrap: pretty; }
-/* A room, small: each friend's circle and name, and at the line's end the time left on their lap
-   in the figure face, or the word for a break in the break's colour, as the Room sets them. */
-.room { display: grid; gap: var(--space-xs); }
-.room > span { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-width: 0; }
-.left { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); color: var(--muted); white-space: nowrap; }
-.left b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); color: var(--ink); }
-.room em { font: var(--type-label); color: var(--rest); white-space: nowrap; }
-/* The last line and its button keep the foot of the screen on a phone of any height, as Focus's
-   action row does: on a short one the drawings scroll behind them. */
-.go { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); padding-bottom: var(--space-lg); background: var(--ground); }
-
-/* A phone at twice its type size: the loud line a size down, so no sentence of it runs to four lines. */
+/* A phone at twice its type size: the title a size down, so it never runs to four lines. */
 @media (max-width: 280px) {
-  /* Twice the type on half the screen: a foot that stayed would be a third of it. It goes with the page, as Focus's actions do here. */
-  .go { position: static; }
-  .first h1 { font: var(--type-title); }
-  /* The two drawings one under the other, each with its own line. */
-  .pair { grid-template-columns: minmax(0, 1fr); }
-  /* With no column beside it to end level with, the task's box is as tall as its pair's line. */
-  .task { min-height: 1lh; }
-  .key li { white-space: normal; }
+  .welcome h1 { font: var(--type-title); letter-spacing: normal; }
 }
 
 @media (min-width: 720px) {
-  /* Beside a sidebar nothing is pinned to the foot: the button follows its sentence. */
-  .welcome { grid-template-rows: auto auto; align-content: start; max-width: 52ch; min-height: 0; }
-  .go { position: static; justify-items: start; }
+  /* Beside a sidebar nothing is pinned to the foot: the words follow the drawing, the button its sentence. */
+  .welcome { max-width: 52ch; min-height: 0; padding-bottom: var(--space-lg); }
+  .welcome .words { margin-top: 0; }
+  .go { justify-items: start; }
 }

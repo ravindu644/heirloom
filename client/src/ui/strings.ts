@@ -232,31 +232,11 @@ export const savedAsYouGo = 'Changes are saved as you make them.';
 // What heirloom is, for someone who has never seen it: the phone app's first screen, and beside
 // the sign-in form in a browser. Sentences, in the order a day meets them.
 export const welcome = {
-  title: 'Work in laps. Race the you of last week.',
-  // What it does, once, briefly. The drawing under it does the rest.
-  what: 'A timer, a task list and a habit tracker that remember your last week, so there is always someone to beat.',
+  // The user's choice, word for word: one idea, and why the next step asks for a server.
+  title: 'Your days stay yours.',
+  what: 'Laps, tasks and habits live on a server that you or a friend runs, and nowhere else. It is free.',
   // The drawing, for someone who cannot see it.
-  drawn: 'A day drawn as a race in two lanes. Yours: six laps with a break after each, the sixth still running. Under it, you a week ago: five laps. You are a lap ahead.',
-  you: 'You',
-  before: 'Last week',
-  ahead: '+25m',
-  // The key to the race, on a line under it: only what the race draws. Two to five words each.
-  key: {
-    lap: 'a lap of focus',
-    rest: 'a break',
-    ghost: 'you, a week ago',
-  },
-  // Two small drawings under the race, each with one line. A habit's week: five days kept, two of rest.
-  week: 'Habits, with rest days that break nothing.',
-  weekDrawn: 'One habit over a week: five days kept and two rest days.',
-  // A task as its row counts it.
-  tasks: 'Tasks, planned in laps.',
-  tasksDrawn: 'One task: two laps done of three planned.',
-  // A room: three friends as the Room shows them, two on a lap and one on a break.
-  room: 'Rooms, where friends work beside you.',
-  roomDrawn: 'A room of three friends: two on a lap with the time left, one on a break.',
-  friends: ['Ishara', 'Nimal', 'Tharu'],
-  where: 'It is free. Everything you do is kept on a server that you or a friend runs, and nowhere else.',
+  drawn: 'Seven weeks of days as squares, darker the more laps a day had, with the rest days marked. They grow darker toward today, the last square.',
   go: 'Connect to a server',
 };
 
