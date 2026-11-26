@@ -258,13 +258,26 @@ On the third build the user found no glitches; four things about how it reads an
 
 ## 16. A way back in
 
-- [ ] [lead] PRODUCT row and protocol: whoever owns the server gives a member a link that sets a
+- [x] [lead] PRODUCT row and protocol: whoever owns the server gives a member a link that sets a
       new password; the owner's own way back is a command on the server
-- [ ] [server] [core] [ui] The reset link, made in the Admins panel and from `heirloomd`
-- [ ] [qa] A reset on two devices; an old token after it
+- [x] [server] [core] [ui] The reset link, made in the Admins panel and from `heirloomd`
+- [x] [qa] A reset on two devices; an old token after it
+- [ ] Gate: built, checked and reviewed (design, stranger, code); waiting on the user's try.
+      Never run by us on a phone: the app's sign-in line, and a reset link opened from a chat
+      on the phone's browser
+
+## 17. What the fifth hour found
+
+- [x] [lead] DESIGN.md: Focus's bar is the task's laps; nothing over it explains it; the list
+      answers a carried row before the release
+- [ ] [ui] Focus: the bar from the task's estimate and its laps, no bar without one; the line
+      over it only in a break or paused. Today: a row carried to the top is Next at once, and
+      what was Next goes down under the finger
+- [ ] [qa] The bar for a task with and without an estimate, past it, and for no task; a carry
+      to the top seen before the release
 - [ ] Gate
 
-## 17. Release 1.0
+## 18. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

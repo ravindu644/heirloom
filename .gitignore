@@ -37,3 +37,4 @@ reviews/*/device/
 design/refs/*
 !design/refs/README.md
 docs/research/pages/
+.claude/worktrees/

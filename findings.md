@@ -88,3 +88,8 @@ when it is done.
 - [15] The long clock keeps the short one's baseline, so about 98px stand between the task's title and "5:59:59" where 54 stand over "99:59".
 - [15] Device A starts a lap and is offline past its bell while B stops that lap in its first minute: B leaves no row, so the rang row A later writes for it stands, and the day gains a lap nobody ran. Closing it means A taking its bell back when it learns the timer was left before it.
 - [15] Upcoming rows dated by an earlier build keep keys that were never by day, so after the update they may stand out of date order until moved once; only rows dated from now on are placed by their day.
+- [16] Invites' and Admins' refusals sit under the button they answer, and Invites' are muted status notes; DESIGN.md says an error stands directly above the buttons. Either the rule names the people panels or they change.
+- [16] An owner whose server was set up from the phone app with no terminal has no way back from a forgotten password: `heirloomd -reset` needs a shell on the server.
+- [16] A reset link reloaded in a phone browser after the page read it is gone from the address bar; the person lands on Sign in with no word that tapping the link again still works.
+- [16] The reset list asked for as Settings opens can land after a link made meanwhile and drop its row until Settings is opened again (`client/src/sync/resets.ts` refresh vs put); invites may share it.
+- [16] `first-hour.spec.ts:624` (Escape or Close on a habit's sheet) failed once in a full run (the sheet did not open after Enter) and passed 3 of 3 alone: a flake to watch.

@@ -254,3 +254,25 @@ For the lead:
   check of a six hour lap found the midnight bug and a repeating task that could end silently;
   ask every lane "what bends at the new extreme?" in the brief.
 
+
+## 12. Lessons from a way back in (password reset)
+
+| What went wrong | The rule |
+|---|---|
+| A reset link opened while signed in turned the address into `#/focus`, and Focus and the mark then did nothing | A page read from the address moves the address to one that is no destination (`#/reset`), so every link the person can follow changes it and is heard |
+| The reset page counted a password's characters one way and the server another | A check the screen makes first counts exactly as the server does, both ends, and each end has its own sentence |
+| The just-made link was hidden from the list under it, so it could not be taken back | Anything just made is in the list with its way back at once; showing it twice beats a gap in what can be undone |
+| The friend was never told their other devices were signed out, nor where the phone app came in | Who is affected and what comes next are said to the one it happens to, not only to whoever caused it |
+| A pasted reset link in the invite field said "There is no invite in that" | A field that refuses a thing of the app's own kind names it and where it goes |
+
+For the lead:
+
+- **A test that mixes a fixed clock with the real one breaks by the calendar.** The invite test
+  passed for a day and then failed on `main`: a command run inside it read `time.Now`. A
+  command a test runs takes the test's clock.
+- **"The server dropped it" must reach whatever remembers it was sent.** Push kept a note of the
+  subscription it last sent; a reset deleted the row with the token, and a device signed in
+  again never sent it. Unit tests passed; only QA's browser test of the whole path found it,
+  twice, because the first fix covered sign-out and the reset never signs out.
+- **Lanes stopped by a quota keep their work on disk.** Look at the diff before re-briefing:
+  the server half was done and only needed a security read.

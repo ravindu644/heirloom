@@ -400,10 +400,12 @@ Lanes and bars are square ended: a track has no rounded corners. Rows and button
 
 Built once in `client/src/ui/kit/` and reused.
 
-- **Lap bar:** four segments, 8px tall (`lane`), 4px gaps. A lap that rang is filled in you; one
-  that was stopped is filled as far as it ran and stays that way, so the bar never says more than
-  was done; the current lap is filled to its elapsed share, the long break after lap four named in words beside it. In the
-  set-of-four moment it stands 24px tall (`lane-set`): that is what makes a set bigger than a lap.
+- **Lap bar:** one segment for each lap of a task's estimate, 8px tall (`lane`), 4px gaps. A lap
+  that rang is filled in you; one that was stopped is filled as far as it ran and stays that way,
+  so the bar never says more than was done; the current lap is filled to its elapsed share. Past
+  the estimate a segment is added for each lap. When the lap just done is the task's last
+  estimated one, the bar stands 24px tall (`lane-set`): the task's laps are all in. Today draws
+  the same bar for the day's target.
 - **Focus's buttons** keep the foot of the screen in every state, and the one quiet line over them
   holds what is lesser: "Undo", "5 more minutes", and after a bell or in a break "Done for now"
   at its right end. The buttons never move because a lap rang.
@@ -453,7 +455,12 @@ Built once in `client/src/ui/kit/` and reused.
   is not carried down into Upcoming, since that would need a day, which is given in the task:
   let go there it returns, and the bar says why ("To plan it for another day, set its day in
   the task."). The bar after a carry up names what was replaced: "Now due today. It was
-  tomorrow." Upcoming reads by day until a hand moves a row.
+  tomorrow." Upcoming reads by day until a hand moves a row. **The list answers before the
+  release:** the moment a lifted row is over the top place it wears the Next card's outline
+  (and its Start), and what was Next glides down to the head of Later today as an ordinary row,
+  the "Later today" heading moving with it; moved away again, both go back. Letting go then
+  changes nothing on screen but the shadow. Nothing overlaps a card while a row is carried:
+  the place it would land is always open under it.
   A row with nowhere to go does not lift: the only open task stays where it is. (Upcoming
   could not be put in order at all, and the one task under Next lifted to go nowhere.)
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
@@ -590,6 +597,16 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
+- **A way back in** is the owner's to give, in Settings beside Admins: a username, one button
+  ("Make a reset link"), and the link shown once in the same block an invite's new link has,
+  with Copy, and it stays after a copy: it can never be shown again. Under it the open ones by
+  name and when they run out, each with "Take back". The sentence
+  over the field says what the link does and for how long ("It sets a new password, once, and
+  works for 24 hours."), and that it signs that person's devices out. The page the link opens
+  names whose password it is and has one field and one button; a link that no longer works
+  says so and who to ask. The sign-in screen says, in one muted line, where a forgotten
+  password leads: to whoever runs the server. Nothing asks for an email, and nothing says
+  "recover".
 - **The welcome:** what heirloom is, for someone who has never seen it, shown and not
   explained. The mark and name, the headline, one sentence of what it does, then **one
   drawing**: a day as a race, two lanes on one scale. Yours is made of laps as filled blocks
@@ -828,15 +845,18 @@ Each is a rule for every screen, not for the one where it was seen.
   is the timer's own bookkeeping: nobody chose the four, and drawn as a bar on Focus it was
   asked about three times ("why does it stay at 4", "why are there four hard coded lines, can I
   clear them", "why a long break line"), with a noun and without. So the set is on no screen
-  and in no notification. Focus's bar is the day's target, the same bar Today has, with "Lap 3
-  of 5 today" and its state (", next", ", focus", ", paused", ", done"); past the target it says
-  "Lap 6 today, 5 planned"; with no target there is no bar, only "Lap 3 today". What the set
-  decides is said where it matters and in its own terms: at the line's right end, "5 min break
-  after" or "15 min long break after", and in a break "lap 4 today next". The one place the
-  rule is said is where the long break is earned, and it is said as a rule: "Four laps. The
-  long break is earned!" (not "in a row": the four may be hours apart). A bell says "Lap done."
-  and the break it has earned; a room's row says "Focusing" and the time left. Past the target
-  the line says "Lap 6 today, past your target of 5": "planned" is Today's word for estimates.
+  and in no notification. **Focus's bar is the task's laps**, its estimate and how many are done:
+  "Learn C basics" with five estimated has five segments. A lap for nothing in particular, or on
+  a task with no estimate, has no bar. The day's target is Today's alone. Nothing over the bar
+  explains it: no "Lap 3 of 5 today", no ", next", no "5 min break after" (the user's fifth hour:
+  "they over explain something, a common AI trap"). The line over the bar says only what the
+  digits cannot: in a break its name ("Short break", "Long break"), and "Paused" or "Break over"
+  when it is so; otherwise it is empty and keeps its height, so the digits never move. The break
+  a lap earns is said where it is taken, on the button ("Start 5 min break"). The one place the
+  rule of four is said is where the long break is earned: "Four laps. The long break is
+  earned!" (not "in a row": the four may be hours apart). A bell says "Lap done." and the break
+  it has earned; a room's row says "Focusing" and the time left. Today's figures say "past your
+  target of 5" where the day goes over it: "planned" is Today's word for estimates.
   A lap begun before midnight is "A lap from yesterday" in every state it can be in, running,
   rung or stopped; it is never "Lap 0", and nothing promises it will add to today.
 - **A count says of what.** "3 of 5 laps today" is the day's target; "1 of 2" on a row is the
