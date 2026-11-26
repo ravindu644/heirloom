@@ -438,6 +438,8 @@ test('the browser\'s signed-out screen carries the welcome: beside the form at 1
     // The form is the way in here: the phone app's button is not.
     await expect(a.page.getByRole('button', { name: about.go })).toHaveCount(0);
     await expect(welcome.getByRole('button')).toHaveCount(0);
+    // The screen's arrival (it rises into place) must be over, or the form is read a pixel low.
+    await settle(a.page);
     const [w, f] = [(await welcome.boundingBox())!, (await a.page.locator('form').boundingBox())!];
     if (place === 'beside') {
       expect(w.x + w.width <= f.x || f.x + f.width <= w.x, 'the welcome is not beside the form').toBe(true);

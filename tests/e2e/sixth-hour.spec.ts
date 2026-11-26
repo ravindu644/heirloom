@@ -39,6 +39,7 @@ test('a screen opened from the bottom bar or the sidebar opens at its top, where
     await a.page.setViewportSize(size);
     for (const to of ['Today', 'Habits'] as const) {
       await go(a.page, 'Progress');
+      await expect(a.page.getByText(/^Progress, week of /)).toBeVisible();
       await settle(a.page);
       await a.page.locator('main').evaluate((main) => main.scrollTo(0, main.scrollHeight));
       await a.page.mouse.wheel(0, 4000);
@@ -96,7 +97,7 @@ test('with a lap running past its first minute, the own lane in a room says the 
   await go(a.page, 'Room');
   await a.page.getByLabel('Its name').fill('one room');
   await button(a.page, 'Make the room').click();
-  const own = a.page.getByRole('region', { name: 'Who is focusing now' }).locator('article').filter({ hasText: 'You' }).first();
+  const own = a.page.getByRole('region', { name: 'Who is focusing now' }).locator('article').filter({ has: a.page.locator('p b').getByText('You', { exact: true }) });
   await expect(own).toBeVisible({ timeout: 3000 });
   await go(a.page, 'Focus');
   await startButton(a.page).click();
@@ -110,15 +111,16 @@ test('with a lap running past its first minute, the own lane in a room says the 
     const roomNow = async (): Promise<[string, string]> => {
       await go(a.page, 'Room');
       const text = (await own.innerText()).replace(/\s+/g, ' ');
-      const m = text.match(/((?:\d+h )?\d+m) today in \d+ laps?, ((?:\d+h )?\d+m) this week\./) ?? text.match(/Nothing today yet, ((?:\d+h )?\d+m) this week\./);
+      const m = text.match(/((?:\d+h )?\d+m) today, ((?:\d+h )?\d+m) this week\./) ?? text.match(/Nothing today yet, ((?:\d+h )?\d+m) this week\./);
       return m ? (m.length === 3 ? [m[1]!, m[2]!] : ['0m', m[1]!]) : [`none in "${text}"`, ''];
     };
     const room = await roomNow();
     await go(a.page, 'Today');
     const today = minutes(await a.page.locator('main dl > div').filter({ hasText: 'Focused' }).innerText());
     await go(a.page, 'Progress');
+    await expect(a.page.getByText(/^Progress, week of /)).toBeVisible();
     // The week's chart says it in its label: "This week 27m so far."
-    const week = minutes(((await a.page.getByRole('img', { name: /^This week .* so far\./ }).first().getAttribute('aria-label')) ?? '').replace(/^This week /, ''));
+    const week = minutes(((await a.page.getByRole('img', { name: /^This week .* so far\./ }).filter({ visible: true }).first().getAttribute('aria-label')) ?? '').replace(/^This week /, ''));
     const again = await roomNow();
     if (room.join() === again.join()) read = { room, today, week, again };
   }
@@ -191,15 +193,19 @@ test('a friend\'s lane counts their lap in progress: B\'s lane on A says what B\
   await button(b.page, 'Join').click();
   const lanes = a.page.getByRole('region', { name: 'Who is focusing now' }).locator('article');
   await expect(lanes).toHaveCount(2, { timeout: 5000 });
-  const laneB = lanes.filter({ has: a.page.getByText(new RegExp(`^.${nameB}$`)) });
+  const laneB = lanes.filter({ has: a.page.locator('p b').getByText(nameB, { exact: true }) });
 
   /** B's lane as A sees it, and the room's week, from A's Room. */
   const onA = async () => {
     await go(a.page, 'Room');
+    await a.page.getByRole('tab', { name: 'People' }).click();
     const text = (await laneB.innerText()).replace(/\s+/g, ' ');
-    const m = text.match(/((?:\d+h )?\d+m) today in \d+ laps?, ((?:\d+h )?\d+m) this week\./);
+    const m = text.match(/((?:\d+h )?\d+m) today, ((?:\d+h )?\d+m) this week\./);
     if (!m) throw new Error(`B's lane on A says "${text}"`);
-    const together = minutes((await a.page.getByText(/together this week\.$/).first().innerText()));
+    // The room's week is on the Week tab: "1h 22m together this week".
+    await a.page.getByRole('tab', { name: 'Week' }).click();
+    const together = minutes(await a.page.getByRole('tabpanel').locator('p').filter({ hasText: /together this week$/ }).first().innerText());
+    await a.page.getByRole('tab', { name: 'People' }).click();
     return { today: m[1]!, week: m[2]!, together };
   };
 
@@ -215,7 +221,8 @@ test('a friend\'s lane counts their lap in progress: B\'s lane on A says what B\
     await go(b.page, 'Today');
     const today = minutes(await b.page.locator('main dl > div').filter({ hasText: 'Focused' }).innerText());
     await go(b.page, 'Progress');
-    const week = minutes(((await b.page.getByRole('img', { name: /^This week .* so far\./ }).first().getAttribute('aria-label')) ?? '').replace(/^This week /, ''));
+    await expect(b.page.getByText(/^Progress, week of /)).toBeVisible();
+    const week = minutes(((await b.page.getByRole('img', { name: /^This week .* so far\./ }).filter({ visible: true }).first().getAttribute('aria-label')) ?? '').replace(/^This week /, ''));
     const again = await onA();
     if (JSON.stringify(first) === JSON.stringify(again)) read = { lane: first, today, week };
   }

@@ -142,11 +142,13 @@ test('totals: laps rung by each show in the others\' view and the room\'s week i
     [b.id, { today_ms: 6000, today_laps: 2, week_ms: 6000 }],
     [c.id, { today_ms: lap, today_laps: 1, week_ms: cWeek }],
   ]);
-  const totals = (p: Person) => roomOf(p, room)?.members.map((m) => [m.id, { today_ms: m.today_ms, today_laps: m.today_laps, week_ms: m.week_ms }]);
+  // By member id: the members come in the live order, which is not what this is about.
+  const byId = <T>(list: [string, T][]) => list.sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+  const totals = (p: Person) => byId(roomOf(p, room)?.members.map((m) => [m.id, { today_ms: m.today_ms, today_laps: m.today_laps, week_ms: m.week_ms }] as [string, object]) ?? []);
   await until(
-    () => [a, b, c].every((p) => JSON.stringify(totals(p)) === JSON.stringify([...expected])),
+    () => [a, b, c].every((p) => JSON.stringify(totals(p)) === JSON.stringify(byId([...expected]))),
     5000,
-    () => `totals never matched:\n  expected ${JSON.stringify([...expected])}\n${[a, b, c].map((p) => `  ${p.name} saw ${JSON.stringify(totals(p))}`).join('\n')}`,
+    () => `totals never matched:\n  expected ${JSON.stringify(byId([...expected]))}\n${[a, b, c].map((p) => `  ${p.name} saw ${JSON.stringify(totals(p))}`).join('\n')}`,
   );
   for (const p of [a, b, c]) assert.equal(roomOf(p, room)?.week_ms, 3000 + 6000 + cWeek);
   close(a, b, c);

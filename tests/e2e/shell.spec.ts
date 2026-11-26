@@ -40,14 +40,15 @@ test('sign out offline with unsent work is refused in the words, and the person 
   await expect(statusLine(a.page)).toHaveText('No connection. 1 change is safe on this laptop.');
   await person(a.page, name).click();
   await a.page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(a.page.getByRole('alert')).toHaveText('Needs a connection. 1 change is only on this laptop, so you stay signed in until it is sent.');
+  // Settings holds more than one alert region (the picture has its own, empty until it has something to say): the one that speaks.
+  await expect(a.page.getByRole('alert').filter({ hasText: /\S/ })).toHaveText('Needs a connection. 1 change is only on this laptop, so you stay signed in until it is sent.');
   await expect(person(a.page, name)).toBeVisible();
   await expect(a.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 
   // Back online the change goes, the refusal is no longer true, and signing out works.
   await a.setOffline(false);
   await expect(statusLine(a.page)).toHaveText('', { timeout: 5000 });
-  await expect(a.page.getByRole('alert')).toHaveCount(0);
+  await expect(a.page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
   await a.page.getByRole('button', { name: 'Sign out' }).click();
   await expect(a.page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });

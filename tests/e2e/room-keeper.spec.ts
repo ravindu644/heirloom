@@ -71,7 +71,7 @@ test('only the keeper changes a room: B reads the name, target and ranking as wo
   const code = (await sheetA.getByRole('region', { name: 'The code to share' }).locator('p').first().innerText()).replace(/\s/g, '');
   await closeSheet(a.page);
   await join(b, code);
-  await expect(b.page.getByText('Room: study hall')).toBeVisible();
+  await expect(b.page.getByText(/^study hall, kept by /)).toBeVisible();
 
   // B's sheet: words, not controls.
   await readOnly(b.page, nameA, 'study hall', 'No target');
@@ -89,8 +89,8 @@ test('only the keeper changes a room: B reads the name, target and ranking as wo
   }
   for (const d of [a, b]) {
     await go(d.page, 'Room');
-    await expect(d.page.getByText('Room: study hall')).toBeVisible();
-    await expect(d.page.getByText('Room: mine now')).toHaveCount(0);
+    await expect(d.page.getByText(/^study hall, kept by /)).toBeVisible();
+    await expect(d.page.getByText(/^mine now, kept by /)).toHaveCount(0);
   }
 
   // A renames it and sets a target of 2 hours: both see it.
@@ -103,15 +103,17 @@ test('only the keeper changes a room: B reads the name, target and ranking as wo
   await closeSheet(a.page);
   for (const d of [a, b]) {
     await go(d.page, 'Room');
-    await expect(d.page.getByText('Room: reading room')).toBeVisible({ timeout: 3000 });
-    await expect(d.page.getByText(/ of 2h(?: 0m)? together this week\.$/)).toBeVisible({ timeout: 3000 });
+    await expect(d.page.getByText(/^reading room, kept by /)).toBeVisible({ timeout: 3000 });
+    await d.page.getByRole('tab', { name: 'Week' }).click();
+    await expect(d.page.getByRole('tabpanel')).toContainText(/of 2h(?: 0m)? together this week/, { timeout: 3000 });
+    await d.page.getByRole('tab', { name: 'People' }).click();
   }
   await readOnly(b.page, nameA, 'reading room', '2 hours a week together');
   await closeSheet(b.page);
 
   // C joins after B; then A leaves. B joined next after A, so B keeps the room.
   await join(c, code);
-  await expect(c.page.getByText('Room: reading room')).toBeVisible();
+  await expect(c.page.getByText(/^reading room, kept by /)).toBeVisible();
   const leaving = await openSheet(a.page);
   await button(leaving as never, 'Leave the room').click();
   await button(a.page, 'Leave').click();

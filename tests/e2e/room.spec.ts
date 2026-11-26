@@ -1,16 +1,17 @@
 // Rooms through the screen (protocol section 15): three accounts in three browser contexts, and a
 // fourth outside. The roadmap's box: presence within 1 s, totals right, privacy holds.
 import type { Page } from '@playwright/test';
+import { signedIn, until } from '../sync/harness.ts';
 import { accountWith, digits, go, ready, signIn, startButton, startNow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
+import { e2eServer } from './server.ts';
 
 type Lengths = Parameters<typeof accountWith>[1];
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
-// Someone's lane on a screen: their name, or "You" on their own.
-// The person chip draws the initial in the same span as the name: "Rra_x1" is ra_x1, "YYou" is you.
+// Someone's lane on a screen: their name, or "You" on their own, the first bold word of the row after its circle.
 const lane = (page: Page, who: string) =>
-  page.getByRole('region', { name: 'Who is focusing now' }).locator('article').filter({ has: page.getByText(new RegExp(`^.${who}$`)) });
+  page.getByRole('region', { name: 'Who is focusing now' }).locator('article').filter({ has: page.locator('p b').getByText(who, { exact: true }) });
 
 async function person(d: Device, tag: string, lengths: Lengths = {}) {
   const name = username(tag);
@@ -38,7 +39,7 @@ async function trio(a: Device, b: Device, c: Device, lengths: Lengths = {}) {
     // Read out over the phone: in small letters, with the space in the middle.
     await d.page.getByLabel('The code a friend gave you').fill(`${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`);
     await button(d.page, 'Join').click();
-    await expect(d.page.getByText('Room: study hall')).toBeVisible();
+    await expect(d.page.getByText(/^study hall, kept by /)).toBeVisible();
   }
   for (const d of [a, b, c]) await expect(d.page.getByRole('region', { name: 'Who is focusing now' }).locator('article')).toHaveCount(3);
   return { names, code };
@@ -57,7 +58,7 @@ test('presence: a lap on A shows on B and C within a second with the same time l
   // Time left on the lane, against A's own digits: within a second.
   const seconds = (text: string) => Number(text.split(':')[0]) * 60 + Number(text.split(':')[1]);
   for (const d of [b, c]) {
-    const theirs = seconds(await lane(d.page, nameA!).locator('b').first().innerText());
+    const theirs = seconds(await lane(d.page, nameA!).locator('b[aria-label$=" left"]').first().innerText());
     const mine = seconds((await digits(a.page).innerText()));
     expect(Math.abs(theirs - mine), `${theirs} s on the lane, ${mine} s on A`).toBeLessThanOrEqual(1);
   }
@@ -92,12 +93,12 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
   const { names } = await trio(a, b, c, { work_ms: 3000, short_ms: 60000 });
   const [nameA, nameB, nameC] = names as [string, string, string];
   // The lanes top to bottom, as the names they show ("You" on one's own). Joined order, before any ranking.
-  // Each lane's name, from its person chip: the span that starts with the initial.
+  // Each lane's name: the first bold word of its row.
   const order = (page: Page) =>
     page
       .getByRole('region', { name: 'Who is focusing now' })
       .locator('article')
-      .evaluateAll((els) => els.map((el) => [...el.querySelectorAll('span')].find((span) => span.firstElementChild?.tagName === 'I')?.textContent?.slice(1) ?? ''));
+      .evaluateAll((els) => els.map((el) => el.querySelector('p b')?.textContent ?? ''));
   await expect.poll(() => order(b.page)).toEqual([nameA, 'You', nameC]);
 
   // A runs one lap, B two.
@@ -110,8 +111,11 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
   await expect(startNow(b.page)).toBeVisible({ timeout: 8000 });
   await expect(startNow(a.page)).toBeVisible();
   await go(b.page, 'Room');
-  await expect(lane(c.page, nameA)).toContainText('0m today in 1 lap, 0m this week.', { timeout: 3000 });
-  await expect(lane(c.page, nameB)).toContainText('0m today in 2 laps, 0m this week.');
+  // Laps of 3 s: no minute yet in the figures, so the laps are counted by the blocks in each lane.
+  // At a laptop's width the two figures are lines of their own: "Nothing today yet", "0m this week".
+  for (const who of [nameA, nameB]) await expect(lane(c.page, who)).toContainText(/Nothing today yet,? ?0m this week/, { timeout: 3000 });
+  await expect(lane(c.page, nameA).locator('[class*="_lap_"]')).toHaveCount(1);
+  await expect(lane(c.page, nameB).locator('[class*="_lap_"]')).toHaveCount(2);
 
   // B cheers A: shown at once, once.
   const cheer = lane(b.page, nameA).getByRole('button', { name: /^Cheer / });
@@ -167,7 +171,15 @@ test('privacy: the task title only while A shares it, gone at once when A stops;
   await go(c.page, 'Focus');
   await startButton(c.page).click();
   await expect(startNow(c.page)).toBeVisible({ timeout: 8000 });
-  await expect(lane(b.page, nameC)).toContainText('in 1 lap', { timeout: 3000 });
+  // C's lap counts: the room message B's account hears says so (a 3 s lap shows no minute on a screen).
+  const heardB = await signedIn(e2eServer(), names[1]!);
+  try {
+    const seen: { members?: { name: string; today_laps?: number }[] }[] = [];
+    heardB.engine.onRoom((msg) => void seen.push(msg as never));
+    await until(() => seen.some((msg) => msg.members?.find((m) => m.name === nameC)?.today_laps === 1), 5000, 'C\'s lap did not count');
+  } finally {
+    await heardB.engine.stop();
+  }
   await expect(lane(b.page, nameC)).toContainText('Away');
   await expect(lane(b.page, nameC).getByRole('button', { name: /Cheer/ })).toHaveCount(0);
 });
@@ -180,17 +192,19 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await button(sheet as never, 'Rename').click();
   // The target: plus nudges it, a whole number is typed, anything else is put back.
   const target = sheet.getByRole('spinbutton', { name: 'Together in a week' });
+  // The room's week and its target are on the Week tab.
+  await b.page.getByRole('tab', { name: 'Week' }).click();
   await sheet.getByRole('button', { name: 'One hour more', exact: true }).click();
   await expect(target).toHaveValue('1');
-  await expect(b.page.getByText('0m of 1h together this week.')).toBeVisible({ timeout: 2000 });
+  await expect(b.page.getByText('0m of 1h together this week')).toBeVisible({ timeout: 2000 });
   await target.fill('20');
   await target.press('Enter');
-  await expect(b.page.getByText('0m of 20h together this week.')).toBeVisible({ timeout: 2000 });
+  await expect(b.page.getByText('0m of 20h together this week')).toBeVisible({ timeout: 2000 });
   // A fraction is put back; past either end a figure comes to the nearest one it can be (DESIGN.md).
   await target.fill('2.5');
   await target.press('Enter');
   await expect(target, '"2.5" was kept').toHaveValue('20');
-  for (const [typed, kept, said] of [['201', '200', '0m of 200h together this week.'], ['-1', '0', '0m together this week.'], ['20', '20', '0m of 20h together this week.']] as const) {
+  for (const [typed, kept, said] of [['201', '200', '0m of 200h together this week'], ['-1', '0', '0m together this week'], ['20', '20', '0m of 20h together this week']] as const) {
     await target.fill(typed);
     await target.press('Enter');
     await expect(target, `"${typed}" typed`).toHaveValue(kept);
@@ -200,11 +214,11 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await target.fill('');
   await target.press('Enter');
   await b.page.waitForTimeout(1000);
-  await expect(b.page.getByText('0m of 20h together this week.'), 'an emptied field set the room\'s target to none').toBeVisible();
+  await expect(b.page.getByText('0m of 20h together this week'), 'an emptied field set the room\'s target to none').toBeVisible();
   await expect(target).toHaveValue('20');
   await button(sheet as never, 'Close').click();
-  await expect(b.page.getByText('Room: night owls')).toBeVisible({ timeout: 2000 });
-  await expect(b.page.getByText('0m of 20h together this week.')).toBeVisible();
+  await expect(b.page.getByText(/^night owls, kept by /)).toBeVisible({ timeout: 2000 });
+  await expect(b.page.getByText('0m of 20h together this week')).toBeVisible();
 
   // A and B on laps; then B without a connection: old news is said in the past, and only B's own time left shows.
   for (const d of [a, b]) {
@@ -215,11 +229,13 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 focusing now.', { timeout: 2000 });
   await b.setOffline(true);
   await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 were focusing when the room was last heard from.', { timeout: 3000 });
-  await expect(lane(b.page, 'You').locator('b')).toHaveCount(1);
-  await expect(lane(b.page, names[0]!).locator('b')).toHaveCount(0);
+  // The time left: a figure whose label ends "left".
+  const left = (who: string) => lane(b.page, who).locator('b[aria-label$=" left"]');
+  await expect(left('You')).toHaveCount(1);
+  await expect(left(names[0]!)).toHaveCount(0);
   await b.setOffline(false);
   await expect(b.page.getByRole('heading', { level: 1 })).toHaveText('2 of 3 focusing now.', { timeout: 5000 });
-  await expect(lane(b.page, names[0]!).locator('b')).toHaveCount(1);
+  await expect(left(names[0]!)).toHaveCount(1);
 
   // Everyone leaves; C is last, and is told leaving ends the room.
   for (const d of [a, c]) {

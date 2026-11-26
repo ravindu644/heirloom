@@ -79,7 +79,7 @@ const states: Record<string, (page: Page, name: string) => Promise<void>> = {
   'Room, one': async (page) => {
     await page.getByLabel('Its name').fill('study hall');
     await page.getByRole('button', { name: 'Make the room' }).click();
-    await expect(page.getByText('Room: study hall')).toBeVisible();
+    await expect(page.getByText(/^study hall, kept by /)).toBeVisible();
   },
   'Room, sheet': async (page) => {
     await page.getByRole('button', { name: 'Code and settings' }).click();
