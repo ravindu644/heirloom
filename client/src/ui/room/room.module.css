@@ -23,6 +23,8 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 
 .panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
 .tab { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+/* An empty part (the started-together line when no lap was) takes no row, and so no gap. */
+.tab > :empty { display: none; }
 
 /* The call: a band of its own, at the foot of a phone's screen, over the bottom bar. */
 /* The fold the call opens in: on a phone it is what sticks to the foot, under the panel. */
@@ -44,7 +46,9 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .together { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--space-md); font: var(--type-label); color: var(--muted); }
 
 /* People: a panel each, 8px apart, the hours over the first one's lane. */
-.people { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+.people { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+/* Links in a line under the last panel: another room at the left, calling a lap at the right end. */
+.links { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-md); }
 /* The hours stand where the lanes do: inside a panel's 16px, and with a sidebar in the lane's column. */
 .hoursRow { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 var(--space-md); }
 .hoursRow > span { display: none; }

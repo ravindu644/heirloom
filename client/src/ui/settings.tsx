@@ -5,7 +5,7 @@ import type { Engine } from '../sync/engine.ts';
 import type { Invites } from '../sync/invites.ts';
 import type { Resets } from '../sync/resets.ts';
 import type { Rooms } from '../sync/rooms.ts';
-import { makePicture, ownPicture, usePicture } from './picture.ts';
+import { holderOf, makePicture, ownPicture, usePicture } from './picture.ts';
 import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
@@ -112,13 +112,13 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
   const [made, setMade] = useState<{ url: string | null; over: string | null } | null>(null);
   const [pictureSaid, setPictureSaid] = useState('');
   const hash = ownPicture(rooms);
-  const shown = usePicture(rooms, hash);
+  const shown = usePicture(rooms, hash, holderOf(engine, rooms));
   useEffect(() => {
     if (made && hash !== made.over) setMade(null);
   }, [hash]);
   // A picture's URL holds its bytes until it is let go: replaced, taken off or the screen left.
   useEffect(() => () => void (made?.url && URL.revokeObjectURL(made.url)), [made]);
-  const mine = made ? (made.url ?? undefined) : shown;
+  const mine = made ? (made.url ?? undefined) : (shown ?? undefined);
   const sendPicture = async (bytes: Uint8Array | null) => {
     const result = await rooms.setPicture(bytes);
     if (!result.ok) return setPictureSaid(s.people.errors[result.error] ?? s.people.failed);
@@ -136,7 +136,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
 
   const accountPanel = (
     <Panel title={s.settings.account}>
-      <Person name={account.username} picture={mine} />
+      <Person name={account.username} picture={mine} pending={!made && shown === undefined} />
       {/* The sentence holds the server's address, which is there to be copied. */}
       <p class="copies">{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
       {/* Said once more here, under the account: a fact, not an alarm. */}

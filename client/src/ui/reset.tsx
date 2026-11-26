@@ -66,7 +66,9 @@ export function ResetPage({ resets, reset, host, onDone, onLeave }: Props) {
   // says it no longer works, folding into each other's place, so a link found dead after a round
   // trip, or on Set, closes the field in time instead of swapping the page between two frames.
   return (
-    <Shell page="form">
+    // From 720px one column on the mark's edge, its heading on the sign-in's line, 112px down.
+    <Shell page="form" bare>
+      <div class={css.lone}>
       <div class={css.form}>
         <h1>{s.reset.heading}</h1>
         <Fold gap="md">
@@ -100,6 +102,7 @@ export function ResetPage({ resets, reset, host, onDone, onLeave }: Props) {
             </form>
           )}
         </Fold>
+      </div>
       </div>
     </Shell>
   );

@@ -15,6 +15,8 @@ import form from '../kit/form.module.css';
 import links from '../kit/links.module.css';
 import { Panel } from '../kit/panel.tsx';
 import { Face, Person } from '../kit/person.tsx';
+import { holderOf } from '../picture.ts';
+import type { Holder } from '../picture.ts';
 import { useUnderSaid } from '../kit/said.tsx';
 import add from '../kit/quick-add.module.css';
 import { Tabs, tabPanel } from '../kit/tabs.tsx';
@@ -23,6 +25,7 @@ import type { Window } from '../kit/track.tsx';
 import { WeekChart } from '../kit/week.tsx';
 import { SplitChip } from '../kit/race.tsx';
 import { useSidebar } from '../kit/wide.ts';
+import { motion } from '../kit/ms.ts';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
@@ -33,8 +36,8 @@ import css from './room.module.css';
 
 const MIN = 60000;
 const HOUR = 3600000;
-// A week has 168 hours and a room 8 people; more than this together is nobody's target.
-const TARGET_MAX = 200;
+// A room is 16 people at most, and 25 hours a week each is a lot: more than this together is nobody's target.
+const TARGET_MAX = 400;
 
 const why = (result: RoomResult) => (result.ok ? '' : (s.room.errors[result.error] ?? s.room.failed));
 
@@ -88,7 +91,7 @@ function Doors({ rooms, onIn, inSheet }: { rooms: Rooms; onIn: (room?: string) =
 }
 
 /** The room's own settings: its name, what it fills in a week, its order, the code to share, and the way out. */
-function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: Rooms; pictures: Record<string, string>; onClose: () => void }) {
+function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: Rooms; pictures: (hash: string | null) => string | null | undefined; onClose: () => void }) {
   const [said, setSaid] = useState('');
   const [copied, setCopied] = useState('');
   const [leaving, setLeaving] = useState(false);
@@ -186,7 +189,7 @@ function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: 
               .filter((m) => !m.you)
               .map((m) => (
                 <li key={m.id}>
-                  <Person name={m.name} picture={pictures[m.picture ?? '']} />
+                  <Person name={m.name} picture={pictures(m.picture)} pending={pictures(m.picture) === undefined} />
                   <Twice words={s.room.remove} ask={s.room.removeAsk(m.name)} onDo={async () => setSaid(why(await rooms.remove(room.id, m.id)))} />
                 </li>
               ))}
@@ -286,15 +289,25 @@ const closeReport = () => (opened ? ((opened = false), history.back()) : locatio
 const lapsOf = (m: MemberView, now: number) => [...m.laps.map(([start, end]) => ({ start, end })), ...(m.runStart !== null ? [{ start: m.runStart, end: now }] : [])];
 
 /** Each picture of the room as a URL an `img` shows, by hash, once the core has it. */
-function usePictures(rooms: Rooms, hashes: (string | null)[]) {
-  const [urls, setUrls] = useState<Record<string, string>>({});
+function usePictures(rooms: Rooms, hashes: (string | null)[], { account, online }: Holder) {
+  // By hash: its URL, or null when the fetch answered nothing (gone): then the letters. Held for
+  // one account: another's URLs are gone with it.
+  const [held, setHeld] = useState<{ account: number; urls: Record<string, string | null> }>({ account, urls: {} });
+  const urls = held.account === account ? held.urls : {};
   const wanted = [...new Set(hashes.filter((hash): hash is string => !!hash))].sort().join(' ');
   useEffect(() => {
+    if (!online) return;
     let gone = false;
-    for (const hash of wanted ? wanted.split(' ') : []) void rooms.picture(hash).then((url) => !gone && url && setUrls((was) => (was[hash] === url ? was : { ...was, [hash]: url })));
+    for (const hash of wanted ? wanted.split(' ') : [])
+      if (!rooms.pictureNow(hash))
+        void rooms.picture(hash).then((url) => !gone && setHeld((was) => ({ account, urls: { ...(was.account === account ? was.urls : {}), [hash]: url } })));
     return () => void (gone = true);
-  }, [wanted]);
-  return urls;
+    // Asked again when the connection comes back: an answer of nothing while offline was no answer.
+  }, [wanted, account, online]);
+  // What the device keeps is there for the first paint; the rest arrives as it is fetched.
+  // Undefined: still on its way. Null: none to be had.
+  // Offline, one not kept here cannot come: the letters stand in until the connection is back.
+  return (hash: string | null): string | null | undefined => (hash ? (rooms.pictureNow(hash) ?? (hash in urls ? urls[hash] : online ? undefined : null)) : null);
 }
 
 // A lap is called for a whole minute, 1 to 30 minutes ahead (protocol section 15). The first
@@ -304,9 +317,23 @@ const callAt = (now: number, minutes: number) => Math.ceil((now + MIN) / MIN) * 
 const CALL_MAX = 29;
 
 /** Calling a lap: how many minutes from now, with the time it starts, and the call. Small, in place, closed by Not now. */
-function Caller({ rooms, room, now, onDone }: { rooms: Rooms; room: string; now: () => number; onDone: () => void }) {
+function Caller({ rooms, room, now, reveal, onDone }: { rooms: Rooms; room: string; now: () => number; reveal: { current: boolean }; onDone: () => void }) {
   const [minutes, setMinutes] = useState(5);
   const [refused, setRefused] = useState('');
+  // Opened at the foot of a page, the picker would stand behind the bottom bar: once it has
+  // opened, its buttons are brought into view, the scroll being the answer to the tap that asked.
+  // Only after that tap (not on coming back to People) and only when they are out of sight.
+  const ends = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!reveal.current) return;
+    reveal.current = false;
+    const timer = setTimeout(() => {
+      const el = ends.current;
+      const seen = el?.closest('main')?.getBoundingClientRect();
+      if (el && seen && el.getBoundingClientRect().bottom > seen.bottom) el.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }, motion(ends.current!, '--motion-fill'));
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div class={form.group}>
       <span class={css.legend}>{s.room.callWhen}</span>
@@ -319,7 +346,7 @@ function Caller({ rooms, room, now, onDone }: { rooms: Rooms; room: string; now:
         floor={minutes <= 1}
         top={minutes >= CALL_MAX}
       />
-      <div class={form.ends}>
+      <div ref={ends} class={form.ends}>
         <Button
           onClick={async () => {
             // The minute as it is at the tap, not as the screen last drew it.
@@ -363,6 +390,8 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const [sheet, setSheet] = useState<'room' | 'another' | null>(null);
   const [tab, setTab] = useState<'people' | 'notes' | 'week'>('people');
   const [calling, setCalling] = useState(false);
+  // Set by the tap that opens the picker: only that opening brings it into view.
+  const reveal = useRef(false);
   const wide = useSidebar();
   const base = useId();
   const reporting = useReport();
@@ -370,7 +399,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   // A call made anywhere answers the picker: it does not open again by itself when that call ends.
   const called = !!room?.call;
   useEffect(() => void (called && setCalling(false)), [called]);
-  const pictures = usePictures(rooms, [...(room?.members.map((m) => m.picture) ?? []), ...(room?.notes.map((note) => note.picture) ?? [])]);
+  const pictures = usePictures(rooms, [...(room?.members.map((m) => m.picture) ?? []), ...(room?.notes.map((note) => note.picture) ?? [])], holderOf(engine, rooms));
 
   // Time left, a call's count down and the hours move by themselves, once a second while
   // anybody's clock runs or a call is open, and once a minute otherwise.
@@ -431,7 +460,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const w = stretch(now, wide, room.members);
   const call = room.call;
   const together = timer.run?.startsWith('call-') && onLap && timer.started !== null ? timer.started : null;
-  const face = (name: string, picture: string | null, size?: 'sm' | 'lg' | 'xl') => <Face name={name} picture={pictures[picture ?? '']} size={size} />;
+  const face = (name: string, picture: string | null, size?: 'sm' | 'lg' | 'xl') => <Face name={name} picture={pictures(picture)} pending={pictures(picture) === undefined} size={size} />;
 
   const callStrip = call && call.at > now && (
     <Docked key={call.id} class={css.call}>
@@ -633,19 +662,13 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
       <div {...tabPanel(base, tab)} class={css.tab}>
         {tab === 'people' && (
           <>
-            {/* One fold for every way the picker closes: Not now, a call made here, or one made elsewhere. */}
+            {/* Only while a lap started together runs: nothing else stands between the tabs and the hours. */}
             <Fold>
-              {!call &&
-                (calling ? (
-                  <Caller key="caller" rooms={rooms} room={room.id} now={() => engine.now()} onDone={() => setCalling(false)} />
-                ) : (
-                  <p key="together" class={css.together}>
-                    <span>{together !== null && s.room.startedTogether(together)}</span>
-                    <Button kind="link" onClick={() => setCalling(true)}>
-                      {s.room.callTogether}
-                    </Button>
-                  </p>
-                ))}
+              {together !== null && (
+                <p key="together" class={css.together}>
+                  {s.room.startedTogether(together)}
+                </p>
+              )}
             </Fold>
             {people}
           </>
@@ -654,9 +677,33 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
         {tab === 'week' && week}
       </div>
 
-      <Button kind="link" class={css.link} onClick={() => setSheet('another')}>
-        {s.room.another}
-      </Button>
+      {/* Under the last panel: another room at the left, and on People the way to call a lap at
+          the right end. Its picker opens in place of the line, and one fold closes it whichever
+          way: Not now, a call made here, or one made elsewhere. */}
+      <Fold>
+        {calling && !call && tab === 'people' ? (
+          <Caller key="caller" rooms={rooms} room={room.id} now={() => engine.now()} reveal={reveal} onDone={() => setCalling(false)} />
+        ) : (
+          <div key="links" class={css.links}>
+            <Button kind="link" onClick={() => setSheet('another')}>
+              {s.room.another}
+            </Button>
+            {tab === 'people' && !call && (
+              // A tap that moves the page on purpose: the picker opens in its place and is brought into view.
+              <Button
+                kind="link"
+                data-moves
+                onClick={() => {
+                  reveal.current = true;
+                  setCalling(true);
+                }}
+              >
+                {s.room.callTogether}
+              </Button>
+            )}
+          </div>
+        )}
+      </Fold>
 
       <Kept>
       {sheet === 'room' && <RoomSheet room={room} rooms={rooms} pictures={pictures} onClose={() => setSheet(null)} />}

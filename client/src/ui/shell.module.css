@@ -115,3 +115,14 @@
   .person { justify-self: start; padding: 0 var(--layout-gap) var(--space-md); }
   .person > span { flex-direction: row; }
 }
+
+/* Signed out, from 720px: no sidebar, only the mark at the top left, over the screen, which has
+   the whole frame; a screen that draws its own room to the edges (`bare`) starts at the top. */
+@media (min-width: 720px) {
+  .out { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "brand" "main" "status"; }
+  .out .brand { position: relative; z-index: 1; justify-self: start; }
+  /* What a signed-out screen holds starts where the mark does. */
+  .out .main { padding-inline: var(--layout-gap); }
+  .bare .main { grid-row: 1 / 3; padding: 0; }
+  .bare .canvas { max-width: none; }
+}

@@ -129,7 +129,7 @@ export interface DemoRoom {
   /** None, one room, or two to move between. */
   rooms?: 'none' | 'one' | 'two';
   /** Who is in it: just you, the four of the mockup, or eight. */
-  members?: 'alone' | 'four' | 'eight';
+  members?: 'alone' | 'four' | 'eight' | 'sixteen';
   name?: string;
   ranked?: boolean;
   stale?: boolean;
@@ -145,8 +145,8 @@ export interface DemoRoom {
   /** Notes from others written since Notes was last open; and no notes at all. */
   newNotes?: number;
   noNotes?: boolean;
-  /** Pictures for the friends who set one; `broken`, ones that fail to load. */
-  pictures?: boolean | 'broken';
+  /** Pictures for the friends who set one; `broken`, ones that fail to load; `unfetched`, ones the server answers nothing for. */
+  pictures?: boolean | 'broken' | 'unfetched';
 }
 
 // A picture as a phone would make one, drawn from the tokens: a head and shoulders on a ground.
@@ -202,7 +202,7 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
   const lap = (n: number, ago: number, cheers: string[] = []) => ({ run: `run-${n}`, ended: at - ago * MIN, cheers, cheered: cheers.includes('me'), cheerers: cheers.map(who) });
   // Laps of 25 minutes that began this many minutes ago.
   const ran = (...ago: number[]): [number, number][] => ago.map((m) => [at - m * MIN, at - m * MIN + 25 * MIN]);
-  const pic = (id: string) => (seed.pictures ? (seed.pictures === 'broken' ? `x${id}` : `p${id}`) : null);
+  const pic = (id: string) => (seed.pictures ? `${seed.pictures === 'broken' ? 'x' : seed.pictures === 'unfetched' ? 'n' : 'p'}${id}` : null);
   const you = member('me', 'ravi', {
     you: true,
     picture: pic('me'),
@@ -240,10 +240,31 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     member('tharu', 'tharu', { today_ms: 0, today_laps: 0, week_ms: 45 * MIN }),
     four[3]!,
   ];
+  // The most a room holds: the eight, and eight more on laps, breaks and away, a few with
+  // pictures, a few with a lap that rang today and cheers on it.
+  const more = ['malsha', 'kasun_perera', 'yohan', 'dinithi', 'pasan', 'tharushi', 'ruwan.k', 'chamodi'].map((name, i) =>
+    member(`m${i}`, name, {
+      picture: i % 3 === 0 ? pic(`m${i}`) : null,
+      // Someone away shows no lane of laps, as the server sends them.
+      laps: i % 4 === 2 ? [] : ran(...[230, 190, 150, 110, 70].slice(i % 4, i % 4 + 2 + (i % 3))),
+      ...(i % 4 === 0
+        ? { phase: 'work' as const, ends_at: at + (6 + i) * MIN, runStart: at - (19 - i) * MIN }
+        : i % 4 === 1
+          ? { phase: 'short' as const, ends_at: at + (2 + i / 2) * MIN }
+          : i % 4 === 2
+            ? { away: true }
+            : {}),
+      today_ms: (2 + (i % 3)) * 25 * MIN,
+      today_laps: 2 + (i % 3),
+      week_ms: (3 + i) * HOUR,
+      last: i % 4 === 2 ? null : lap(10 + i, 20 + i, i % 2 ? ['me'] : ['sachi', 'dilan']),
+    }),
+  );
+  const sixteen = [...eight, ...more];
   // Each one's week against their own last, for their report: you a little behind, the others ahead.
   const withWeek = (m: MemberView): MemberView =>
     m.away ? m : { ...m, week: { days: [m.week_ms * 0.45, m.week_ms, null, null, null, null, null], last: [0.4, 0.95, 1.4, 1.7, 1.9, 2.1, 2.2].map((k) => k * m.week_ms * (m.you ? 1.1 : 0.85)), ahead_ms: m.you ? -30 * MIN : 85 * MIN } };
-  const members = (seed.members === 'alone' ? [{ ...you, last: lap(1, 9) }] : seed.members === 'eight' ? eight : four).map(withWeek);
+  const members = (seed.members === 'alone' ? [{ ...you, last: lap(1, 9) }] : seed.members === 'eight' ? eight : seed.members === 'sixteen' ? sixteen : four).map(withWeek);
   // The room's week, added up day by day: the demo's day is a Tuesday.
   const weekOf = (people: MemberView[]) => {
     const week = people.reduce((sum, m) => sum + m.week_ms, 0);
@@ -348,9 +369,12 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
       }),
     markNotesRead: (id) => change(id, (one) => ({ ...one, newNotes: 0 })),
     calledIn: signal([]),
+    account: signal(0),
     setPicture: () => answer('', () => ({ ok: true })),
     // A broken one is a picture the image cannot show: the initial stands in.
-    picture: async (hash) => (hash.startsWith('x') ? 'data:image/webp;base64,AAAA' : picture(hash)),
+    picture: async (hash) => (hash.startsWith('x') ? 'data:image/webp;base64,AAAA' : hash.startsWith('n') ? null : picture(hash)),
+    // The demo's pictures are drawn, not kept: each comes a moment later, as a fetched one would.
+    pictureNow: () => null,
     setHidden: (rooms_hidden) => void prefs.set({ rooms_hidden }),
     setShareTask: (share_task) => void prefs.set({ share_task }),
   };

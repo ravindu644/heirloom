@@ -4,6 +4,8 @@
    scripted: the browser brings the field being typed in into view, once, and a field's
    scroll-margin gives it room for the button under it. */
 /* The form, and in a browser what heirloom is: under the form on a phone, beside it from 720px. */
+/* Under 720px the form's half, and a lone form's frame, are no boxes of their own. */
+.formHalf, .lone { display: contents; }
 .page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-lg); padding-bottom: var(--space-lg); }
 .page > section { padding-top: var(--space-lg); border-top: var(--layout-hair) solid var(--line); }
 .form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
@@ -23,6 +25,19 @@
 .actions > * { flex: 1; }
 @media (min-width: 720px) {
   .page { grid-template-columns: minmax(0, 44ch) minmax(0, 44ch); gap: var(--space-xl); }
+  /* Two halves, each its whole height: what heirloom is on the ground at the left, the form on a
+     surface at the right, at its 44ch. The drawing's top and the form's heading stand on one line;
+     each half's block is centred in it; the free space falls at the bottom. */
+  .halves { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; min-height: 100%; padding: 0; }
+  .page.halves > div, .page.halves > section { grid-row: 1; align-self: stretch; padding-bottom: var(--space-xl); }
+  .halves > .formHalf { display: grid; grid-column: 2; align-content: start; justify-items: center; background: var(--surface); }
+  .halves .form { width: min(44ch, 100% - 2 * var(--layout-gutter)); }
+  .halves > section { grid-column: 1; }
+  /* A signed-out form alone (a reset link's page): on the mark's edge, its heading 112px down as sign-in's is. */
+  .lone { display: grid; grid-template-columns: minmax(0, 44ch); padding: 0 var(--layout-gap) var(--space-xl); }
+  .lone::before { content: ""; height: calc(var(--layout-touch) * 2 + var(--space-md)); }
+  /* The drawing's top and the form's heading on one line, 112px down: a spacer at each half's top. */
+  .halves > .formHalf::before, .halves > section::before { content: ""; height: calc(var(--layout-touch) * 2 + var(--space-md)); }
   .page > section { padding-top: 0; border-top: 0; }
   .form { max-width: 44ch; }
   .actions > * { flex: none; }

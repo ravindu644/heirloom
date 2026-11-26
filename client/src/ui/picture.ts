@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import type { Engine } from '../sync/engine.ts';
 import type { Rooms } from '../sync/rooms.ts';
 
 // What the server takes (protocol section 15): square, 96 by 96, WebP or JPEG, at most 12000 bytes.
@@ -28,18 +29,36 @@ export async function makePicture(file: Blob): Promise<Uint8Array | null> {
   return null;
 }
 
-/** A picture by its hash, as a URL an `img` shows, once the core has it; nothing while it has not. */
-export function usePicture(rooms: Rooms, hash: string | null | undefined): string | undefined {
-  const [url, setUrl] = useState<string>();
+/**
+ * A picture by its hash, as a URL an `img` shows: undefined while it is on its way, null when
+ * there is none to be had (no hash, or a fetch that answered nothing: offline, gone), and then
+ * the circle shows its letters.
+ */
+export function usePicture(rooms: Rooms, hash: string | null | undefined, { account, online }: Holder): string | null | undefined {
+  // Kept on the device, it is there for the first paint; otherwise it is fetched, and kept. What
+  // was fetched is the account's it was fetched for: another account's URL is gone with it.
+  const [fetched, setFetched] = useState<{ hash: string; url: string | null; account: number } | null>(null);
   useEffect(() => {
-    setUrl(undefined);
-    if (!hash) return;
+    if (!hash || rooms.pictureNow(hash) || !online) return;
     let gone = false;
-    void rooms.picture(hash).then((got) => !gone && setUrl(got ?? undefined));
+    void rooms.picture(hash).then((url) => !gone && setFetched({ hash, url, account }));
     return () => void (gone = true);
-  }, [hash]);
-  return url;
+    // Asked again when the connection comes back: an answer of nothing while offline was no answer.
+  }, [hash, account, online]);
+  if (!hash) return null;
+  // Offline, one not kept here cannot come: the letters stand in until the connection is back.
+  return rooms.pictureNow(hash) ?? (fetched?.hash === hash && fetched.account === account ? fetched.url : online ? undefined : null);
 }
+
+/** Whose pictures are asked for, and whether they can be: an account's, and only with a connection. */
+export interface Holder {
+  /** The rooms' count of account changes: it moves also when the same account signs in again, whose old URLs are gone. */
+  account: number;
+  online: boolean;
+}
+
+/** Which signing in the pictures belong to, and whether the server can be reached. */
+export const holderOf = (engine: Engine, rooms: Rooms): Holder => ({ account: rooms.account.value, online: engine.sync.value !== 'offline' });
 
 /** Your own picture's hash, as your rooms last said it: the server names it nowhere else. */
 export const ownPicture = (rooms: Rooms) => rooms.list.value.flatMap((room) => room.members.filter((m) => m.you)).find((m) => m.picture)?.picture ?? null;

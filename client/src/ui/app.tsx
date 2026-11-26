@@ -25,7 +25,7 @@ import { HabitsScreen } from './habits/habits.tsx';
 import { RoomScreen } from './room/room.tsx';
 import { ProgressScreen } from './progress/progress.tsx';
 import { ResetPage, ResetSignedIn, resetIn } from './reset.tsx';
-import { ownPicture, usePicture } from './picture.ts';
+import { holderOf, ownPicture, usePicture } from './picture.ts';
 import { SignIn } from './signin.tsx';
 import { TodayScreen } from './today/today.tsx';
 import * as s from './strings.ts';
@@ -133,7 +133,8 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
   const screen = useScreen();
   const invite = useInvite();
   const link = useReset();
-  const picture = usePicture(rooms, ownPicture(rooms));
+  const pictureHash = ownPicture(rooms);
+  const picture = usePicture(rooms, pictureHash, holderOf(engine, rooms));
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -173,7 +174,8 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
     // The status line keeps its space only where buttons sit at the bottom of a phone screen: Focus.
     <Shell
       person={account.username}
-      picture={picture}
+      picture={picture ?? undefined}
+      pending={picture === undefined}
       at={screen === 'settings' || reset ? undefined : screen}
       page={reset ? 'reset' : undefined}
       without={rooms.hidden.value ? 'room' : undefined}

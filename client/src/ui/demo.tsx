@@ -369,6 +369,10 @@ const ROOM_SCENES: Record<string, Scene> = {
   'room-report-you': { ...week, about: 'Your own report: the split chip and what your next lap would do', run: shortBreak, room: { onBreak: true, keeper: 'sachi' }, tap: 'css:button[aria-label^="You:"]' },
   'room-report-away': { ...week, about: 'The report of someone away: no laps yet today, and the week as a figure only', run: shortBreak, room: { onBreak: true, keeper: 'sachi' }, tap: 'css:button[aria-label^="amaya:"]' },
   'room-letters': { ...week, about: 'No pictures: everyone in their colour and letters, a two-part name in two', run: onKr, room: { members: 'eight', name: 'Second years, block C, the ones who stay up' } },
+  'room-sixteen': { ...week, about: 'The most a room holds, sixteen: laps, breaks, away, pictures and cheers, the hours over sixteen panels', run: onKr, room: { members: 'sixteen', pictures: true, target: 300, keeper: 'sachi' } },
+  'room-sixteen-week': { ...week, about: 'Sixteen people: the room\'s week', run: onKr, room: { members: 'sixteen', pictures: true, target: 300, keeper: 'sachi' }, tap: 'Week' },
+  'room-sixteen-sheet': { ...week, about: 'Sixteen people: the keeper\'s sheet, who is in, each with Remove', run: onKr, room: { members: 'sixteen', pictures: true, target: 300 }, tap: 'Code and settings' },
+  'room-pictures-unfetched': { ...week, about: 'Pictures the server answers nothing for (offline, gone): each circle shows its letters', run: onKr, room: { pictures: 'unfetched' } },
   'room-pictures-broken': { ...week, about: 'Pictures that fail to load: each circle falls back to its initial', run: onKr, room: { pictures: 'broken' } },
   'room-sheet-remove': { ...week, about: 'The keeper\'s sheet: who is in, each with Remove, asked twice', run: onKr, room: { pictures: true }, tap: ['Code and settings', 'Remove'] },
 };

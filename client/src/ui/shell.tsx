@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { Brand } from './kit/brand.tsx';
+import { cx } from './kit/cx.ts';
 import { holdTaps } from './kit/hold.ts';
 import { useKeyboard } from './kit/keyboard.ts';
 import { Person } from './kit/person.tsx';
@@ -18,8 +19,9 @@ export type Destination = (typeof DESTINATIONS)[number];
 interface Props {
   /** Who is signed in. Left out, nobody is: the frame has no person and no destinations. */
   person?: string;
-  /** Their picture, where they set one: the circle of the header chip. */
+  /** Their picture, where they set one: the circle of the header chip; `pending` while it is on its way. */
   picture?: string;
+  pending?: boolean;
   /** The destination being shown, if it is one of the five. */
   at?: Destination;
   /** A name for what is shown when it is not a destination: a change of it is a change of screen, and comes in as one. */
@@ -30,6 +32,8 @@ interface Props {
   status?: string;
   /** Keep the status line's space even when it is silent: for a screen with buttons at the bottom of a phone. */
   keepStatus?: boolean;
+  /** From 720px the screen draws its own room to the frame's edges (the browser's sign-in, in two halves). */
+  bare?: boolean;
   children: ComponentChildren;
 }
 
@@ -38,7 +42,7 @@ interface Props {
  * and the name in one place, the person at the right of the header (at the foot of the sidebar
  * on a laptop), the screen, what the connection has to say, and the five destinations.
  */
-export function Shell({ person, picture, at, page = at, without, status = '', keepStatus, children }: Props) {
+export function Shell({ person, picture, pending, at, page = at, without, status = '', keepStatus, bare, children }: Props) {
   const sidebar = useSidebar();
   // What the last tap did was said of the screen it was made on.
   useEffect(() => () => say(null), [page]);
@@ -83,7 +87,7 @@ export function Shell({ person, picture, at, page = at, without, status = '', ke
   // The person is the way to Settings, and to nothing else: one target.
   const who = person && (
     <a key="person" class={css.person} href="#/settings" aria-label={s.settings.open(person)}>
-      <Person name={person} picture={picture} />
+      <Person name={person} picture={picture} pending={pending} />
     </a>
   );
   // CSS places the parts; the page is written in the order the eye meets them, which is what Tab
@@ -92,5 +96,6 @@ export function Shell({ person, picture, at, page = at, without, status = '', ke
   // destinations, the status, the person), then the screen. The parts are keyed, so crossing
   // the width moves them and the screen keeps everything it holds.
   const bar = <Said key="said" class={css.over} undo={s.today.undo} />;
-  return <div class={css.shell}>{sidebar ? [brand, nav, said, who, screen, bar] : [brand, who, screen, bar, said, nav]}</div>;
+  // Signed out there is nothing for a sidebar to hold: the mark stands alone at the top left.
+  return <div class={cx(css.shell, !person && css.out, bare && css.bare)}>{sidebar ? [brand, nav, said, who, screen, bar] : [brand, who, screen, bar, said, nav]}</div>;
 }

@@ -61,8 +61,11 @@ export function About({ first }: { first?: boolean }) {
     </>
   ) : (
     <section class={css.about}>
-      <Days />
-      <div class={css.words}>{words}</div>
+      {/* One block: in a half of its own from 720px it is centred there as one. */}
+      <div class={css.block}>
+        <Days />
+        <div class={css.words}>{words}</div>
+      </div>
     </section>
   );
 }

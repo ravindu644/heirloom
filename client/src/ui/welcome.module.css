@@ -20,7 +20,8 @@
 
 /* Beside the sign-in form, or under it: the drawing, then the title and its sentence, the
    title a step under the page's own heading. */
-.about { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
+.about { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.block { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 .about h2 { font: var(--type-title); }
 
 /* A phone at twice its type size: the title a size down, so it never runs to four lines. */
@@ -29,6 +30,17 @@
 }
 
 @media (min-width: 720px) {
+  /* Beside the form, in a half of its own: one block, centred, its squares scaled to the half
+     (56px at 1440, 40px at 1024, about 36px at 720), the title loud, the sentence as wide as
+     the drawing or the title. */
+  .about { container-type: inline-size; justify-items: center; }
+  /* As wide as the drawing or the title, never wider than the half less the mark's inset each side: on a narrow half the title wraps. */
+  .block { grid-template-columns: minmax(0, max-content); max-width: calc(100cqi - 2 * var(--layout-gap)); }
+  .about h2 { text-wrap: balance; }
+  .about .words p { text-wrap: pretty; }
+  .about .days { --cell: clamp(calc(var(--space-xl) - var(--space-xs)), 7.8cqi, calc(var(--layout-touch) + var(--space-sm))); width: calc(var(--cell) * 7.75); }
+  .about h2 { font: var(--type-headline-lg); letter-spacing: var(--tracking-headline-lg); }
+  .about .words p { width: 0; min-width: 100%; }
   /* Beside a sidebar nothing is pinned to the foot: the words follow the drawing, the button its sentence. */
   .welcome { max-width: 52ch; min-height: 0; padding-bottom: var(--space-lg); }
   .welcome .words { margin-top: 0; }

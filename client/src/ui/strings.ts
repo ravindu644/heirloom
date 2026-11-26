@@ -330,6 +330,8 @@ export const account = {
   signIn: 'Sign in',
   // This server, not their own: a friend's server is not theirs.
   signInIntro: (device: string) => `Your laps live on this server. Sign in and this ${device} keeps step with your other devices.`,
+  // Beside what heirloom is, which says where laps live already: said once on a screen.
+  signInIntroBeside: (device: string) => `Sign in and this ${device} keeps step with your other devices.`,
   join: 'Join with an invite',
   joinIntro: 'Accounts here are by invite. One link makes one account.',
   // Arrived by an invite link: the invite is already in hand, and is not a field to type.
@@ -840,7 +842,7 @@ export const room = {
   errors: {
     offline: 'Needs a connection. Nothing was sent.',
     code: 'No room has that code.',
-    full: 'That room has its 8 people, the most there can be.',
+    full: 'That room has its 16 people, the most there can be.',
     slow_down: 'Too many wrong codes. Joining opens again within the hour.',
     room: 'That room is no longer there.',
     bad_request: 'A room needs a name of 1 to 40 characters.',

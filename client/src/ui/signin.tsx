@@ -4,6 +4,7 @@ import type { Engine } from '../sync/engine.ts';
 import { inviteIn } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import { Button } from './kit/button.tsx';
+import { cx } from './kit/cx.ts';
 import { Field } from './kit/field.tsx';
 import { first } from './kit/first.ts';
 import { Fold } from './kit/fold.tsx';
@@ -98,12 +99,16 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
   const host = new URL(server?.address ?? engine.server, location.origin).host;
   const making = kind !== 'signin';
 
+  // In a browser the page is the form and what heirloom is, in two halves from 720px.
+  const about = !server && !again;
   return (
-    <Shell page="form">
-      <div class={css.page}>
+    <Shell page="form" bare={about}>
+      <div class={cx(css.page, about && css.halves)}>
+      {/* The form's half: on a surface its whole height from 720px; nothing of its own under 720px. */}
+      <div class={css.formHalf}>
       <form class={css.form} onSubmit={submit}>
         <h1>{kind === 'setup' ? s.account.setup : kind === 'join' ? s.account.join : s.account.signIn}</h1>
-        <p class={css.intro}>{kind === 'setup' ? s.account.setupIntro : kind === 'join' ? (linked ? s.account.joinLinked(host) : s.account.joinIntro) : s.account.signInIntro(s.device())}</p>
+        <p class={css.intro}>{kind === 'setup' ? s.account.setupIntro : kind === 'join' ? (linked ? s.account.joinLinked(host) : s.account.joinIntro) : about ? s.account.signInIntroBeside(s.device()) : s.account.signInIntro(s.device())}</p>
         {kind === 'join' && !linked && (
           <Field label={s.account.invite} hint={s.account.inviteHint} name="invite" required autocomplete="off" autocapitalize="none" spellcheck={false} />
         )}
@@ -181,9 +186,10 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
           </div>
         )}
       </form>
+      </div>
       {/* In a browser, someone who was only handed a link reads what this is: beside the form
           where there is room, under it on a phone. The phone app said it on its first screen. */}
-      {!server && !again && <About />}
+      {about && <About />}
       </div>
     </Shell>
   );
