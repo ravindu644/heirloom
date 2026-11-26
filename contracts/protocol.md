@@ -605,7 +605,9 @@ Worked out on the device from `habit` and `checkin` rows.
   nothing else.
 - **The streak** is section 8's function with the habit's `days` as the mask and its done days as
   the kept days, over the same 45 day window as the focus streak. The target used is today's, for
-  every past day.
+  every past day. A habit's planned days are counted from the day it was made, or from its first
+  done day if that is earlier, so two habits made together read the same `of`. The habit row has
+  no created field: the day it was made is the local day of the oldest stamp among its cells.
 - **This week against last:** the check-ins of all habits (not archived, not deleted) from Monday
   to now, and last week's from its Monday to the same weekday and time.
 - `reminds` is a list of local times of day, sorted, `["06:00", "22:00"]`: at most one for each

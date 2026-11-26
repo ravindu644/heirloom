@@ -649,6 +649,12 @@ Built once in `client/src/ui/kit/` and reused.
   "Version 1.0.0 (ac7fe13)", the commit in the figures face so it can be read out in a bug
   report, and one link, "Source on GitHub", to github.com/ravindu644/heirloom, which opens in
   the browser (outside the app on the phone). Nothing else: no licences list, no credits wall.
+- **Counted the same everywhere.** Every total that includes today counts the lap in progress as
+  far as it has run: Today, Focus, Progress and a room's lanes give the same minutes at the same
+  moment. A screen opened from the bottom bar or the sidebar opens at its top, wherever the last
+  screen was scrolled. A habit's day is filled as far as its count went, past days as today: 1 of 2
+  is half a box, never an empty one. A habit's "of the last N planned days" counts from the day
+  the habit was made, so two habits made together read the same N.
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
   "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
   and an equal negative margin, so the line it sits in keeps its height.

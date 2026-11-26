@@ -290,7 +290,16 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [qa] About names the version and commit the build was made from; the link opens outside the app
 - [ ] Gate
 
-## 20. Release 1.0
+## 20. What the pictures showed
+
+- [x] [lead] DESIGN.md: counted the same everywhere; a screen opens at its top; a habit's past
+      part count is drawn; planned days count from the habit's making
+- [x] [ui] A screen from the bottom bar opens at its top; a past day's part count drawn
+- [x] [core] Room's totals count the lap in progress; planned days from the habit's making
+- [x] [qa] Each as a test
+- [ ] Gate: built and checked (182 browser tests); waiting on the user's try
+
+## 21. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
