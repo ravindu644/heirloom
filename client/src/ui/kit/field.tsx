@@ -12,10 +12,10 @@ export function Field({ label, hint, ...input }: InputHTMLAttributes<HTMLInputEl
   return (
     <div class={css.field}>
       <label>
-        <span>{label}</span>
+        <span data-job="name">{label}</span>
         <input aria-describedby={hint ? described : undefined} {...input} />
       </label>
-      {hint && <small id={described}>{hint}</small>}
+      {hint && <small id={described} data-job="note">{hint}</small>}
     </div>
   );
 }
@@ -26,10 +26,10 @@ export function LongField({ label, hint, ...area }: TextareaHTMLAttributes<HTMLT
   return (
     <div class={css.field}>
       <label>
-        <span>{label}</span>
+        <span data-job="name">{label}</span>
         <textarea rows={1} aria-describedby={hint ? described : undefined} {...area} />
       </label>
-      {hint && <small id={described}>{hint}</small>}
+      {hint && <small id={described} data-job="note">{hint}</small>}
     </div>
   );
 }

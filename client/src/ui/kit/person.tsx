@@ -39,12 +39,14 @@ export function Face({ name, picture, pending, size }: { name: string; picture?:
 /**
  * A person: their circle, and beside it the username, or `label` where other words stand for
  * them ("You"). The circle is who it is, everywhere: it never takes its letter from the words.
+ * The name is `body`, as every person's name in a list; `chip` is the header's, in `label`, as
+ * small as the header's line.
  */
-export function Person({ name, label, picture, pending }: { name: string; label?: string; picture?: string | null; pending?: boolean }) {
+export function Person({ name, label, picture, pending, chip }: { name: string; label?: string; picture?: string | null; pending?: boolean; chip?: boolean }) {
   return (
-    <span class={css.person}>
+    <span class={cx(css.person, chip && css.chip)}>
       <Face name={name} picture={picture} pending={pending} />
-      <span>{label ?? name}</span>
+      <span data-job={chip ? undefined : 'person'}>{label ?? name}</span>
     </span>
   );
 }

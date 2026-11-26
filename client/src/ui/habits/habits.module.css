@@ -60,7 +60,6 @@
 .gone button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
 /* The note under them, as a field's own hint is drawn. */
 .remind small { font: var(--type-label); color: var(--muted); text-wrap: pretty; }
-.legend { font: var(--type-label); color: var(--muted); }
 /* The box the record's squares are sized against: large while every week fits it. */
 .record { container-type: inline-size; }
 

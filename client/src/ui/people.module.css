@@ -6,7 +6,6 @@
 /* A link to give away: whole, breaking anywhere so it never runs past the edge, and selectable
    where the browser may not copy it. */
 .fresh { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-.fresh h3 { font: var(--type-label); color: var(--muted); }
 .link { overflow-wrap: anywhere; user-select: all; }
 
 /* A row is the thing, with what can be done to it as links at its end. */

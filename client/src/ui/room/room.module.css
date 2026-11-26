@@ -120,7 +120,7 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .code { margin-left: var(--layout-figure-bearing); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); user-select: all; }
 .rename { display: grid; gap: var(--space-md); }
 /* Who is in, each with the keeper's way to take them out. */
-.out { display: grid; padding: 0; list-style: none; }
+.out { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; list-style: none; }
 .out li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
 
 @media (min-width: 720px) {

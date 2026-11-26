@@ -21,7 +21,8 @@
 /* The edit form's foot: Done, and apart from it at the row's end the link that deletes, as under the day target. */
 .edits { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-md); }
 
-.nudge { color: var(--ink); text-wrap: pretty; }
+/* A note, in ink: the one that asks for something. `p.` so it outweighs the kit note's muted. */
+p.nudge { color: var(--ink); }
 /* A full target for a thumb that takes no more room than the words beside it. */
 .nudge button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
 
@@ -43,6 +44,7 @@
 }
 .sub input:focus-visible { border-color: var(--ink); outline-offset: 0; }
 
-.removed, .saved { color: var(--muted); }
+/* What a tap did, with its Undo: a note, as the habit's removed reminders are. */
+.removed { font: var(--type-label); color: var(--muted); }
 .removed button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
 

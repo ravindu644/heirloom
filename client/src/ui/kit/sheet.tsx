@@ -86,7 +86,7 @@ export function Sheet({ title, close, onClose, grows, children }: Props) {
       <div class={css.inside}>
         <header class={css.head}>
           {/* The focus lands on the name, not in a field: on a phone a field would raise the keyboard. */}
-          <h2 tabIndex={-1} autofocus>
+          <h2 tabIndex={-1} autofocus data-job="sheet">
             {title}
           </h2>
           <Button kind="link" onClick={shut}>

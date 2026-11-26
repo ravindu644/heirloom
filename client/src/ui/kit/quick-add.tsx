@@ -43,7 +43,7 @@ export function QuickAdd({ name, label, hint, example, go, said, onAdd }: { name
       {example && (
         <Fold>
           {using && (
-            <p key="example" id={described} class={css.example}>
+            <p key="example" id={described} class={css.example} data-job="note">
               {example}
             </p>
           )}

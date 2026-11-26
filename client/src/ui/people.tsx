@@ -11,6 +11,7 @@ import { cx } from './kit/cx.ts';
 import { Field } from './kit/field.tsx';
 import { Fold } from './kit/fold.tsx';
 import links from './kit/links.module.css';
+import { Name, Note } from './kit/note.tsx';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
 import css from './people.module.css';
@@ -96,15 +97,15 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
   // each row come and go in time.
   return (
     <Panel title={s.people.invites}>
-      <p key="note" class={css.note}>
+      <Note key="note">
         {s.people.canInvite} {s.people.linkNote}
-      </p>
+      </Note>
       <div key="make" class={css.actions}>
         <Button onClick={make}>{s.people.make}</Button>
       </div>
       {fresh && (
         <section key="fresh" class={css.fresh} aria-label={s.people.fresh}>
-          <h3>{s.people.fresh}</h3>
+          <Name>{s.people.fresh}</Name>
           {/* It may break after `/join/` first, so the invite stays in one piece where there is room for it. */}
           <p class={css.link}>
             {fresh.link.slice(0, fresh.link.indexOf('/join/') + 6)}
@@ -189,9 +190,9 @@ export function AdminsPanel({ admins, rooms, holder }: { admins: Admins; rooms: 
 
   return (
     <Panel title={s.people.admins}>
-      <p key="note" class={css.note}>
+      <Note key="note">
         {s.people.decide}
-      </p>
+      </Note>
       {list && (
         <Fold key="rows" list class={css.rows}>
           {list.map((one) => (
@@ -278,23 +279,23 @@ export function ResetsPanel({ resets }: { resets: Resets }) {
 
   return (
     <Panel title={s.reset.title}>
-      <p key="note" class={css.note}>
+      <Note key="note">
         {s.reset.note}
-      </p>
+      </Note>
       <form key="make" class={css.raise} onSubmit={submit}>
         <Field label={s.people.username} name="reset" required autocomplete="off" autocapitalize="none" spellcheck={false} />
         <Button type="submit">{s.reset.make}</Button>
       </form>
       {fresh && (
         <section key="fresh" class={css.fresh} aria-label={s.people.fresh}>
-          <h3>{s.people.fresh}</h3>
+          <Name>{s.people.fresh}</Name>
           {/* It may break after `/reset/` first, so the key stays in one piece where there is room for it. */}
           <p class={css.link}>
             {fresh.link.slice(0, at)}
             <wbr />
             {fresh.link.slice(at)}
           </p>
-          <p class={css.note}>{s.reset.give(fresh.username)}</p>
+          <Note>{s.reset.give(fresh.username)}</Note>
           <div class={css.actions}>
             <Button onClick={() => copy(fresh.link)}>{s.people.copyNew}</Button>
           </div>

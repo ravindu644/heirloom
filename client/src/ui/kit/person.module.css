@@ -1,4 +1,5 @@
-.person { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; font: var(--type-label); color: var(--ink); }
+.person { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; font: var(--type-body); color: var(--ink); }
+.chip { font: var(--type-label); }
 /* Flat, one hue of the palette, never a gradient; letters 0.4 of the circle, 0.34 for two. */
 .face {
   --side: var(--space-xl);

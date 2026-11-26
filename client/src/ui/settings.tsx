@@ -13,6 +13,7 @@ import { Button } from './kit/button.tsx';
 import { Fold } from './kit/fold.tsx';
 import form from './kit/form.module.css';
 import links from './kit/links.module.css';
+import { Name, Note } from './kit/note.tsx';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
 import { AdminsPanel, InvitesPanel, ResetsPanel } from './people.tsx';
@@ -140,7 +141,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
       {/* The sentence holds the server's address, which is there to be copied. */}
       <p class="copies">{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
       {/* Said once more here, under the account: a fact, not an alarm. */}
-      {plain && <p class={css.note}>{s.server.plain}</p>}
+      {plain && <Note>{s.server.plain}</Note>}
       <div class={css.actions}>
         {/* The server has already signed this device out: the way back in comes first. */}
         {refused && (
@@ -153,8 +154,8 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
       {refusal && <p role="alert">{refusal}</p>}
       {/* Your circle in the rooms: chosen here, made small here, and shown above as it will be seen. */}
       <div class={css.picture}>
-        <h3 class={css.legend}>{s.settings.picture}</h3>
-        <p class={css.note}>{s.settings.pictureNote}</p>
+        <Name>{s.settings.picture}</Name>
+        <Note>{s.settings.pictureNote}</Note>
         <div class={css.actions}>
           <Button onClick={() => picked.current!.click()}>{mine ? s.settings.pictureChange : s.settings.pictureChoose}</Button>
           {mine && (
@@ -184,7 +185,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
     <>
       <Panel title={s.settings.lengths}>
         <Lengths of={all} onSet={(change) => settings.set(change)} />
-        <p class={css.note}>{s.settings.lengthsNote}</p>
+        <Note>{s.settings.lengthsNote}</Note>
       </Panel>
 
       <Panel title={s.settings.target}>
@@ -197,13 +198,13 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
           top={all.day_target >= TARGET_MAX}
           floor={all.day_target <= 0}
         />
-        <p class={css.note}>{s.settings.targetNote}</p>
+        <Note>{s.settings.targetNote}</Note>
       </Panel>
 
       <Panel title={s.settings.auto}>
         <Switch label={s.settings.autoBreak} on={all.auto_break} onChange={(auto_break) => settings.set({ auto_break })} />
         <Switch label={s.settings.autoWork} on={all.auto_work} onChange={(auto_work) => settings.set({ auto_work })} />
-        <p class={css.note}>{s.settings.autoNote}</p>
+        <Note>{s.settings.autoNote}</Note>
       </Panel>
 
       <Panel title={s.settings.bell}>
@@ -225,9 +226,9 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
       </Panel>
 
       <Panel title={s.settings.copy}>
-        <p class={css.note}>
+        <Note>
           {s.settings.copyNote} {s.settings.importNote}
-        </p>
+        </Note>
         {/* Where a file cannot be saved (the phone app), the screen says where one can, and never "Saved". */}
         {!canSave && <p class="copies">{s.settings.exportElsewhere(server)}</p>}
         <div class={css.actions}>
@@ -250,7 +251,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
           </span>
         }
       >
-        <p class={css.note}>{s.about.what}</p>
+        <Note>{s.about.what}</Note>
         <p>
           {/* The commit in the figures face, to be read out in a bug report. */}
           {version.slice(0, at)}

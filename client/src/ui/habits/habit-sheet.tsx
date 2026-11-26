@@ -8,6 +8,7 @@ import { Fold } from '../kit/fold.tsx';
 import form from '../kit/form.module.css';
 import links from '../kit/links.module.css';
 import { Heat } from '../kit/heat.tsx';
+import { Name, Note } from '../kit/note.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { useTyped } from '../kit/typed.ts';
@@ -106,7 +107,7 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
             </button>
           ))}
         </div>
-        <Fold role="status">{lastDay && <p class={css.quiet}>{s.habits.lastDay}</p>}</Fold>
+        <Fold role="status">{lastDay && <Note>{s.habits.lastDay}</Note>}</Fold>
       </fieldset>
 
       <fieldset class={form.group}>
@@ -149,7 +150,7 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
               ),
           )}
         </Fold>
-        <small>{app ? note : `${note} ${s.remindsWhere}`}</small>
+        <small data-job="note">{app ? note : `${note} ${s.remindsWhere}`}</small>
         <Fold>
           {habit.reminds.length > 0 && (
             <Button
@@ -183,7 +184,7 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
       </div>
 
       <section class={cx(form.group, css.record)} aria-label={s.habits.record}>
-        <h3 class={css.legend}>{s.habits.record}</h3>
+        <Name>{s.habits.record}</Name>
         {habit.record.length === 0 ? (
           <p class={css.quiet}>{s.habits.noRecord}</p>
         ) : (
@@ -194,24 +195,24 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
               weekdays={s.progress.rowNames}
               month={s.progress.month}
             />
-            <p class={css.quiet}>
+            <Note>
               {run && `${s.cap(run)}. `}
               {s.habits.recordNote}
-            </p>
+            </Note>
           </>
         )}
       </section>
 
       {/* There is no Save to look for, and the two ways out say what each keeps. */}
       <div class={form.group}>
-        <p class={css.quiet}>{s.savedAsYouGo}</p>
+        <Note>{s.savedAsYouGo}</Note>
         <div class={form.ends}>
           <Button onClick={leave(onArchive)}>{s.habits.archive}</Button>
           <Button kind="quiet" onClick={leave(onRemove)}>
             {s.task.delete}
           </Button>
         </div>
-        <p class={css.quiet}>{s.habits.footNote}</p>
+        <Note>{s.habits.footNote}</Note>
       </div>
     </Sheet>
   );

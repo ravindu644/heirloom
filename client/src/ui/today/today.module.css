@@ -85,7 +85,6 @@
 .foot { position: sticky; bottom: calc(var(--layout-touch) + var(--space-md)); }
 .foot p { padding-bottom: var(--space-sm); background: var(--ground); }
 
-.binNote { color: var(--muted); }
 
 @media (min-width: 720px) {
   .today { max-width: 80ch; }

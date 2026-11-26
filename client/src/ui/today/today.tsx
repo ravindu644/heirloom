@@ -21,6 +21,7 @@ import { QuickAdd } from '../kit/quick-add.tsx';
 import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
+import { Note } from '../kit/note.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { cx } from '../kit/cx.ts';
@@ -478,7 +479,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
         )}
         {bin && (
           <Sheet key="bin" title={s.today.binTitle} close={s.task.close} onClose={() => setBin(false)}>
-            <p class={css.binNote}>{s.today.binNote}</p>
+            <Note>{s.today.binNote}</Note>
             <Fold gap="sm">
               {deleted.map((task) => (
                 <TaskRow

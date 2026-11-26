@@ -14,6 +14,7 @@ import { Week } from '../kit/day-box.tsx';
 import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
+import { Note } from '../kit/note.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
@@ -195,7 +196,7 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
       )}
       {shelf && (
         <Sheet key="shelf" title={shelf === 'archived' ? s.habits.archivedTitle : s.today.binTitle} close={s.task.close} onClose={() => setShelf(null)}>
-          <p class={css.quiet}>{shelf === 'archived' ? s.habits.archivedNote : s.habits.binNote}</p>
+          <Note>{shelf === 'archived' ? s.habits.archivedNote : s.habits.binNote}</Note>
           <Fold gap="sm">
             {shelved.map((habit) => (
               <div key={habit.id} class={cx(css.row, css.plain, shelf === 'deleted' && css.shelved)}>

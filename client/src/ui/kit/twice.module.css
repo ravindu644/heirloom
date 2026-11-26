@@ -1,3 +1,6 @@
 .both { display: inline-grid; text-decoration: inherit; }
-.both > * { grid-area: 1 / 1; text-align: left; }
+/* It ends a row wherever it is used, so both wordings end on the row's edge: "Remove" stands
+   in one line down a list however long the name its question carries. */
+/* A question that carries a long username breaks inside it rather than run off the row. */
+.both > * { grid-area: 1 / 1; align-self: center; text-align: end; overflow-wrap: anywhere; }
 .off { visibility: hidden; }

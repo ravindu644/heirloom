@@ -14,6 +14,7 @@ import type { LengthsOf } from '../kit/lengths.tsx';
 import { Picker } from '../kit/picker.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
 import { Square } from '../kit/square.tsx';
+import { Note } from '../kit/note.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { useTyped } from '../kit/typed.ts';
@@ -274,13 +275,13 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app
             <span>{s.task.count(task.laps, task.estimate)}</span>
           </div>
           {estimate > NUDGE_OVER && (
-            <p key="nudge" class={css.nudge}>
+            <Note key="nudge" class={css.nudge}>
               {s.task.nudge(estimate)}
               {/* This tap asks to be taken to the field: it is a move, and the page may scroll for it. */}
               <Button kind="link" data-moves onClick={(event) => event.currentTarget.closest('dialog')?.querySelector<HTMLInputElement>('[name="subtask"]')?.focus()}>
                 {s.task.nudgeGo}
               </Button>
-            </p>
+            </Note>
           )}
         </Fold>
       </fieldset>
@@ -306,9 +307,9 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app
           </div>
           {own && <Lengths key="own" of={ownLengths} onSet={edit} />}
           {own && (
-            <p key="note" class={css.saved}>
+            <Note key="note">
               {s.task.ownNote}
-            </p>
+            </Note>
           )}
         </Fold>
       </fieldset>
@@ -430,7 +431,7 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app
 
       {/* There is no Save to look for. */}
       <div class={form.group}>
-        <p class={css.saved}>{s.savedAsYouGo}</p>
+        <Note>{s.savedAsYouGo}</Note>
         <div class={form.ends}>
           <Button onClick={leave(onDone)}>{task.done ? s.task.notDone : s.task.done}</Button>
           <Button kind="quiet" onClick={leave(onRemove)}>

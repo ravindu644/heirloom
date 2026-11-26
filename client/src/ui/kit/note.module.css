@@ -1,0 +1,3 @@
+/* A name over a group and a note under something are one size wherever they stand: `label`. */
+.name, .note { font: var(--type-label); color: var(--muted); }
+.note { text-wrap: pretty; }

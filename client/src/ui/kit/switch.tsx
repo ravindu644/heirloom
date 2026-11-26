@@ -11,8 +11,8 @@ export function Switch({ label, note, on, onChange }: { label: string; note?: st
   return (
     <label class={css.switch}>
       <span>
-        <b>{label}</b>
-        {note && <small id={described}>{note}</small>}
+        <b data-job="switch">{label}</b>
+        {note && <small id={described} data-job="note">{note}</small>}
       </span>
       <Check checked={on} label={label} described={note ? described : undefined} onChange={onChange} />
     </label>

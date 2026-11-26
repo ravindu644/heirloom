@@ -29,6 +29,7 @@ import { motion } from '../kit/ms.ts';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
+import { Name, Note } from '../kit/note.tsx';
 import { Switch } from '../kit/switch.tsx';
 import { Twice } from '../kit/twice.tsx';
 import * as s from '../strings.ts';
@@ -45,7 +46,7 @@ const why = (result: RoomResult) => (result.ok ? '' : (s.room.errors[result.erro
 function Group({ title, children }: { title: string; children: ComponentChildren }) {
   return (
     <section class={form.group} aria-label={title}>
-      <h3 class={css.legend}>{title}</h3>
+      <Name>{title}</Name>
       {children}
     </section>
   );
@@ -106,14 +107,14 @@ function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: 
   return (
     <Sheet grows title={s.room.sheet} close={s.task.close} onClose={onClose}>
       {/* Nothing here is this person's alone. */}
-      {keeps && <p class={css.quiet}>{s.room.forAll}</p>}
+      {keeps && <Note>{s.room.forAll}</Note>}
       <section class={form.group} aria-label={s.room.codeTitle}>
-        <h3 class={css.legend}>{s.room.codeTitle}</h3>
+        <Name>{s.room.codeTitle}</Name>
         {/* Two groups of four: easier to read out, and to hear. */}
         <p class={css.code}>
           {room.code.slice(0, 4)} {room.code.slice(4)}
         </p>
-        <p class={css.quiet}>{s.room.codeNote}</p>
+        <Note>{s.room.codeNote}</Note>
         <div>
           <div class={form.ends}>
             <Button onClick={() => copy()}>{s.room.copy}</Button>
@@ -162,19 +163,19 @@ function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: 
         <div class={form.group}>
           <dl class={css.values}>
             <div>
-              <dt>{s.room.name}</dt>
+              <dt data-job="name">{s.room.name}</dt>
               <dd>{room.name}</dd>
             </div>
             <div>
-              <dt>{s.room.target}</dt>
+              <dt data-job="name">{s.room.target}</dt>
               <dd>{s.room.targetSaid(hours)}</dd>
             </div>
             <div>
-              <dt>{s.room.ranked}</dt>
+              <dt data-job="name">{s.room.ranked}</dt>
               <dd>{s.room.rankedSaid(room.ranked)}</dd>
             </div>
           </dl>
-          <p class={css.quiet}>{s.room.onlyKeeper(room.keeper)}</p>
+          <Note>{s.room.onlyKeeper(room.keeper)}</Note>
           <Fold role="alert">{said && <p class={css.told}>{said}</p>}</Fold>
         </div>
       )}
@@ -182,8 +183,8 @@ function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: 
       {/* The keeper's way to take someone out: a member at a time, asked twice, as anything that cannot be taken back. */}
       {room.youKeep && room.keeper && room.members.length > 1 && (
         <section class={form.group} aria-label={s.room.whoIsIn}>
-          <h3 class={css.legend}>{s.room.whoIsIn}</h3>
-          <p class={css.quiet}>{s.room.removeNote}</p>
+          <Name>{s.room.whoIsIn}</Name>
+          <Note>{s.room.removeNote}</Note>
           <ul class={css.out}>
             {room.members
               .filter((m) => !m.you)
@@ -336,7 +337,7 @@ function Caller({ rooms, room, now, reveal, onDone }: { rooms: Rooms; room: stri
   }, []);
   return (
     <div class={form.group}>
-      <span class={css.legend}>{s.room.callWhen}</span>
+      <span class={css.legend} data-job="name">{s.room.callWhen}</span>
       <Stepper
         text={s.room.callIn(minutes, callAt(now(), minutes))}
         less={s.room.callLess}
@@ -808,7 +809,7 @@ function WeekTab({ room, me, now }: { room: RoomView; me: MemberView | undefined
           )}
           {me && (
             <section class={css.panel}>
-              <h3 class={css.partTitle}>{s.room.yourPart}</h3>
+              <h3 class={css.partTitle} data-job="heading">{s.room.yourPart}</h3>
               <p class={css.part}>
                 <b>{s.total(me.week_ms)}</b> <span>{s.room.partOf(room.week_ms)}</span>
               </p>
@@ -857,7 +858,7 @@ function Report({ person: m, now, lapMs, face, shareTask, call, phase }: { perso
       </header>
       {call}
       <section class={css.panel}>
-        <h2 class={css.partTitle}>{s.room.today}</h2>
+        <h2 class={css.partTitle} data-job="heading">{s.room.today}</h2>
         {day ? (
           <>
             <p class={css.figure}>
@@ -874,7 +875,7 @@ function Report({ person: m, now, lapMs, face, shareTask, call, phase }: { perso
         )}
       </section>
       <section class={cx(css.panel, css.weekPanel)}>
-        <h2 class={css.partTitle}>{s.room.thisWeek}</h2>
+        <h2 class={css.partTitle} data-job="heading">{s.room.thisWeek}</h2>
         <p class={css.figure}>
           <b>{s.total(m.week_ms)}</b>
           {m.you && ahead !== null && <SplitChip text={s.race.split(ahead)} tone={ahead > 0 ? 'ahead' : ahead < 0 ? 'behind' : 'level'} />}

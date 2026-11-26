@@ -10,7 +10,7 @@ import css from './panel.module.css';
 export function Panel({ title, children }: { title: ComponentChildren; children: ComponentChildren }) {
   return (
     <section class={css.panel}>
-      <h2>{title}</h2>
+      <h2 data-job="heading">{title}</h2>
       <Fold gap="md">{children}</Fold>
     </section>
   );

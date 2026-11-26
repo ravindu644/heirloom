@@ -87,7 +87,7 @@ export function Shell({ person, picture, pending, at, page = at, without, status
   // The person is the way to Settings, and to nothing else: one target.
   const who = person && (
     <a key="person" class={css.person} href="#/settings" aria-label={s.settings.open(person)}>
-      <Person name={person} picture={picture} pending={pending} />
+      <Person chip name={person} picture={picture} pending={pending} />
     </a>
   );
   // CSS places the parts; the page is written in the order the eye meets them, which is what Tab
