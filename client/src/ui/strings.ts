@@ -839,6 +839,57 @@ export const marks = {
 export const mark = (m: { kind: 'laps'; tier: number } | { kind: 'estimate'; title: string; estimate: number; laps: number } | { kind: 'week'; focus_ms: number; before_ms: number }) =>
   m.kind === 'laps' ? marks.laps(m.tier) : m.kind === 'estimate' ? marks.estimate(m.title, m.laps, m.estimate) : marks.week(m.focus_ms, m.before_ms);
 
+/**
+ * A way back in: a new password by a link that whoever runs the server gives. There is no email
+ * here and nothing to recover by, so nothing says "recover" and nothing asks for an address.
+ */
+export const reset = {
+  // The owner's block in Settings, beside Admins.
+  title: 'A way back in',
+  note: 'For someone who forgot their password. The link sets a new one, once, and works for 24 hours. Using it signs their devices out. A new link for the same name ends the one before.',
+  make: 'Make a reset link',
+  // Under the link just made: the server keeps no copy of it to show again.
+  give: (name: string) => `Give it to ${name} yourself. It is shown only now.`,
+  // An open one, as a row beside its name, as an invite's: "runs out at 16:59 tomorrow". A link lives a day, so the hour is said.
+  runsOut: (expires: number, now = Date.now()) => {
+    const days = Math.round((new Date(expires).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / (24 * 60 * MIN));
+    return days === 0 ? `runs out at ${wall(expires)} today` : days === 1 ? `runs out at ${wall(expires)} tomorrow` : `runs out on ${day(expires)}`;
+  },
+  // The names of a row's links, for a screen reader: each says whose.
+  forName: (words: string, name: string) => `${words}, the link for ${name}`,
+  // What the server refuses here, each with what to do.
+  errors: {
+    unknown: 'Nobody by that name is on this server.',
+  } as Record<string, string>,
+  // The owner's own name: refused by the server, and said with the whole command to run there.
+  own: (name: string) => `Your own password is reset on the server itself: heirloomd -reset ${name}`,
+
+  // The page the link opens, signed out.
+  heading: 'A new password',
+  whoseOn: (name: string, server: string) => `For ${name}, on ${server}.`,
+  field: 'New password',
+  go: 'Set it and sign in',
+  // The rule of registering, said of the one field there is.
+  short: 'A password is 8 characters or more.',
+  long: 'A password is at most 256 characters.',
+  // The link came from a person, by hand: they are the one to ask.
+  dead: 'This link no longer works. Ask whoever gave it to you for a new one.',
+  toSignIn: 'Back to sign in',
+  // Under the button from the first frame: the owner was told, and so is the one whose devices they are.
+  others: 'Your other devices will be signed out. Sign in on them with the new password.',
+  // Opened where an account is open: the way on is Settings, where signing out is, and the app holds the link meanwhile.
+  signedIn: 'This link sets a new password. Sign out in Settings and this page comes back.',
+  // The same, when the server has said whose it is: an owner who opened a link made for someone else is not led into their account.
+  signedInFor: (name: string) => `This link sets a new password for ${name}. Sign out in Settings and this page comes back.`,
+
+  // The sign-in screen: where a forgotten password leads.
+  forgot: 'Forgot your password? Whoever runs this server can give you a link that sets a new one. If that is you, run heirloomd -reset with your username on the server.',
+  // The phone app is not opened by a link: the link opens in a browser, and the app is signed in after.
+  // A reset link pasted where the phone app asks for an invite: it is for a browser.
+  pasted: 'This link sets a new password. Open it in a browser, set the password there, then sign in here.',
+  forgotApp: 'Forgot your password? Whoever runs this server can give you a link. It opens in a browser: set the new password there, then sign in here.',
+};
+
 /** The phone app's server: where it is, said as an address a person would type. */
 export const server = {
   title: 'Which server?',

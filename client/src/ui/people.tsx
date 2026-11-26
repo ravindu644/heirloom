@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Admins } from '../sync/admins.ts';
 import { UNDO_MS } from '../sync/focus.ts';
 import type { InviteView, Invites } from '../sync/invites.ts';
+import type { ResetLink, Resets } from '../sync/resets.ts';
 import { Button } from './kit/button.tsx';
 import { copyText } from './kit/copy.ts';
 import { cx } from './kit/cx.ts';
@@ -220,6 +221,110 @@ export function AdminsPanel({ admins }: { admins: Admins }) {
       </form>
       <Fold key="said" role="alert">
         {said && <p>{said}</p>}
+      </Fold>
+    </Panel>
+  );
+}
+
+/**
+ * A way back in, the owner's alone: a name, and a link that sets that account a new password.
+ * The server keeps no copy of the link, so it is shown here until the panel goes, copied or not;
+ * the open ones are rows by name, each taken back with a second tap, as an invite is.
+ */
+export function ResetsPanel({ resets }: { resets: Resets }) {
+  const open = resets.open.value;
+  const [fresh, setFresh] = useState<ResetLink | null>(null);
+  // What a tap did ("Copied.") and what the server refused are two lines, drawn as Invites' report and Admins' error.
+  const [said, setSaid] = useState('');
+  const [refused, setRefused] = useState('');
+  const [taking, setTaking] = useState<string | null>(null);
+  useEffect(() => void resets.refresh(), []);
+
+  const submit = async (event: TargetedSubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const field = event.currentTarget.elements.namedItem('reset') as HTMLInputElement;
+    const username = field.value.trim();
+    if (!username) return;
+    const result = await resets.create(username);
+    setSaid('');
+    setRefused(result.ok ? '' : result.error === 'bad_request' ? s.reset.own(username.toLowerCase()) : why(result.error, s.reset.errors));
+    if (!result.ok) return;
+    setFresh(result.reset);
+    field.value = '';
+  };
+  const copy = async (link: string) => {
+    setRefused('');
+    setSaid((await copyText(link)) ? s.people.copied : s.people.copyFailed);
+  };
+  const takeBack = async (username: string) => {
+    setTaking(null);
+    const result = await resets.revoke(username);
+    setSaid(result.ok ? s.people.takenBack : '');
+    setRefused(result.ok ? '' : why(result.error, s.reset.errors));
+    if (result.ok && fresh?.username === username) setFresh(null);
+  };
+
+  // The link just made has its row too, unlike an invite's: the row is where it is taken back and says when it runs out.
+  const rows = open ?? [];
+  const at = fresh ? fresh.link.indexOf('/reset/') + 7 : 0;
+
+  return (
+    <Panel title={s.reset.title}>
+      <p key="note" class={css.note}>
+        {s.reset.note}
+      </p>
+      <form key="make" class={css.raise} onSubmit={submit}>
+        <Field label={s.people.username} name="reset" required autocomplete="off" autocapitalize="none" spellcheck={false} />
+        <Button type="submit">{s.reset.make}</Button>
+      </form>
+      {fresh && (
+        <section key="fresh" class={css.fresh} aria-label={s.people.fresh}>
+          <h3>{s.people.fresh}</h3>
+          {/* It may break after `/reset/` first, so the key stays in one piece where there is room for it. */}
+          <p class={css.link}>
+            {fresh.link.slice(0, at)}
+            <wbr />
+            {fresh.link.slice(at)}
+          </p>
+          <p class={css.note}>{s.reset.give(fresh.username)}</p>
+          <div class={css.actions}>
+            <Button onClick={() => copy(fresh.link)}>{s.people.copyNew}</Button>
+          </div>
+        </section>
+      )}
+      {rows.length > 0 && (
+        <Fold key="rows" list class={css.rows}>
+          {rows.map((one) => (
+            <div key={one.username} class={css.row}>
+              <span class={css.what}>
+                <b>{one.username}</b>
+                <span>{s.reset.runsOut(one.expires)}</span>
+              </span>
+              {/* Both sets of links in one place, one unseen: see the invites' rows. */}
+              <span class={css.slot}>
+                <span class={cx(links.links, taking === one.username && css.off)}>
+                  <Button kind="link" aria-label={s.reset.forName(s.people.takeBack, one.username)} onClick={() => setTaking(one.username)}>
+                    {s.people.takeBack}
+                  </Button>
+                </span>
+                <span class={cx(links.links, taking !== one.username && css.off)}>
+                  <Button kind="link" aria-label={s.reset.forName(s.people.takeBackGo, one.username)} onClick={() => takeBack(one.username)}>
+                    {s.people.takeBackGo}
+                  </Button>
+                  <Button kind="link" aria-label={s.reset.forName(s.people.keep, one.username)} onClick={() => setTaking(null)}>
+                    {s.people.keep}
+                  </Button>
+                </span>
+              </span>
+            </div>
+          ))}
+        </Fold>
+      )}
+      <Fold key="said" role="status">
+        {said && <p class={css.note}>{said}</p>}
+      </Fold>
+      <Fold key="refused" role="alert">
+        {refused && <p>{refused}</p>}
       </Fold>
     </Panel>
   );

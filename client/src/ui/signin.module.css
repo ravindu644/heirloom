@@ -12,6 +12,10 @@
 /* Two lines whatever it says: sign in and join have intros of different lengths, and the form under them must not move between the two. */
 .intro { min-height: 2lh; }
 .intro { color: var(--muted); }
+/* Whose password a reset link sets: two lines kept from the first frame, filled when the server has said, so a name of 32 letters moves nothing. */
+.whose { min-height: 2lh; color: var(--muted); overflow-wrap: anywhere; }
+/* One quiet line under a form: where a forgotten password leads, what a new one does to the other devices. */
+.aside { color: var(--muted); text-wrap: pretty; }
 /* The error's space to the buttons is its own, so it opens and closes with it. */
 .error { padding-bottom: var(--space-md); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }

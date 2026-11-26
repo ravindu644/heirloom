@@ -9,6 +9,7 @@ import { addDays } from '../core/progress.ts';
 import type { AdminView, Admins } from '../sync/admins.ts';
 import type { HabitView, Habits } from '../sync/habits.ts';
 import type { InviteView, Invites } from '../sync/invites.ts';
+import type { ResetView, Resets } from '../sync/resets.ts';
 import type { MemberView, RoomResult, RoomView, Rooms } from '../sync/rooms.ts';
 import type { ServerChoice, ServerRefusal } from '../sync/server.ts';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
@@ -347,6 +348,34 @@ export function demoInvites(seed: number | 'forbidden' | 'token', now: () => num
       open.value = list().filter((invite) => invite.invite !== id);
       return later({ ok: true });
     },
+  };
+}
+
+/**
+ * The owner's reset links: `seed` open ones. A username that is nobody's here is `nobody_here`,
+ * and `ravi`, the owner, is refused as the server refuses the owner. The page a link opens is
+ * the engine's, passed in. Times are the real clock's, as the panel reads "until" against it.
+ */
+export function demoResets(seed: number, page: Pick<Resets, 'look' | 'use'>): Resets {
+  const one = (username: string, hoursLeft: number): ResetView => ({ username, created: Date.now() - (24 - hoursLeft) * HOUR, expires: Date.now() + hoursLeft * HOUR });
+  const open = signal<readonly ResetView[] | null>([one('dilan', 6), one('sachi', 20)].slice(0, seed));
+  const later = <T>(answer: T) => new Promise<T>((done) => setTimeout(() => done(answer), 200));
+  return {
+    open,
+    refresh: async () => {},
+    create(username) {
+      if (username === 'nobody_here') return later({ ok: false, error: 'unknown' });
+      if (username === 'ravi') return later({ ok: false, error: 'bad_request' });
+      const made = one(username, 24);
+      const reset = 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy';
+      open.value = [...open.value!.filter((it) => it.username !== username), made];
+      return later({ ok: true, reset: { ...made, reset, link: `https://heirloom.example/#/reset/${reset}` } });
+    },
+    revoke(username) {
+      open.value = open.value!.filter((it) => it.username !== username);
+      return later({ ok: true });
+    },
+    ...page,
   };
 }
 

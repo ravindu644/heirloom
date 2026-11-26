@@ -15,6 +15,8 @@
 .rows > li + li .row { border-top: var(--layout-hair) solid var(--line); }
 /* One place for two sets of links: each lies in the same cell, and the one not offered is unseen and cannot be pressed. */
 .slot { display: grid; }
+/* On a phone a row's links stand on their own line, in every row: never beside the words in one and under them in the next. */
+.slot { flex-basis: 100%; }
 .slot > * { grid-area: 1 / 1; }
 .off { visibility: hidden; }
 .what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); min-width: 0; }
@@ -32,4 +34,7 @@
 
 @media (min-width: 720px) {
   .actions > *, .raise button { flex: none; justify-self: start; }
+  /* Beside the words, and the links shown end at the row's right edge, whichever of the two sets is the wider. */
+  .slot { flex-basis: auto; }
+  .slot > * { justify-self: end; }
 }

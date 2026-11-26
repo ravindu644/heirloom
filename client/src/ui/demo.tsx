@@ -20,10 +20,11 @@ import type { Progress } from '../sync/progress.ts';
 import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
-import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoRooms, demoServer, demoSettings } from './demo-more.ts';
+import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
 import type { DemoHabit, DemoRoom, DemoServer } from './demo-more.ts';
 import type { Admins } from '../sync/admins.ts';
 import type { Invites } from '../sync/invites.ts';
+import type { Resets } from '../sync/resets.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import { ServerStep } from './server.tsx';
 import { FirstRun } from './welcome.tsx';
@@ -92,6 +93,10 @@ interface Scene {
   /** The invite the phone app holds from a pasted link. */
   held?: string;
   admins?: string[];
+  /** The owner's open reset links, how many. */
+  resets?: number;
+  /** Arrived by a reset link carrying this reset. `dead` is one the server no longer knows. */
+  reset?: string;
   /** A second tab: no app at all. */
   elsewhere?: boolean;
   signedOut?: boolean;
@@ -364,6 +369,16 @@ const SERVER: Record<string, Scene> = {
   'settings-demoted': { ...owner, about: 'An admin the owner has made a member again, before the server said so here', role: 'admin', invites: 'forbidden' },
   'settings-signed-out': { ...owner, about: 'An admin whose device the server signed out asks for a link', role: 'admin', sync: 'signed-out', invites: 'token', tap: 'Make an invite link' },
   'signin-phone-invite': { about: 'The phone app, started from a pasted invite link: the invite is in hand', signedOut: true, serverAt: 'https://heirloom.example', held: 'k3J9xQ7mPa2f8Lw0' },
+  'settings-owner-reset': { ...owner, about: 'A reset link just made: shown whole, once, with whose it is', admins: ['sachi'], resets: 2, tap: ['fill:reset=dilan', 'submit:reset'] },
+  'settings-owner-resets': { ...owner, about: 'Two reset links open, each with when it runs out', admins: ['sachi'], resets: 2 },
+  'settings-owner-resets-taking': { ...owner, about: 'Taking a reset link back: the second tap', admins: ['sachi'], resets: 2, tap: 'Take back' },
+  'settings-owner-reset-unknown': { ...owner, about: 'A reset link for a name nobody has here', admins: ['sachi'], tap: ['fill:reset=nobody_here', 'submit:reset'] },
+  'settings-owner-reset-own': { ...owner, about: 'A reset link for the owner: the way is the server\'s own command', admins: ['sachi'], tap: ['fill:reset=ravi', 'submit:reset'] },
+  reset: { about: 'A reset link opened, signed out: whose password, one field, one button', signedOut: true, reset: 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy' },
+  'reset-short': { about: 'A new password that is too short', signedOut: true, reset: 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy', tap: ['fill:password=short', 'submit:password'] },
+  'reset-dead': { about: 'A reset link that no longer works', signedOut: true, reset: 'dead' },
+  'reset-signed-in': { ...idleAt2, about: 'A reset link opened where an account is open: sign out first', day: day(), reset: 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy' },
+  'signin-phone-reset-pasted': { about: 'A reset link pasted where the phone app asks for an invite: it is for a browser', signedOut: true, serverAt: 'https://heirloom.example', tap: ['I have an invite', 'fill:invite=https://heirloom.example/#/reset/q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy', 'fill:username=sachi', 'fill:password=long enough', 'submit:username'] },
   'settings-plain': { ...owner, about: 'Settings in the phone app on a plain http server', role: 'member', serverAt: LAN },
 };
 
@@ -438,7 +453,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins; server?: ServerChoice } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins; resets: Resets; server?: ServerChoice } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -630,6 +645,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     saved: async () => {},
     cells: () => [],
     stop: async () => {},
+    // A reset link: `dead` is one the server no longer knows, and a password that is an error's code gets that error.
+    resetLook: async (reset) => (reset === 'dead' ? { ok: false, error: 'reset' } : { ok: true, username: 'sachi' }),
+    resetUse: (reset, password) => (reset === 'dead' ? Promise.resolve({ ok: false, error: 'reset' }) : answer('sachi', password)),
   };
   const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
   const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
@@ -637,13 +655,14 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
   const invites = demoInvites(scene.invites ?? 0, now);
   const admins = demoAdmins(scene.admins ?? []);
+  const resets = demoResets(scene.resets ?? 0, { look: engine.resetLook, use: engine.resetUse });
   const server = scene.serverAt ? demoServer({ address: scene.serverAt, held: scene.held }) : undefined;
-  return { engine, focus, today, progress, habits, rooms, settings, invites, admins, server };
+  return { engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server };
 }
 
 const name = new URLSearchParams(location.search).get('state');
 const scene = name ? SCENES[name] : undefined;
-if (scene && !location.hash) location.hash = scene.join ? `#/join/${scene.join}` : scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
+if (scene && !location.hash) location.hash = scene.join ? `#/join/${scene.join}` : scene.reset ? `#/reset/${scene.reset}` : scene.today ? '#/today' : scene.settings ? '#/settings' : scene.record ? '#/progress' : scene.habits ? '#/habits' : scene.room ? '#/room' : '';
 // Staged once, so a tap word can change what another device would have changed.
 const staged = scene && !scene.elsewhere && !scene.welcome && !scene.serverStep ? stage(scene) : undefined;
 render(

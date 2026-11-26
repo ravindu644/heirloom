@@ -69,7 +69,8 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
     // Only the setup form sends none: an empty invite makes the owner of a fresh server, and
     // nobody joining means that. Nothing found is said, and nothing is sent.
     const joining = kind === 'join' ? (linked ?? inviteIn(field('invite'))) : '';
-    if (joining === null) return setError(s.account.noInvite);
+    // A reset link pasted here is not an invite, and is said to be what it is.
+    if (joining === null) return setError(field('invite').includes('#/reset/') ? s.reset.pasted : s.account.noInvite);
     // What was said stays while the server is asked again: taken away now and put back a moment
     // later, it would move the buttons twice under the finger.
     setBusy(true);
@@ -164,6 +165,8 @@ export function SignIn({ engine, again, invite, server, onDone }: Props) {
           )}
         </div>
         </div>
+        {/* Only where a password is asked for and there is someone to have forgotten it. */}
+        {kind === 'signin' && <p class={css.aside}>{server ? s.reset.forgotApp : s.reset.forgot}</p>}
         {/* The phone app is not served by its server, so it says which one it talks to, and that can be changed here. */}
         {server && (
           <div class={css.server}>

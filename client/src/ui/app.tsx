@@ -7,6 +7,7 @@ import './base.css';
 import type { Admins } from '../sync/admins.ts';
 import type { Engine } from '../sync/engine.ts';
 import type { Invites } from '../sync/invites.ts';
+import type { Resets } from '../sync/resets.ts';
 import { inviteIn } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Focus } from '../sync/focus.ts';
@@ -23,6 +24,7 @@ import { FocusScreen } from './focus/focus.tsx';
 import { HabitsScreen } from './habits/habits.tsx';
 import { RoomScreen } from './room/room.tsx';
 import { ProgressScreen } from './progress/progress.tsx';
+import { ResetPage, ResetSignedIn, resetIn } from './reset.tsx';
 import { SignIn } from './signin.tsx';
 import { TodayScreen } from './today/today.tsx';
 import * as s from './strings.ts';
@@ -55,6 +57,37 @@ function useInvite(): string | undefined {
   return invite;
 }
 
+// A reset link is the address of this page too: `<server>/#/reset/<reset>`. It is read once and
+// the address made `#/reset` at that moment: the link is a key, and must not stay in the address
+// bar, the history or a bookmark. `#/reset` is no destination (it draws Focus), so any link the
+// person follows, Focus and the mark included, changes the address and is heard. From then on it is held here and nowhere else,
+// until it is used, found dead or let go. `shown` is false once the person has gone anywhere
+// since: where an account is open, the page that says so is not in the way of the app twice.
+function useReset() {
+  const read = () => {
+    const found = resetIn(location.hash);
+    if (found) history.replaceState(null, '', '#/reset');
+    return found;
+  };
+  const [held, setHeld] = useState(() => ({ reset: read(), shown: true }));
+  useEffect(() => {
+    const change = () => {
+      const found = read();
+      setHeld((was) => (found ? { reset: found, shown: true } : { ...was, shown: false }));
+    };
+    addEventListener('hashchange', change);
+    return () => removeEventListener('hashchange', change);
+  }, []);
+  return {
+    ...held,
+    // Used or let go: the address is an ordinary one again, as the screen under it already is.
+    drop: () => {
+      if (location.hash === '#/reset') history.replaceState(null, '', '#/focus');
+      setHeld({ reset: null, shown: false });
+    },
+  };
+}
+
 /** The whole screen when there is no app to show: the frame and one sentence. */
 export function Notice({ text }: { text: string }) {
   return (
@@ -84,20 +117,29 @@ interface Props {
   canSave?: boolean;
   invites: Invites;
   admins: Admins;
+  resets: Resets;
   /** The phone app's server. Left out in a browser, where the page's own address is the server. */
   server?: ServerChoice;
   /** True while the device will not let heirloom notify: Settings says so under the bell. */
   ringBlocked?: ReadonlySignal<boolean>;
 }
 
-export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, server, onReminderSet, canSave, ringBlocked }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, onReminderSet, canSave, ringBlocked }: Props) {
   const screen = useScreen();
   const invite = useInvite();
+  const link = useReset();
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
   // The server refused this device's token: the app still works, and Settings offers signing in again.
   const [again, setAgain] = useState(false);
+
+  // A reset link in hand and nobody signed in: its page. Signed in, the link waits (see below) and is
+  // offered again the moment the account is closed, so it need not be opened a second time.
+  if (!account && link.reset) {
+    const host = new URL(server?.address ?? engine.server, location.origin).host;
+    return <ResetPage key={link.reset} resets={resets} reset={link.reset} host={host} onDone={link.drop} onLeave={link.drop} />;
+  }
 
   if (!account || again) {
     const done = () => {
@@ -118,16 +160,22 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
         ? s.status.refused(s.device())
         : '';
 
+  // A reset link opened where an account is open: it is not used over that account. Said once, until the person goes anywhere.
+  const reset = link.reset !== null && link.shown;
+
   return (
     // The status line keeps its space only where buttons sit at the bottom of a phone screen: Focus.
     <Shell
       person={account.username}
-      at={screen === 'settings' ? undefined : screen}
+      at={screen === 'settings' || reset ? undefined : screen}
+      page={reset ? 'reset' : undefined}
       without={rooms.hidden.value ? 'room' : undefined}
       status={said}
       keepStatus={screen === 'focus'}
     >
-      {screen === 'focus' ? (
+      {reset ? (
+        <ResetSignedIn resets={resets} reset={link.reset!} />
+      ) : screen === 'focus' ? (
         <FocusScreen engine={engine} focus={focus} today={today} rooms={rooms} settings={settings} />
       ) : screen === 'today' ? (
         <TodayScreen engine={engine} focus={focus} today={today} settings={settings} app={canSave === false} onReminderSet={onReminderSet} />
@@ -139,7 +187,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
         <RoomScreen engine={engine} rooms={rooms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
-        <Settings engine={engine} settings={settings} invites={invites} admins={admins} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

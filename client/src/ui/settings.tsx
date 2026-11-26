@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Admins } from '../sync/admins.ts';
 import type { Engine } from '../sync/engine.ts';
 import type { Invites } from '../sync/invites.ts';
+import type { Resets } from '../sync/resets.ts';
 import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
@@ -12,7 +13,7 @@ import form from './kit/form.module.css';
 import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
-import { AdminsPanel, InvitesPanel } from './people.tsx';
+import { AdminsPanel, InvitesPanel, ResetsPanel } from './people.tsx';
 import { Stepper } from './kit/stepper.tsx';
 import { Switch } from './kit/switch.tsx';
 import { useWide } from './kit/wide.ts';
@@ -40,6 +41,7 @@ interface Props {
   settings: SettingsData;
   invites: Invites;
   admins: Admins;
+  resets: Resets;
   /** The phone app's server; left out in a browser. */
   server?: ServerChoice;
   canSave?: boolean;
@@ -48,7 +50,7 @@ interface Props {
   onSignIn: () => void;
 }
 
-export function Settings({ engine, settings, invites, admins, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
+export function Settings({ engine, settings, invites, admins, resets, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -116,6 +118,8 @@ export function Settings({ engine, settings, invites, admins, server: choice, ca
     <>
       {role !== 'member' && <InvitesPanel invites={invites} />}
       {role === 'owner' && <AdminsPanel admins={admins} />}
+      {/* The owner's alone: an admin could otherwise take any account, the owner's too, by resetting it. */}
+      {role === 'owner' && <ResetsPanel resets={resets} />}
     </>
   );
 
