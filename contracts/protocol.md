@@ -658,7 +658,7 @@ errors as section 10, and these of their own:
 |---|---|---|
 | 404 | `room` | No such room, or the account is not in it |
 | 404 | `code` | No room has this code |
-| 409 | `full` | The room has 8 members, or the account is in 5 rooms |
+| 409 | `full` | The room has 16 members, or the account is in 5 rooms |
 | 404 | `run` | `to` is not a member, or has no such session that rang |
 | 429 | `slow_down` | Ten wrong codes from one account inside an hour: every join by it, the right code included, until the hour is up. `Retry-After` carries the seconds |
 | 403 | `forbidden` | `update` or `remove` by a member who is not the keeper |
