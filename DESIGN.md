@@ -624,7 +624,10 @@ Built once in `client/src/ui/kit/` and reused.
   - It is still. It is one image to a screen reader, with one sentence that says what it shows.
   - The title is the screen's heading in `headline-lg`; the sentence is `body` in
     `muted`. Its words say why the next step asks for a server, so the button needs no other.
-  - The phone app shows it once, before the server step. The browser shows the drawing, title
+  - The phone app shows it before the first server step, and the server step's "Back" always
+    leads to it, also when the step was opened by "Change" under Sign in: Back means the
+    welcome and nothing else. The address the app holds stays in the server field and stays
+    the server until "Use this server" chooses another; leaving by Back changes nothing. The browser shows the drawing, title
     and sentence beside the sign-in form from 720px and under it below, without the button;
     there its title is `title`, a step under the form's own heading.
 - **The launcher icon** is the mark at three quarters of the adaptive icon's safe circle (about
