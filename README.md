@@ -24,7 +24,7 @@ else.
    Allow notifications, or the bell cannot ring with the screen off.
 3. To study with friends, open **Room** and type the room's code.
 
-No friend with a server? [Run your own](docs/DEPLOY.md): one file for Linux, x86_64 or arm64.
+No friend with a server? [Run your own](docs/DEPLOY.md): one file for Linux on x86_64 or aarch64, installed with one command.
 
 ## Screenshots
 

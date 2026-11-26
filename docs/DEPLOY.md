@@ -2,89 +2,60 @@
 
 `heirloomd` is one file. The web app is built into it and its data lives in one SQLite file, so a
 machine that runs it needs nothing else: no Go, no Node, no database server. It runs on Linux,
-x86_64 or arm64, in about 50 MB of memory.
+x86_64 or aarch64, in about 50 MB of memory.
 
-## 1. Get heirloomd
+## 1. Install it
 
-**Download it.** Each [release](https://github.com/ravindu644/heirloom/releases/latest) carries
-`heirloomd-linux-amd64` and `heirloomd-linux-arm64` (`uname -m` says `x86_64` or `aarch64`),
-the service file `heirloomd.service`, and `SHA256SUMS`.
+On Linux with systemd running, on x86_64 or aarch64 (nothing else is supported):
 
 ```
-ARCH=arm64   # or amd64
-curl -LO https://github.com/ravindu644/heirloom/releases/latest/download/heirloomd-linux-$ARCH
-curl -LO https://github.com/ravindu644/heirloom/releases/latest/download/heirloomd.service
-curl -LO https://github.com/ravindu644/heirloom/releases/latest/download/SHA256SUMS
-sha256sum --ignore-missing -c SHA256SUMS
-mv heirloomd-linux-$ARCH heirloomd
+curl -fsSL https://github.com/ravindu644/heirloom/releases/latest/download/install.sh | sudo sh
 ```
 
-**Or build it** with Go 1.26, Node 22 and pnpm 12 ([TOOLCHAINS.md](../TOOLCHAINS.md) has the pins).
-The web app is built first, then copied into the binary:
+[install.sh](../install.sh) downloads the latest `heirloomd` for the machine, checks it against the
+release's `SHA256SUMS`, gives it a user of its own and installs it as the `heirloomd` service,
+with its data in `/var/lib/heirloomd`. Run it again to update; the address and contact already
+set are kept. Options go after `sudo sh -s --`, or after `install.sh` in a checkout:
 
-```
-pnpm install
-make server   # server/bin/heirloomd for this machine, server/bin/heirloomd-arm64 for linux arm64
-```
+- `--addr 127.0.0.1:8787`: where it listens (all addresses, port 8787, by default). Use
+  `127.0.0.1` behind a tunnel or a proxy on the same machine.
+- `--contact mailto:you@example.org`: who a browser's push service can write to (step 4).
+- `--binary` and `--service`: install your own build instead. With Go 1.26, Node 22 and pnpm 12
+  ([TOOLCHAINS.md](../TOOLCHAINS.md)):
 
-The service file is `server/deploy/heirloomd.service`. Either way, `./heirloomd -version` prints
-what you have.
+  ```
+  pnpm install && make server
+  sudo sh install.sh --binary server/bin/heirloomd --service server/deploy/heirloomd.service
+  ```
 
-## 2. Install it as a service
-
-```
-id heirloomd || sudo useradd --system --home-dir /var/lib/heirloomd --shell /usr/sbin/nologin heirloomd
-sudo install -m 0755 heirloomd /usr/local/bin/heirloomd
-sudo install -m 0644 heirloomd.service /etc/systemd/system/heirloomd.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now heirloomd
-```
-
-The unit makes `/var/lib/heirloomd` itself, owned by `heirloomd` and closed to everyone else, and
-locks the server down to what it uses; each line of the file says why it is there.
 `systemctl status heirloomd` and `journalctl -u heirloomd` say how it is doing. The log holds a
-start line and errors, never anything a person wrote.
+start line and errors, never anything a person wrote. Each line of
+[heirloomd.service](../server/deploy/heirloomd.service) says why it is there.
 
-It listens on port 8787 of every address the machine has. To change that, edit `-addr` in the
-unit's `ExecStart` and run the last two lines again. Behind a tunnel or a proxy on the same
-machine, `-addr 127.0.0.1:8787` keeps it off the network.
+## 2. Set it up, before anyone else
 
-To update, install the new binary the same way and `sudo systemctl restart heirloomd`.
+The first account made on a new server owns it. Open the server's address in a browser, choose
+**Set up this server**, and do it before you give the address to anyone or open a tunnel to it.
 
-## 3. Set it up, before anyone else
-
-A server nobody has signed up on belongs to whoever signs up first. Open its address in a
-browser: it shows **Set up this server**, and the account made there is the **owner**. Do this
-before you give the address to anyone or open a tunnel to it. Until then the journal says
-`no account yet` at each start.
-
-The owner makes invite links in Settings, and can let others invite under **Admins**. A link makes
-one account, once, and is good for 7 days. From a shell on the server:
+The owner makes invite links in Settings (one account each, good for 7 days) and can let others
+invite under **Admins**. From a shell, as the service's user so the files stay its own:
 
 ```
-sudo -u heirloomd /usr/local/bin/heirloomd -data /var/lib/heirloomd -invite
+sudo -u heirloomd /usr/local/bin/heirloomd -data /var/lib/heirloomd -invite            # <server>/#/join/<this>
+sudo -u heirloomd /usr/local/bin/heirloomd -data /var/lib/heirloomd -reset <username>  # <server>/#/reset/<this>
 ```
 
-prints one, the last part of `<server>/#/join/<invite>`. Run it as `heirloomd`, not as root: root
-would leave files in the data directory the server cannot open. Someone who forgot their password
-gets one from `-reset <username>` in place of `-invite`: the last part of `<server>/#/reset/<code>`.
+## 3. Reach it from outside
 
-## 4. Reach it from outside
+`http://<the machine's address>:8787` works on a home network you trust, but it is plain http: a
+password crosses the wifi as typed, and browsers give such a page no bell with the tab closed and
+no offline copy. For friends, put https in front: a Cloudflare tunnel or a reverse proxy with a
+certificate, pointed at `http://127.0.0.1:8787`, passing WebSockets on `/api/ws`.
 
-- **The home network**, at `http://<the machine's address>:8787`. Plain http: anyone on the same
-  wifi can read a password as it is typed. A browser also treats it as not secure, so a laptop
-  gets no bell with the tab closed and the app is not kept for offline use. Fine for a house you
-  trust.
-- **https**, through a Cloudflare tunnel or a reverse proxy with a certificate, pointed at
-  `http://127.0.0.1:8787`. Reachable from anywhere, and everything works. This is the address to
-  give friends. Proxies must pass WebSockets on `/api/ws`.
+## 4. Let browsers ring
 
-## 5. Let browsers ring
-
-At a bell the server sends a Web Push to each browser that asked for one. Push services want to
-know who is sending, and some refuse a sender they cannot write to. Add
-`-contact mailto:you@example.org` (or an `https:` address) to the unit's `ExecStart`. The key for
-this is made at the first start and lives in the database.
+A browser's bell is a Web Push, and some push services refuse a sender they cannot write to. Run
+install.sh again with `--contact mailto:you@example.org` (or an `https:` address).
 
 ## Backups and restoring
 

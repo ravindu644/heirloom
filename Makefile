@@ -109,19 +109,13 @@ bump:
 	@sed -i 's/^  "version": ".*",/  "version": "$(NEW)",/' package.json
 	@echo "[+] Version $$(node -p 'require("./package.json").version') set. Commit it, then tag v$(NEW) to release."
 
-# Puts the binary and its systemd unit on the server and restarts the service there. It listens on
-# the container's localhost only; the tunnel is what lets anyone in. The sudo password goes from
-# .local/ENV.md straight into ssh's stdin: never in a variable, an argument or the log.
+# Puts the binary and its systemd unit on the server and runs install.sh there, the same script a
+# release installs with. The sudo password goes from .local/ENV.md straight into ssh's stdin:
+# never in a variable, an argument or the log.
 deploy: server
 	$(need-host)
-	scp server/bin/heirloomd-arm64 $(HOST):heirloomd
-	scp server/deploy/heirloomd.service $(HOST):heirloomd.service
-	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'sudo -S -p "" sh -ec "\
-		id heirloomd >/dev/null 2>&1 || useradd --system --home-dir /var/lib/heirloomd --shell /usr/sbin/nologin heirloomd; \
-		install -m 0755 /home/$(HOST_USER)/heirloomd /usr/local/bin/heirloomd; \
-		install -m 0644 /home/$(HOST_USER)/heirloomd.service /etc/systemd/system/heirloomd.service; \
-		systemctl daemon-reload; systemctl enable heirloomd >/dev/null 2>&1; systemctl restart heirloomd; \
-		sleep 3; systemctl is-active heirloomd; /usr/local/bin/heirloomd -version"'
+	scp install.sh server/bin/heirloomd-arm64 server/deploy/heirloomd.service $(HOST):
+	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'cd && sudo -S -p "" sh install.sh --binary heirloomd-arm64 --service heirloomd.service'
 
 # Memory of the running service on the real hardware.
 server-rss:
