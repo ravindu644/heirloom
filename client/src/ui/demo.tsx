@@ -144,6 +144,12 @@ const OWN = { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN };
 const swap = (id: string, fields: Partial<DemoTask>) => TASKS.map((task) => (task.id === id ? { ...task, ...fields } : task));
 const READING: DemoTask = { id: 'read', title: 'Read one chapter of OSTEP', estimate: 1, due: DAY, repeat: { every: 'day' } };
 
+// Few enough rows that the top of Today and Upcoming are both on a phone's screen.
+const FEW = day([...TASKS.filter((task) => ['kr', 'ex', 'react'].includes(task.id)), { id: 'quiz', title: 'Discrete maths quiz 4', project: 'uni', estimate: 2, due: '2026-11-25' }]);
+
+// One task today and one tomorrow: carried up, the tomorrow one needs a "Later today" that is not there yet.
+const ONE = day([...TASKS.filter((task) => task.id === 'kr'), { id: 'quiz', title: 'Discrete maths quiz 4', project: 'uni', estimate: 2, due: '2026-11-25' }]);
+
 const TODAY: Record<string, Scene> = {
   'today-empty': { about: 'Today on a first day: nothing yet', next: 0, at: [9, 5], day: { tasks: [] } },
   today: { ...idleAt2, about: 'Today, the day of the mockup, nothing running', day: day() },
@@ -175,6 +181,12 @@ const TODAY: Record<string, Scene> = {
       { id: 'app', title: 'Next.js: data fetching', project: 'next', estimate: 3, due: '2026-11-27', repeat: { every: 'week', days: 0b0010100 } },
     ]),
   },
+  // Held, not let go: the list as it answers a carried row before the release.
+  'today-carry-top': { ...idleAt2, about: 'A Later row carried over the Next card: it wears the outline and Start, and what was Next is the first of Later', day: day(), tap: 'demo:carry:Thinking in React' },
+  'today-few-upcoming': { ...idleAt2, about: 'Three tasks today and one tomorrow, all in sight on a phone', day: FEW },
+  'today-one-upcoming': { ...idleAt2, about: 'One task today and one tomorrow: no Later today yet', day: ONE },
+  'today-carry-over-one': { ...idleAt2, about: 'The task of tomorrow carried over the only task of today: Later today comes in over the task it pushes down, while it is held', day: ONE, tap: 'demo:carry:Discrete maths quiz 4' },
+  'today-carry-up': { ...idleAt2, about: 'The task of tomorrow carried to the top: it is Next before the release, and Upcoming is gone', day: FEW, tap: 'demo:carry:Discrete maths quiz 4' },
   'today-target': { ...idleAt2, about: 'Changing the day target', day: day(), tap: 'Change' },
   'today-untargeted': { ...idleAt2, about: 'The target removed on another device while its editor is open here: the way to set one is back', day: day(), tap: ['Change', 'demo:untarget'] },
   'today-top': {
@@ -249,9 +261,14 @@ const TODAY: Record<string, Scene> = {
   'today-picked': { ...idleAt2, about: 'A project in a colour the person picked: its square inside a hair line', day: day(TASKS, { projects: PROJECTS.map((project) => (project.id === 'c' ? { ...project, color: PICKED } : project)) }) },
   'sheet-picked': { ...idleAt2, about: 'A new project in a picked colour: Pick, the thirteenth square, carries it, and the two sliders stand under the squares', day: day(), tap: ['Exercise 5-3', 'New project', 'Pick', 'fill:hue=210'] },
   'sheet-repeat': { ...idleAt2, about: 'The sheet with a repeat on chosen days', day: day(swap('ex', { repeat: { every: 'week', days: 0b0010101 } })), tap: 'Exercise 5-3' },
-  // An estimate of five here, so "lap 3 of 5 on this task" cannot be taken for the set of four above it.
-  'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for', day: day(swap('kr', { estimate: 5 })) },
-  'focus-task': { about: 'Focus with a lap running on a task', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5 })) },
+  // An estimate of five here, so the bar cannot be taken for the set of four.
+  'focus-next': { ...idleAt2, about: 'Focus idle, naming the task the next lap is for: five segments, two of them full', day: day(swap('kr', { estimate: 5 })) },
+  'focus-task': { about: 'Focus with a lap running on a task: its bar, the running lap growing in the third segment', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5 })) },
+  'focus-task-paused': { about: 'That lap paused: said once, under the digits; the line over the bar is empty', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 5 })) },
+  'focus-past-estimate': { about: 'A lap running on a task past its estimate of 2: a segment for each lap, four in all', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 2, squares: [1, 1, 0.5] })) },
+  'focus-no-estimate': { ...idleAt2, about: 'The next task has no estimate: no bar, and the digits where they always are', day: day(swap('kr', { estimate: undefined })) },
+  'focus-no-estimate-running': { about: 'A lap running on a task with no estimate: no bar, no count beside the project', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: undefined })) },
+  'focus-all-in': { about: "The task's last estimated lap just rang: its bar stands tall", run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { estimate: 3 })) },
   'focus-break-task': { about: 'Focus on a break, with tasks up next', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day(swap('kr', { squares: [1, 1, 1] }), { done_ms: 150 * MIN, laps: 6 }) },
   'focus-result-task': { about: 'The result naming the task', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', { title: 'K&R chapter 5', estimate: 5 })) },
   'focus-result-long': { about: 'The result for a task with a long title: it says "This task"', run: { ...onKr, left: 0 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
@@ -415,11 +432,7 @@ const SCENES: Record<string, Scene> = {
   'focus-choose-top': { ...idleAt2, about: 'Choosing among rows at their top: 32 laps and 60 character titles', day: squaresDay(32), tap: 'css:[aria-haspopup=dialog]' },
   'focus-own': { ...idleAt2, about: 'The next task has its own lengths: the digits, the end and the line that says so', day: day(swap('kr', OWN)) },
   'lap-done-own': { about: 'A lap over on a task with its own lengths: the break offered is the one that task has', run: { ...onKr, planned: 50 * MIN, left: 0 }, you: 131 * MIN, laps: 5, ghost: tuesday, day: day(swap('kr', OWN)) },
-  'long-break-paused': { about: 'The long break held: the set bar ends in its mark, filled', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000, paused: true }, you: 200 * MIN, laps: 8, ghost: tuesday },
-  'focus-target-reached': { about: 'The lap that reaches the day target has just rung', run: { ...onKr, left: 0 }, you: 150 * MIN, laps: 5, ghost: tuesday, day: day(TASKS, { target: 6 }) },
-  'focus-target-passed': { ...idleAt2, about: 'Past the day target: the line says so with the target, and the bar is full', day: day(TASKS, { target: 5 }) },
-  'focus-no-target': { ...idleAt2, about: 'No day target: the lap by the day, and no bar', day: day(TASKS, { target: 0 }) },
-  'focus-no-target-running': { about: 'No day target, a lap running', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(TASKS, { target: 0 }) },
+  'long-break-paused': { about: 'The long break held: its name over the bar, and paused said under the digits', run: { phase: 'long', lap: 3, left: 11 * MIN + 5000, paused: true }, you: 200 * MIN, laps: 8, ghost: tuesday },
   'focus-360': { ...idleAt2, about: 'A lap of 360 minutes, the longest there is, before its start: the timer reads hours', day: day(swap('kr', { work_ms: 360 * MIN })) },
   'focus-360-running': { about: 'That lap a second in: seven characters, 5:59:59', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'focus-100-running': { about: 'A long lap with 100 minutes left: the last moment it reads hours, 1:40:00', run: { ...onKr, planned: 360 * MIN, left: 100 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
@@ -720,6 +733,14 @@ render(
     } else if (words === 'demo:untarget') {
       // The day target taken away on another device, while this one has its editor open.
       staged!.today.setTarget(0);
+    } else if (words.startsWith('demo:carry:')) {
+      // Pressed on a row, held, and carried over the Next card, and not let go.
+      const row = [...document.querySelectorAll<HTMLElement>('[data-lift]')].find((one) => one.textContent?.includes(words.slice(11)))!;
+      const box = row.getBoundingClientRect();
+      const next = document.querySelector('[data-lift]')!.getBoundingClientRect();
+      const at = (y: number) => ({ bubbles: true, pointerId: 1, isPrimary: true, clientX: box.left + box.width / 2, clientY: y });
+      row.dispatchEvent(new PointerEvent('pointerdown', at(box.top + box.height / 2)));
+      setTimeout(() => dispatchEvent(new PointerEvent('pointermove', at(next.top + next.height / 2))), 500);
     } else if (words === 'demo:day') {
       // A week back in the year, by the keyboard.
       document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));

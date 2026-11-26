@@ -5,11 +5,14 @@ import type { Engine } from '../../sync/engine.ts';
 import type { Focus } from '../../sync/focus.ts';
 import type { Settings } from '../../sync/settings.ts';
 import type { TaskView, Today } from '../../sync/today.ts';
+import { upNext } from '../../core/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { stopSaid } from '../focus/stopped.ts';
+import { picked } from '../focus/choice.ts';
 import { focusRow, hasMoved, useLift } from '../kit/lift.ts';
+import type { Carry } from '../kit/lift.ts';
 import type { Figure } from '../kit/figures.tsx';
 import { LapBar } from '../kit/lapbar.tsx';
 import links from '../kit/links.module.css';
@@ -100,6 +103,14 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   const movable = today.list.value;
   const lists = useRef<HTMLDivElement>(null);
   const [placed, setPlaced] = useState('');
+  // Where the row in the hand would land, while it is carried.
+  const [carry, setCarry] = useState<Carry>(null);
+  // A row set down as Next is what Focus's Start begins too: a task chosen on Focus earlier (the
+  // one the last lap was on) gives way, or two screens would offer two tasks. While a lap runs
+  // the choice is for the lap after it, and stays.
+  const followNext = (id: string) => {
+    if (today.next.peek()?.id === id && !inLap) picked.value = null;
+  };
   useLift(
     lists,
     (id, before) => {
@@ -108,6 +119,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     const intoToday = !!ahead && (before === '' || movable.some((task) => task.id === before));
     if (intoToday) {
       const was = today.moveToToday(id, before || null);
+      followNext(id);
       // The bar says so, to eyes and to a screen reader: the day it has now, the day it had as its row showed it, and the way back.
       const undo = () => {
         today.moveBack(id, was!);
@@ -120,13 +132,28 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     }
     // Within today's rows the edge is their end; within Upcoming there is no edge under a row.
     today.move(id, before || null);
+    followNext(id);
     const list = (ahead ? upcoming : movable).filter((task) => task.id !== id);
     const at = before ? list.findIndex((task) => task.id === before) : list.length;
     setPlaced(s.today.nowAt([...movable, ...upcoming].find((task) => task.id === id)?.title ?? '', at + 1, list.length + 1));
     },
     // A row of today let go inside Upcoming, or stepped at it with the keys: it stays, and the bar says why.
     () => say({ lead: '', title: s.today.staysToday }),
+    setCarry,
   );
+  // The list answers before the release: what is Next, and what Later holds, as they will be once
+  // the row in the hand is let go. The rows stay in their lists until then; the hand moves them.
+  const lapOn = today.running.value?.id ?? null;
+  const shown = (() => {
+    const open = [...movable, null, ...upcoming];
+    const moving = carry && open.find((task) => task?.id === carry.id);
+    if (!carry || !moving) return { next, later, upcoming };
+    const rest = open.filter((task) => task !== moving);
+    // Before a row, before the edge between today and Upcoming (''), or at the very end (null).
+    const at = carry.before === null ? -1 : rest.findIndex((task) => (carry.before === '' ? task === null : task?.id === carry.before));
+    rest.splice(at < 0 ? rest.length : at, 0, moving);
+    return { ...upNext(rest.slice(0, rest.indexOf(null)) as TaskView[], lapOn), upcoming: rest.slice(rest.indexOf(null) + 1) };
+  })();
 
   // Recently deleted closes with its last row.
   useEffect(() => {
@@ -151,12 +178,30 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     to?.focus({ preventScroll: true });
   }, [open]);
 
+  // The Next card's look: its outline, and its Start, the one filled button of the screen, which
+  // starts a lap on this task now, break or no break. It goes to a carried row the moment the row
+  // is over the top place.
+  const look = (task: TaskView): { next?: boolean; end?: ComponentChildren } =>
+    task.id !== shown.next?.id
+      ? {}
+      : {
+          next: true,
+          end: inLap ? undefined : (
+            <Button kind={rung ? 'secondary' : 'primary'} onClick={() => focus.skipBreak(task.id)}>
+              {s.today.start}
+            </Button>
+          ),
+        };
+
+  // An Upcoming row carried up among today's is due today once let go, and says so already.
+  const comingToday = (task: TaskView) => carry?.id === task.id && [shown.next, ...shown.later].includes(task);
+
   const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => (
     <TaskRow
       key={task.id}
       task={task}
       of={s.today.of(task.estimate)}
-      note={[task.due && task.due !== day ? s.today.due(task.due, day) : '', task.time ?? '', task.subtasks.length ? s.today.subtasks(task.subtasks.filter((sub) => sub.done).length, task.subtasks.length) : ''].filter(Boolean).join(', ')}
+      note={[task.due && task.due !== day && !comingToday(task) ? s.today.due(task.due, day) : '', task.time ?? '', task.subtasks.length ? s.today.subtasks(task.subtasks.filter((sub) => sub.done).length, task.subtasks.length) : ''].filter(Boolean).join(', ')}
       checkLabel={s.today.check(task.title)}
       onDone={(isDone) => setDone(task, isDone)}
       onOpen={() => {
@@ -188,7 +233,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   // lap for that task: it is named from the task's own row, as Focus names it.
   const lapRow = state.task ? engine.rows('task').value.get(state.task) : undefined;
   const named = typeof lapRow?.title === 'string' ? lapRow.title : undefined;
-  const leftInLater = later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
+  const leftInLater = shown.later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
   return (
     <div class={cx(css.today, said.room)}>
@@ -306,29 +351,22 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
         <Fold gap="md" class={css.open} data-said>
           {next && (
             <section key="next">
-              <h2 class={css.sect} id="list-next" tabIndex={-1}>
+              <h2 class={css.sect} id="list-next" tabIndex={-1} data-lift-head="0">
                 {s.today.next}
               </h2>
-              <Fold>
-                {row(next, 'next', {
-                  next: true,
-                  // The one filled button of the screen. It starts a lap on this task, now, break or no break.
-                  end: inLap ? undefined : (
-                    <Button kind={rung ? 'secondary' : 'primary'} onClick={() => focus.skipBreak(next.id)}>
-                      {s.today.start}
-                    </Button>
-                  ),
-                })}
-              </Fold>
+              <Fold>{row(next, 'next', look(next))}</Fold>
             </section>
           )}
-          {later.length > 0 && (
+          {/* From what the list will be: a row carried up from Upcoming over the only task of today
+              brings the heading in while it is held, over the task it pushes down. */}
+          {shown.later.length > 0 && (
             <section key="later">
-              <h2 class={css.sect} id="list-later" tabIndex={-1}>
+              {/* It stands over whichever row is first under Next, and moves with it while a row is carried. */}
+              <h2 class={css.sect} id="list-later" tabIndex={-1} data-lift-head={next ? 1 : 0}>
                 {s.today.later}
-                <span>{s.today.laterCount(later.length, leftInLater)}</span>
+                <span>{s.today.laterCount(shown.later.length, leftInLater)}</span>
               </h2>
-              <Fold gap="sm">{later.map((task) => row(task, 'later'))}</Fold>
+              <Fold gap="sm">{later.map((task) => row(task, 'later', look(task)))}</Fold>
             </section>
           )}
 
@@ -342,10 +380,11 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
               at every width. Its heading is the edge: a row comes up over it, none goes down under it. */}
           {upcoming.length > 0 && (
             <section key="upcoming">
-              <h2 class={css.sect} id="list-upcoming" tabIndex={-1} data-lift-edge>
+              {/* Its last row carried up into today, it fades: it goes when the row is let go. */}
+              <h2 class={cx(css.sect, shown.upcoming.length === 0 && css.leaving)} id="list-upcoming" tabIndex={-1} data-lift-edge>
                 {s.today.upcoming}
               </h2>
-              <Fold gap="sm">{upcoming.map((task) => row(task, 'upcoming'))}</Fold>
+              <Fold gap="sm">{upcoming.map((task) => row(task, 'upcoming', look(task)))}</Fold>
             </section>
           )}
 

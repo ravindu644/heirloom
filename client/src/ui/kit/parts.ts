@@ -27,10 +27,13 @@ export function keep<V>(was: Part<V>[], now: Part<V>[]): Part<V>[] {
 
 // A list just put in order by hand (kit/lift.ts) already stands as it will be drawn: for that
 // one redraw nothing is kept, nothing arrives and nothing glides a second time.
+// Kept for two frames: a list redrawn by a signal is redrawn in the next animation frame, after
+// anything asked for before the write. Let go in that same frame, the redraw it was meant for
+// came after it, and a row that changed lists was shown leaving one and arriving in the other.
 let byHand = false;
 export const placedByHand = () => {
   byHand = true;
-  requestAnimationFrame(() => (byHand = false));
+  requestAnimationFrame(() => requestAnimationFrame(() => (byHand = false)));
 };
 export const wasPlacedByHand = () => byHand;
 

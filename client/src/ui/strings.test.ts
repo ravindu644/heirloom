@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clock, focus } from './strings.ts';
+import { clock, focus, result, ring } from './strings.ts';
+
+test('the long break is earned by four laps, and from the second of the day by four more', () => {
+  assert.equal(result.set(4), 'Four laps. The long break is earned!');
+  assert.equal(result.set(8), 'Four more laps. The long break is earned!');
+  assert.equal(result.set(0), 'Four laps. The long break is earned!');
+});
+
+test('the countdown in the notification names the lap by the day when it is for no task', () => {
+  assert.equal(ring.lapOn(null, 3, null), 'Lap 3 today');
+  assert.equal(ring.lapOn('Essay', 2, 4), 'Lap 2, 4 estimated: Essay');
+});
 
 const MIN = 60000;
 
@@ -14,13 +25,6 @@ test('the clock reads minutes under 100 minutes and hours from there', () => {
   assert.equal(clock(100 * MIN - 400), '1:40:00');
 });
 
-test('a lap is counted by the day, against the target where there is one', () => {
-  assert.equal(focus.lap(3, 5), 'Lap 3 of 5 today');
-  assert.equal(focus.lap(5, 5), 'Lap 5 of 5 today');
-  assert.equal(focus.lap(6, 5), 'Lap 6 today, past your target of 5');
-  assert.equal(focus.lap(3, 0), 'Lap 3 today');
-});
-
 test('a stop says how far the lap ran as the clock says it, and a lap from yesterday has no number', () => {
   assert.equal(focus.stopped(3, 30000), 'Lap 3 today stopped in its first minute.');
   assert.equal(focus.stopped(3, 12 * MIN + 59000), 'Lap 3 today stopped at 12 min.');
@@ -30,6 +34,4 @@ test('a stop says how far the lap ran as the clock says it, and a lap from yeste
   assert.equal(focus.stopped(0, 80 * MIN), "Yesterday's lap stopped at 1h 20m.");
   assert.equal(focus.stoppedAfter(2), 'Stopped after lap 2 today.');
   assert.equal(focus.stoppedAfter(0), "Stopped after yesterday's lap.");
-  assert.equal(focus.breakAfter(5 * MIN, false), '5 min break after');
-  assert.equal(focus.breakAfter(15 * MIN, true), '15 min long break after');
 });

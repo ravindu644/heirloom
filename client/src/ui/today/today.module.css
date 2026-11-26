@@ -46,6 +46,12 @@
 
 .sect { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); font: var(--type-label); color: var(--muted); }
 .sect span { font-weight: inherit; }
+/* It fades as its last row is carried up; while a row is carried it also glides with the rows
+   (kit/lift.ts marks it `data-gliding`). Both are named here, on a selector that outranks the
+   kit's own, so neither depends on which sheet the build puts last. */
+.sect { transition: opacity var(--motion-fill) var(--motion-ease); }
+.sect[data-gliding] { transition: opacity var(--motion-fill) var(--motion-ease), transform var(--motion-fill) var(--motion-ease); }
+.leaving { opacity: 0; }
 /* The focus is sent to a list's heading when a sheet closes on a task that has left it: a place to read on from, not a control. */
 .sect:focus, .head h1:focus { outline: none; }
 

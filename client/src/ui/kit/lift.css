@@ -1,0 +1,9 @@
+/* A row that is up: one step off the surface, the one shadow, a hair line of ink, or the Next
+   card's outline (`--row-ring`) when it is that card or would be once let go. `--row` is the
+   fill a task's and a habit's row draw themselves with, and `--row-track` the empty part of
+   their squares and lanes: on `raised` that is `line`, or `raised` on `raised` would vanish.
+   Marked in data attributes (see lift.ts). Doubled, so it wins over the row's own shadow
+   whichever sheet came first. */
+[data-lifted][data-lifted] { position: relative; z-index: 3; --row: var(--raised); --row-track: var(--line); box-shadow: var(--shadow-float), var(--row-ring, inset 0 0 0 var(--layout-hair) var(--ink)); cursor: grabbing; }
+/* The rows it passes, and the row itself as it is set down, move in time. */
+[data-gliding] { transition: transform var(--motion-fill) var(--motion-ease); }

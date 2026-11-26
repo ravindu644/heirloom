@@ -13,9 +13,10 @@
 }
 .big i { height: var(--layout-lane-set); }
 
-/* Four laps in a row: each of the last four takes a sixth of the moment and starts a sixth after
-   the one before, which leaves the last sixth for the words. */
+/* A task's laps all in: they light one after another in the first two thirds of the moment,
+   however many there are (four take a sixth each, as the set of four once did), which leaves
+   the last sixth for the words. */
 .lit::after {
-  animation: light calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * var(--i) / 6) both;
+  animation: light calc(var(--motion-set-done) * 2 / 3 / var(--lit)) var(--motion-ease) calc(var(--motion-set-done) * 2 / 3 * var(--i) / var(--lit)) both;
 }
 @keyframes light { from { transform: scaleX(0); } }

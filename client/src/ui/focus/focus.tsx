@@ -91,19 +91,16 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // Ready: nothing is running, and the big digits show the lap a tap would start.
   const ready = view.over ? !result : state.phase === 'idle';
   // The timer's own set of four is on no screen. What it decides is said in its own terms: the
-  // break this lap will earn, and after the fourth lap in a row the one moment that marks it.
+  // break this lap will earn, and after the fourth lap in a row the one sentence that marks it.
   const set = result && view.next.phase === 'long';
-  // The lap by the day's count: today's laps, and with them the one starting or running. A lap
-  // whose bell has gone is among today's already, and so is one that rang and runs on.
   const fig = today.figures();
-  const dayLap = fig.laps + (ready || fig.open !== null ? 1 : 0);
   // A lap begun before midnight and still running counts on the day it began: it has no number today.
   // Running, rung or stopped, it is said as that and never as a lap of today.
   const stale = state.phase === 'work' && !ready && state.started !== null && dayOf(state.started) !== dayOf(now);
 
   // The task this lap is for, and the one the next lap will be for. Starting needs no task: with
   // none next, a lap is for nothing in particular.
-  const tasks = [today.running.value, today.next.value, ...today.later.value, ...today.done.value];
+  const tasks = [today.running.value, today.next.value, ...today.later.value, ...today.done.value, ...today.upcoming.value];
   const lapTask = (state.task && tasks.find((task) => task?.id === state.task)) || null;
   const nextTask = today.next.value;
   // The task the next lap is for: the one chosen here or the one the last lap was on, while it
@@ -164,35 +161,91 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   }, [ready]);
 
   // The break this lap will earn, by the timer's own count and at the task's own length: the one
-  // thing the set of four decides that a person feels.
-  const longNext = ready ? view.next.set_index === 3 : view.next.phase === 'long';
-  const breakMs = lengths[longNext ? 'long_ms' : 'short_ms'];
+  // thing the set of four decides that a person feels. It is said on the button that takes it.
+  const breakMs = lengths[(ready ? view.next.set_index === 3 : view.next.phase === 'long') ? 'long_ms' : 'short_ms'];
+  // The line over the bar says only what the digits cannot: a break and its name, a lap that
+  // began yesterday. A lap held is said once, under the digits ("paused since 16:38"). Otherwise
+  // the line is empty and keeps its height, so the digits never move.
   const lapLine = (
     <p class={css.lapline}>
       {isBreak ? (
-        <span>
+        <>
           <i class={css.rest} />
           <b>{state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak}</b>
-          {view.over ? s.focus.breakOver : view.paused ? s.focus.lapPaused : ''}
-        </span>
+          {view.over && s.focus.breakOver}
+        </>
       ) : (
-        <span>
-          <b>{stale ? s.focus.lapYesterday : s.focus.lap(dayLap, fig.target)}</b>
-          {ready ? s.focus.lapNext : result ? s.focus.lapDone : view.paused ? s.focus.lapPaused : s.focus.lapFocus}
-        </span>
+        stale && <b>{s.focus.lapYesterday}</b>
       )}
-      {/* The right end: the break this lap will earn, and in a break the lap of the day that follows. */}
-      <span>{isBreak ? s.focus.lapAhead(fig.laps + 1) : s.focus.breakAfter(breakMs, longNext)}</span>
     </p>
   );
-  // The bar is the day's target, the one Today has: today's laps as full as each ran, then the
-  // lap in progress. With no target there is no bar.
-  const bar = (more: { big?: boolean; lighting?: boolean } = {}) => fig.target > 0 && <LapBar fills={fig.fills} of={fig.target} share={fig.open ?? 0} {...more} />;
+  // The bar is the task's: one segment for each lap of its estimate, more where laps went past
+  // it, each as full as it ran. In a lap and on its result it is that lap's task; otherwise the
+  // one a start would begin. No task, or one with no estimate, has no bar, and its place is kept.
+  const inLap = state.phase === 'work' && !ready;
+  const barTask = inLap || result ? lapTask : chosen;
+  // The lap running on it grows with the clock: the row's last square is that lap, read live here.
+  const growing = inLap && !view.over && barTask?.id === state.task;
+  const squares = barTask?.squares ?? [];
+  const fills = growing ? squares.slice(0, -1) : squares;
+  // The lap just done is the task's last estimated one: its laps are all in, and the bar stands tall.
+  const allIn = result && !!barTask && barTask.estimate !== null && barTask.laps === barTask.estimate;
+  const bar = (more: { big?: boolean; lighting?: boolean } = {}) =>
+    barTask && barTask.estimate !== null ? (
+      <LapBar fills={fills} of={Math.max(barTask.estimate, squares.length)} share={growing ? 1 - view.left_ms / (state.planned_ms || 1) : 0} {...more} />
+    ) : (
+      <i class={css.nobar} />
+    );
+
+  // The lines over the digits name the task: in a lap and on its result the one it is on,
+  // otherwise the one a tap would start. A lap on a task that is not on today's list still has its title, from the row
+  // itself. They are there in every state or in none, so the digits never move: a lap for nothing
+  // says so in the same two lines.
+  const named = barTask;
+  const row = (inLap || result) && !named && state.task ? engine.rows('task').value.get(state.task) : undefined;
+  // Before a start there is a choice to show whenever there is a task to choose.
+  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : (inLap || result ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
+  const upNext = open.filter((task) => task !== named).slice(0, 3);
+  const lines = (
+    <>
+      <span class={css.about}>
+        {named?.project && (
+          <span class={css.project}>
+            <Square color={named.project.color} />
+            {named.project.name}
+          </span>
+        )}
+        {/* How far the task is, the bar says: the words would only repeat it. */}
+        {!named && !row && s.focus.freeLabel}
+        {/* The one word drawn as a link: the two lines are pressed as one. */}
+        {ready && <u class={css.change}>{s.focus.change}</u>}
+      </span>
+      <span class={css.title} title={title}>
+        {title}
+      </span>
+    </>
+  );
+  // A bar sits with what it counts: the task's laps under the task's title, between it and the
+  // digits, so it is never read as the day's. Its place is kept when there is none.
+  const task = (more: { big?: boolean; lighting?: boolean } = {}) => (
+    <div class={css.named}>
+      {/* Before a start the two lines are the way to choose what the lap is for; once it runs they are words. */}
+      {title &&
+        (ready ? (
+          <button type="button" class={css.task} aria-label={s.focus.choose(title)} aria-haspopup="dialog" onClick={() => setChoosing(true)}>
+            {lines}
+          </button>
+        ) : (
+          <div class={css.task}>{lines}</div>
+        ))}
+      {bar(more)}
+    </div>
+  );
 
   if (result) {
     const l = lanes(race, lengths.work_ms, now);
     const headline = set
-      ? s.result.set
+      ? s.result.set(focus.lapsToday())
       : !l.day
         ? s.result.noGhost(race.you_ms)
         : l.chip.tone === 'level'
@@ -201,11 +254,11 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
             ? s.result.ahead(l.split, l.day)
             : s.result.behind(Math.max(1, l.lapsBehind()), fig.laps + 1, l.day);
     return (
-      <div class={cx(css.focus, css.result, live && (set ? css.setMoment : css.lapMoment))}>
+      <div class={cx(css.focus, css.result, live && (allIn ? css.setMoment : css.lapMoment))}>
         <h1 class="sr">{s.focus.title}</h1>
         <div class={css.laps}>
           {lapLine}
-          {bar({ big: set, lighting: live && set })}
+          {task({ big: allIn, lighting: live && allIn })}
         </div>
         <div class={css.told}>
           <p class={cx(css.headline, css.words)} role="status">
@@ -214,7 +267,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           {/* The marks open in place under the lanes, and take no room while there are none. */}
           <div>
             <div class={css.lanes}>
-              <Race big you={l.you} ghost={l.ghost} from={live && !set ? Math.max(0, race.you_ms - state.planned_ms) / (race.you_ms || 1) * l.you.share : undefined} />
+              <Race big you={l.you} ghost={l.ghost} from={live && !allIn ? Math.max(0, race.you_ms - state.planned_ms) / (race.you_ms || 1) * l.you.share : undefined} />
             </div>
             <Marks settings={settings} say={s.mark} />
           </div>
@@ -228,15 +281,14 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           <p class={css.facts}>
             {l.day && (
               <>
-                <SplitChip {...l.chip} turning={live && !set} /> <span class={css.words}>{s.race.at(now)} </span>
+                <SplitChip {...l.chip} turning={live && !allIn} /> <span class={css.words}>{s.race.at(now)} </span>
               </>
             )}
+            {/* The break is said once, on the button that starts it. A lap from yesterday is none of
+                today's: the day's count is not said beside it. The task's count is said only where
+                no bar draws it: a task with no estimate. */}
             <span class={css.words}>
-              {/* A lap from yesterday is none of today's: the day's count is not said beside it. */}
-              {!stale && `${s.result.laps(focus.lapsToday())} `}
-              {lapTask && `${s.result.task(lapTask.title, lapTask.laps, lapTask.estimate)} `}
-              {rooms.cheered.value.length > 0 && `${s.result.cheered(rooms.cheered.value)} `}
-              {s.result.take(breakMs)}
+              {[!stale && s.result.laps(focus.lapsToday()), lapTask && lapTask.estimate === null && s.result.task(lapTask.title, lapTask.laps, lapTask.estimate), rooms.cheered.value.length > 0 && s.result.cheered(rooms.cheered.value)].filter(Boolean).join(' ')}
             </span>
           </p>
             <Button kind="link" class={css.far} onClick={focus.stop}>
@@ -256,34 +308,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
     );
   }
 
-  // The lines over the digits name the task: in a lap the one it is on, otherwise the one a tap
-  // would start. A lap on a task that is not on today's list still has its title, from the row
-  // itself. They are there in every state or in none, so the digits never move: a lap for nothing
-  // says so in the same two lines.
-  const inLap = state.phase === 'work' && !ready;
-  const named = inLap ? lapTask : chosen;
-  const row = inLap && !named && state.task ? engine.rows('task').value.get(state.task) : undefined;
-  // Before a start there is a choice to show whenever there is a task to choose.
-  const title = named?.title ?? (typeof row?.title === 'string' ? row.title : (inLap ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
-  const upNext = open.filter((task) => task !== named).slice(0, 3);
-  const lines = (
-    <>
-      <span class={css.about}>
-        {named?.project && (
-          <span class={css.project}>
-            <Square color={named.project.color} />
-            {named.project.name}
-          </span>
-        )}
-        {named ? s.focus.onTask(named.laps + 1, named.estimate) : !row && s.focus.freeLabel}
-        {/* The one word drawn as a link: the two lines are pressed as one. */}
-        {ready && <u class={css.change}>{s.focus.change}</u>}
-      </span>
-      <span class={css.title} title={title}>
-        {title}
-      </span>
-    </>
-  );
   const shown = ready ? lengths.work_ms : view.left_ms;
   // The digits are for eyes. A screen reader gets a sentence that changes once a minute.
   const heard = ready ? s.focus.nextLength(lengths.work_ms) : s.focus.left(view.left_ms);
@@ -305,20 +329,9 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
     <div class={css.focus}>
       <h1 class="sr">{s.focus.title}</h1>
       <div class={css.clock}>
-        <div>
-          {lapLine}
-          {bar()}
-        </div>
+        {lapLine}
         <div class={css.face}>
-          {/* Before a start the two lines are the way to choose what the lap is for; once it runs they are words. */}
-          {title &&
-            (ready ? (
-              <button type="button" class={css.task} aria-label={s.focus.choose(title)} aria-haspopup="dialog" onClick={() => setChoosing(true)}>
-                {lines}
-              </button>
-            ) : (
-              <div class={css.task}>{lines}</div>
-            ))}
+          {task()}
           <div class={css.time}>
             {/* Each digit sits a little differently in its box. Where DESIGN.md gives the bearing of
                 the digit that leads, the ink lands exactly on the edge; else the one bearing serves. */}
@@ -347,7 +360,8 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         <RacePanel race={race} inLap={inLap && !stale} left={view.left_ms} workMs={lengths.work_ms} now={now} />
         {upNext.length > 0 && (
           <div class={css.upnext}>
-            <Panel title={s.focus.upNext}>
+            {/* What Today calls the rest of its open tasks, in the same words. */}
+            <Panel title={s.today.later}>
               <ul>
                 {upNext.map((task) => (
                   <li key={task.id}>

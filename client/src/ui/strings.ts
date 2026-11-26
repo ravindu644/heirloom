@@ -75,21 +75,13 @@ export const nav = {
 export const focus = {
   title: 'Focus',
 
-  // The lap by the day's count, against the day's target where there is one. The timer's own set
-  // of four is on no screen: nobody chose the four.
-  lap: (n: number, target: number) => (target <= 0 ? `Lap ${n} today` : n > target ? `Lap ${n} today, past your target of ${target}` : `Lap ${n} of ${target} today`),
-  // A lap begun before midnight and still running: it counts on the day it began, so it has no number today.
+  // The line over the bar says only what the digits cannot. Nothing counts laps there: the bar
+  // is the task's, and "Lap 3 of 5 today, next" explained what nobody had asked.
+  // A lap begun before midnight: it counts on the day it began, so it has no number today.
   lapYesterday: 'A lap from yesterday',
-  lapNext: ', next',
-  lapFocus: ', focus',
-  lapPaused: ', paused',
-  lapDone: ', done',
   shortBreak: 'Short break',
   longBreak: 'Long break',
   breakOver: ', over',
-  // At the line's right end: the break this lap will earn, and in a break the lap that follows.
-  breakAfter: (ms: number, long: boolean) => `${mins(ms)} min ${long ? 'long break' : 'break'} after`,
-  lapAhead: (n: number) => `lap ${n} today next`,
 
   endsIfStarted: (end: number, own: boolean) => `Start now and it ends at ${wall(end)}.${own ? ` ${focus.ownLengths}` : ''}`,
   endsAt: (planned: number, end: number) => `of ${clock(planned)}, ends at ${wall(end)}`,
@@ -118,8 +110,6 @@ export const focus = {
     `${lap > 0 ? `Lap ${lap} today` : "Yesterday's lap"} stopped ${ran < MIN ? 'in its first minute' : `at ${ran < 60 * MIN ? `${mins(ran)} min` : total(ran)}`}.`,
   undo: 'Undo',
 
-  // The line over the digits when the lap is for a task. The lap in progress is counted.
-  onTask: (lap: number, estimate: number | null) => (estimate === null ? `lap ${lap} on this task` : `lap ${lap} on this task, ${estimate} estimated`),
   // At the end of an Up next row: how far the task is.
   upNextLaps: (laps: number, estimate: number | null) => (estimate === null ? plural(laps, 'lap', 'laps') : `${laps} of ${plural(estimate, 'lap', 'laps')}`),
   // Starting must not need planning: the quiet way past the task that is next.
@@ -133,7 +123,6 @@ export const focus = {
   chooseTitle: 'This lap is for',
   // 4: said with the length before a start, when the task chosen has lengths of its own.
   ownLengths: 'This task has its own lengths.',
-  upNext: 'Up next',
 
   // What a screen reader hears, once a minute.
   left: (ms: number) => (ms > MIN ? `${Math.ceil(ms / MIN)} minutes left` : ms > 0 ? 'Under a minute left' : 'Time is up'),
@@ -170,7 +159,9 @@ export const result = {
     laps === 1 ? `Lap ${nextLap} draws you level with ${day}.` : `${laps} laps draw you level with ${day}.`,
   noGhost: (ms: number) => `${cap(length(ms))} today.`,
   // The one exclamation mark.
-  set: 'Four laps. The long break is earned!',
+  // `laps`: today's laps, the one that just rang among them. Past the first four of the day, the
+  // four that earned this break are "four more": "Four laps" again read as the count starting over.
+  set: (laps: number) => (laps > 4 ? 'Four more laps. The long break is earned!' : 'Four laps. The long break is earned!'),
   laps: (n: number) => (n <= 1 ? 'First lap of the day.' : `${n} laps today.`),
   take: (ms: number) => (mins(ms) === 5 ? 'Take five.' : `Take ${length(ms)}.`),
   cheered: (who: string[]) => `${names(who)} cheered.`,
@@ -214,7 +205,7 @@ export const ring = {
   stop: 'Stop',
   paused: (ms: number) => `Paused, ${clock(ms)} left`,
   // What the lap is for, with the task's own count: "Lap 1 of 4" alone was read as its estimate.
-  lapOn: (title: string | null, lap: number, estimate: number | null) => (title === null ? focus.lap(lap, 0) : `Lap ${lap}${estimate === null ? '' : `, ${estimate} estimated`}: ${title}`),
+  lapOn: (title: string | null, lap: number, estimate: number | null) => (title === null ? `Lap ${lap} today` : `Lap ${lap}${estimate === null ? '' : `, ${estimate} estimated`}: ${title}`),
   // The bell's line for a lap on a task. The title stands last, where the phone may cut it.
   lapOnDone: (title: string, lap: number) => `Lap ${lap} done: ${title}`,
   // The way out of a break, from the notification: the words Focus has for it.
@@ -308,7 +299,7 @@ export const settings = {
   // Under the three lengths.
   lengthsNote: 'A lap or a break already running keeps its length.',
   // Under the day target: the same number Today edits.
-  targetNote: 'Today and Focus show a bar of this many laps. It can be changed on Today too.',
+  targetNote: 'Today shows a bar of this many laps. It can be changed there too.',
   finish: 'A finished lap',
   celebrate: 'Mark a finished lap',
   celebrateNote: 'A short motion when a lap reaches its bell, and one line at the laps worth it: the first, the 25th, a best week. Off, a finished lap is its numbers and nothing more.',

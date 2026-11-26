@@ -4,19 +4,16 @@
    sentence that explains it directly above. The one stretch of free space lies between them. */
 .focus { display: flex; flex-direction: column; gap: var(--space-lg); min-height: 100%; }
 
-/* The lap line and its bar. */
-.lapline {
-  display: flex;
-  /* Where the two ends do not fit one line, the right end goes under: no word is dropped. */
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0 var(--space-md);
-  margin-bottom: var(--space-sm);
-  font: var(--type-label);
-  color: var(--muted);
-}
-/* Which lap it is, in ink; the rest of the line muted. One weight: DESIGN.md has no bold label. */
+/* The line over the bar, and the bar. Both keep their height when they have nothing to show, so
+   the digits under them stand still from a task with an estimate to one without. */
+.lapline { min-height: 1lh; font: var(--type-label); color: var(--muted); }
+/* What the state is, in ink; the rest of the line muted. One weight: DESIGN.md has no bold label. */
 .lapline b { font-weight: inherit; color: var(--ink); }
+.nobar { display: block; height: var(--layout-lane); }
+/* The task and its bar are one block: the bar sits under the title, with what it counts. */
+.named { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+/* On a result: the line over them, then the task and its bar. */
+.laps { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
 .rest {
   display: inline-block;
   width: var(--space-sm);
@@ -37,7 +34,7 @@
    they can be pressed. */
 /* Over the digits: the box of a 300px figure reaches up past its ink, and a press on these lines must not land on it. */
 button.task { position: relative; z-index: 1; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
-.about { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
+.about { min-height: 1lh; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font: var(--type-label); color: var(--muted); }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); }
 .task i { width: var(--layout-lane); height: var(--layout-lane); }
 /* At the line's end on a phone, as the day target's "Change" is. */
@@ -129,7 +126,7 @@ button.task:hover .change, button.task:active .change { color: var(--ink); }
 
 /* lap-done: the bar runs and the chip turns in the kit; the words come last. */
 .lapMoment .words { animation: say calc(var(--motion-lap-done) * 0.3) var(--motion-ease) calc(var(--motion-lap-done) * 0.7) both; }
-/* set-done: the four segments light in turn, then the result and the long break are offered. */
+/* A task's laps all in: its segments light in turn, then the result and the break are offered. */
 .setMoment .told { animation: say calc(var(--motion-set-done) / 6) var(--motion-ease) calc(var(--motion-set-done) * 5 / 6) both; }
 @keyframes say { from { opacity: 0; } }
 
