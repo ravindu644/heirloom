@@ -1,11 +1,11 @@
 ---
 name: device-test
-description: How to test heirloom on the user's Android phone over adb and deploy to the S10 server container. Load before any [android] or deploy box, or any check that needs a real device.
+description: How to test heirloom on the user's Android phone over adb and deploy to the server container. Load before any [android] or deploy box, or any check that needs a real device.
 ---
 
 # Testing on real devices
 
-Details that differ per machine (adb serial, the S10 container's address and login) are in
+Details that differ per machine (adb serial, the server container's address and login) are in
 `.local/ENV.md`, gitignored. If it is missing, ask the user. Never guess a password, and never write
 one into the repository.
 
@@ -26,7 +26,7 @@ one into the repository.
 6. Leave the phone as you found it: uninstall test builds the user did not ask to keep, turn the
    screen back on, end any `adb` port forwards you opened.
 
-## The S10 server container
+## The server container
 - Deploy only with `make deploy` (built in roadmap section 9): it cross-compiles for arm64, copies
   the binary, and restarts the systemd unit. Never edit files on the container by hand.
 - Memory proof: `grep VmRSS /proc/$(pidof heirloomd)/status`, idle and under the simulator.

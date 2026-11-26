@@ -105,4 +105,4 @@ about itself, or a source read only as an abstract. ❌ not confirmed: left out.
 - Full texts behind ScienceDirect, Springer, Wiley, JAMA: abstracts used, marked above.
 - Francesco Cirillo's current website (404); the 2007 paper used instead.
 - Bun, Deno, Go and Rust memory could not be measured locally (toolchain downloads were blocked);
-  section 0 of the roadmap measures the real server on the S10.
+  section 0 of the roadmap measures the real server.

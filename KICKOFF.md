@@ -30,6 +30,6 @@ Start with section 0.
 
 ## Before you paste it
 
-- Fill in `.local/ENV.md` (copy `.local/ENV.example.md`): the S10 container's address and user,
+- Fill in `.local/ENV.md` (copy `.local/ENV.example.md`): the server container's address and user,
   and the phone's adb serial. It stays out of git.
 - Have the Cloudflare domain ready for section 9 (the tunnel needs a hostname on it).

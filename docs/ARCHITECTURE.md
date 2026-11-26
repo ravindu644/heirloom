@@ -17,7 +17,7 @@ bottom, before code changes.
            └──────────────┬────────────────┘                            │
                           │  tunnel (TLS)                               │
                 ┌─────────▼─────────────────────────────────────────────▼──┐
-                │ heirloomd: one Go binary, one SQLite file, on the S10     │
+                │ heirloomd: one Go binary, one SQLite file, on any Linux  │
                 │ stores the newest value of every field, hands out what   │
                 │ each device missed, tracks who in a room is focusing     │
                 └──────────────────────────────────────────────────────────┘
@@ -44,7 +44,7 @@ bottom, before code changes.
 | Phone rings at the end with the screen off | User, [stack.md](research/stack.md) §1 | Native exact alarm through Capacitor |
 | Android and laptop browser now; iOS and desktop later without a rewrite | User | One web UI; Capacitor has iOS; the browser build installs as a PWA |
 | Friends study together in v1 | User | Rooms with presence, served by the same server |
-| Server on the S10 container: arm64, 1 GiB, kernel 4.14 | User | Go + bundled SQLite, measured budget in section 7 |
+| Server: an arm64 Linux container, 1 GiB, kernel 4.14 | User | Go + bundled SQLite, measured budget in section 7 |
 | Instant UI, no slow animations | User | Preact, 5.9 KB; budgets in section 7 |
 | Free | User | No paid service anywhere in the path |
 

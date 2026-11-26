@@ -103,13 +103,13 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
   build output (`dist/`, `android/app/build/`, `server/bin/`).
 
 ## Devices
-- Machine-specific details (the S10 container's address and login, the phone's adb serial) live in
+- Machine-specific details (the server container's address and login, the phone's adb serial) live in
   `.local/ENV.md`, which is gitignored. Ask the user if it is missing; never guess a password.
 - Release signing: `release.keystore` at the repo root (gitignored, never committed) and the Gradle
   properties `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` in `~/.gradle/gradle.properties`; CI
   gets the same from secrets, the key as base64 in `RELEASE_KEYSTORE`.
 - Phone: run `adb devices` first, every time. If no line ends in `device`, stop and say so.
-- S10 container: deploy with `make deploy`; never edit files on it by hand.
+- The server container: deploy with `make deploy`; never edit files on it by hand.
 
 ## Self-improvement
 - **Tools:** a command sequence run twice, or a script you would run again, becomes
@@ -126,14 +126,14 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | Naming, copy, a reward moment, anything that could come out generic | the global `antialgorithm` |
 | A new dataset or field, anything touching sync | `sync-change` |
 | A UI gate, a build about to go to the user, anything called confusing | `stranger-walk` |
-| Anything on the phone or the S10 | `device-test` |
+| Anything on the phone or the server | `device-test` |
 
 ## Tools
 | Tool | Use |
 |---|---|
 | `make check` | Every check, each one reported. The gate runs this |
 | `make dev` / `web` / `server` / `apk` | Vite beside heirloomd / the built app / the binary for here and arm64 / the debug APK |
-| `make deploy`, `make s10-rss` | Copy the arm64 binary to the S10 / run it there for 3 s and print its memory |
+| `make deploy`, `make server-rss` | Copy the arm64 binary to the server / run it there for 3 s and print its memory |
 | `tools/sim/soak.ts`, `load.ts` | Many devices at random against a server for an hour, or a burst of them for a memory reading; `--url --invites --rss --minutes --seed` |
 | `tools/tokens.mjs` | DESIGN.md to `client/src/ui/tokens.css`, fonts included. Run by `make tokens` |
 | `tools/style-check.mjs` | Fails on a colour, font name or duration literal in `client/src/ui/` |
@@ -155,7 +155,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 - `go.mod` says `go 1.26.0`, not `go 1.26`: the SQLite driver sets that floor and Go rewrites the line.
 - Never pass a cancellable context to a SQLite call in `server/`: a cancelled call makes the driver
   drop the connection, the checkpoint at close is skipped and a `-wal` file is left behind.
-- SQLite before 3.51.3 can corrupt a WAL database (Ubuntu 24.04 ships 3.45.1): use the bundled one. Node does not support the S10's kernel (4.14): the server is Go.
+- SQLite before 3.51.3 can corrupt a WAL database (Ubuntu 24.04 ships 3.45.1): use the bundled one. Node does not support the 4.14 kernel of the arm64 container it was first measured on: the server is Go.
 - `@capacitor/local-notifications` silently falls back to an inexact alarm without the exact-alarm
   permission. Declare `USE_EXACT_ALARM` and check `checkExactNotificationSetting()`.
 - Android hands an activity its first intent again when it is restored after a process kill: an

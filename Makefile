@@ -4,14 +4,14 @@ TOKENS := client/src/ui/tokens.css
 VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
 GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
-# The S10's address and login live in .local/ENV.md and nowhere else.
-S10_USER := $(shell sed -n 's/^- SSH user: *\([A-Za-z0-9_-]*\).*/\1/p' .local/ENV.md 2>/dev/null)
-S10_ADDR := $(shell sed -n 's/^- Address: *\([A-Za-z0-9.:-]*\).*/\1/p' .local/ENV.md 2>/dev/null)
-S10 := $(S10_USER)@$(S10_ADDR)
-need-s10 = @test -n "$(S10_USER)" -a -n "$(S10_ADDR)" || { echo "No S10 address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
+# The server's address and login live in .local/ENV.md and nowhere else.
+HOST_USER := $(shell sed -n 's/^- SSH user: *\([A-Za-z0-9_-]*\).*/\1/p' .local/ENV.md 2>/dev/null)
+HOST_ADDR := $(shell sed -n 's/^- Address: *\([A-Za-z0-9.:-]*\).*/\1/p' .local/ENV.md 2>/dev/null)
+HOST := $(HOST_USER)@$(HOST_ADDR)
+need-host = @test -n "$(HOST_USER)" -a -n "$(HOST_ADDR)" || { echo "No server address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
 CHECKS := lint-design contracts test-tools style audit types pure test-core test-server test-sync sim budget e2e
-.PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy s10-rss
+.PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy server-rss
 
 # -k: one failing check does not hide the others.
 check:
@@ -109,21 +109,21 @@ bump:
 	@sed -i 's/^  "version": ".*",/  "version": "$(NEW)",/' package.json
 	@echo "[+] Version $$(node -p 'require("./package.json").version') set. Commit it, then tag v$(NEW) to release."
 
-# Puts the binary and its systemd unit on the S10 and restarts the service there. It listens on
+# Puts the binary and its systemd unit on the server and restarts the service there. It listens on
 # the container's localhost only; the tunnel is what lets anyone in. The sudo password goes from
 # .local/ENV.md straight into ssh's stdin: never in a variable, an argument or the log.
 deploy: server
-	$(need-s10)
-	scp server/bin/heirloomd-arm64 $(S10):heirloomd
-	scp server/deploy/heirloomd.service $(S10):heirloomd.service
-	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(S10) 'sudo -S -p "" sh -ec "\
+	$(need-host)
+	scp server/bin/heirloomd-arm64 $(HOST):heirloomd
+	scp server/deploy/heirloomd.service $(HOST):heirloomd.service
+	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'sudo -S -p "" sh -ec "\
 		id heirloomd >/dev/null 2>&1 || useradd --system --home-dir /var/lib/heirloomd --shell /usr/sbin/nologin heirloomd; \
-		install -m 0755 /home/$(S10_USER)/heirloomd /usr/local/bin/heirloomd; \
-		install -m 0644 /home/$(S10_USER)/heirloomd.service /etc/systemd/system/heirloomd.service; \
+		install -m 0755 /home/$(HOST_USER)/heirloomd /usr/local/bin/heirloomd; \
+		install -m 0644 /home/$(HOST_USER)/heirloomd.service /etc/systemd/system/heirloomd.service; \
 		systemctl daemon-reload; systemctl enable heirloomd >/dev/null 2>&1; systemctl restart heirloomd; \
 		sleep 3; systemctl is-active heirloomd; /usr/local/bin/heirloomd -version"'
 
 # Memory of the running service on the real hardware.
-s10-rss:
-	$(need-s10)
-	@ssh $(S10) 'p=$$(systemctl show -p MainPID --value heirloomd); test "$$p" -gt 0 && grep VmRSS /proc/$$p/status || { echo "heirloomd is not running on the S10"; exit 1; }'
+server-rss:
+	$(need-host)
+	@ssh $(HOST) 'p=$$(systemctl show -p MainPID --value heirloomd); test "$$p" -gt 0 && grep VmRSS /proc/$$p/status || { echo "heirloomd is not running on the server"; exit 1; }'

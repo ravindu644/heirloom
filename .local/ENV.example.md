@@ -1,6 +1,6 @@
 # Local environment (copy to .local/ENV.md, never commit it)
 
-## S10 server container
+## Server container
 - Address: 
 - SSH user: 
 - Root via: (sudo password, or ask the user each time)

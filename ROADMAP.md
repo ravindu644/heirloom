@@ -12,7 +12,7 @@ Lanes are named in brackets: **[lead]** the orchestrating session, **[server]**,
 Nothing user-visible. Ends with every check wired and failing for the right reason.
 
 - [x] [lead] Pin toolchains in `TOOLCHAINS.md`: Go, Node, pnpm, Android SDK and JDK versions, read
-      from the machine and the S10 container
+      from the machine and the server container
 - [x] [lead] `Makefile` with `make check` (runs everything below), `make dev`, `make server`,
       `make web`, `make apk`, `make deploy`
 - [x] [lead] `contracts/`: `protocol.md` (the messages in ARCHITECTURE §5, exact JSON), one JSON
@@ -26,7 +26,7 @@ Nothing user-visible. Ends with every check wired and failing for the right reas
       `client/src/ui/` outside `tokens.css`
 - [x] [lead] `tools/budget.mjs`: built JS and CSS sizes against ARCHITECTURE §7
 - [x] [server] Skeleton Go module; `select sqlite_version()` test asserts 3.51.3 or later; the
-      binary cross-compiled for arm64 runs on the S10 container and its idle RSS is written down
+      binary cross-compiled for arm64 runs on the server container and its idle RSS is written down
 - [x] [core] Skeleton TS package with the fixture runner; every fixture loads and fails
 - [x] [qa] Playwright set up with a "two devices" helper (two browser contexts, `setOffline`)
 - [ ] Gate
@@ -125,14 +125,14 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [design-review] Every screen, empty states included, at both sizes, light and dark
 - [ ] Gate
 
-## 9. Live on the S10
+## 9. Live on the server
 
 - [x] [server] systemd unit, data directory, daily `VACUUM INTO` backup kept for 7 days
 - [x] [server] Web Push with VAPID at phase end for laptop browsers
-- [ ] [lead] Exposure: Cloudflare named Tunnel on the user's domain (`cloudflared` on the S10
+- [ ] [lead] Exposure: Cloudflare named Tunnel on the user's domain (`cloudflared` on the server
       container, its RSS measured); WebSocket and the 25 s heartbeat tested through it
 - [x] [ui] Export and import as JSON
-- [x] [qa] Measured on the S10: idle RSS, RSS with 20 simulated devices, both under budget
+- [x] [qa] Measured on the server: idle RSS, RSS with 20 simulated devices, both under budget
 - [ ] Gate (the friend installs it from a link and joins a room)
 
 ## 10. A server anyone can run
@@ -143,8 +143,8 @@ The first thing the user can touch: one timer, live on two screens.
 - [x] [ui] The server step, "Set up this server", joining from a link, the Invites and Admins panels
 - [ ] [android] Plain http to any host from the app
 - [x] [qa] Setup, a link from make to join, raise and lower, the app build's server step
-- [x] [lead] The S10 listens on the home network; the APK that asks
-- [ ] Gate (the user sets up the S10 from the phone, makes a link, a second device joins with it)
+- [x] [lead] The server listens on the home network; the APK that asks
+- [ ] Gate (the user sets up the server from the phone, makes a link, a second device joins with it)
 
 ## 11. What the first hands found
 
@@ -333,7 +333,7 @@ On the third build the user found no glitches; four things about how it reads an
 
 ## 24. Release 1.0
 
-- [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
+- [x] [qa] Soak: simulator for an hour against the server with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
 - [ ] [qa] Budgets: bundle, tap latency on the phone, live timer arrival
 - [x] [lead] README for friends: install the APK, open the web app, join a room

@@ -6,7 +6,7 @@
 > RAM. Self-monitoring works (d = 0.40) and comparing with your past self beats ranking against
 > friends. A synced timer is a start time and a state, never a ticking number, and work that was
 > really done must be stored so no conflict can erase it. Android rings on time only through a
-> native exact alarm, which Capacitor provides; a Go server with SQLite fits the S10 in a few MB.
+> native exact alarm, which Capacitor provides; a Go server with SQLite fits a small arm64 box in a few MB.
 
 Researched 2026-11-24 by one lead and four research agents, every claim then checked by the lead
 against a saved copy of its source.

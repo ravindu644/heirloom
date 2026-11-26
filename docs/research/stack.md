@@ -4,7 +4,7 @@
 > Only a native alarm rings on time on Android with the screen off; a web page cannot schedule one
 > (Chrome's Notification Triggers has sat behind a flag since 2022). Capacitor runs the same web
 > build in the laptop browser and on the phone, and its notification plugin uses exact alarms. Go
-> runs on the S10's 4.14 kernel at a few MB of RAM; Node does not support that kernel at all.
+> runs on a 4.14 kernel at a few MB of RAM; Node does not support that kernel at all.
 > SQLite needs version 3.51.3 or later because of a WAL bug fixed in March 2026. Friends reach a
 > home server through Cloudflare Tunnel (needs a domain) or Tailscale Funnel (free, beta).
 
@@ -40,7 +40,7 @@ Checked 2026-11-24 against saved copies of each page.
 
 No source compares APK size and cold start of all five on one device with a stated method.
 
-## 3. The server, on the S10
+## 3. The server
 
 The container: Ubuntu 24.04, arm64, 1 GiB RAM, no swap, kernel 4.14.
 
