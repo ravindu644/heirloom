@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 )
 
 // SQLite before 3.51.3 can corrupt a WAL database. Nothing is built on an older one.
@@ -229,7 +232,7 @@ func TestRoomsFromBeforeKeepersAreKeptByTheirLongestMember(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := len(migrations) - 1
+	before := slices.IndexFunc(migrations, func(m string) bool { return strings.Contains(m, "add column keeper") })
 	for _, m := range migrations[:before] {
 		if _, err := old.Exec(m); err != nil {
 			t.Fatal(err)
@@ -252,5 +255,11 @@ func TestRoomsFromBeforeKeepersAreKeptByTheirLongestMember(t *testing.T) {
 	var keepers string
 	if err := db.QueryRow("select group_concat(name || ' ' || keeper, ', ') from (select * from room order by id)").Scan(&keepers); err != nil || keepers != "One 2, Two 4" {
 		t.Errorf("keepers after the migration: %q, %v; want sachi for One and mali for Two", keepers, err)
+	}
+	// And the second pass of rooms: the rooms and members already here start from the day
+	// of the migration, not from 1970, so no streak reaches back before it.
+	var oldest int64
+	if err := db.QueryRow("select min(x) from (select created as x from room union all select joined from member)").Scan(&oldest); err != nil || oldest < time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli() {
+		t.Errorf("the oldest room or member starts at %d, %v; want the day of the migration", oldest, err)
 	}
 }

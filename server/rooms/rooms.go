@@ -4,11 +4,13 @@
 package rooms
 
 import (
+	"cmp"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	gosync "sync"
 	"time"
@@ -32,6 +34,8 @@ const (
 	// low five bits pick one evenly.
 	alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	codeLen  = 8
+	// A day's laps a member shows. Sixteen hours of 20 minute laps; past that, the newest.
+	maxLaps = 48
 	// Wrong codes an account may try in an hour before every join of its is refused until
 	// the hour is up. A code is one of 2^40, so ten an hour finds nothing in a lifetime,
 	// and nobody copying a code from a friend's screen gets it wrong ten times.
@@ -57,11 +61,35 @@ type Message struct {
 	Ranked     bool     `json:"ranked"`
 	ServerTime int64    `json:"server_time"`
 	Members    []Member `json:"members"`
+	// The room's focus per local day of this week and last, Monday first, and last week's
+	// total as far as this moment of it, for "4h ahead of last week at this time".
+	Days       [7]int64   `json:"days"`
+	LastDays   [7]int64   `json:"last_days"`
+	LastAtMs   int64      `json:"last_at_ms"`
+	Streak     RoomStreak `json:"streak"`
+	Call       *Call      `json:"call"`
+	NotesSince *string    `json:"notes_since"`
+}
+
+// RoomStreak is section 8 over the room's days, and how the last 14 of them went, today last.
+type RoomStreak struct {
+	Run   int      `json:"run"`
+	Marks []string `json:"marks"`
+}
+
+// Call is a lap called for a minute ahead: who called it, when it starts, and who is in,
+// the caller first.
+type Call struct {
+	ID string   `json:"id"`
+	By string   `json:"by"`
+	At int64    `json:"at"`
+	In []string `json:"in"`
 }
 
 type Member struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
+	Picture   *string `json:"picture"`
 	You       bool    `json:"you"`
 	Away      bool    `json:"away"`
 	Phase     string  `json:"phase"`
@@ -74,6 +102,9 @@ type Member struct {
 	WeekMs    int64   `json:"week_ms"`
 	Run       *Run    `json:"run"`
 	Last      *Last   `json:"last"`
+	// The work laps of their local day so far, [started, ended], oldest first: the rows,
+	// so not the lap in progress (that is run) and not a lap set aside.
+	Laps [][2]int64 `json:"laps"`
 }
 
 // Run is the work lap in progress, which the totals leave out: a screen adds ms to the
@@ -101,10 +132,16 @@ type Gone struct {
 type totals struct {
 	offset    int
 	day       string
+	from      int64 // the rows read start here
 	todayMs   int64
 	todayLaps int
 	weekMs    int64
 	last      *Session // the latest lap that rang today
+	days      [7]int64 // this week's focus by local day, Monday first
+	lastDays  [7]int64
+	lastWeek  []Session       // last week's counted laps, to be cut at this moment of it
+	rang      map[string]bool // the local days with a work lap that rang, since from
+	laps      [][2]int64      // today's, oldest first, the newest maxLaps
 }
 
 // Service's SQLite calls take no context, for the reason sync.Store gives. No method
@@ -124,6 +161,12 @@ type Service struct {
 	// Wrong codes tried, by account. At most one entry an account, and accounts are by invite.
 	guessMu gosync.Mutex
 	guesses map[int64]guesses
+
+	// When each account changed its picture in the last day, oldest first. Held across the
+	// write, so two changes at once cannot both slip under the limit.
+	// ponytail: in memory, so a restart forgets the day's count; a table if that is ever abused.
+	pictureMu gosync.Mutex
+	pictures  map[int64][]int64
 }
 
 type guesses struct {
@@ -132,7 +175,7 @@ type guesses struct {
 }
 
 func New(db *sql.DB, cells *sync.Store, now func() time.Time) *Service {
-	return &Service{db: db, cells: cells, now: now, totals: map[int64]totals{}, guesses: map[int64]guesses{}}
+	return &Service{db: db, cells: cells, now: now, totals: map[int64]totals{}, guesses: map[int64]guesses{}, pictures: map[int64][]int64{}}
 }
 
 // guess counts a try at a code before the code is looked at, as sign-ins are counted, so
@@ -177,14 +220,10 @@ func (s *Service) Create(account int64, name string) (public string, room int64,
 		return "", 0, err
 	}
 	public = rand.Text()
+	now := s.now().UnixMilli()
 	// A code somebody already has is as likely as guessing one: try again rather than fail.
 	for range 5 {
-		code := make([]byte, codeLen)
-		rand.Read(code)
-		for i, b := range code {
-			code[i] = alphabet[b&31]
-		}
-		res, err := tx.Exec("insert into room (public_id, name, code, keeper) values (?, ?, ?, ?) on conflict (code) do nothing", public, name, string(code), account)
+		res, err := tx.Exec("insert into room (public_id, name, code, keeper, created) values (?, ?, ?, ?, ?) on conflict (code) do nothing", public, name, newCode(), account, now)
 		if err != nil {
 			return "", 0, fmt.Errorf("store room: %w", err)
 		}
@@ -196,7 +235,7 @@ func (s *Service) Create(account int64, name string) (public string, room int64,
 	if room == 0 {
 		return "", 0, errors.New("store room: no free code in five tries")
 	}
-	if _, err := tx.Exec("insert into member (room, account) values (?, ?)", room, account); err != nil {
+	if _, err := tx.Exec("insert into member (room, account, joined) values (?, ?, ?)", room, account, now); err != nil {
 		return "", 0, fmt.Errorf("store member: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -238,7 +277,7 @@ func (s *Service) Join(account int64, code string) (public string, room int64, e
 	if err := roomToSpare(tx, account); err != nil {
 		return "", 0, err
 	}
-	if _, err := tx.Exec("insert into member (room, account) values (?, ?)", room, account); err != nil {
+	if _, err := tx.Exec("insert into member (room, account, joined) values (?, ?, ?)", room, account, s.now().UnixMilli()); err != nil {
 		return "", 0, fmt.Errorf("store member: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -268,13 +307,8 @@ func (s *Service) Leave(account int64, public string) (room int64, err error) {
 	if room, err = find(tx, account, public); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec("delete from member where room = ? and account = ?", room, account); err != nil {
-		return 0, fmt.Errorf("delete member: %w", err)
-	}
-	// A keeper who leaves hands the room to whoever has been in it longest. The caller
-	// announces the room after any leave, so every member hears who keeps it now.
-	if _, err := tx.Exec("update room set keeper = (select account from member where room = ?1 order by id limit 1) where id = ?1 and keeper = ?2", room, account); err != nil {
-		return 0, fmt.Errorf("hand on room: %w", err)
+	if err := out(tx, room, account, s.now().UnixMilli()); err != nil {
+		return 0, err
 	}
 	if _, err := tx.Exec("delete from room where id = ? and not exists (select 1 from member where room = ?)", room, room); err != nil {
 		return 0, fmt.Errorf("delete room: %w", err)
@@ -297,12 +331,8 @@ func (s *Service) Update(account int64, public string, name *string, targetMs *i
 	}
 	// Who is asking comes before what they ask: a member who is not the keeper is told
 	// forbidden, never how their change would have been judged.
-	var keeps bool
-	if err := tx.QueryRow("select keeper is ? from room where id = ?", account, room).Scan(&keeps); err != nil {
-		return 0, fmt.Errorf("read keeper: %w", err)
-	}
-	if !keeps {
-		return 0, auth.ErrForbidden
+	if err := keeps(tx, room, account); err != nil {
+		return 0, err
 	}
 	if name != nil && !validName(*name) || targetMs != nil && (*targetMs < 0 || *targetMs > maxTargetMs) {
 		return 0, auth.ErrBadRequest
@@ -457,13 +487,14 @@ func (s *Service) Pushed(account int64, won []sync.Cell) (matters bool) {
 }
 
 // Message is the room as viewer is to see it right now, and the next moment it will
-// read differently by time alone: a bell, or a member's midnight. It is nil when the
-// room is gone or viewer is not in it, which is the only way anyone gets one.
+// read differently by time alone: a bell, a member's midnight, or a call's end. It is nil
+// when the room is gone or viewer is not in it, which is the only way anyone gets one.
 func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 	now := s.now().UnixMilli()
 	m := &Message{Type: "room", ServerTime: now}
-	err := s.db.QueryRow(`select r.public_id, r.name, r.code, coalesce(k.public_id, ''), r.target_ms, r.ranked
-		from room r left join account k on k.id = r.keeper where r.id = ?`, room).Scan(&m.Room, &m.Name, &m.Code, &m.Keeper, &m.TargetMs, &m.Ranked)
+	var created int64
+	err := s.db.QueryRow(`select r.public_id, r.name, r.code, coalesce(k.public_id, ''), r.target_ms, r.ranked, r.created
+		from room r left join account k on k.id = r.keeper where r.id = ?`, room).Scan(&m.Room, &m.Name, &m.Code, &m.Keeper, &m.TargetMs, &m.Ranked, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, nil
 	} else if err != nil {
@@ -472,9 +503,11 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 	type who struct {
 		id     int64
 		offset int
+		joined int64
+		t      totals
 		Member
 	}
-	rows, err := s.db.Query(`select a.id, a.public_id, a.username, a.utc_offset_min
+	rows, err := s.db.Query(`select a.id, a.public_id, a.username, a.utc_offset_min, a.picture_hash, m.joined
 		from member m join account a on a.id = m.account where m.room = ? order by m.id`, room)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read members: %w", err)
@@ -483,7 +516,7 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 	in := false
 	for rows.Next() {
 		var p who
-		if err := rows.Scan(&p.id, &p.ID, &p.Name, &p.offset); err != nil {
+		if err := rows.Scan(&p.id, &p.ID, &p.Name, &p.offset, &p.Picture, &p.joined); err != nil {
 			rows.Close()
 			return nil, 0, fmt.Errorf("read members: %w", err)
 		}
@@ -499,27 +532,128 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 		return nil, 0, nil
 	}
 	var next int64
-	for _, p := range people {
-		change, err := s.fill(&p.Member, room, p.id, p.offset, now)
+	viewerOffset := 0
+	for i := range people {
+		p := &people[i]
+		// A day of margin either side of the room's first day, for any member's offset.
+		t, midnight, err := s.count(p.id, p.offset, now, created-dayMs)
+		if err != nil {
+			return nil, 0, err
+		}
+		change, err := s.fill(&p.Member, room, p.id, t, midnight, now)
 		if err != nil {
 			return nil, 0, err
 		}
 		if next == 0 || change < next {
 			next = change
 		}
+		p.t = t
+		if p.You {
+			viewerOffset = p.offset
+		}
+		for d := range 7 {
+			m.Days[d] += t.days[d]
+			m.LastDays[d] += t.lastDays[d]
+		}
+		m.LastAtMs += focusBefore(t.lastWeek, now-7*dayMs, p.offset)
 		m.Members = append(m.Members, p.Member)
+	}
+
+	// The streak, by the viewer's calendar: a day is kept when everybody then in the room
+	// ran a lap that rang on their own local day of that date. The record starts the day
+	// the first of those here now came in: nobody is held to a day before they were here.
+	today := localDay(now, viewerOffset)
+	since := today
+	for _, p := range people {
+		since = min(since, localDay(p.joined, p.offset))
+	}
+	var kept []string
+	for d, _ := time.Parse(time.DateOnly, since); d.Format(time.DateOnly) <= today; d = d.AddDate(0, 0, 1) {
+		date, all := d.Format(time.DateOnly), true
+		for _, p := range people {
+			if localDay(p.joined, p.offset) <= date && !p.t.rang[date] {
+				all = false
+				break
+			}
+		}
+		if all {
+			kept = append(kept, date)
+		}
+	}
+	m.Streak = roomStreak(today, kept, since)
+
+	if m.Call, err = s.call(room, now); err != nil {
+		return nil, 0, err
+	}
+	if m.Call != nil {
+		next = min(next, m.Call.At+callLasts)
+	}
+	var newest string
+	err = s.db.QueryRow("select public_id from note where room = ? and at > ? order by at desc, id desc limit 1", room, now-keepNotes).Scan(&newest)
+	if err == nil {
+		m.NotesSince = &newest
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, fmt.Errorf("read notes: %w", err)
 	}
 	return m, next, nil
 }
 
+// roomStreak is section 8 over the room's kept days, and the last 14 days as marks. A day
+// before the record began, or every day while nothing has been kept, is "none": there was
+// nothing to keep yet, and a miss would say there was.
+func roomStreak(today string, kept []string, since string) RoomStreak {
+	r := Streak(today, kept, 14, 127, since)
+	held := map[string]string{}
+	for _, d := range kept {
+		held[d] = "kept"
+	}
+	for _, d := range r.Rest {
+		held[d] = "rest"
+	}
+	start := since
+	if len(kept) > 0 {
+		start = min(start, kept[0])
+	}
+	end, _ := time.Parse(time.DateOnly, today)
+	marks := make([]string, 0, 14)
+	for back := 13; back >= 0; back-- {
+		date := end.AddDate(0, 0, -back).Format(time.DateOnly)
+		switch {
+		case held[date] == "kept":
+			marks = append(marks, "kept")
+		case date == today:
+			marks = append(marks, "open")
+		case len(kept) == 0 || date < start:
+			marks = append(marks, "none")
+		case held[date] == "rest":
+			marks = append(marks, "rest")
+		default:
+			marks = append(marks, "miss")
+		}
+	}
+	return RoomStreak{Run: r.Streak, Marks: marks}
+}
+
+// focusBefore is section 7's focus over these laps, each cut at the moment given.
+func focusBefore(laps []Session, cut int64, offsetMin int) (ms int64) {
+	var before []Session
+	for _, l := range laps {
+		if l.from() < cut {
+			l.Ended = min(l.Ended, cut)
+			before = append(before, l)
+		}
+	}
+	days, _ := Stats(before, offsetMin)
+	for _, d := range days {
+		ms += d.FocusMs
+	}
+	return ms
+}
+
 // fill reads one member: the totals always, the rest only if they have not hidden rooms.
 // It returns when this member will next read differently with nobody doing anything.
-func (s *Service) fill(m *Member, room, account int64, offsetMin int, now int64) (change int64, err error) {
-	t, midnight, err := s.count(account, offsetMin, now)
-	if err != nil {
-		return 0, err
-	}
-	m.Phase, m.TodayMs, m.TodayLaps, m.WeekMs = "idle", t.todayMs, t.todayLaps, t.weekMs
+func (s *Service) fill(m *Member, room, account int64, t totals, midnight, now int64) (change int64, err error) {
+	m.Phase, m.TodayMs, m.TodayLaps, m.WeekMs, m.Laps = "idle", t.todayMs, t.todayLaps, t.weekMs, [][2]int64{}
 	if m.Away, err = s.flag(account, "rooms_hidden"); err != nil || m.Away {
 		// Not watched: no phase, no task, no last lap. What they did still counts.
 		return midnight, err
@@ -529,10 +663,10 @@ func (s *Service) fill(m *Member, room, account int64, offsetMin int, now int64)
 		return 0, err
 	}
 	p := watch(state, now)
-	m.Phase, m.SetIndex, m.EndsAt, m.Paused = p.phase, p.setIndex, p.endsAt, p.paused
+	m.Phase, m.SetIndex, m.EndsAt, m.Paused, m.Laps = p.phase, p.setIndex, p.endsAt, p.paused, t.laps
 	if p.phase == "work" {
 		// Read by the same offset as the totals, so a lap is never in both or in neither.
-		m.Run = &Run{p.ranMs, localDay(p.started, offsetMin) == t.day, weekOf(p.started, offsetMin) == weekOf(now, offsetMin)}
+		m.Run = &Run{p.ranMs, localDay(p.started, t.offset) == t.day, weekOf(p.started, t.offset) == weekOf(now, t.offset)}
 	}
 	change = midnight
 	if p.endsAt != nil {
@@ -583,43 +717,71 @@ func (s *Service) flag(account int64, field string) (bool, error) {
 	return string(v) == "true", err
 }
 
-// count is the member's day and week, and when their day ends. It reads their sessions
-// only when they have pushed one since, or their day or offset has changed: a room
-// message for a timer starting or a title changing reads no session at all. When it does
-// read, it reads the week's rows through the index on started, not the years before.
-func (s *Service) count(account int64, offsetMin int, now int64) (totals, int64, error) {
+// count is the member's this week and last, the days they kept, and when their day ends.
+// It reads their sessions only when they have pushed one since, their day or offset has
+// changed, or a room asks for days further back than were read: a room message for a
+// timer starting or a title changing reads no session at all. When it does read, it reads
+// through the index on started, from last Monday or the room's first day, whichever is
+// older, not the years before.
+//
+// ponytail: a room's streak reads its members' laps back to the day it was made. For a
+// room years old that is years of rows on each lap's end; keep kept days in a table if a
+// read ever shows up on the phone.
+func (s *Service) count(account int64, offsetMin int, now, from int64) (totals, int64, error) {
 	day := localDay(now, offsetMin)
 	midnight, _ := time.Parse(time.DateOnly, day)
 	dayStart := midnight.UnixMilli() - int64(offsetMin)*60000
+	// Monday is the first day of the week; Go's Sunday is 0.
+	weekday := (int(midnight.Weekday()) + 6) % 7
+	monday := dayStart - int64(weekday)*dayMs
+	from = min(from, monday-7*dayMs)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t, ok := s.totals[account]; ok && t.day == day && t.offset == offsetMin {
+	if t, ok := s.totals[account]; ok && t.day == day && t.offset == offsetMin && t.from <= from {
 		return t, dayStart + dayMs, nil
 	}
-	// Monday is the first day of the week; Go's Sunday is 0.
-	monday := dayStart - int64((int(midnight.Weekday())+6)%7)*dayMs
-	rows, err := s.cells.Sessions(account, monday, monday+7*dayMs)
+	rows, err := s.cells.Sessions(account, from, monday+7*dayMs)
 	if err != nil {
 		return totals{}, 0, err
 	}
 	s.counts++
-	week := make([]Session, 0, len(rows))
+	t := totals{offset: offsetMin, day: day, from: from, rang: map[string]bool{}}
+	var week []Session
 	for id, fields := range rows {
 		// A row that is missing a field, or holds a shape this build does not know, is not counted.
 		object, _ := json.Marshal(fields)
 		session := Session{ID: id}
-		if len(fields) == 5 && json.Unmarshal(object, &session) == nil {
+		if len(fields) != 5 || json.Unmarshal(object, &session) != nil || !session.counts() {
+			continue
+		}
+		switch {
+		case session.Started >= monday:
 			week = append(week, session)
+		case session.Started >= monday-7*dayMs:
+			t.lastWeek = append(t.lastWeek, session)
+		}
+		if session.Outcome == "rang" {
+			t.rang[localDay(session.Started, offsetMin)] = true
 		}
 	}
-	t := totals{offset: offsetMin, day: day}
-	days, _ := Stats(week, offsetMin)
-	for _, d := range days {
-		t.weekMs += d.FocusMs
+	this, _ := Stats(week, offsetMin)
+	last, _ := Stats(t.lastWeek, offsetMin)
+	for d := range 7 {
+		t.days[d] = this[midnight.AddDate(0, 0, d-weekday).Format(time.DateOnly)].FocusMs
+		t.lastDays[d] = last[midnight.AddDate(0, 0, d-weekday-7).Format(time.DateOnly)].FocusMs
+		t.weekMs += t.days[d]
 	}
-	t.todayMs, t.todayLaps = days[day].FocusMs, days[day].Laps
+	t.todayMs, t.todayLaps = this[day].FocusMs, this[day].Laps
+	t.laps = [][2]int64{}
 	for _, session := range week {
-		rang := session.counts() && session.Outcome == "rang" && localDay(session.Started, offsetMin) == day
+		if session.Kind == "work" && localDay(session.Started, offsetMin) == day {
+			t.laps = append(t.laps, [2]int64{session.Started, session.Ended})
+		}
+	}
+	slices.SortFunc(t.laps, func(a, b [2]int64) int { return cmp.Or(cmp.Compare(a[0], b[0]), cmp.Compare(a[1], b[1])) })
+	t.laps = t.laps[max(0, len(t.laps)-maxLaps):]
+	for _, session := range week {
+		rang := session.Outcome == "rang" && localDay(session.Started, offsetMin) == day
 		if rang && (t.last == nil || session.Ended > t.last.Ended || session.Ended == t.last.Ended && session.ID > t.last.ID) {
 			t.last = &session
 		}

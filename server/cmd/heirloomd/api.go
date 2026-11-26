@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	maxPushBody    = 8 << 10 // a subscription and thirteen sentences of up to 80 characters
-	maxAccountBody = 4 << 10 // register, login, logout: a few short strings
-	maxSyncBody    = 1 << 20 // the same 1 MB as a frame on the socket
+	maxPushBody    = 8 << 10  // a subscription and thirteen sentences of up to 80 characters
+	maxAccountBody = 4 << 10  // register, login, logout: a few short strings
+	maxPictureBody = 20 << 10 // 12000 bytes of picture as base64, and the token beside it
+	maxSyncBody    = 1 << 20  // the same 1 MB as a frame on the socket
 )
 
 // newAPI wires the routes of contracts/protocol.md, and the web app under everything
@@ -197,26 +198,41 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 		Ranked   *bool   `json:"ranked"`
 		To       string  `json:"to"`
 		Run      string  `json:"run"`
+		Member   string  `json:"member"`
+		Text     string  `json:"text"`
+		At       *int64  `json:"at"` // null or left out: take one's own call back
+		Call     string  `json:"call"`
+		In       *bool   `json:"in"`
 	}
 	type roomReply struct {
 		Room string `json:"room,omitempty"`
 	}
-	room := func(path string, do func(account int64, req roomRequest) (public string, room int64, err error)) {
-		mux.HandleFunc("POST /api/rooms/"+path, post(maxAccountBody, func(_ context.Context, req roomRequest) (roomReply, error) {
+	// do answers with the reply, and the room the members' devices are to look at again:
+	// 0 for a request that changed nothing.
+	answer := func(path string, do func(account int64, req roomRequest) (reply any, room int64, err error)) {
+		mux.HandleFunc("POST /api/"+path, post(maxAccountBody, func(_ context.Context, req roomRequest) (any, error) {
 			if !auth.ValidDevice(req.Device) {
-				return roomReply{}, auth.ErrBadRequest
+				return nil, auth.ErrBadRequest
 			}
 			account, _, err := accounts.Check(req.Token, req.Device)
 			if err != nil {
-				return roomReply{}, err
+				return nil, err
 			}
-			public, id, err := do(account, req)
+			reply, id, err := do(account, req)
 			if err != nil {
-				return roomReply{}, err
+				return nil, err
 			}
-			h.Announce(id)
-			return roomReply{public}, nil
+			if id != 0 {
+				h.Announce(id)
+			}
+			return reply, nil
 		}))
+	}
+	room := func(path string, do func(account int64, req roomRequest) (public string, room int64, err error)) {
+		answer("rooms/"+path, func(account int64, req roomRequest) (any, int64, error) {
+			public, id, err := do(account, req)
+			return roomReply{public}, id, err
+		})
 	}
 	room("create", func(account int64, req roomRequest) (string, int64, error) {
 		if req.Name == nil {
@@ -242,6 +258,88 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 		id, err := together.Cheer(account, req.Room, req.To, req.Run)
 		return "", id, err
 	})
+	answer("rooms/remove", func(account int64, req roomRequest) (any, int64, error) {
+		id, removed, err := together.Remove(account, req.Room, req.Member)
+		if err == nil && removed != 0 {
+			h.Left(removed, id) // their devices are told "gone"; Announce reaches members only
+		}
+		return struct{}{}, id, err
+	})
+	answer("rooms/note", func(account int64, req roomRequest) (any, int64, error) {
+		note, id, err := together.Note(account, req.Room, req.Text)
+		return map[string]string{"note": note}, id, err
+	})
+	answer("rooms/notes", func(account int64, req roomRequest) (any, int64, error) {
+		notes, err := together.Notes(account, req.Room)
+		return map[string][]rooms.Note{"notes": notes}, 0, err
+	})
+	answer("rooms/call", func(account int64, req roomRequest) (any, int64, error) {
+		call, id, err := together.Call(account, req.Room, req.At)
+		if call == "" {
+			return struct{}{}, id, err
+		}
+		return map[string]string{"call": call}, id, err
+	})
+	answer("rooms/in", func(account int64, req roomRequest) (any, int64, error) {
+		if req.In == nil {
+			return nil, 0, auth.ErrBadRequest
+		}
+		id, err := together.In(account, req.Room, req.Call, *req.In)
+		return struct{}{}, id, err
+	})
+
+	// A picture, for every room the account is in. Its bytes are never logged.
+	type pictureRequest struct {
+		Token   string  `json:"token"`
+		Device  string  `json:"device"`
+		Picture *string `json:"picture"`
+	}
+	mux.HandleFunc("POST /api/me/picture", post(maxPictureBody, func(_ context.Context, req pictureRequest) (any, error) {
+		if !auth.ValidDevice(req.Device) {
+			return nil, auth.ErrBadRequest
+		}
+		account, _, err := accounts.Check(req.Token, req.Device)
+		if err != nil {
+			return nil, err
+		}
+		hash, changed, err := together.SetPicture(account, req.Picture)
+		if err != nil {
+			return nil, err
+		}
+		if changed {
+			h.AnnounceOf(account)
+		}
+		if hash == "" {
+			return struct{}{}, nil
+		}
+		return map[string]string{"picture": hash}, nil
+	}))
+	mux.HandleFunc("GET /api/pictures/{hash}", func(w http.ResponseWriter, r *http.Request) {
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		account, err := accounts.Bearer(token)
+		if !ok || errors.Is(err, auth.ErrToken) {
+			reply(w, http.StatusUnauthorized, auth.ErrToken)
+			return
+		}
+		var data []byte
+		var kind string
+		if err == nil {
+			data, kind, err = together.Picture(account, r.PathValue("hash"))
+		}
+		var known *auth.Error
+		if errors.As(err, &known) {
+			reply(w, known.Status, known)
+			return
+		} else if err != nil {
+			log.Printf("%s: %v", r.URL.Path, err)
+			reply(w, http.StatusInternalServerError, &auth.Error{Code: "server"})
+			return
+		}
+		// A new picture is a new hash, so this one never changes: the device keeps it.
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		w.Header().Set("Content-Type", kind)
+		w.Write(data)
+	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" {
@@ -253,7 +351,7 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 			w.Header().Set("Access-Control-Expose-Headers", "Retry-After")
 			if r.Method == http.MethodOptions {
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 				w.Header().Set("Access-Control-Max-Age", "86400")
 				w.WriteHeader(http.StatusNoContent)
 				return

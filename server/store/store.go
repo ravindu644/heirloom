@@ -192,6 +192,53 @@ create table resets (
 -- is kept by the member who has been in it longest.
 alter table room add column keeper integer references account (id);
 update room set keeper = (select account from member where member.room = room.id order by member.id limit 1);
+`, `
+-- Rooms, the second pass. A room's streak counts from the day it was made and each member
+-- from the day they came in. Nobody knows those days for the rooms and members already
+-- here, so they start from today: no day before it is held against them.
+alter table room add column created integer not null default 0;
+alter table member add column joined integer not null default 0;
+update room set created = cast(unixepoch('subsec') * 1000 as integer);
+update member set joined = cast(unixepoch('subsec') * 1000 as integer);
+
+-- A picture is kept as it was sent and named by the sha-256 of its bytes (hex), so a new
+-- one is a new name and a device may keep an old one for good.
+alter table account add column picture blob;
+alter table account add column picture_hash text;
+
+-- One line from a member, kept seven days. account is null once its writer has left:
+-- the note stays with the room, from "someone who left".
+create table note (
+	id        integer primary key,
+	public_id text not null unique,
+	room      integer not null references room (id) on delete cascade,
+	account   integer references account (id),
+	at        integer not null,
+	text      text not null
+) strict;
+create index note_room on note (room, at);
+
+-- A lap called for a minute ahead. It stands until a minute after at, unless ended
+-- (taken back, or its caller left) first. Rows stay a day after, for the limit of six.
+create table call (
+	id        integer primary key,
+	public_id text not null unique,
+	room      integer not null references room (id) on delete cascade,
+	account   integer not null references account (id),
+	at        integer not null,
+	made      integer not null,
+	ended     integer
+) strict;
+create index call_room on call (room);
+create index call_account on call (account, made);
+
+-- Who is in. id is the order they said so: the caller's row is the first.
+create table call_in (
+	id      integer primary key,
+	call    integer not null references call (id) on delete cascade,
+	account integer not null references account (id),
+	unique (call, account)
+) strict;
 `}
 
 func migrate(db *sql.DB) error {

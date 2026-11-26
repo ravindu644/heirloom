@@ -60,9 +60,10 @@ func (p *person) connect() []msg {
 }
 
 type answer struct {
-	status      int
-	Room, Error string
-	raw         string
+	status                  int
+	Room, Error, Note, Call string
+	Notes                   []rooms.Note
+	raw                     string
 }
 
 // ask makes a rooms request as this person's device.
@@ -240,7 +241,7 @@ func TestRoomCreateJoinLeave(t *testing.T) {
 	if !regexp.MustCompile(`^[A-HJ-NP-Z2-9]{8}$`).MatchString(m.Code) {
 		t.Errorf("code %q is not 8 of A-Z 2-9 without I and O", m.Code)
 	}
-	if me := m.Members; len(me) != 1 || !reflect.DeepEqual(me[0], rooms.Member{ID: ravi.Account, Name: "ravi", You: true, Phase: "idle"}) {
+	if me := m.Members; len(me) != 1 || !reflect.DeepEqual(me[0], rooms.Member{ID: ravi.Account, Name: "ravi", You: true, Phase: "idle", Laps: [][2]int64{}}) {
 		t.Errorf("members = %s, want only ravi, idle, with nothing counted", m.raw)
 	}
 	sachi.still("a room was made that sachi is not in")
@@ -646,7 +647,7 @@ func TestAwayIsNotWatchedButStillCounts(t *testing.T) {
 
 	ravi.set(setting("rooms_hidden", true))
 	m := sachi.room()
-	want := rooms.Member{ID: ravi.Account, Name: "ravi", Away: true, Phase: "idle", TodayMs: lapMs, TodayLaps: 1, WeekMs: lapMs}
+	want := rooms.Member{ID: ravi.Account, Name: "ravi", Away: true, Phase: "idle", TodayMs: lapMs, TodayLaps: 1, WeekMs: lapMs, Laps: [][2]int64{}}
 	if got := who(t, m, "ravi"); !reflect.DeepEqual(got, want) {
 		t.Errorf("hidden: %+v\nwant no phase, no lap number, no end, no task, no last lap, and the totals: %+v", got, want)
 	}
@@ -1142,6 +1143,10 @@ func TestNothingOfARoomIsLogged(t *testing.T) {
 	ravi.set(sessionCells("run-rang", "work", "rang", now-2*lapMs, ravi.id))
 	sachi.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": "run-rang"}).ok(t, "cheer")
 	ravi.ask("update", map[string]any{"room": room, "name": "Whispers, louder"}).ok(t, "update")
+	sachi.ask("note", map[string]any{"room": room, "text": "Whispered note"}).ok(t, "note")
+	sachi.ask("note", map[string]any{"room": room, "text": "Whispered\nnote"}).refused(t, "a note of two lines", 400, "bad_request")
+	sachi.ask("notes", map[string]any{"room": room}).ok(t, "notes")
+	w.post("/api/me/picture", map[string]any{"token": ravi.Token, "device": ravi.id, "picture": "U2VjcmV0IHBpY3R1cmU="}, nil) // refused: not an image
 	nimal.ask("join", map[string]any{"code": "WRONG234"})
 	nimal.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": "run-rang"})
 	nimal.ask("join", map[string]any{"code": code}).ok(t, "join")
@@ -1151,7 +1156,7 @@ func TestNothingOfARoomIsLogged(t *testing.T) {
 		p.settle()
 	}
 
-	for _, secret := range []string{"Secret", "Whispers", code, room, "run-rang", "run-now", ravi.Account, ravi.Token, "ravi", "share_task"} {
+	for _, secret := range []string{"Secret", "Whispers", "Whispered", "U2VjcmV0", code, room, "run-rang", "run-now", ravi.Account, ravi.Token, "ravi", "share_task"} {
 		if strings.Contains(written.String(), secret) {
 			t.Errorf("the log holds %q: %s", secret, written.String())
 		}

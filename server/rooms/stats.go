@@ -155,3 +155,65 @@ func clampIndex(i int) int {
 	}
 	return i
 }
+
+// StreakResult is section 8's answer, the shape streak.json expects.
+type StreakResult struct {
+	Streak int      `json:"streak"`
+	Rest   []string `json:"rest"`
+	Kept   int      `json:"kept"`
+	Of     int      `json:"of"`
+}
+
+// Streak is contracts/protocol.md section 8, as client/src/core/streak.ts has it: the same
+// days in, the same answer out. mask is bit 0 Monday to bit 6 Sunday; since, when not "",
+// starts the record earlier than its first kept day.
+func Streak(today string, kept []string, window, mask int, since string) StreakResult {
+	monday := func(t time.Time) int { return (int(t.Weekday()) + 6) % 7 }
+	planned := func(t time.Time) bool { return mask>>monday(t)&1 == 1 }
+	keptDays := map[time.Time]bool{}
+	var first time.Time
+	for _, d := range kept {
+		if t, err := time.Parse(time.DateOnly, d); err == nil && planned(t) {
+			keptDays[t] = true
+			if first.IsZero() || t.Before(first) {
+				first = t
+			}
+		}
+	}
+	if len(keptDays) == 0 {
+		return StreakResult{Rest: []string{}}
+	}
+	if t, err := time.Parse(time.DateOnly, since); err == nil && t.Before(first) {
+		first = t
+	}
+	now, _ := time.Parse(time.DateOnly, today)
+	end := now
+	if !keptDays[now] {
+		end = now.AddDate(0, 0, -1)
+	}
+	windowStart := end.AddDate(0, 0, -(window - 1))
+	r := StreakResult{Rest: []string{}}
+	empties := 0
+	for d := first; !d.After(end); d = d.AddDate(0, 0, 1) {
+		if monday(d) == 0 {
+			empties = 0
+		}
+		if !planned(d) {
+			continue
+		}
+		if keptDays[d] {
+			r.Streak++
+		} else if empties++; empties <= 2 {
+			r.Rest = append(r.Rest, d.Format(time.DateOnly))
+		} else {
+			r.Streak = 0
+		}
+		if !d.Before(windowStart) {
+			r.Of++
+			if keptDays[d] {
+				r.Kept++
+			}
+		}
+	}
+	return r
+}

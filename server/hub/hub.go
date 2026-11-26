@@ -397,6 +397,13 @@ func (h *Hub) announce(room int64) {
 	}
 }
 
+// AnnounceOf is Announce for every room the account is in: its picture changed.
+func (h *Hub) AnnounceOf(account int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.announceOf(account)
+}
+
 func (h *Hub) announceOf(account int64) {
 	in, err := h.rooms.Of(account)
 	if ours(err) != nil {
@@ -446,7 +453,10 @@ func (h *Hub) tell(c *conn, in []int64) error {
 		c.shown[room] = shown{msg, next}
 		if before != nil {
 			was, is := *before, *msg
+			// last_at_ms moves too while this moment of last week falls inside one of its laps,
+			// and a screen does not move it on: neither is a change worth a message by itself.
 			was.ServerTime, is.ServerTime = 0, 0
+			was.LastAtMs, is.LastAtMs = 0, 0
 			if reflect.DeepEqual(was, is) {
 				continue
 			}

@@ -81,7 +81,7 @@ func TestPolicyAllowsOnlyWhatTheAppDoes(t *testing.T) {
 		"style-src":       "'self'",
 		"style-src-attr":  "'unsafe-inline'",
 		"font-src":        "'self'",
-		"img-src":         "'self'", // the tab's icon; nothing wider, or an injected image could carry data out
+		"img-src":         "'self' blob:", // the tab's icon and room pictures the page made into blobs; no host, or an injected image could carry data out
 		"connect-src":     "'self'",
 		"base-uri":        "'none'",
 		"form-action":     "'none'",

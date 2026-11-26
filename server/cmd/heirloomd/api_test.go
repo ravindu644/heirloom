@@ -190,9 +190,16 @@ type msg struct {
 	Ranked   bool
 	Gone     bool
 	Members  []rooms.Member
-	Rooms    []string // in a welcome
-	Role     string   // in a welcome, and the whole of a role message
-	raw      string
+	// The second pass.
+	Days       [7]int64 `json:"days"`
+	LastDays   [7]int64 `json:"last_days"`
+	LastAtMs   int64    `json:"last_at_ms"`
+	Streak     rooms.RoomStreak
+	Call       *rooms.Call
+	NotesSince *string  `json:"notes_since"`
+	Rooms      []string // in a welcome
+	Role       string   // in a welcome, and the whole of a role message
+	raw        string
 }
 
 type device struct {
@@ -790,7 +797,8 @@ func TestAnyOriginIsAnswered(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != 204 || res.Header.Get("Access-Control-Allow-Origin") != "*" ||
 		!strings.Contains(res.Header.Get("Access-Control-Allow-Methods"), "POST") ||
-		!strings.EqualFold(res.Header.Get("Access-Control-Allow-Headers"), "content-type") {
+		// Authorization: a picture is fetched with the token as a Bearer, from the app's own origin.
+		!strings.EqualFold(res.Header.Get("Access-Control-Allow-Headers"), "content-type, authorization") {
 		t.Errorf("preflight = %d %v", res.StatusCode, res.Header)
 	}
 	// The answer itself carries the header too, on a refusal as on a success.

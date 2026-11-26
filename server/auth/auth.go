@@ -562,6 +562,18 @@ func (s *Service) Check(token, device string) (account int64, key string, err er
 	return account, string(hash), nil
 }
 
+// Bearer is whose token this is, for a GET that names no device: an <img> or a fetch of a
+// picture carries the token alone. Everything that writes goes through Check.
+func (s *Service) Bearer(token string) (account int64, err error) {
+	err = s.db.QueryRow("select account from token where hash = ?", hashOf(token)).Scan(&account)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrToken
+	} else if err != nil {
+		return 0, fmt.Errorf("read token: %w", err)
+	}
+	return account, nil
+}
+
 // issue gives the device a new token and returns the hash of the one it replaces, if any.
 func issue(tx *sql.Tx, account int64, device string, now int64) (token string, replaced []byte, err error) {
 	err = tx.QueryRow("select hash from token where account = ? and device = ?", account, device).Scan(&replaced)
