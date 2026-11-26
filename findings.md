@@ -95,3 +95,7 @@ when it is done.
 - [16] `first-hour.spec.ts:624` (Escape or Close on a habit's sheet) failed once in a full run (the sheet did not open after Enter) and passed 3 of 3 alone: a flake to watch.
 - [17] Past its estimate Focus's bar just grows: a task of 2 with four laps shows four equal segments, read as an estimate of 4. Today's row says "4 of 2". A wider gap before the first segment past the estimate would show it without words.
 - [17] Progress's day list does not mark a running lap as overlapping another device's session until its row is written: both blocks share row 0 without the two-devices note.
+- [19] A screen opened from the bottom bar keeps the last screen's scroll: with Progress scrolled down, Today opened 217px down and Habits with its heading cut (the shell's `<main>` keeps `scrollTop`).
+- [19] A past habit day with part of its count (1 of 2) is drawn as an empty day; today's part count is drawn filled. DESIGN.md says a count is filled that far.
+- [19] Room's own lane counts today and the week without the lap in progress, while Today, Focus and Progress count it: 1h 15m beside 1h 26m at the same moment.
+- [19] Two every-day habits made at the same moment read "of the last 34 planned days" and "of the last 35": the window starts at each habit's first check-in.
