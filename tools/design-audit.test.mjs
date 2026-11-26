@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { colour, columns, edge, fluid, header, press, rhythm, scroll, shape, space, spec, type } from './design-audit.mjs';
+import { colour, columns, edge, fluid, header, job, press, rhythm, scroll, shape, space, spec, type } from './design-audit.mjs';
 
 const s = spec(fs.readFileSync('DESIGN.md', 'utf8'));
 let n = 0;
@@ -207,4 +207,16 @@ test('edge: a big figure that leads a row starts the column, so it carries its b
   assert.deepEqual(run({ ...row }, sixty(20 + -0.057 * 44)), []);
   // Words before the number: the words start the column, not the figure.
   assert.deepEqual(run({ ...row, textFirst: true }, sixty(80)), []);
+});
+
+test('job: a note, a name and a switch are each the one size DESIGN.md gives the job', () => {
+  const label = { family: 'Barlow', size: 13, weight: 500, lh: 16.9 };
+  const body = { family: 'Barlow', size: 16, weight: 400, lh: 23.2 };
+  assert.deepEqual(job(el({ job: 'note', font: label }), s), []);
+  assert.deepEqual(job(el({ job: 'switch', font: body }), s), []);
+  assert.deepEqual(job(el({ job: 'person', font: { ...body, weight: 600 } }), s), [], 'a name may be strong; the size is the job');
+  assert.match(job(el({ job: 'note', font: body }), s)[0].what, /a note at 16px/);
+  assert.match(job(el({ job: 'name', font: body }), s)[0].allowed, /label, 13px/);
+  assert.match(job(el({ job: 'heading', font: label }), s)[0].allowed, /body-strong, 16px/);
+  assert.deepEqual(job(el({ font: body }), s), [], 'words with no job are not judged here');
 });

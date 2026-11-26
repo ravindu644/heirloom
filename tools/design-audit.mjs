@@ -1,10 +1,12 @@
 // Usage: node tools/design-audit.mjs [--state <name>] [--size phone|wide|laptop]
 // Opens every state of client/demo.html in Chromium at 412x915, 471x1020 (the first real phone)
 // and 1440x900, reads what was drawn and holds it to DESIGN.md: type, colour (light and dark),
-// shape, space, one left edge, rhythm, touch targets, the header, a page that scrolls, and
-// columns that run margin to margin under 720px. Prints each violation once with every state it shows in, exits 1
-// if there is any. Builds the demo once with Vite into a temporary folder, serves it, and ends the
-// server and the browser and removes the folder, also on failure or Ctrl-C.
+// shape, space, one left edge, rhythm, touch targets, the header, a page that scrolls, columns
+// that run margin to margin under 720px, and each job of words (a name, a note, a switch's words,
+// a heading, a person) at the one size DESIGN.md gives it. Prints each violation once with every
+// state it shows in, exits 1 if there is any. Builds the demo once with Vite into a temporary
+// folder, serves it, and ends the server and the browser and removes the folder, also on failure
+// or Ctrl-C.
 // The rules are pure functions over collected data, so tools/design-audit.test.mjs runs them with
 // no browser.
 import { createHash } from 'node:crypto';
@@ -265,6 +267,19 @@ export function fluid(col, size) {
 }
 
 /**
+ * 11. A size follows the job. The kit marks what its words do (`data-job`, a fieldset's legend is a
+ * name), and each job is the one role DESIGN.md's Typography gives it, so the same job is one size
+ * on every screen and two peers in one panel or sheet never differ.
+ */
+const JOBS = { name: 'label', note: 'label', sheet: 'label', switch: 'body', person: 'body', heading: 'body-strong' };
+export function job(el, s) {
+  if (!el.job || !el.font || el.figure || !JOBS[el.job]) return [];
+  const role = s.roles.find((r) => r.name === JOBS[el.job]);
+  if (near(el.font.size, role.size, 0.05)) return [];
+  return [v('job', el, `a ${el.job} at ${r2(el.font.size)}px`, `a ${el.job} is ${role.name}, ${role.size}px, wherever it stands`)];
+}
+
+/**
  * 8. Every signed-in state has the same header at a size. Each state is compared with the header
  * most states share, and the first difference is named.
  */
@@ -295,7 +310,7 @@ export function audit(light, dark, s, size, doc) {
   const cols = columns(light);
   const inCol = new Set(cols.flatMap((c) => c.blocks.map((b) => b.i)));
   return [
-    ...light.flatMap((el) => [...type(el, s, width), ...colour(el, s, 'light'), ...shape(el, s), ...space(el, s), ...press(el, s)]),
+    ...light.flatMap((el) => [...type(el, s, width), ...colour(el, s, 'light'), ...shape(el, s), ...space(el, s), ...press(el, s), ...job(el, s)]),
     ...dark.flatMap((el) => colour(el, s, 'dark')),
     ...cols.flatMap((c) => [...edge(c, s), ...rhythm(c, s, size, !inCol.has(c.box.i) || c.box.root), ...fluid(c, size)]),
     ...(doc ? scroll(doc, size) : []),
@@ -366,8 +381,10 @@ export function collect(colours) {
   };
   const visit = (el, parent, scoped) => {
     const cs = getComputedStyle(el);
-    if (cs.display === 'none' || !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) return;
+    // A box of its own first: checkVisibility is false for display: contents, which has none, and
+    // asked first it hid everything a contents wrapper holds (the room's sheet went unread).
     if (cs.display === 'contents') return [...el.children].forEach((c) => visit(c, parent, scoped));
+    if (cs.display === 'none' || !el.checkVisibility({ visibilityProperty: true, opacityProperty: true })) return;
     const r = el.getBoundingClientRect();
     // A screen reader's text: one pixel, clipped. Nothing of it is drawn.
     if (r.width <= 1 && r.height <= 1) return;
@@ -383,7 +400,9 @@ export function collect(colours) {
     const space = [];
     for (const s of SIDES) {
       space.push([`padding-${s}`, px(cs[`padding-${s}`])]);
-      if (tm.get(`margin-${s}`).toString() !== 'auto') space.push([`margin-${s}`, px(cs[`margin-${s}`])]);
+      // An open sheet's margin hangs it in the screen (a share of its height on the laptop): where
+      // it stands, not a space between two things.
+      if (tm.get(`margin-${s}`).toString() !== 'auto' && !(isRoot && el.tagName === 'DIALOG')) space.push([`margin-${s}`, px(cs[`margin-${s}`])]);
     }
     for (const g of ['row-gap', 'column-gap']) if (cs[g] !== 'normal') space.push([g, px(cs[g])]);
     const pressable = el.matches(PRESS) && !(modal && !modal.contains(el));
@@ -419,6 +438,8 @@ export function collect(colours) {
       display: cs.display, flexDirection: cs.flexDirection, position: cs.position, float: cs.float,
       inPress: !!el.closest(PRESS),
       inScope, root: isRoot,
+      // What the words do, where the kit says so; a fieldset's legend names its group.
+      job: el.dataset?.job ?? (el.tagName === 'LEGEND' ? 'name' : null),
       ...drawn(cs, el, !!own || field),
       space, pressable, button, hit: null, el,
     });
