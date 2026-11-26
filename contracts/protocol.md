@@ -645,7 +645,7 @@ errors as section 10, and these of their own:
 | `/api/rooms/create` | `name` (1 to 40 characters) | `{"room":"<id>"}` |
 | `/api/rooms/join` | `code` | `{"room":"<id>"}`. Joining a room one is in already is the same answer |
 | `/api/rooms/leave` | `room` | `{}`. The last member leaving ends the room |
-| `/api/rooms/update` | `room`, and any of `name`, `target_ms` (0 for none), `ranked` | `{}`. Any member may |
+| `/api/rooms/update` | `room`, and any of `name`, `target_ms` (0 for none), `ranked` | `{}`. The room's keeper only; anyone else gets 403 `forbidden` |
 | `/api/rooms/cheer` | `room`, `to` (a member's id), `run` (a session row id of theirs) | `{}`. Once per person per run; a second is the same answer |
 
 | Status | Code | When |
@@ -667,7 +667,7 @@ A device drops any room it holds that a `welcome`'s `rooms` or a POST reply's `r
 name: it was not there to hear `gone`.
 
 ```json
-{ "type": "room", "room": "r_8f3a", "name": "Sachi and me", "code": "K7QW3RXM",
+{ "type": "room", "room": "r_8f3a", "name": "Sachi and me", "code": "K7QW3RXM", "keeper": "a_19c2",
   "target_ms": 36000000, "ranked": false, "server_time": 1795494600150,
   "members": [
     { "id": "a_19c2", "name": "sachi", "you": false, "away": false,
@@ -678,6 +678,11 @@ name: it was not there to hear `gone`.
       "last": { "run": "run-7f3a", "ended": 1795493100000, "cheers": ["a_02b7"] } } ] }
 ```
 
+- `keeper` is the id of the member who keeps the room: the one who made it. Only the keeper may
+  change its name, its target and whether it is ranked. When the keeper leaves, the member who has
+  been in the room longest becomes the keeper, in the same transaction, and every member is sent
+  the room again. A room made before keepers existed is kept by its longest member. The code is
+  everyone's to see and share: friends invite friends.
 - `members` are in the order they joined. `id` is the account's opaque id, `name` its username,
   `you` marks the account this message is for.
 - `phase`, `set_index`, `ends_at` and `paused` come from the member's timer cell, read at
