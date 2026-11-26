@@ -255,7 +255,8 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
       <Fold class={css.target} role="group" aria-label={s.today.target}>
         {figures.target > 0 && (
           <div key="bar" class={css.lane}>
-            <LapBar fills={figures.fills} of={figures.target} />
+            {/* The lap running fills its segment as it runs, as on Focus: Today is drawn again on every tick. */}
+            <LapBar fills={figures.fills} of={figures.target} share={figures.open ?? 0} />
           </div>
         )}
         <p key="words">
