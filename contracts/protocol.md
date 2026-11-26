@@ -647,6 +647,12 @@ errors as section 10, and these of their own:
 | `/api/rooms/leave` | `room` | `{}`. The last member leaving ends the room |
 | `/api/rooms/update` | `room`, and any of `name`, `target_ms` (0 for none), `ranked` | `{}`. The room's keeper only; anyone else gets 403 `forbidden` |
 | `/api/rooms/cheer` | `room`, `to` (a member's id), `run` (a session row id of theirs) | `{}`. Once per person per run; a second is the same answer |
+| `/api/rooms/remove` | `room`, `member` (a member's id, not your own) | `{}`. The keeper only. The member is out (their devices get `gone`) and the room gets a new `code` in the same transaction, so the old one stops working |
+| `/api/rooms/note` | `room`, `text` (1 to 200 characters, one line: no line breaks) | `{"note":"<id>"}`. A break note; see **Notes** |
+| `/api/rooms/call` | `room`, `at` (server ms, a whole minute 1 to 30 minutes ahead), or `at: null` to take your own call back | `{"call":"<id>"}` or `{}`. See **Start together** |
+| `/api/rooms/notes` | `room` | `{"notes": [...]}`: the last seven days, newest first. See **Notes** |
+| `/api/rooms/in` | `room`, `call`, `in` (true or false) | `{}`. Until the call starts; a second is the same answer |
+| `/api/me/picture` | `picture`: a base64 WebP or JPEG of at most 12000 bytes, square, or `null` to take it off | `{"picture":"<hash>"}` or `{}` |
 
 | Status | Code | When |
 |---|---|---|
@@ -655,6 +661,18 @@ errors as section 10, and these of their own:
 | 409 | `full` | The room has 8 members, or the account is in 5 rooms |
 | 404 | `run` | `to` is not a member, or has no such session that rang |
 | 429 | `slow_down` | Ten wrong codes from one account inside an hour: every join by it, the right code included, until the hour is up. `Retry-After` carries the seconds |
+| 403 | `forbidden` | `update` or `remove` by a member who is not the keeper |
+| 404 | `call` | No such call open in that room |
+| 409 | `call` | The room has an open call already; one at a time |
+| 400 | `bad_request` | A note empty, too long or with a line break; `at` not a whole minute 1 to 30 minutes ahead; a picture too large or not WebP or JPEG |
+| 429 | `slow_down` | More than 30 notes from one account in a room in a day, or more than 6 calls in a day. `Retry-After` carries the seconds |
+
+**Pictures.** An account's picture is kept by the server as it was sent and named by the sha-256
+of its bytes (`hash`, hex). Members carry `picture` (that hash, or `null` for the initial).
+`GET /api/pictures/<hash>` with the token as `Authorization: Bearer <token>` returns it, to an
+account that shares a room with its owner (else 404), with `Cache-Control: private, max-age=31536000,
+immutable`: a new picture is a new hash. The device makes it before it sends it: cut square, 96 by
+96, WebP (JPEG where WebP cannot be made), so it is about 5 KB.
 
 A room's `code` is 8 characters of `A-Z 2-9` without the look-alikes (`I`, `O`, `0`, `1`), made
 by the server. Whoever has it can join; any member can read it.
@@ -712,9 +730,57 @@ name: it was not there to hear `gone`.
   and a lap, not to a room: it shows in every room the two share. Only a lap that rang can be
   cheered, never a break, never one's own, and never a member who is away.
 - A member's local midnight changes their `today_ms`, so it sends the message like any other change.
+- `picture` on each member: see **Pictures**.
+- `laps` on each member: their work laps of their local day so far, from their session rows,
+  oldest first, each `[started, ended]` in server ms (paused time inside a lap is not cut out;
+  a lap set aside is not there). The lap in progress is not in it: it is `run`. `[]` when there is
+  none, and for a member who is `away`. At most 48; past that, the newest 48.
+- `days` and `last_days` are the room's focus per local day of this week and of last week, Monday
+  first, seven numbers each in ms (each member counted on their own local day, rows only, as
+  `week_ms`). `last_at_ms` is the room's total last week as far as the same weekday and time of
+  day, so a screen says "4h ahead of last week at this time" from `week` minus it.
+- `streak` is the room's: `{ "run": 12, "marks": [14 of "kept", "rest", "miss", "open", "none"] }`,
+  oldest first, today last, on the calendar of the account the message is for. A day is kept when
+  every member in the room on that day (from the day they joined; one who has left is not counted)
+  ran a work lap that rang on their own local day of that date; section 8's rule gives two rest
+  days a Monday to Sunday week. Today is `"open"` until it is kept. `"none"` is a day before the
+  room was made, or before anything was ever kept: no mark is drawn for it, so a new room is not
+  shown misses. A device that meets a mark it does not know draws nothing for it.
+- `call` is the room's open call or `null`: `{ "id", "by": <member id>, "at": <server ms>,
+  "in": [member ids, the caller first] }`.
+- `notes_since` is the id of the newest note, so a device knows there is something to fetch.
 - The room's own total for the week is the sum of its members' `week_ms`; `target_ms` is what
   they are filling together, 0 when none is set. `ranked` says whether this room shows its
-  members by `week_ms`, most first; otherwise they stay in joining order, side by side.
+  members by `week_ms`, most first; otherwise in the live order (see **Order**).
+
+**Start together.** A member calls a lap for a whole minute 1 to 30 minutes ahead; the caller is
+in. Others say they are in, or take it back, until it starts. At `at`, each device of an account
+that is in and whose timer is idle (not on a lap or a break) starts a work lap with run id
+`call-<call id>`, at `started = at`, on the task Focus would start; the same run id on every
+device of that account makes it one lap, whichever writes first. A device that is not open at
+that minute starts nothing; the phone shows a notification at `at` ("The lap together starts"),
+set when you say you are in and taken off if you take it back. The call ends one minute after
+`at`, or when the caller takes it back; the room is sent again either way. A member who leaves is
+taken out of the call; the caller leaving ends it.
+
+**Small rules.** The caller takes a call back with `at: null` (`in` from the caller is 400); `in`
+from `at` on is 404 `call`; removing a member already gone is `{}`; the 30 notes and 6 calls are
+counted over the last 24 hours, and `Retry-After` counts to when the oldest of them is a day old;
+`last_at_ms` is true when the message is built and a screen does not move it. An account may fetch
+its own picture whether or not it shares a room; a picture's squareness is the device's to make.
+`/api/me/picture` takes at most 20 changes a day (429 `slow_down` past that, counted by the
+running server); sending the picture an account already has, or none when it has none, is not a
+change: it is not counted and sends no room again.
+
+**Notes.** A note is one line from a member: `{ "id", "from": <member id>, "at": <server ms>,
+"text" }`. `POST /api/rooms/notes` with `room` replies `{"notes": [...]}`, newest first, the last
+seven days. Notes older than seven days are deleted. A note belongs to the room: when its writer
+leaves it stays, written by `"from": null` ("Someone who left"). The server sends no notification
+for a note; what is new is the device's own reckoning (the newest note it has shown), not the
+server's. A device on a lap does not show them.
+
+**Order.** A screen shows members on a lap first, then on a break, then the rest, each group by
+`week_ms` (most first, joining order on a tie). `ranked` true shows them by `week_ms` alone.
 
 **What the server reads.** Only what this needs: an account's `timer` cell, its `session` rows,
 its `settings` fields `share_task` and `rooms_hidden`, and the `title` of the one task a shared
