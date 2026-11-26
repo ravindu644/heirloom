@@ -276,3 +276,21 @@ For the lead:
   twice, because the first fix covered sign-out and the reset never signs out.
 - **Lanes stopped by a quota keep their work on disk.** Look at the diff before re-briefing:
   the server half was done and only needed a security read.
+
+## 13. Lessons from the user's fifth hour
+
+| What went wrong | The rule |
+|---|---|
+| "Lap 1 of 4 today, next" and "5 min break after" over Focus's bar: the user called them "a common AI trap" | A mark that is plain from what it stands with needs no sentence. Before adding a line that explains a bar, move the bar to what it counts |
+| Focus's bar was the day's target while Today's row showed the task's squares: two bars, two meanings | One kind of mark, one meaning per screen; a bar sits with what it counts (under the task's title on Focus) |
+| "Paused" over the bar and "paused since" under the digits; "Take five." over "Start 5 min break" | Say a state once, where it is acted on. Grep a screen's own words for a second saying of the same fact |
+| A carried row overlapped the Next card and the list changed only at release | A list answers a carried row before the release: the place it lands is open and every row already looks as it will |
+| After a carry, Today's Next and Focus's task differed: two Starts for two tasks | When a hand changes what is next, everything that offers "next" follows it |
+
+For the lead:
+
+- **A class added by hand to an element Preact renders is wiped when its props change.** The
+  lift's shadow vanished the moment the row turned into Next. State a kit helper sets on
+  elements it does not render goes in `data-` attributes.
+- **Review a merged picture, not the lane's word.** The first carry frames looked right in the
+  lane's report; the design review measured classes frame by frame and found the lift gone.

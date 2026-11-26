@@ -146,18 +146,18 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 - One browser spec run by hand (`playwright test x.spec.ts`) uses the last built `server/bin/heirloomd`,
   which carries the web app: run `make server` first or it tests old code. `make e2e` rebuilds it.
 - A visually hidden element placed `absolute` needs a positioned ancestor, or it makes the whole page scroll.
-- Playwright's `getByRole(..., { name: 'Back' })` also matches "Bring a copy back": pass `exact: true`.
-- Chromium's `elementFromPoint` snaps x.5 to the next pixel: sample whole pixels when measuring a target.
+- Playwright: `getByRole(..., { name: 'Back' })` also matches "Bring a copy back" (pass `exact: true`); Chromium's `elementFromPoint` snaps x.5 up (sample whole pixels).
 - `node --test tools/` fails: Node 22 wants a quoted glob (`node --test "tools/*.test.mjs"`), not a directory.
 - `go.mod` says `go 1.26.0`, not `go 1.26`: the SQLite driver sets that floor and Go rewrites the line.
 - Never pass a cancellable context to a SQLite call in `server/`: a cancelled call makes the driver
   drop the connection, the checkpoint at close is skipped and a `-wal` file is left behind.
-- SQLite before 3.51.3 can corrupt a WAL database; Ubuntu 24.04 ships 3.45.1. Use the bundled one.
-- Node does not support the S10's kernel (4.14). The server is Go for that reason.
+- SQLite before 3.51.3 can corrupt a WAL database (Ubuntu 24.04 ships 3.45.1): use the bundled one. Node does not support the S10's kernel (4.14): the server is Go.
 - `@capacitor/local-notifications` silently falls back to an inexact alarm without the exact-alarm
   permission. Declare `USE_EXACT_ALARM` and check `checkExactNotificationSetting()`.
 - Android hands an activity its first intent again when it is restored after a process kill: an
   extra that does something once is dropped when a saved state or `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY` is there.
+- @preact/signals 2 redraws in the next animation frame: a flag covering that redraw (`placedByHand`) must outlast it, and
+  a class added by hand to an element Preact renders is wiped when its `class` changes (use a `data-` attribute).
 - Chrome throttles timers in background tabs. The laptop's end-of-phase alert comes from Web Push,
   not from a `setTimeout` in the page.
 - Cloudflare closes idle WebSockets and restarts its servers: ping every 25 s and always reconnect.

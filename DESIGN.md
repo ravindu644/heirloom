@@ -459,8 +459,10 @@ Built once in `client/src/ui/kit/` and reused.
   release:** the moment a lifted row is over the top place it wears the Next card's outline
   (and its Start), and what was Next glides down to the head of Later today as an ordinary row,
   the "Later today" heading moving with it; moved away again, both go back. Letting go then
-  changes nothing on screen but the shadow. Nothing overlaps a card while a row is carried:
-  the place it would land is always open under it.
+  changes nothing on screen but the shadow. While a row is carried no two resting cards
+  overlap, and the place it would land is always open; the carried card itself passes over
+  whatever is under the finger, headings included. Carried back to where it was picked up, the
+  list is as it was.
   A row with nowhere to go does not lift: the only open task stays where it is. (Upcoming
   could not be put in order at all, and the one task under Next lifted to go nowhere.)
 - **The strip of the lap in progress** (on Today): an `ink` bar with `ground` text: the time left,
@@ -693,7 +695,7 @@ found none of this and called it the one thing that makes the rest feel finished
 | What the last tap did | `sheet` 200ms | Rises `rise` in, fades out |
 | The timer | none | Digits change; nothing animates |
 | A lap done | `lap-done` 700ms | Your bar runs to meet the ghost's line, the split chip turns over, then the words. Tap anywhere to skip |
-| A set of four done | `set-done` 1200ms | The four segments light in turn and the long break is offered. Skippable, once per set |
+| A task's laps all in | `set-done` 1200ms | The bar stands tall and its segments light in turn over two thirds of it, when the lap just done is the task's last estimated one. Skippable, once per task |
 
 Code that needs a duration reads it through the kit's one function, in milliseconds: the built
 CSS writes `200ms` as `.2s`, and a bare `parseFloat` of a token made every glide last 0.16 ms in
@@ -846,13 +848,17 @@ Each is a rule for every screen, not for the one where it was seen.
   asked about three times ("why does it stay at 4", "why are there four hard coded lines, can I
   clear them", "why a long break line"), with a noun and without. So the set is on no screen
   and in no notification. **Focus's bar is the task's laps**, its estimate and how many are done:
-  "Learn C basics" with five estimated has five segments. A lap for nothing in particular, or on
+  "Learn C basics" with five estimated has five segments. **A bar sits with what it counts:** on
+  Focus it stands under the task's title, between the title and the digits, so it is never read as
+  the day's count; Today's day bar stands with the day's figures. A lap for nothing in particular, or on
   a task with no estimate, has no bar. The day's target is Today's alone. Nothing over the bar
   explains it: no "Lap 3 of 5 today", no ", next", no "5 min break after" (the user's fifth hour:
   "they over explain something, a common AI trap"). The line over the bar says only what the
-  digits cannot: in a break its name ("Short break", "Long break"), and "Paused" or "Break over"
-  when it is so; otherwise it is empty and keeps its height, so the digits never move. The break
-  a lap earns is said where it is taken, on the button ("Start 5 min break"). The one place the
+  digits cannot: in a break its name ("Short break", "Long break"), and "Break over" when it is
+  so; otherwise it is empty and keeps its height, so the digits never move. Paused is said once,
+  under the digits ("paused since 16:38"), with the digits greyed and Resume on the button. The
+  break a lap earns is said once, where it is taken, on the button ("Start 5 min break"), with no
+  "Take five." over it. The one place the
   rule of four is said is where the long break is earned: "Four laps. The long break is
   earned!" (not "in a row": the four may be hours apart). A bell says "Lap done." and the break
   it has earned; a room's row says "Focusing" and the time left. Today's figures say "past your

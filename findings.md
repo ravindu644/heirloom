@@ -93,3 +93,4 @@ when it is done.
 - [16] A reset link reloaded in a phone browser after the page read it is gone from the address bar; the person lands on Sign in with no word that tapping the link again still works.
 - [16] The reset list asked for as Settings opens can land after a link made meanwhile and drop its row until Settings is opened again (`client/src/sync/resets.ts` refresh vs put); invites may share it.
 - [16] `first-hour.spec.ts:624` (Escape or Close on a habit's sheet) failed once in a full run (the sheet did not open after Enter) and passed 3 of 3 alone: a flake to watch.
+- [17] Past its estimate Focus's bar just grows: a task of 2 with four laps shows four equal segments, read as an estimate of 4. Today's row says "4 of 2". A wider gap before the first segment past the estimate would show it without words.
