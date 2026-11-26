@@ -251,10 +251,8 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [design-review] Focus in every state with and without a target; the long timer; the list
       (`reviews/15/`), and a stranger's walk (`reviews/15/stranger.md`: 15 findings, 11 fixed,
       4 in findings.md)
-- [ ] Gate (the user lives with it). On the phone: a row carried with a finger; a 360 minute
-      lap's alarm with the screen off; the welcome under the phone's own bars. Five tests that
-      need the day's earlier hours were skipped by a run made after midnight: run `make e2e`
-      in the daytime
+- [x] Gate: the user tried it on the phone on 2026-11-26 ("everything's looking good now");
+      a 360 minute lap's alarm with the screen off is still untried
 
 ## 16. A way back in
 
@@ -262,9 +260,8 @@ On the third build the user found no glitches; four things about how it reads an
       new password; the owner's own way back is a command on the server
 - [x] [server] [core] [ui] The reset link, made in the Admins panel and from `heirloomd`
 - [x] [qa] A reset on two devices; an old token after it
-- [ ] Gate: built, checked and reviewed (design, stranger, code); waiting on the user's try.
-      Never run by us on a phone: the app's sign-in line, and a reset link opened from a chat
-      on the phone's browser
+- [ ] Gate: built, checked and reviewed; waiting on a reset link tried on the phone (one opened
+      from a chat in the phone's browser) and the app's sign-in line
 
 ## 17. What the fifth hour found
 
@@ -275,8 +272,7 @@ On the third build the user found no glitches; four things about how it reads an
       what was Next goes down under the finger
 - [x] [qa] The bar for a task with and without an estimate, past it, and for no task; a carry
       to the top seen before the release
-- [ ] Gate: built, checked and reviewed (design, stranger, code); waiting on the user's try.
-      Never run by us on a phone: a carry with a finger, where the hold and the glide are felt
+- [x] Gate: the user tried it on the phone on 2026-11-26 ("everything's looking good now")
 
 ## 18. A quieter welcome
 
@@ -284,9 +280,17 @@ On the third build the user found no glitches; four things about how it reads an
       of days, "Your days stay yours.", one sentence, the button. DESIGN.md rewritten
 - [x] [ui] The welcome as chosen, in the phone app and beside the browser's sign-in
 - [x] [qa] The welcome's tests read the new screen
-- [ ] Gate: built and checked (170 browser tests); waiting on the user's try on the phone
+- [x] Gate: the user tried it on the phone on 2026-11-26 ("everything's looking good now")
 
-## 19. Release 1.0
+## 19. About
+
+- [x] [lead] PRODUCT row and DESIGN.md: About at the foot of Settings; the build's version and
+      commit stamped by vite.config.ts; the repository at github.com/ravindu644/heirloom (private)
+- [x] [ui] About in Settings, in the browser and the phone app
+- [x] [qa] About names the version and commit the build was made from; the link opens outside the app
+- [ ] Gate
+
+## 20. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

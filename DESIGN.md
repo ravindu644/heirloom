@@ -644,6 +644,11 @@ Built once in `client/src/ui/kit/` and reused.
   47 of 108dp tall), so no launcher's mask crowds it; the splash uses the same drawing.
   - (It was first four sentences about a lap and its 25 minutes, then a day drawn as a race with
     a key and three small drawings; the user found that cluttered and chose this from three.)
+- **About** is the last block of Settings, for everyone: the mark and "heirloom", one line of
+  what it is ("A free Pomodoro, tasks and habits app, made in free time."), the version as
+  "Version 1.0.0 (ac7fe13)", the commit in the figures face so it can be read out in a bug
+  report, and one link, "Source on GitHub", to github.com/ravindu644/heirloom, which opens in
+  the browser (outside the app on the phone). Nothing else: no licences list, no credits wall.
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
   "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
   and an equal negative margin, so the line it sits in keeps its height.
