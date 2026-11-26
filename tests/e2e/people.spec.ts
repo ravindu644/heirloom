@@ -255,7 +255,7 @@ test('nobody can change the owner: naming the owner is bad_request from the owne
     expect(await api(server, '/api/admins/set', { ...owner, username: 'owner', role })).toEqual({ status: 400, body: { error: 'bad_request' } });
     expect(await api(server, '/api/admins/set', { ...sam, username: 'owner', role })).toEqual({ status: 403, body: { error: 'forbidden' } });
   }
-  expect((await api(server, '/api/admins/list', owner)).body.admins[0]).toEqual({ username: 'owner', role: 'owner' });
+  expect((await api(server, '/api/admins/list', owner)).body.admins[0]).toEqual({ username: 'owner', role: 'owner', picture: null });
 });
 
 test('plain http is said once in Settings\' Account for a server on the network, and not for localhost', async ({ fresh, deviceA: a, deviceB: b }) => {
