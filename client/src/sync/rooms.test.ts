@@ -83,6 +83,50 @@ describe('the list', () => {
     assert.equal(r.list.value[0]!.members[1]!.today_ms, 50 * MIN);
   });
 
+  it('a friend\'s lap in progress is in their figures from `run`, on since `server_time` while it counts; paused it stands; without it, the rows alone', async () => {
+    const { w, d, r } = await one();
+    const run = { ms: 14 * MIN, today: true, week: true };
+    const sachi = (over: object) => member(SACHI, 'sachi', { phase: 'work', ends_at: T0 + 11 * MIN, today_ms: 50 * MIN, today_laps: 2, week_ms: 100 * MIN, run, ...over });
+    const figures = () => r.list.value[0]!.members.map((m) => [m.today_ms, m.week_ms]);
+    say(d, room('r_1', [member(ME, 'ravi', { week_ms: 10 * MIN, run: { ms: 99 * MIN, today: true, week: true } }), sachi({})]));
+    // You are counted from this device's own timer, never from `run`.
+    assert.deepEqual(figures(), [[0, 10 * MIN], [64 * MIN, 114 * MIN]]);
+    w.time.advance(3 * MIN);
+    assert.deepEqual(figures(), [[0, 10 * MIN], [67 * MIN, 117 * MIN]], 'moved on at the minute with nobody sending');
+    assert.equal(r.list.value[0]!.week_ms, 127 * MIN, 'and the room\'s week with it');
+
+    // Begun yesterday and still running: in the week, not in today.
+    say(d, room('r_1', [member(ME, 'ravi'), sachi({ run: { ...run, today: false }, ends_at: T0 + 20 * MIN })], { server_time: T0 + 3 * MIN }));
+    assert.deepEqual(figures()[1], [50 * MIN, 114 * MIN]);
+
+    // Paused: as far as it had run, and it stays there.
+    say(d, room('r_1', [member(ME, 'ravi'), sachi({ paused: true, ends_at: null })], { server_time: T0 + 3 * MIN }));
+    w.time.advance(5 * MIN);
+    assert.deepEqual(figures()[1], [64 * MIN, 114 * MIN]);
+
+    // No lap in progress, or an older server that does not send `run`: the rows alone.
+    say(d, room('r_1', [member(ME, 'ravi'), sachi({ run: null })], { server_time: T0 + 8 * MIN }));
+    assert.deepEqual(figures()[1], [50 * MIN, 100 * MIN]);
+    const older = sachi({}) as Record<string, unknown>;
+    delete older.run;
+    say(d, room('r_1', [member(ME, 'ravi'), older], { server_time: T0 + 8 * MIN }));
+    assert.deepEqual(figures()[1], [50 * MIN, 100 * MIN]);
+  });
+
+  it('a friend\'s lap in progress stops counting at their bell with no new message, and nothing is left waiting after it', async () => {
+    const { w, d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { phase: 'work', ends_at: T0 + 5 * MIN, today_ms: 50 * MIN, week_ms: 100 * MIN, run: { ms: 20 * MIN, today: true, week: true } })]));
+    let changes = 0;
+    const stop = r.list.subscribe(() => changes++);
+    w.time.advance(10 * MIN);
+    const sachi = r.list.value[0]!.members[1]!;
+    assert.deepEqual([sachi.phase, sachi.today_ms, sachi.week_ms], ['idle', 75 * MIN, 125 * MIN], '+25 to the bell, not +30');
+    // Once on subscribing, then at each of the five minutes up to the bell, the bell being the fifth: none after it.
+    assert.equal(changes, 6);
+    assert.equal(w.time.waiting(), 0);
+    stop();
+  });
+
   it('`gone` removes the room; two rooms are two entries, each its own', async () => {
     const { d, r } = await one();
     say(d, room('r_1', [member(ME, 'ravi')]));

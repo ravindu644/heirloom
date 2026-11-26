@@ -168,12 +168,26 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     return { today: began === today ? ran : 0, week: mondayOf(began) === mondayOf(today) ? ran : 0 };
   }
 
-  const list = computed(() => {
+  // A friend's lap in progress: how far the server said it had run at `server_time`, and on since
+  // then while it is not paused, up to its bell. Nothing when the message has no `run` (an older server).
+  function running(member: Record<string, unknown>, said: unknown, ends: number | null, now: number): { today: number; week: number; moving: boolean } {
+    const run = member.run as { ms?: unknown; today?: unknown; week?: unknown } | null | undefined;
+    if (member.away === true || !run || typeof run !== 'object' || typeof run.ms !== 'number' || run.ms < 0) return { today: 0, week: 0, moving: false };
+    const moving = member.paused !== true && typeof said === 'number';
+    const ran = run.ms + (moving ? Math.max(0, Math.min(now, ends ?? now) - (said as number)) : 0);
+    return { today: run.today === true ? ran : 0, week: run.week === true ? ran : 0, moving: moving && (ends === null || ends > now) };
+  }
+
+  // The rooms as shown, and the figures in them that move with a lap in progress: the list is
+  // looked at again when the first of those reaches a whole minute.
+  const model = computed(() => {
     void bell.value;
     const now = engine.now();
-    const own = yours(now);
+    const s = engine.timer.value;
+    const own = { ...yours(now), moving: s.phase === 'work' && s.paused_at === null && !view(s, now).over && counts.open(now) !== null };
     const mine = new Set([...waiting.value.map(keyOf), ...accepted.value]);
-    return [...rooms.value.values()].map((msg): RoomView => {
+    const moving: number[] = [];
+    const views = [...rooms.value.values()].map((msg): RoomView => {
       // Only what could be a member: anything else in the list is left out, not tripped over.
       const raw = (Array.isArray(msg.members) ? (msg.members as Record<string, unknown>[]) : []).filter((member) => member !== null && typeof member === 'object');
       const you = text(raw.find((member) => member?.you === true)?.id);
@@ -190,6 +204,10 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         const theirs = Array.isArray(last?.cheers) ? last.cheers.filter((c): c is string => typeof c === 'string') : [];
         // A cheer made here shows at once, before the server has heard of it.
         const cheers = you && mine.has(keyOf({ room: msg.room, to: id, run })) && !theirs.includes(you) ? [...theirs, you] : theirs;
+        // You are counted from this device's own timer, which knows your lap exactly; `run` is for everyone else.
+        const lap = member.you === true ? own : running(member, msg.server_time, ends, now);
+        const [today_ms, week_ms] = [amount(member.today_ms) + lap.today, amount(member.week_ms) + lap.week];
+        if (lap.moving) moving.push(today_ms, week_ms);
         return {
           id,
           name: text(member.name),
@@ -200,9 +218,9 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           ends_at: phase === 'idle' ? null : ends,
           paused: phase !== 'idle' && member.paused === true,
           task: phase === 'work' && typeof member.task === 'string' ? member.task : null,
-          today_ms: amount(member.today_ms) + (member.you === true ? own.today : 0),
+          today_ms,
           today_laps: amount(member.today_laps),
-          week_ms: amount(member.week_ms) + (member.you === true ? own.week : 0),
+          week_ms,
           last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you), cheerers: cheers.flatMap((cheerer) => (names.has(cheerer) ? [{ id: cheerer, name: names.get(cheerer)! }] : [])) } : null,
         };
       });
@@ -218,21 +236,20 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         members: ranked ? members.toSorted((a, b) => b.week_ms - a.week_ms) : members,
       };
     });
+    return { views, moving };
   });
+  const list = computed(() => model.value.views);
 
   const stopBell = effect(() => {
     void bell.value;
     const all = rooms.value;
-    const lanes = list.value.flatMap((room) => room.members.filter((member) => member.you));
-    const s = engine.timer.value;
+    const { moving } = model.value;
     untracked(() => {
       cancelBell();
       cancelBell = () => {};
       const now = engine.now();
       const ends = [...all.values()].flatMap((msg) => (Array.isArray(msg.members) ? (msg.members as { ends_at?: unknown }[]) : []).map((member) => member?.ends_at));
-      // Your own figures move with your lap: looked at again when either next reaches a whole minute.
-      const counting = s.phase === 'work' && s.paused_at === null && !view(s, now).over && counts.open(now) !== null;
-      const minutes = counting ? lanes.flatMap((member) => [member.today_ms, member.week_ms]).map((ms) => now + MIN - (ms % MIN)) : [];
+      const minutes = moving.map((ms) => now + MIN - (ms % MIN));
       const next = Math.min(...ends.filter((at): at is number => typeof at === 'number' && at > now), ...minutes);
       // A day at most: a browser runs a timer set further out than 2^31 ms at once.
       if (Number.isFinite(next)) cancelBell = env.schedule(() => void bell.value++, Math.min(next - now, DAY_MS));
