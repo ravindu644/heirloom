@@ -22,6 +22,7 @@ func TestFixtureStreak(t *testing.T) {
 			Kept   []string
 			Window int
 			Mask   *int `json:"days_mask"`
+			Pinned *int `json:"pinned_mask"`
 			Expect StreakResult
 		}
 	}
@@ -29,6 +30,9 @@ func TestFixtureStreak(t *testing.T) {
 		t.Fatalf("streak.json: %d cases, %v", len(fixture.Cases), err)
 	}
 	for _, c := range fixture.Cases {
+		if c.Pinned != nil {
+			continue // rooms pin nothing: pinned rest days are a person's focus streak only
+		}
 		mask := 127
 		if c.Mask != nil {
 			mask = *c.Mask
