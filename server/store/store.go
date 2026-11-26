@@ -173,6 +173,18 @@ create table invitation (
 
 -- The codes of before were kept only as hashes and cannot be carried over.
 drop table invite;
+`, `
+-- A way back in: a link the owner gives that sets a new password, once. Unlike an
+-- invitation it is kept only as its hash, because it opens an account that exists: the
+-- link is shown when it is made and the server cannot show it again. One row an
+-- account, so making a new one for somebody is the end of their old one.
+create table resets (
+	account integer primary key references account (id),
+	hash    blob not null unique, -- sha-256 of the reset
+	created integer not null,
+	expires integer not null,
+	used    integer -- when it set a password; null until then
+) strict;
 `}
 
 func migrate(db *sql.DB) error {

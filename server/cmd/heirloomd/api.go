@@ -127,6 +127,33 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 		return struct{}{}, accounts.SetRole(caller, req.Username, req.Role)
 	})
 
+	// A way back in. The owner's three calls are like the ones above. The two below them
+	// carry no token: the link is the whole of the caller's standing, and whoever holds it
+	// is told one username, the one it was made for, and nothing else about anybody.
+	staff("resets/create", func(caller int64, req staffRequest) (any, error) {
+		made, err := accounts.CreateReset(caller, req.Username)
+		return map[string]auth.Reset{"reset": made}, err
+	})
+	staff("resets/list", func(caller int64, _ staffRequest) (any, error) {
+		open, err := accounts.Resets(caller)
+		return map[string][]auth.Reset{"resets": open}, err
+	})
+	staff("resets/revoke", func(caller int64, req staffRequest) (any, error) {
+		return struct{}{}, accounts.RevokeReset(caller, req.Username)
+	})
+	type resetRequest struct {
+		Reset    string `json:"reset"`
+		Password string `json:"password"`
+		Device   string `json:"device"`
+	}
+	mux.HandleFunc("POST /api/reset/look", post(maxAccountBody, func(_ context.Context, req resetRequest) (map[string]string, error) {
+		username, err := accounts.LookReset(req.Reset)
+		return map[string]string{"username": username}, err
+	}))
+	mux.HandleFunc("POST /api/reset", post(maxAccountBody, func(ctx context.Context, req resetRequest) (auth.Session, error) {
+		return accounts.UseReset(ctx, req.Reset, req.Password, req.Device)
+	}))
+
 	// Web Push at the bell (protocol section 17). The key is public: a browser needs it
 	// before it has anything to sign in with. Signing out removes a device's subscription
 	// by itself: the row hangs on the token's.

@@ -127,7 +127,7 @@ type creds map[string]string
 // signUp makes an invite the way the owner would and registers with it.
 func (w *world) signUp(username, device string) session {
 	w.t.Helper()
-	code, err := newInvite(w.dir)
+	code, err := newInvite(w.dir, w.now)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -552,7 +552,7 @@ func TestTwoAccountsNeverSeeEachOther(t *testing.T) {
 
 func TestAccountsOverHTTP(t *testing.T) {
 	w := start(t)
-	code, err := newInvite(w.dir)
+	code, err := newInvite(w.dir, w.now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,7 +561,7 @@ func TestAccountsOverHTTP(t *testing.T) {
 	if status != 200 || s.Username != "ravi" || s.Token == "" || s.Account == "" {
 		t.Fatalf("register = %d %+v", status, s)
 	}
-	second, _ := newInvite(w.dir)
+	second, _ := newInvite(w.dir, w.now)
 	for what, c := range map[string]struct {
 		path   string
 		body   any
@@ -750,7 +750,7 @@ func TestInviteWhileTheServerHasTheDatabaseOpen(t *testing.T) {
 	codes := map[string]bool{}
 	for i := range 20 {
 		d.push("k", cell(stamp(i, phone), "task", fmt.Sprintf("t%d", i), "title", `1`))
-		code, err := newInvite(w.dir)
+		code, err := newInvite(w.dir, w.now)
 		if err != nil {
 			t.Fatalf("invite %d beside a running server: %v", i, err)
 		}

@@ -1,7 +1,8 @@
 // Package auth holds accounts, their roles, invitations, per-device tokens and the
-// sign-in rate limit: contracts/protocol.md section 10. It never logs, and it stores no
-// password or token as it was given, only hashes. An invitation is kept as it is, on
-// purpose: see the invitation table.
+// sign-in rate limit: contracts/protocol.md section 10. It stores no password, token or
+// reset as it was given, only hashes. An invitation is kept as it is, on purpose: see the
+// invitation table. The one thing it logs is a reset being made, used or taken back, by
+// username: never the reset, never a password.
 package auth
 
 import (
@@ -41,6 +42,7 @@ var (
 	ErrForbidden   = &Error{Status: 403, Code: "forbidden"}
 	ErrFull        = &Error{Status: 409, Code: "full"}
 	ErrUnknown     = &Error{Status: 404, Code: "unknown"}
+	ErrReset       = &Error{Status: 403, Code: "reset"}
 )
 
 // The three roles. The server holds an account's role and reads it from the database on
@@ -201,9 +203,8 @@ func (s *Service) invite(by *int64) (Invitation, error) {
 		return Invitation{}, fmt.Errorf("begin invite: %w", err)
 	}
 	defer tx.Rollback()
-	// Here, where invitations are made, is where the long dead ones are cleared away.
-	if _, err := tx.Exec("delete from invitation where expires <= ?", now.Add(-keepRunOut).UnixMilli()); err != nil {
-		return Invitation{}, fmt.Errorf("clear old invites: %w", err)
+	if err := sweep(tx, now); err != nil {
+		return Invitation{}, err
 	}
 	var open int
 	if err := tx.QueryRow("select count(*) from invitation where expires > ?", inv.Created).Scan(&open); err != nil {
@@ -219,6 +220,19 @@ func (s *Service) invite(by *int64) (Invitation, error) {
 		return Invitation{}, fmt.Errorf("commit invite: %w", err)
 	}
 	return inv, nil
+}
+
+// sweep clears away what nobody can use any more: invitations long run out, and resets
+// used or run out. It runs where either is made, so neither table grows by itself.
+func sweep(tx *sql.Tx, now time.Time) error {
+	if _, err := tx.Exec("delete from invitation where expires <= ?", now.Add(-keepRunOut).UnixMilli()); err != nil {
+		return fmt.Errorf("clear old invites: %w", err)
+	}
+	// A reset cannot be renewed, so one that is used or has run out is of no use at once.
+	if _, err := tx.Exec("delete from resets where used is not null or expires <= ?", now.UnixMilli()); err != nil {
+		return fmt.Errorf("clear old resets: %w", err)
+	}
+	return nil
 }
 
 // Invites lists every invitation that can still be used, oldest first.

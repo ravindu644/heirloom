@@ -40,6 +40,7 @@ func run() error {
 	data := flag.String("data", "./data", "directory for the database, created if missing")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	invite := flag.Bool("invite", false, "print one invite code for the database in -data and exit")
+	reset := flag.String("reset", "", "print one link that sets a new password for this `username`, in the database in -data, and exit")
 	contact := flag.String("contact", push.DefaultContact, "who a push service may write to about this server: mailto:you@example.org or an https: address")
 	flag.Parse()
 
@@ -53,7 +54,7 @@ func run() error {
 	}
 
 	if *invite {
-		code, err := newInvite(*data)
+		code, err := newInvite(*data, time.Now)
 		if err != nil {
 			return err
 		}
@@ -62,6 +63,19 @@ func run() error {
 		fmt.Println(code)
 		fmt.Fprintln(os.Stderr, "This is the last part of the link to give: <server>/#/join/"+code)
 		fmt.Fprintln(os.Stderr, "It makes one account, once, and is good for 7 days.")
+		return nil
+	}
+
+	if *reset != "" {
+		made, err := newReset(*data, *reset, time.Now)
+		if err != nil {
+			return err
+		}
+		// As -invite: the reset alone on standard output, the rest for the person to read.
+		fmt.Println(made.Reset)
+		fmt.Fprintln(os.Stderr, "This is the last part of the link to give "+made.Username+": <server>/#/reset/"+made.Reset)
+		fmt.Fprintln(os.Stderr, "It sets a new password once, signs every device of theirs out, and is good for 24 hours.")
+		fmt.Fprintln(os.Stderr, "It will not be shown again: the server keeps only what it needs to know it by.")
 		return nil
 	}
 
@@ -158,11 +172,28 @@ func run() error {
 
 // newInvite is "heirloomd -invite". It opens the database for itself, which is safe beside
 // a running server: SQLite lets a second process write between the first one's commits.
-func newInvite(data string) (string, error) {
+func newInvite(data string, now func() time.Time) (string, error) {
 	db, err := store.Open(data)
 	if err != nil {
 		return "", err
 	}
 	defer db.Close()
-	return auth.New(db, time.Now, nil).Invite()
+	return auth.New(db, now, nil).Invite()
+}
+
+// newReset is "heirloomd -reset <username>": the owner's own way back, and anybody's.
+// It writes beside a running server the way -invite does: its own connection to the same
+// file, which SQLite lets write between the server's commits. The server needs no telling:
+// it reads the reset from the database when the link is used.
+func newReset(data, username string, now func() time.Time) (auth.Reset, error) {
+	db, err := store.Open(data)
+	if err != nil {
+		return auth.Reset{}, err
+	}
+	defer db.Close()
+	made, err := auth.New(db, now, nil).ResetFor(username)
+	if errors.Is(err, auth.ErrUnknown) {
+		return auth.Reset{}, fmt.Errorf("no account is called %q on this server", username)
+	}
+	return made, err
 }

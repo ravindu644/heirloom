@@ -257,7 +257,7 @@ func TestInvitationsOverHTTP(t *testing.T) {
 	_, body = w.call(ravi, phone, "invites/create", nil)
 	second := shape.FindStringSubmatch(body)[1]
 	// The command line's invite is in the list like any other.
-	third, err := newInvite(w.dir)
+	third, err := newInvite(w.dir, w.now)
 	if err != nil {
 		t.Fatal(err)
 	}
