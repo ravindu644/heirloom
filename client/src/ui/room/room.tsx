@@ -380,6 +380,24 @@ function Docked({ class: extra, children }: { class?: string; children: Componen
 }
 
 /**
+ * The live order, once it holds: changes that come a few messages apart (two friends arriving on a
+ * called lap, each in their own message) sort the room once, when they stop, and not at each one,
+ * which slid the panels one way and back. Who comes or goes is shown at once, where the order held.
+ * ponytail: the wait is `hold`, the nearest token; a token of its own if it ever needs tuning.
+ */
+function useSettled(ids: string[]): string[] {
+  const given = JSON.stringify(ids);
+  const [shown, setShown] = useState(given);
+  useEffect(() => {
+    if (given === shown) return;
+    const timer = setTimeout(() => setShown(given), motion(document.documentElement, '--motion-hold'));
+    return () => clearTimeout(timer);
+  }, [given]);
+  const held = (JSON.parse(shown) as string[]).filter((id) => ids.includes(id));
+  return [...held, ...ids.filter((id) => !held.includes(id))];
+}
+
+/**
  * Friends, side by side: the line that names the room, the finding, a call to start together,
  * and three tabs: People on a track of the day's hours, Notes read on a break, and the Week the
  * room fills together. Never a ranking unless the room itself has switched one on.
@@ -400,6 +418,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   // A call made anywhere answers the picker: it does not open again by itself when that call ends.
   const called = !!room?.call;
   useEffect(() => void (called && setCalling(false)), [called]);
+  const order = useSettled(room?.members.map((m) => m.id) ?? []);
   const pictures = usePictures(rooms, [...(room?.members.map((m) => m.picture) ?? []), ...(room?.notes.map((note) => note.picture) ?? [])], holderOf(engine, rooms));
 
   // Time left, a call's count down and the hours move by themselves, once a second while
@@ -411,6 +430,13 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
     const timer = setInterval(() => tick((n) => n + 1), running ? 1000 : MIN);
     return () => clearInterval(timer);
   }, [running]);
+  // A call ends on its minute, not on whichever second the interval next falls.
+  const callAt = room?.call?.at;
+  useEffect(() => {
+    if (callAt === undefined) return;
+    const timer = setTimeout(() => tick((n) => n + 1), Math.max(0, callAt - engine.now()));
+    return () => clearTimeout(timer);
+  }, [callAt]);
 
   // On a lap of your own, notes fold away; open on a break, what was waiting is read.
   const now = engine.now();
@@ -463,14 +489,17 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const together = timer.run?.startsWith('call-') && onLap && timer.started !== null ? timer.started : null;
   const face = (name: string, picture: string | null, size?: 'sm' | 'lg' | 'xl') => <Face name={name} picture={pictures(picture)} pending={pictures(picture) === undefined} size={size} />;
 
-  const callStrip = call && call.at > now && (
+  // The call goes the moment its lap starts here, in the same frame as the line that says so
+  // comes: one change of height, not a line opening under a call that waits for the next tick.
+  const callOpen = !!call && call.at > now && timer.run !== `call-${call.id}`;
+  const callStrip = call && callOpen && (
     <Docked key={call.id} class={css.call}>
       <h2 class="sr">{s.room.calledLap}</h2>
       <div class={css.callWords}>
         <p>
           <b>{s.room.hour(call.at)}</b> <span>{s.room.calls(call.by.name, call.yours)}</span>
         </p>
-        <p class={css.callIn}>
+        <p class={css.callIn} data-live>
           <span class={css.faces}>{call.in.map((one) => <Fragment key={one.id}>{face(one.name, room.members.find((m) => m.id === one.id)?.picture ?? null, 'sm')}</Fragment>)}</span>
           <span>{s.room.startsIn(call.at - now, call.in.map((one) => ({ name: one.name, you: one.id === me?.id })))}</span>
         </p>
@@ -493,7 +522,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
 
   // People: a panel each, in the order the room gives, the hours over the first one's lane.
   const callFaces = (m: MemberView) =>
-    call && call.at > now && call.in.some((one) => one.id === m.id) && (
+    call && callOpen && call.in.some((one) => one.id === m.id) && (
       <Mark window={w} at={call.at}>
         {face(m.name, m.picture, 'sm')}
       </Mark>
@@ -519,10 +548,10 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
       </b>
     );
   const task = (m: MemberView) =>
-    m.phase === 'work' && (m.task || !m.you || !rooms.shareTask.value) ? <p class={m.task ? css.task : css.quiet}>{m.task ?? (m.you ? s.room.yoursHidden : s.room.notSharing)}</p> : null;
+    m.phase === 'work' && (m.task || !m.you || !rooms.shareTask.value) ? <p key="task" class={m.task ? css.task : css.quiet}>{m.task ?? (m.you ? s.room.yoursHidden : s.room.notSharing)}</p> : null;
   const cheered = (m: MemberView) => {
     const who = m.last?.cheerers.map((one) => (one.id === me?.id ? s.room.you : one.name)) ?? [];
-    return who.length > 0 && <p class={css.small}>{s.room.cheeredBy(who, m.you)}</p>;
+    return who.length > 0 && <p key="cheered" class={css.small}>{s.room.cheeredBy(who, m.you)}</p>;
   };
   const named = (m: MemberView, withPhase = true) => (
     <p class={css.name}>
@@ -541,7 +570,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
         {hours}
       </div>
       <Fold list gap="sm" class={css.rows}>
-        {room.members.map((m) => (
+        {order.map((id) => room.members.find((m) => m.id === id)!).map((m) => (
           <article key={m.id} class={cx(css.person, wide && css.side)}>
             {cover(m)}
             {wide ? (
@@ -557,8 +586,11 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
                   {cheer(m)}
                 </div>
                 <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
-                {task(m)}
-                {cheered(m)}
+                {/* What comes and goes with a lap opens in time, and the panels under it glide. */}
+                <Fold gap="xs" within="xs">
+                  {task(m)}
+                  {cheered(m)}
+                </Fold>
               </div>
             ) : (
               <>
@@ -571,13 +603,13 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
                   {left(m)}
                   {cheer(m)}
                 </div>
-                {task(m)}
+                <Fold within="sm">{task(m)}</Fold>
               </>
             )}
             <Lane window={w} laps={lapsOf(m, now)} mine={m.you}>
               {callFaces(m)}
             </Lane>
-            {!wide && cheered(m)}
+            {!wide && <Fold within="sm">{cheered(m)}</Fold>}
           </article>
         ))}
       </Fold>
@@ -588,7 +620,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const person = reporting && room.members.find((m) => m.id === decodeURIComponent(reporting));
   if (person)
     return (
-      <Report person={person} now={now} lapMs={lapMs} face={face} shareTask={rooms.shareTask.value} call={<Fold class={css.dock}>{callStrip}</Fold>} phase={phase(person)} />
+      <Report person={person} now={now} lapMs={lapMs} face={face} shareTask={rooms.shareTask.value} call={<Fold class={css.dock} within="md">{callStrip}</Fold>} phase={phase(person)} />
     );
 
   const notes = onLap ? (
@@ -647,7 +679,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
       )}
       {/* A band under the finding with a sidebar; on a phone it stands over the bottom bar. */}
       {/* It opens in time, as any part does, and moves nothing in a jump. */}
-      <Fold class={css.dock}>{callStrip}</Fold>
+      <Fold class={css.dock} within="md">{callStrip}</Fold>
 
       <Tabs
         base={base}
@@ -664,7 +696,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
         {tab === 'people' && (
           <>
             {/* Only while a lap started together runs: nothing else stands between the tabs and the hours. */}
-            <Fold>
+            <Fold within="md">
               {together !== null && (
                 <p key="together" class={css.together}>
                   {s.room.startedTogether(together)}
@@ -853,7 +885,7 @@ function Report({ person: m, now, lapMs, face, shareTask, call, phase }: { perso
         {face(m.name, m.picture, 'xl')}
         <div>
           <h1>{name}</h1>
-          <p class={css.small}>{s.room.phaseLeft(phase, m.ends_at === null ? null : Math.max(0, m.ends_at - now))}</p>
+          <p class={css.small} data-live>{s.room.phaseLeft(phase, m.ends_at === null ? null : Math.max(0, m.ends_at - now))}</p>
         </div>
       </header>
       {call}

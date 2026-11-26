@@ -288,7 +288,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           <p class={css.facts}>
             {l.day && (
               <>
-                <SplitChip {...l.chip} turning={live && !allIn} /> <span class={css.words}>{s.race.at(now)} </span>
+                <SplitChip {...l.chip} turning={live && !allIn} /> <span class={css.words} data-live>{s.race.at(now)} </span>
               </>
             )}
             {/* The break is said once, on the button that starts it. A lap from yesterday is none of
@@ -356,7 +356,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
             {/* While the clock runs this line is about the digits and stays with them. Before a
                 start it explains the button: with the digits where there is a sidebar, with the
                 button on a phone. */}
-            <p class={cx(css.sub, ready && css.wide)}>
+            <p class={cx(css.sub, ready && css.wide)} data-live>
               {ready ? why : view.ends_at !== null ? s.focus.endsAt(state.planned_ms, view.ends_at) : s.focus.pausedSince(state.planned_ms, state.paused_at ?? now)}
             </p>
           </div>
@@ -402,7 +402,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           )}
         </div>
         <div class={css.quiet}>
-          {ready && <p class={css.why}>{why}</p>}
+          {ready && <p class={css.why} data-live>{why}</p>}
           {isBreak && !ready && (
             <Button kind="link" class={css.far} onClick={focus.stop}>
               {s.focus.doneForNow}

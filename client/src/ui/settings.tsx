@@ -10,6 +10,7 @@ import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
 import { Button } from './kit/button.tsx';
+import { cx } from './kit/cx.ts';
 import { Fold } from './kit/fold.tsx';
 import form from './kit/form.module.css';
 import links from './kit/links.module.css';
@@ -70,6 +71,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
   const server = new URL(engine.server, location.origin).host;
   const all = settings.all.value;
   const two = useWide();
+  const pins = [0, 1, 2, 3, 4, 5, 6].filter((bit) => (all.rest_days >> bit) & 1).length;
   const role = engine.role.value;
   // Plain http to anything but this device itself: what is sent can be read on the way. One
   // check for the phone app and the browser, core's.
@@ -199,6 +201,21 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
           floor={all.day_target <= 0}
         />
         <Note>{s.settings.targetNote}</Note>
+      </Panel>
+
+      <Panel title={s.settings.restDays}>
+        {/* Two at most, as the streak allows two a week: with both pinned the other five take no press. */}
+        <div class={cx(form.choices, form.days)} role="group" aria-label={s.settings.restDays}>
+          {s.habits.weekdays.map((name, bit) => {
+            const on = (all.rest_days & (1 << bit)) !== 0;
+            return (
+              <button key={name} type="button" class={cx(form.choice, form.weekday)} aria-pressed={on} disabled={!on && pins >= 2} onClick={() => settings.set({ rest_days: all.rest_days ^ (1 << bit) })}>
+                {name}
+              </button>
+            );
+          })}
+        </div>
+        <Note>{s.settings.restNote}</Note>
       </Panel>
 
       <Panel title={s.settings.auto}>

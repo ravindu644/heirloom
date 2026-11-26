@@ -138,8 +138,8 @@ export interface DemoRoom {
   keeper?: 'you' | string | null;
   /** Who cheered your latest lap, for the Focus result. */
   cheered?: string[];
-  /** A lap called for a few minutes from now: by a friend, by a friend with you in, or by you. */
-  call?: 'theirs' | 'in' | 'mine';
+  /** A lap called for a few minutes from now: by a friend, by a friend with you in, or by you; `long`, by the friend with the longest name, you in. */
+  call?: 'theirs' | 'in' | 'mine' | 'long';
   /** You are on a short break, not on the lap the four are drawn with. */
   onBreak?: boolean;
   /** Notes from others written since Notes was last open; and no notes at all. */
@@ -196,7 +196,14 @@ const member = (id: string, name: string, more: Partial<MemberView> = {}): Membe
   ...more,
 });
 
-export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { value: SettingsView }; set(fields: Partial<SettingsView>): boolean }): Rooms {
+// What the demo plays as another device would, beyond the Rooms a screen sees.
+export type DemoRooms = Rooms & { callStarts(startHere: (run: string) => void): void };
+
+// The server's live order (sync/rooms.ts): on a lap, on a break, the rest, each by the week.
+const GROUP = { work: 0, short: 1, long: 1, idle: 2 } as const;
+const live = (members: MemberView[]) => members.toSorted((a, b) => GROUP[a.phase] - GROUP[b.phase] || b.week_ms - a.week_ms);
+
+export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { value: SettingsView }; set(fields: Partial<SettingsView>): boolean }): DemoRooms {
   const at = now();
   const who = (id: string) => ({ id, name: id === 'me' ? 'ravi' : id });
   const lap = (n: number, ago: number, cheers: string[] = []) => ({ run: `run-${n}`, ended: at - ago * MIN, cheers, cheered: cheers.includes('me'), cheerers: cheers.map(who) });
@@ -271,12 +278,13 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     const last = [5, 9.5, 14, 18, 21.5, 24, 27.5].map((h) => h * HOUR);
     return { days: [week * 0.45, week, null, null, null, null, null], last, ahead_ms: week - 8 * HOUR, you_ms: you.week_ms };
   };
+  const isuru = { id: 'isuru', name: 'isuru_the_night_owl_of_block_c' };
   const call = () =>
     seed.call && {
       id: 'c1',
-      by: seed.call === 'mine' ? who('me') : who('sachi'),
+      by: seed.call === 'mine' ? who('me') : seed.call === 'long' ? isuru : who('sachi'),
       at: Math.floor(at / MIN) * MIN + 8 * MIN,
-      in: seed.call === 'mine' ? [who('me')] : seed.call === 'in' ? [who('sachi'), who('me')] : [who('sachi')],
+      in: seed.call === 'mine' ? [who('me')] : seed.call === 'in' ? [who('sachi'), who('me')] : seed.call === 'long' ? [isuru, who('me')] : [who('sachi')],
       you: seed.call !== 'theirs',
       yours: seed.call === 'mine',
     };
@@ -352,6 +360,19 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
         change(id, (one) => ({ ...one, code: 'Q8ZR4TWE', members: one.members.filter((m) => m.id !== gone) }));
         return { ok: true };
       }),
+    // A called lap starting for two, as the user saw it on a laptop: the call is a second away;
+    // at its minute this device starts the lap, and then the two of them arrive on a lap in two
+    // messages a few frames apart, each sorting the room again. The call itself stays, passed.
+    callStarts(startHere) {
+      const start = now() + 1500;
+      const pair = live([member('sachi', 'sachi', { picture: pic('sachi'), today_ms: MIN, today_laps: 0, week_ms: 2 * HOUR + 53 * MIN }), { ...you, phase: 'idle', ends_at: null, runStart: null, task: null, last: null, today_ms: 2 * MIN, week_ms: 27 * MIN }]);
+      const onLap = (id: string, task: string | null) => (one: RoomView) => ({ ...one, members: live(one.members.map((m) => (m.id === id ? { ...m, phase: 'work' as const, ends_at: start + 25 * MIN, runStart: start, task } : m))) });
+      change('r1', (one) => ({ ...one, members: pair, call: { id: 'c3', by: who('me'), at: start, in: [who('me'), who('sachi')], you: true, yours: true } }));
+      // A little before the call's own minute by this clock, as a timer set from another clock fires.
+      setTimeout(() => startHere('call-c3'), start - now() - 30);
+      setTimeout(() => change('r1', onLap('me', null)), start - now() + 100);
+      setTimeout(() => change('r1', onLap('sachi', 'Stranger Things: S05E04')), start - now() + 140);
+    },
     callLap: (id, when) =>
       answer('', () => {
         change(id, (one) => ({ ...one, call: when === null ? null : { id: 'c2', by: who('me'), at: when, in: [who('me')], you: true, yours: true } }));
@@ -392,6 +413,7 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     day_target: 8,
     share_task: false,
     rooms_hidden: false,
+    rest_days: 0,
     ...seed,
   });
   const ringHere = signal(true);

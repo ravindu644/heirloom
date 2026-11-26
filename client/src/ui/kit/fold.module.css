@@ -21,6 +21,9 @@
    gap either, and gives it back in time when the line comes. */
 .part { transition: margin-bottom var(--motion-fill) var(--motion-ease); }
 .part:has(> div > .fold:empty), .part:has(> div > .fold > .going:only-child) { margin-bottom: calc(var(--gap) * -1); }
+/* The same for a fold standing in a flex column of the screen's own, whose gap it is told (`within`). */
+.fold { transition: margin-bottom var(--motion-fill) var(--motion-ease); }
+.fold:empty, .fold:has(> .going:only-child) { margin-bottom: calc(var(--within, 0px) * -1); }
 
 /* Around a child that moves itself: no box of its own. */
 .bare { display: contents; }

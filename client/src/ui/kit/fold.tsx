@@ -8,6 +8,7 @@ import { keep, staying, wasPlacedByHand } from './parts.ts';
 import type { Part as Kind } from './parts.ts';
 
 const Going = createContext(false);
+type Space = 'xs' | 'sm' | 'md' | 'lg';
 /** True while what you are in is on its way out: a sheet closes itself, the bar fades. */
 export const useGoing = () => useContext(Going);
 
@@ -38,7 +39,7 @@ const place = (type: unknown, nth: number) => {
  * hears one. Without `fold` nothing is drawn around the children and they move themselves (a
  * sheet, the bar), told by `useGoing`. Children are elements: a bare word among them is not drawn.
  */
-function Parts({ children, fold, list, gap, class: extra, ...rest }: Omit<HTMLAttributes<HTMLElement>, 'children'> & { children: ComponentChildren; fold?: boolean; list?: boolean; gap?: 'xs' | 'sm' | 'md' | 'lg' }) {
+function Parts({ children, fold, list, gap, within, class: extra, ...rest }: Omit<HTMLAttributes<HTMLElement>, 'children'> & { children: ComponentChildren; fold?: boolean; list?: boolean; gap?: Space; within?: Space }) {
   const parts = useRef<Part[]>([]);
   const drawn = useRef(false);
   const nodes = useRef(new Map<unknown, HTMLElement>());
@@ -110,13 +111,17 @@ function Parts({ children, fold, list, gap, class: extra, ...rest }: Omit<HTMLAt
   return (
     // The role is said outright: without its bullets a `ul` is not a list to every screen reader.
     // The gap is always set here: a column inside another must not take the outer one's.
-    <Outer role={list ? 'list' : undefined} {...(rest as object)} class={cx(css.fold, extra)} style={`--gap:${gap ? `var(--space-${gap})` : '0px'}`}>
+    <Outer role={list ? 'list' : undefined} {...(rest as object)} class={cx(css.fold, extra)} style={`--gap:${gap ? `var(--space-${gap})` : '0px'}${within ? `;--within:var(--space-${within})` : ''}`}>
       {drawnParts}
     </Outer>
   );
 }
 
-/** A column whose parts open, close and change places in time. `gap` is the space between them. */
+/**
+ * A column whose parts open, close and change places in time. `gap` is the space between them.
+ * `within` is the gap of the flex column it stands in: with nothing in it, or only a part on its
+ * way out, it gives that gap back, in time, so the column never snaps by a gap as it fills or empties.
+ */
 export const Fold = (props: Omit<Parameters<typeof Parts>[0], 'fold'>) => <Parts {...props} fold />;
 
 /** Children that move themselves (a sheet, the bar), kept until their leaving has played. */

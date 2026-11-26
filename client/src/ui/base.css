@@ -32,6 +32,11 @@ button, input { font: inherit; color: inherit; }
 ::placeholder { color: var(--muted); opacity: 1; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+/* DESIGN.md, Typography: tabular figures wherever a number updates. A clock or a countdown inside
+   words is marked `data-live`, so its line is as wide at 4:31 as at 4:30 and wraps on neither.
+   The feature and not font-variant-numeric: every `font:` shorthand resets the latter. */
+[data-live] { font-feature-settings: "tnum" 1; }
+
 /* For a screen reader only. */
 .sr {
   position: absolute;

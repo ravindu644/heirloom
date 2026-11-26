@@ -81,6 +81,7 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
   );
 
   const count = String(streak.missed ? streak.kept : streak.streak);
+  const pinned = streak.pinned.length > 0;
   const streakPanel = (
     <Panel title={s.progress.streak}>
       {/* After a miss the screen counts the days kept, and says nothing of the one that was not. */}
@@ -92,7 +93,20 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
         days={streak.recent.map((d) => d.state)}
         label={s.progress.dots(streak.recent.filter((d) => d.state === 'kept').length, streak.recent.filter((d) => d.state === 'rest').length)}
       />
-      <p>{streak.kept === 0 ? s.progress.streakStart : open ? s.progress.todayOpen : rest ? s.progress.restDay(rest.day) : s.progress.restKeeps}</p>
+      {/* Pinned rest days are named in place of the last rest day: they are the rule the person set. */}
+      <p>
+        {streak.kept === 0
+          ? pinned
+            ? s.progress.pinnedStart(streak.pinned)
+            : s.progress.streakStart
+          : open
+            ? s.progress.todayOpen
+            : pinned
+              ? s.progress.pinned(streak.pinned)
+              : rest
+                ? s.progress.restDay(rest.day)
+                : s.progress.restKeeps}
+      </p>
       {(bests.day || bests.week) && (
         <div class={css.bests}>
           <h3>{s.progress.bests}</h3>

@@ -22,21 +22,22 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .told { padding-top: var(--space-sm); }
 
 .panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
-.tab { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
-/* An empty part (the started-together line when no lap was) takes no row, and so no gap. */
-.tab > :empty { display: none; }
+.tab { display: flex; flex-direction: column; gap: var(--space-md); }
+/* A flex column, so the started-together line's fold can give its gap back (in a grid a row is never less than nothing). */
+.tab > * { min-width: 0; }
 
 /* The call: a band of its own, at the foot of a phone's screen, over the bottom bar. */
 /* The fold the call opens in: on a phone it is what sticks to the foot, under the panel. */
 .dock { position: sticky; bottom: 0; z-index: 1; order: 9; margin-top: auto; margin-bottom: calc(var(--space-md) * -1); }
-.dock:empty { display: none; }
 /* While the call is docked the bar can rise over it: a bar's height stays free over the call, so
    the last thing of the room can be scrolled clear of the bar. Before the call, which is ordered last. */
 .room:has(> .dock .call)::after { content: ""; flex: none; height: var(--layout-touch); }
 .call { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
 /* Its surface runs from edge to edge of the screen, under the words that keep the column's edge. */
 .call::before { content: ""; position: absolute; inset: 0 calc(var(--layout-margin) * -1); z-index: -1; border-top: var(--layout-hair) solid var(--line); background: var(--surface); }
-.callWords { display: grid; gap: var(--space-xs); min-width: 0; }
+.callWords { flex: 1; display: grid; gap: var(--space-xs); min-width: 0; }
+/* The button keeps its size and its one line; the words beside it take what is left and wrap there. */
+.call > button { flex: none; white-space: nowrap; }
 .callWords > p:first-child { display: flex; align-items: baseline; gap: var(--space-sm); font: var(--type-body-strong); }
 .callWords b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 .callIn { display: flex; align-items: center; gap: var(--space-sm); font: var(--type-label); color: var(--muted); }
@@ -54,7 +55,10 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .hoursRow > span { display: none; }
 .rows { padding: 0; list-style: none; }
 /* A panel is one target: a tap anywhere on it but Cheer opens the person's report. */
-.person { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+/* A flex column, so a line that comes and goes (the task, who cheered) opens its gap with it. */
+.person { position: relative; display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+.person > * { min-width: 0; }
+.person.side { display: grid; }
 /* What is drawn in the panel lets a tap through to the button under it, all but Cheer. */
 .person > :not(.cover) { position: relative; pointer-events: none; }
 .cover { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
@@ -136,7 +140,7 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
   /* Words in a column at the panel's left, 220px, the lane the rest of the row. */
   .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) - var(--space-md) + var(--space-xs)) minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
   .hoursRow > span { display: block; }
-  .words { display: grid; gap: var(--space-xs); min-width: 0; }
+  .words { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
   .side .top { grid-template-columns: auto minmax(0, 1fr) auto; }
   .weekPanel { max-width: calc(var(--layout-canvas) * 2 / 3); }
   .notes, .tab > .panel:only-child { max-width: calc(var(--layout-canvas) * 2 / 3); }

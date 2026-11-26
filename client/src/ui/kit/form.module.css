@@ -21,6 +21,8 @@
 .choice:hover { border-color: var(--ghost); }
 /* Chosen: ink, and never the grey of a quiet button. The words keep their weight, so nothing shifts. */
 .choice[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--ground); }
+/* A choice that takes no press (both rest days pinned): off as a stepper's key is off, the quiet fill with no line, its words muted. */
+.choice:disabled { border-color: transparent; background: var(--key-quiet); color: var(--muted); cursor: default; }
 .choice i { width: var(--layout-lane); height: var(--layout-lane); }
 /* Seven days on one line of a phone: seven targets and six small gaps. Where the line is under
    400px the seven share it equally, a little narrower than a target and as tall, rather than
@@ -28,7 +30,9 @@
 .days { gap: var(--space-xs); container-type: inline-size; }
 .weekday { min-width: var(--layout-touch); padding: 0; justify-content: center; }
 @container (max-width: 400px) {
-  .weekday { flex: 1; min-width: 0; }
+  .weekday { position: relative; flex: 1; min-width: 0; }
+  /* Narrower than a finger, each day takes half the gap on either side as its own, so the finger still gets 48px. */
+  .weekday::after { content: ''; position: absolute; inset: 0 calc(var(--space-xs) / -2); }
 }
 
 .line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); font: var(--type-label); color: var(--muted); }

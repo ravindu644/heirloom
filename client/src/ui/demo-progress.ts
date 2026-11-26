@@ -31,6 +31,8 @@ export interface DemoRecord {
   scripted?: boolean;
   /** How the lap in progress stands, when one runs: counting (the default) or held. */
   live?: 'running' | 'paused';
+  /** Pinned rest days, as `settings.rest_days` holds them. */
+  rest?: number;
 }
 
 // The reference's days: the ones its words talk about are fixed, the rest come from the same
@@ -189,8 +191,8 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
     }),
     today: signal(DAY),
     note: (day) => (day === DAY ? note.value : day === '2026-11-17' ? 'Arrays decay to pointers. Wrote that on my hand.' : ''),
-    streak: computed(() => streakView(kept(), DAY)),
-    since: computed(() => since(days(), kept(), DAY)),
+    streak: computed(() => streakView(kept(), DAY, record.rest)),
+    since: computed(() => since(days(), kept(), DAY, record.rest)),
     bests: computed(() => bests(days())),
     estimates: signal(kind === 'weeks' || kind === 'year' ? guesses : NO_GUESSES),
     timeline,

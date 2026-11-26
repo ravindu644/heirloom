@@ -300,6 +300,8 @@ export const settings = {
   lengthsNote: 'A lap or a break already running keeps its length.',
   // Under the day target: the same number Today edits.
   targetNote: 'Today shows a bar of this many laps. It can be changed there too.',
+  restDays: 'Rest days',
+  restNote: 'Two days a week may stay empty without breaking your streak. Pin one or both to a weekday; any left come on the first days you miss.',
   finish: 'A finished lap',
   celebrate: 'Mark a finished lap',
   celebrateNote: 'A short motion when a lap reaches its bell, and one line at the laps worth it: the first, the 25th, a best week. Off, a finished lap is its numbers and nothing more.',
@@ -545,6 +547,11 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 // Monday first, as a week runs.
 const weekdayName = (day: string) => WEEKDAYS[new Date(day).getUTCDay()]!;
 const shortDate = (day: string) => dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
+// Pinned rest days, 0 Monday to 6 Sunday: one leaves a second to come where it is needed.
+const pinned = (days: number[]) => {
+  const names = days.map((w) => `${WEEKDAYS[(w + 1) % 7]}s`);
+  return names.length === 1 ? `${names[0]} are your rest day, and one more comes when you need it.` : `${names[0]} and ${names[1]} are your rest days.`;
+};
 const lapsWord = (n: number) => (n === 1 ? 'One lap' : `${n} laps`);
 
 export const progress = {
@@ -576,6 +583,9 @@ export const progress = {
   inARow: (n: number) => (n === 1 ? 'day in a row' : 'days in a row'),
   ofLast: (of: number) => `of the last ${of} days`,
   streakStart: 'A day counts with one lap run to its bell. The first two days you miss in a week are rest days: they do not break it.',
+  // The weekdays pinned in Settings, said in place of the line about rest days.
+  pinned,
+  pinnedStart: (days: number[]) => `A day counts with one lap run to its bell. ${pinned(days)}`,
   todayOpen: 'No lap has reached its bell today yet.',
   restDay: (day: string) => `${weekdayName(day)} the ${ordinal(new Date(day).getUTCDate())} was a rest day. Two a week keep the streak going.`,
   restKeeps: 'Two rest days a week keep it going.',

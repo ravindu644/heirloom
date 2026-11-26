@@ -22,7 +22,7 @@ import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
 import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
-import type { DemoHabit, DemoRoom, DemoServer } from './demo-more.ts';
+import type { DemoHabit, DemoRoom, DemoRooms, DemoServer } from './demo-more.ts';
 import type { Admins } from '../sync/admins.ts';
 import type { Invites } from '../sync/invites.ts';
 import type { Resets } from '../sync/resets.ts';
@@ -298,6 +298,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-year': { ...week, about: 'A year and a week of record: the grid opens on its newest weeks', record: { history: 'year' } },
   'progress-run': { ...week, about: 'A streak with no rest day in its last fortnight', record: { fill: ['2026-11-11', '2026-11-19'] } },
   'progress-miss': { ...week, about: 'A miss inside the last 45 days: days kept of days, not the run', record: { empty: ['2026-11-12'] } },
+  'progress-rest-pinned': { ...week, about: 'Sunday pinned as a rest day: the streak line names it', record: { rest: 64 } },
   'progress-running': { about: 'Progress with a lap running: the day list ends on it, running and growing, with nothing to set aside', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {} },
   'progress-paused': { about: 'Progress with the lap paused: the day list ends on it, said as paused, up to the pause', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: { live: 'paused' } },
   'progress-to-today': { ...week, about: 'Progress scrolled to its foot, then Today from the bar: Today opens at its top', record: {}, tap: ['demo:end', 'css:nav a[href="#/today"]'] },
@@ -356,6 +357,8 @@ const ROOM_SCENES: Record<string, Scene> = {
   'room-call': { ...week, about: 'On a break, sachi has called a lap: the call over the bottom bar, I am in, a note waiting', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', newNotes: 1, pictures: true } },
   'room-call-in': { ...week, about: 'A called lap you are in: I am out, and your circle at its start in your lane', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'in', pictures: true } },
   'room-call-said': { ...week, about: 'A lap called, and the bar that says what a tap did: it rises over the call', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', pictures: true }, tap: 'demo:say' },
+  'room-call-long': { ...week, about: 'A lap called by the friend with the longest name, you in: the countdown wraps beside I am out, and neither moves as it ticks', run: shortBreak, room: { onBreak: true, keeper: 'sachi', members: 'eight', call: 'long', pictures: true } },
+  'room-call-starts': { ...week, about: 'A lap you called starts for the two of you: the call goes as the line that says so comes, and the order settles once', room: { pictures: true }, tap: 'demo:call-starts' },
   'room-call-mine': { ...week, about: 'A lap you called: you can call it off', run: shortBreak, room: { onBreak: true, call: 'mine', pictures: true } },
   'room-together': { ...week, about: 'On a lap started together: the line that says so, and two notes waiting', run: { ...onKr, id: 'call-c1' }, room: { keeper: 'sachi', newNotes: 2, pictures: true } },
   'room-no-call': { ...week, about: 'On a break, no lap called: the way to call one', run: shortBreak, room: { onBreak: true, keeper: 'sachi', pictures: true } },
@@ -385,6 +388,8 @@ const MORE: Record<string, Scene> = {
   'settings-top': { ...idleAt2, about: 'Settings with every number at its top: each plus is off', settings: true, day: day(), prefs: { work_ms: 360 * MIN, short_ms: 60 * MIN, long_ms: 60 * MIN, day_target: 24 } },
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
   'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
+  'settings-rest-one': { ...idleAt2, about: 'Settings with Sunday pinned as a rest day: the other six can still be chosen', settings: true, day: day(), prefs: { rest_days: 64 } },
+  'settings-rest-two': { ...idleAt2, about: 'Settings with Saturday and Sunday pinned: the other five take no press', settings: true, day: day(), prefs: { rest_days: 96 } },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
   'mark-hundred': { about: 'Lap 100, a best week, and a cheer', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }, { key: 'week-2026-11-23', kind: 'week', focus_ms: 1075 * MIN, before_ms: 1050 * MIN }], cheered: ['sachi', 'dilan'] },
   'mark-off': { about: 'The same lap with celebrations off', run: lapOver, you: 125 * MIN, laps: 5, ghost: tuesday, marks: [{ key: 'laps-100', kind: 'laps', tier: 100 }], prefs: { celebrate: false } },
@@ -506,7 +511,7 @@ const SCENES: Record<string, Scene> = {
   'set-live': { about: 'Three seconds before the bell of lap 4: watch the set-done moment', run: { phase: 'work', lap: 3, left: 3000 }, you: 175 * MIN, laps: 7, ghost: tuesday },
 };
 
-function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins; resets: Resets; server?: ServerChoice } {
+function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: DemoRooms; settings: Settings; invites: Invites; admins: Admins; resets: Resets; server?: ServerChoice; startCall(run: string): void } {
   const [hour, minute] = scene.at ?? [16, 40];
   const opened = Date.now();
   const start = new Date(2026, 10, 24, hour, minute, 18).getTime();
@@ -710,7 +715,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const admins = demoAdmins(scene.admins ?? []);
   const resets = demoResets(scene.resets ?? 0, { look: engine.resetLook, use: engine.resetUse });
   const server = scene.serverAt ? demoServer({ address: scene.serverAt, held: scene.held }) : undefined;
-  return { engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server };
+  // A lap called in a room starting here, with no task: the run is the call's, as the core names it.
+  const startCall = (run: string) => void (state.value = act(state.value, { do: 'start', phase: 'work', run, task: null, planned_ms: LENGTHS.work_ms }, now()));
+  return { engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, startCall };
 }
 
 const name = new URLSearchParams(location.search).get('state');
@@ -778,6 +785,9 @@ const find = <T extends Element>(selector: string, words: string): T => {
     } else if (words === 'demo:start') {
       // A lap started where this screen was not looking: Today's row on another device.
       staged!.focus.start('ex');
+    } else if (words === 'demo:call-starts') {
+      // A called lap starting for two, the moment the user filmed on a laptop.
+      staged!.rooms.callStarts(staged!.startCall);
     } else if (words === 'demo:stop') {
       // Stop pressed where this screen was not looking: the phone's notification.
       staged!.focus.stop();
