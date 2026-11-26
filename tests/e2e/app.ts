@@ -27,18 +27,30 @@ export async function join(page: Page, invite: string, name: string) {
   await page.getByRole('button', { name: 'Join', exact: true }).click();
 }
 
-/** Focus's one start, before a lap: it names no number (the lap line over the digits does). */
+/** Focus's one start, before a lap: it names no number. */
 export const startButton = (page: Page) => page.getByRole('button', { name: 'Start the lap', exact: true });
 /** After a bell or in a break: the lap that comes next, started at once. */
 export const startNow = (page: Page) => page.getByRole('button', { name: 'Start the next lap now', exact: true });
 
-/** Focus's line over the bar: empty but for a break, a pause, or a lap begun yesterday. */
-export const lapLine = (page: Page) => page.locator('[class*="lapline"]').filter({ visible: true }).first();
+/**
+ * Focus's first row, where Today's heading stands: in a break its name ("Short break", ", over"
+ * when over), for a lap begun before midnight "A lap from yesterday", otherwise the task's
+ * project or "This lap is for", with "Change task" before a start. Not drawn with nothing on the
+ * list and no break.
+ */
+export const firstRow = (page: Page) => page.locator('main [class*="_about_"]').filter({ visible: true }).first();
 
-/** What a ready Focus screen shows: its start, under a line that says nothing (DESIGN.md: no "Lap 2 today, next"). */
+/** What the first row says of the lap itself: the break, or a lap from yesterday; '' when it names the task, or is not drawn. */
+export async function lapSaid(page: Page) {
+  const row = firstRow(page);
+  const text = (await row.count()) ? ((await row.textContent())?.trim() ?? '') : '';
+  return /^(Short break|Long break|A lap from yesterday)/.test(text) ? text : '';
+}
+
+/** What a ready Focus screen shows: its start, and a first row that names no break (DESIGN.md: no "Lap 2 today, next"). */
 export async function ready(page: Page) {
   await expect(startButton(page)).toBeVisible();
-  await expect(lapLine(page)).toHaveText('');
+  await expect.poll(() => lapSaid(page), { message: 'Focus is not ready: its first row names a break' }).toBe('');
 }
 
 /**

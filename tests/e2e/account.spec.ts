@@ -1,7 +1,7 @@
 // Accounts through the screens (protocol section 10), and the API from another origin, which is
 // what the phone app is.
 import { PASSWORD } from '../sync/harness.ts';
-import { accountWith, go, join, lapLine, ready, server, signIn, startButton, statusLine, username } from './app.ts';
+import { accountWith, go, join, lapSaid, ready, server, signIn, startButton, statusLine, username } from './app.ts';
 import { ADDR } from './server.ts';
 import { expect, test } from './devices.ts';
 
@@ -44,9 +44,9 @@ test('sign out with nothing unsent goes back to sign in, and signing in again ca
   // Signing in again opens where signing out was done, Settings; the lap is on Focus.
   await go(a.page, 'Focus');
   await expect(a.page.getByRole('button', { name: 'Resume' })).toBeVisible({ timeout: 5000 });
-  // Held: said under the digits only, and nothing over the bar.
+  // Held: said under the digits only, not in the first row.
   await expect(a.page.getByText(/^of \d\d:\d\d, paused since \d\d:\d\d$/).filter({ visible: true })).toBeVisible();
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
 });
 
 test('a page from another origin can sign in over the API and open the socket, as the phone app will', async ({ browser }) => {

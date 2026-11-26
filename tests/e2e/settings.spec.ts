@@ -1,7 +1,7 @@
 // Settings through the screen, on the real engine and server, and the whole app at phone widths.
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
-import { accountWith, digits, go, lapLine, quickAdd, ready, signIn, startButton, startNow, taskRow, username } from './app.ts';
+import { accountWith, digits, go, lapSaid, quickAdd, ready, signIn, startButton, startNow, taskRow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -82,9 +82,9 @@ test('auto-start: with both switches on, the break starts when a lap reaches its
   await go(a.page, 'Focus');
   await startButton(a.page).click();
   // The break started by itself, then the next lap: the line names the break, then says nothing.
-  await expect(lapLine(a.page)).toHaveText('Short break', { timeout: 6000 });
+  await expect.poll(() => lapSaid(a.page), { timeout: 6000 }).toBe('Short break');
   await expect(a.page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible({ timeout: 6000 });
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
 });
 
 test('"Ring on this laptop" stays this laptop\'s own, across a reload', async ({ deviceA: a, deviceB: b }) => {

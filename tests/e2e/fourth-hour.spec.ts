@@ -7,7 +7,7 @@ import { localDay } from '../../client/src/core/stats.ts';
 import * as words from '../../client/src/ui/strings.ts';
 import { serverCells, serverRows, table } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, lapLine as lapLineOf, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { go, lapSaid as lapLine, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -26,8 +26,6 @@ async function also(d: { page: Page }, name: string) {
   await ready(d.page);
 }
 
-// Focus's line over the bar, as read.
-const lapLine = (page: Page) => lapLineOf(page).textContent().then((t) => t?.trim() ?? '');
 // Focus's bar, as drawn: its segments, or none.
 const focusBar = (page: Page) => page.locator('main i[style*="--i:"]').count();
 // Words on a screen that name the set of four.
@@ -41,7 +39,7 @@ const setWords = (page: Page) =>
 
 // 1. The set is on no screen.
 
-test('the set is on no screen: through four laps and the long break, Focus, Today, Progress, Room and Settings never name it; the line over the bar is empty in every lap and on every bell; the break each lap earns is on its button; the fourth lap is "Four laps. The long break is earned!" and offers it', async ({ deviceA: a }) => {
+test('the set is on no screen: through four laps and the long break, Focus, Today, Progress, Room and Settings never name it; the first row counts nothing in any lap or on any bell; the break each lap earns is on its button; the fourth lap is "Four laps. The long break is earned!" and offers it', async ({ deviceA: a }) => {
   test.setTimeout(120000);
   await a.page.setViewportSize(PHONE);
   const { name } = await signedInto(a, 'noset', undefined, { work_ms: 3000, short_ms: 5 * MIN, long_ms: 15 * MIN });

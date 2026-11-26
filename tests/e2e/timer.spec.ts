@@ -1,7 +1,7 @@
 // One timer on two laptops, both online: what one does, the other shows, and the session rows the
 // server ends up with (protocol sections 6 and 11).
 import type { Page } from '@playwright/test';
-import { accountWith, digits, lapLine, ready, sessions, sessionsWhen, signIn, startButton, startNow, username } from './app.ts';
+import { accountWith, digits, lapSaid, ready, sessions, sessionsWhen, signIn, startButton, startNow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -42,14 +42,14 @@ test('a lap started on A shows on B within a second; pause, resume and five more
   const within = { timeout: 1000 };
 
   await seen(test, 'start on A, seen on B', () => startButton(a.page).click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
-  // A plain lap: the line over the bar says nothing the digits do not.
-  await expect(lapLine(b.page)).toHaveText('');
+  // A plain lap: the first row names no break and no count.
+  await expect.poll(() => lapSaid(b.page)).toBe('');
   await sameSecond(a.page, b.page);
 
   await seen(test, 'pause on B, seen on A', () => button(b.page, 'Pause').click(), () => expect(button(a.page, 'Resume')).toBeVisible(within));
-  // Held: said under the digits only, and nothing over the bar.
+  // Held: said under the digits only, not in the first row.
   await expect(a.page.getByText(/^of \d\d:\d\d, paused since \d\d:\d\d$/).filter({ visible: true })).toBeVisible();
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
   await sameSecond(a.page, b.page);
 
   await seen(test, 'resume on A, seen on B', () => button(a.page, 'Resume').click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
@@ -68,7 +68,7 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   await startButton(a.page).click();
   for (const d of [a, b]) {
     await expect(button(d.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
-    await expect(lapLine(d.page)).toHaveText('');
+    await expect.poll(() => lapSaid(d.page)).toBe('');
     await expect(startNow(d.page)).toBeVisible();
   }
   // Both laptops were in step at the bell, so both may write the row: it must still be one.
@@ -79,7 +79,7 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   expect((row!.ended as number) - (row!.started as number)).toBe(4000);
 
   await button(b.page, 'Start 1 min break').click();
-  await expect(lapLine(a.page)).toHaveText('Short break', { timeout: 1000 });
+  await expect.poll(() => lapSaid(a.page), { timeout: 1000 }).toBe('Short break');
   await expect(startNow(a.page)).toBeVisible();
   // A break is not stretched: the offer is for laps.
   for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);

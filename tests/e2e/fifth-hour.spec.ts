@@ -1,11 +1,11 @@
 // What the user's fifth hour found (roadmap section 17), each as the person meets it, at 412x915:
-// Focus's bar is the task's laps and nothing over it explains them, and on Today a carried row
+// Focus's bar is the task's laps and no words explain them, and on Today a carried row
 // takes the Next card's place before it is let go, so letting go moves nothing.
 import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, lapLine, list, server, settle, signedInto, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { firstRow, go, lapSaid, list, server, settle, signedInto, startButton, startNow, staysPut, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -21,29 +21,29 @@ const bar = (page: Page) => page.locator('main i[style*="--i:"]').evaluateAll((e
 const barHeight = (page: Page) => page.locator('main i[style*="--i:"]').first().evaluate((el) => el.getBoundingClientRect().height);
 const digits = (page: Page) => page.locator('[class*="digits"]').first();
 
-test('the bar is the task\'s: an estimate of 3 is three segments filling as each lap rings, standing tall on the result of the third; a fourth lap adds a segment and the bar is not tall again; nothing is said over it', async ({ deviceA: a }) => {
+test('the bar is the task\'s: an estimate of 3 is three segments filling as each lap rings, standing tall on the result of the third; a fourth lap adds a segment and the bar is not tall again; no words count the laps', async ({ deviceA: a }) => {
   test.setTimeout(90000);
   await a.page.setViewportSize(PHONE);
   await signedInto(a, 'taskbar', (node) => node.engine.write('task', 'essay', { title: 'essay', estimate: 3, order: 'V' }), { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
   await expect.poll(() => bar(a.page)).toEqual([0, 0, 0]);
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
 
   for (const lap of [1, 2, 3, 4]) {
     await (lap === 1 ? startButton(a.page) : startNow(a.page)).click();
     await expect(button(a.page, 'Pause')).toBeVisible();
-    await expect(lapLine(a.page), `lap ${lap} running`).toHaveText('');
+    await expect.poll(() => lapSaid(a.page), { message: `lap ${lap} running` }).toBe('');
     // Past the estimate the lap in progress has a segment of its own.
     expect((await bar(a.page)).length, `segments during lap ${lap}`).toBe(Math.max(3, lap));
     await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
     const rung = Array.from({ length: Math.max(3, lap) }, (_, i) => (i < lap ? 1 : 0));
     await expect.poll(() => bar(a.page), { message: `the bar after lap ${lap} rang` }).toEqual(rung);
-    await expect(lapLine(a.page), `lap ${lap} rang`).toHaveText('');
+    await expect.poll(() => lapSaid(a.page), { message: `lap ${lap} rang` }).toBe('');
     // Tall only on the lap that brought the task to its estimate.
     await expect.poll(() => barHeight(a.page), { message: `the bar's height after lap ${lap}` }).toBe(lap === 3 ? 24 : 8);
   }
 });
 
-test('no estimate, no bar; a lap on nothing, no bar; the digits keep still from a task with a bar to one without and to nothing; a held lap says so under the digits, "paused since", and nothing over the bar', async ({ deviceA: a }) => {
+test('no estimate, no bar; a lap on nothing, no bar; the digits keep still from a task with a bar to one without and to nothing; a held lap says so under the digits, "paused since", and not in the first row', async ({ deviceA: a }) => {
   test.setTimeout(60000);
   await a.page.setViewportSize(PHONE);
   await signedInto(a, 'nobar', (node: Node) => {
@@ -66,7 +66,7 @@ test('no estimate, no bar; a lap on nothing, no bar; the digits keep still from 
   // A task with no estimate: no bar, and the digits where they were.
   await staysPut(a.page, digits(a.page), () => choose('bravo'));
   expect(await bar(a.page), 'a task with no estimate has a bar').toEqual([]);
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
   // A lap for nothing in particular: no bar either, the digits still where they were.
   await staysPut(a.page, digits(a.page), () => choose('Nothing in particular'));
   expect(await bar(a.page), 'a lap on nothing has a bar').toEqual([]);
@@ -79,12 +79,12 @@ test('no estimate, no bar; a lap on nothing, no bar; the digits keep still from 
   await startButton(a.page).click();
   await expect(button(a.page, 'Pause')).toBeVisible();
   expect(await bar(a.page), 'a running lap on nothing has a bar').toEqual([]);
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
   await button(a.page, 'Pause').click();
   await expect(a.page.getByText(/^of \d\d:\d\d, paused since \d\d:\d\d$/).filter({ visible: true })).toBeVisible();
-  await expect(lapLine(a.page), 'a held lap is named over the bar').toHaveText('');
+  await expect.poll(() => lapSaid(a.page), { message: 'a held lap is named in the first row' }).toBe('');
   await button(a.page, 'Resume').click();
-  await expect(lapLine(a.page)).toHaveText('');
+  await expect.poll(() => lapSaid(a.page)).toBe('');
   await button(a.page, 'Stop').click();
 
   // A lap on the task with no estimate: still no bar while it runs.
@@ -295,4 +295,29 @@ test('a row carried to the top of Today is what Focus offers next: a lap on alph
   await expect(lines('bravo'), 'Focus kept the old lap\'s task over the one set down at the top').toBeVisible();
   await startButton(a.page).click();
   await expect.poll(async () => ((await serverRows(server, name, 'timer')).get('current')?.state as { task?: string } | undefined)?.task).toBe('b');
+});
+
+// 3. Focus's first row stands where Today's heading does.
+
+test('Focus\'s first row starts at the top Today\'s heading starts at: 56px at 412 wide and 32px at 1440, before a lap and in a break, where it names the break', async ({ deviceA: a }) => {
+  test.setTimeout(60000);
+  await signedInto(a, 'firstrow', (node: Node) => node.engine.write('task', 'essay', { title: 'essay', estimate: 2, order: 'V' }), { work_ms: 3000, short_ms: 60000 });
+  const top = async (locator: ReturnType<Page['locator']>) => Math.round((await boxOf(locator)).y);
+  for (const [size, at] of [[PHONE, 56], [{ width: 1440, height: 900 }, 32]] as const) {
+    await a.page.setViewportSize(size);
+    await go(a.page, 'Today');
+    await settle(a.page);
+    expect(await top(a.page.getByRole('heading', { level: 1 })), `Today's heading at ${size.width}`).toBe(at);
+    await go(a.page, 'Focus');
+    await settle(a.page);
+    await expect(firstRow(a.page)).toContainText('Change task');
+    expect(await top(firstRow(a.page)), `Focus's first row at ${size.width}`).toBe(at);
+  }
+  await a.page.setViewportSize(PHONE);
+  await startButton(a.page).click();
+  await expect(button(a.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
+  await button(a.page, 'Start 1 min break').click();
+  await expect.poll(() => lapSaid(a.page)).toBe('Short break');
+  await settle(a.page);
+  expect(await top(firstRow(a.page)), 'Focus\'s first row in a break').toBe(56);
 });
