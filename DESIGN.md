@@ -853,9 +853,14 @@ Each is a rule for every screen, not for the one where it was seen.
   the day's count; Today's day bar stands with the day's figures. A lap for nothing in particular, or on
   a task with no estimate, has no bar. The day's target is Today's alone. Nothing over the bar
   explains it: no "Lap 3 of 5 today", no ", next", no "5 min break after" (the user's fifth hour:
-  "they over explain something, a common AI trap"). The line over the bar says only what the
-  digits cannot: in a break its name ("Short break", "Long break"), and "Break over" when it is
-  so; otherwise it is empty and keeps its height, so the digits never move. Paused is said once,
+  "they over explain something, a common AI trap"). There is no line over the task: Focus's
+  first row is the task's project with "Change task", and it starts where Today's heading starts
+  (an empty line held open there read as a hole). What the digits cannot say takes the project
+  row's place instead, in the same row: in a break its name ("Short break", "Long break", and
+  "Break over" when it is so), and for a lap begun before midnight "A lap from yesterday". The
+  rows are the same in every state where there is something to put in them, so the digits never
+  move from a lap to its break; with nothing on the list and no break, the row and the bar's
+  place are not drawn at all rather than held open empty. Paused is said once,
   under the digits ("paused since 16:38"), with the digits greyed and Resume on the button. The
   break a lap earns is said once, where it is taken, on the button ("Start 5 min break"), with no
   "Take five." over it. The one place the
