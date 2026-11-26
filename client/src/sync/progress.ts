@@ -203,8 +203,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       // The lap in progress is in this week's figure, so it is in the all-time one too: what it
       // has run so far, less whatever a row for it already holds.
       const open = counts.open(now);
-      const held = open && sessionRows.value.get(open.id);
-      const running = open ? open.ended - open.started - open.paused_ms - (typeof held?.ended === 'number' ? Math.max(0, held.ended - open.started - open.paused_ms) : 0) : 0;
+      const running = counts.unwritten(now);
       const runningFor = open ? (projectOf(open.task)?.id ?? null) : undefined;
       return projectShares(between(addDays(today, -13), today, now), (session) => projectOf(session.task)?.id ?? null, today, offset()).map(
         ({ project, ...sums }) => ({
@@ -212,7 +211,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
           ...sums,
           // The lap in progress gives its minutes and is no lap yet: it becomes one at its bell or when it is stopped.
           laps: sums.laps - (open?.outcome === 'stopped' && project === runningFor ? 1 : 0),
-          all_ms: (allTime.value.get(project) ?? 0) + (project === runningFor ? Math.max(0, running) : 0),
+          all_ms: (allTime.value.get(project) ?? 0) + (project === runningFor ? running : 0),
         }),
       );
     },

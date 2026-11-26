@@ -228,6 +228,29 @@ describe('a habit\'s days', () => {
     ]);
   });
 
+  it('a past day part done gives its count, as today does: 1 of 2 on Monday is a count of 1, in the week and in the record', async () => {
+    const { d, h } = await one();
+    const id = h.add('Stretch', EVERY_DAY, 2)!;
+    on(d, id, ['23']);
+    const monday = view(d, id).week[0]!;
+    assert.deepEqual([monday.day, monday.count, monday.done], ['2026-11-23', 1, false]);
+    assert.deepEqual(view(d, id).record.map((day) => [day.day, day.count]), [['2026-11-23', 1], [TODAY, 0]]);
+  });
+
+  it('two habits made together read the same N of planned days, whichever was checked in first', async () => {
+    const { w, d, h } = await one();
+    const read = h.add('Read', EVERY_DAY, 1)!;
+    const walk = h.add('Walk', EVERY_DAY, 1)!;
+    // A month and a bit on: Read was first checked in the day it was made, Walk the day after.
+    w.time.advance(34 * DAY);
+    past(d, read, '2026-11-24');
+    past(d, walk, '2026-11-25');
+    for (const habit of [read, walk]) past(d, habit, '2026-12-27');
+    // The made day to yesterday (nothing yet today): 34 planned days for both.
+    assert.deepEqual([view(d, read).of, view(d, walk).of], [34, 34]);
+    assert.deepEqual([view(d, read).kept, view(d, walk).kept], [2, 2]);
+  });
+
   it('before any check-in there is no record, no streak and nothing kept', async () => {
     const { d, h } = await one();
     const id = h.add('Read', EVERY_DAY, 1)!;

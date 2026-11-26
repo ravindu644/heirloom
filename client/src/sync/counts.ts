@@ -113,6 +113,17 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     return { id: s.run, kind: 'work', task: s.task, started: s.started, ended, planned_ms: s.planned_ms, paused_ms: s.paused_ms, outcome: over ? 'rang' : 'stopped', device: '' };
   }
 
+  /**
+   * What the lap in progress has run that no row holds yet, in ms: what a total made of rows
+   * lacks, here or on the server. 0 when no lap is on or a row tells it up to here.
+   */
+  function unwritten(now: number): number {
+    const lap = open(now);
+    const held = lap && rows.value.get(lap.id)?.ended;
+    const ran = (ended: number) => ended - lap!.started - lap!.paused_ms;
+    return lap ? Math.max(0, ran(lap.ended) - (typeof held === 'number' ? Math.max(0, ran(held)) : 0)) : 0;
+  }
+
   const counted = (row: Session) => row.kind === 'work' && row.outcome !== 'void';
   /** The laps of `day`, rang or stopped, by rows alone. */
   const lapsOn = (day: string): number => (byDay.value.get(day) ?? []).filter(counted).length;
@@ -161,6 +172,7 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     rangOnce,
     live,
     open,
+    unwritten,
 
     /** You against the ghost at the engine's now, the lap in progress included. */
     race(): Race {

@@ -5,6 +5,9 @@
 
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
+import { mondayOf } from '../core/progress.ts';
+import { view } from '../core/timer.ts';
+import { createCounts } from './counts.ts';
 import type { Engine, RoomMessage } from './engine.ts';
 
 export interface MemberView {
@@ -21,6 +24,7 @@ export interface MemberView {
   paused: boolean;
   /** The title of the task their lap is for, only if they share it. */
   task: string | null;
+  /** Your own lane's also holds your lap in progress as far as it has run, as Today does. A friend's holds their rows only. */
   today_ms: number;
   today_laps: number;
   week_ms: number;
@@ -75,6 +79,8 @@ export interface Rooms {
 }
 
 export interface RoomsEnv {
+  /** The device's offset from UTC in minutes, east positive: 330 in Sri Lanka. The system's own when left out. */
+  utcOffsetMin?(): number;
   /** Runs `run` once after `ms`. Returns a function that cancels it. */
   schedule(run: () => void, ms: number): () => void;
 }
@@ -89,6 +95,7 @@ interface Cheer {
 }
 
 const DAY_MS = 86400000;
+const MIN = 60000;
 const PHASES = ['idle', 'work', 'short', 'long'] as const;
 const keyOf = (cheer: Cheer) => `${cheer.room}/${cheer.to}/${cheer.run}`;
 const text = (v: unknown, or = '') => (typeof v === 'string' ? v : or);
@@ -106,6 +113,8 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   // Cheers this run of the app has sent and had accepted, so they stay shown until the server's message says so itself.
   const accepted = signal<ReadonlySet<string>>(new Set());
   const flying = new Set<string>();
+  // getTimezoneOffset counts minutes west of UTC; the contract counts east.
+  const counts = createCounts(engine, env.utcOffsetMin ?? (() => -new Date().getTimezoneOffset()));
   const connected = computed(() => engine.sync.value === 'syncing' || engine.sync.value === 'in-step');
 
   function remember(next: ReadonlyMap<string, RoomNow>) {
@@ -149,9 +158,20 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   const bell = signal(0);
   let cancelBell = () => {};
 
+  // Your lap in progress as far as it has run, for your own lane: the server's totals are of rows,
+  // and it has none yet. Counted on the day and in the week it began, as Progress counts it.
+  function yours(now: number): { today: number; week: number } {
+    const lap = counts.open(now);
+    if (!lap) return { today: 0, week: 0 };
+    const [began, today] = [counts.today(lap.started), counts.today(now)];
+    const ran = counts.unwritten(now);
+    return { today: began === today ? ran : 0, week: mondayOf(began) === mondayOf(today) ? ran : 0 };
+  }
+
   const list = computed(() => {
     void bell.value;
     const now = engine.now();
+    const own = yours(now);
     const mine = new Set([...waiting.value.map(keyOf), ...accepted.value]);
     return [...rooms.value.values()].map((msg): RoomView => {
       // Only what could be a member: anything else in the list is left out, not tripped over.
@@ -180,9 +200,9 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           ends_at: phase === 'idle' ? null : ends,
           paused: phase !== 'idle' && member.paused === true,
           task: phase === 'work' && typeof member.task === 'string' ? member.task : null,
-          today_ms: amount(member.today_ms),
+          today_ms: amount(member.today_ms) + (member.you === true ? own.today : 0),
           today_laps: amount(member.today_laps),
-          week_ms: amount(member.week_ms),
+          week_ms: amount(member.week_ms) + (member.you === true ? own.week : 0),
           last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you), cheerers: cheers.flatMap((cheerer) => (names.has(cheerer) ? [{ id: cheerer, name: names.get(cheerer)! }] : [])) } : null,
         };
       });
@@ -203,12 +223,17 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   const stopBell = effect(() => {
     void bell.value;
     const all = rooms.value;
+    const lanes = list.value.flatMap((room) => room.members.filter((member) => member.you));
+    const s = engine.timer.value;
     untracked(() => {
       cancelBell();
       cancelBell = () => {};
       const now = engine.now();
       const ends = [...all.values()].flatMap((msg) => (Array.isArray(msg.members) ? (msg.members as { ends_at?: unknown }[]) : []).map((member) => member?.ends_at));
-      const next = Math.min(...ends.filter((at): at is number => typeof at === 'number' && at > now));
+      // Your own figures move with your lap: looked at again when either next reaches a whole minute.
+      const counting = s.phase === 'work' && s.paused_at === null && !view(s, now).over && counts.open(now) !== null;
+      const minutes = counting ? lanes.flatMap((member) => [member.today_ms, member.week_ms]).map((ms) => now + MIN - (ms % MIN)) : [];
+      const next = Math.min(...ends.filter((at): at is number => typeof at === 'number' && at > now), ...minutes);
       // A day at most: a browser runs a timer set further out than 2^31 ms at once.
       if (Number.isFinite(next)) cancelBell = env.schedule(() => void bell.value++, Math.min(next - now, DAY_MS));
     });

@@ -71,7 +71,7 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   const made = createToday(engine, { utcOffsetMin, id, schedule: env.schedule, focus });
   const progress = createProgress(engine, { utcOffsetMin, schedule: env.schedule });
   const habits = createHabits(engine, { utcOffsetMin, id, schedule: env.schedule });
-  const rooms = createRooms(engine, { schedule: env.schedule });
+  const rooms = createRooms(engine, { utcOffsetMin, schedule: env.schedule });
   const settings = createSettings(engine, { utcOffsetMin });
   // What the clock may have passed while nothing ran: the connection, and the day.
   const wake = () => {

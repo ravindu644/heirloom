@@ -55,6 +55,34 @@ describe('the list', () => {
     assert.deepEqual([r.list.value[0]!.members[1]!.phase, r.list.value[0]!.members[1]!.paused, r.list.value[0]!.members[1]!.ends_at], ['work', true, null]);
   });
 
+  it('your own lane counts your lap in progress as far as it has run, as Today does, and moves on the minute with nobody sending', async () => {
+    const { w, d, r } = await one();
+    // The server's totals are of your rows: 75 minutes today, 7h 5m this week. The lap in progress is not in them.
+    say(d, room('r_1', [member(ME, 'ravi', { today_ms: 75 * MIN, today_laps: 3, week_ms: 425 * MIN }), member(SACHI, 'sachi', { today_ms: 50 * MIN, week_ms: 100 * MIN })]));
+    d.focus.start();
+    w.time.advance(11 * MIN);
+    const mine = () => r.list.value[0]!.members[0]!;
+    // 1h 26m and 7h 16m, as Today and Progress say at the same moment.
+    assert.deepEqual([mine().today_ms, mine().today_laps, mine().week_ms], [86 * MIN, 3, 436 * MIN]);
+    assert.equal(mine().today_ms, d.focus.race().you_ms + 75 * MIN);
+    assert.equal(r.list.value[0]!.week_ms, 536 * MIN, 'and so is the room\'s week');
+    // It is read again at each whole minute: the minutes shown are never behind.
+    const shown = () => [mine().today_ms, mine().week_ms].map((ms) => Math.floor(ms / MIN));
+    w.time.advance(MIN - 1);
+    assert.deepEqual(shown(), [86, 436]);
+    w.time.advance(1);
+    assert.deepEqual(shown(), [87, 437]);
+    // Paused, it stays where it stopped.
+    d.focus.pause();
+    w.time.advance(5 * MIN);
+    assert.deepEqual(shown(), [87, 437]);
+    d.focus.resume();
+    w.time.advance(MIN);
+    assert.deepEqual(shown(), [88, 438]);
+    // A friend's lap in progress is not in their figure: the message does not say how far it has run.
+    assert.equal(r.list.value[0]!.members[1]!.today_ms, 50 * MIN);
+  });
+
   it('`gone` removes the room; two rooms are two entries, each its own', async () => {
     const { d, r } = await one();
     say(d, room('r_1', [member(ME, 'ravi')]));

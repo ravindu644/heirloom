@@ -9,6 +9,8 @@ export interface StreakInput {
   window: number;
   /** Bit 0 Monday to bit 6 Sunday. Every day when left out. */
   daysMask?: number;
+  /** The day the record begins, when it is earlier than the first kept day: the day a habit was made. */
+  since?: string;
 }
 
 export interface Streak {
@@ -31,8 +33,8 @@ export const WINDOW_DAYS = 45;
  * The streak as the screens show it: over the 45 day window, and whether a miss lies inside
  * those days. An empty day there that is not a rest day is a miss.
  */
-export function streakWindow(today: string, kept: readonly string[], daysMask = 127): Streak & { missed: boolean } {
-  const s = streak({ today, kept, window: WINDOW_DAYS, daysMask });
+export function streakWindow(today: string, kept: readonly string[], daysMask = 127, since?: string): Streak & { missed: boolean } {
+  const s = streak({ today, kept, window: WINDOW_DAYS, daysMask, since });
   // The same days the streak counted: back from today if today is kept, else from yesterday.
   const now = Date.parse(today);
   const keptToday = ((daysMask >> weekday(now)) & 1) === 1 && kept.includes(today);
@@ -40,7 +42,7 @@ export function streakWindow(today: string, kept: readonly string[], daysMask = 
   return { ...s, missed: s.of - s.kept > s.rest.filter((day) => day >= from).length };
 }
 
-export function streak({ today, kept, window, daysMask = 127 }: StreakInput): Streak {
+export function streak({ today, kept, window, daysMask = 127, since }: StreakInput): Streak {
   const planned = (ms: number) => ((daysMask >> weekday(ms)) & 1) === 1;
   const keptDays = new Set(kept.map((day) => Date.parse(day)).filter(planned));
   if (keptDays.size === 0) return { streak: 0, rest: [], kept: 0, of: 0 };
@@ -53,7 +55,8 @@ export function streak({ today, kept, window, daysMask = 127 }: StreakInput): St
   let empties = 0;
   let keptInWindow = 0;
   let of = 0;
-  for (let ms = Math.min(...keptDays); ms <= end; ms += DAY_MS) {
+  const first = Math.min(...keptDays, since === undefined ? Infinity : Date.parse(since));
+  for (let ms = first; ms <= end; ms += DAY_MS) {
     if (weekday(ms) === 0) empties = 0;
     if (!planned(ms)) continue;
     const isKept = keptDays.has(ms);

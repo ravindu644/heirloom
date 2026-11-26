@@ -89,13 +89,15 @@ export function asCheckIn(id: string, row: Readonly<Record<string, unknown>>): C
 /**
  * A habit as its screen shows it, from its live check-ins counted per day. The target used is
  * today's, for every past day: that is the rule, so raising a target turns past days that met
- * the old one into days that fall short, and lowering it does the opposite.
+ * the old one into days that fall short, and lowering it does the opposite. `made` is the day the
+ * habit was made, where the planned days are counted from.
  */
-export function habitDays(habit: Pick<Habit, 'days' | 'target'>, counts: ReadonlyMap<string, number>, today: string) {
+export function habitDays(habit: Pick<Habit, 'days' | 'target'>, counts: ReadonlyMap<string, number>, today: string, made?: string) {
   const planned = (day: string) => ((habit.days >> weekday(Date.parse(day))) & 1) === 1;
   const done = [...counts].filter(([, count]) => count >= habit.target).map(([day]) => day);
   // Days it is not planned for are no part of the streak: the streak function leaves them out by the mask.
-  const s = streakWindow(today, done, habit.days);
+  // Counted from the day it was made, so two habits made together read the same N of planned days.
+  const s = streakWindow(today, done, habit.days, made);
   const rest = new Set(s.rest);
   const on = (day: string): HabitDay => {
     const count = counts.get(day) ?? 0;

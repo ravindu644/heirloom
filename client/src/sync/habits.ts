@@ -6,9 +6,11 @@ import { batch, computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { asCheckIn, asDays, asHabit, asRemind, asReminds, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
 import type { CheckIn, Habit, HabitDay } from '../core/habits.ts';
+import { stampMs } from '../core/hlc.ts';
 import { newer } from '../core/merge.ts';
 import { GONE, KEPT_MS } from '../core/real.ts';
 import { addDays } from '../core/progress.ts';
+import { localDay } from '../core/stats.ts';
 import { byOrder, keyBetween, moveKeys } from '../core/today.ts';
 import { createDay } from './day.ts';
 import type { Engine } from './engine.ts';
@@ -147,6 +149,13 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
     return one !== undefined && list !== undefined && newer(one, list) ? (habit.remind === null ? [] : [habit.remind]) : habit.reminds;
   }
 
+  // The day a habit was made: its row holds no such time, so it is its oldest cell's stamp, the
+  // first write. A row whose every field has been written again since reads as made then.
+  function made(id: string): string | undefined {
+    const ms = Object.keys(habitRows.value.get(id) ?? {}).map((field) => engine.stamp('habit', id, field)).filter((stamp) => stamp !== undefined).map((stamp) => stampMs(stamp));
+    return ms.length ? localDay(Math.min(...ms), env.utcOffsetMin()) : undefined;
+  }
+
   const model = computed(() => {
     const today = clock.day.value;
     const now = engine.now();
@@ -158,7 +167,7 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       reminds: reminds(habit),
       remind: reminds(habit)[0] ?? null,
       deleted: habit.deleted,
-      ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today),
+      ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today, made(habit.id)),
     });
     const all = [...habits.value.values()];
     const alive = all.filter((habit) => habit.deleted === null).sort(byOrder);

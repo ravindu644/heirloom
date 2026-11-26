@@ -127,7 +127,7 @@ export function world() {
         return (habits ??= createHabits(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule }));
       },
       get rooms() {
-        return (rooms ??= createRooms(engine, { schedule: time.schedule }));
+        return (rooms ??= createRooms(engine, { utcOffsetMin: () => OFFSET, schedule: time.schedule }));
       },
       get settings() {
         return (settings ??= createSettings(engine, { utcOffsetMin: () => OFFSET }));
