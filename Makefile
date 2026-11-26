@@ -109,13 +109,13 @@ bump:
 	@sed -i 's/^  "version": ".*",/  "version": "$(NEW)",/' package.json
 	@echo "[+] Version $$(node -p 'require("./package.json").version') set. Commit it, then tag v$(NEW) to release."
 
-# Puts the binary and its systemd unit on the server and runs install.sh there, the same script a
-# release installs with. The sudo password goes from .local/ENV.md straight into ssh's stdin:
+# Puts the binary on the server and runs install.sh there with it, the same script a release
+# installs with. The sudo password goes from .local/ENV.md straight into ssh's stdin:
 # never in a variable, an argument or the log.
 deploy: server
 	$(need-host)
-	scp install.sh server/bin/heirloomd-arm64 server/deploy/heirloomd.service $(HOST):
-	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'cd && sudo -S -p "" sh install.sh --binary heirloomd-arm64 --service heirloomd.service'
+	scp install.sh server/bin/heirloomd-arm64 $(HOST):
+	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'cd && sudo -S -p "" env HEIRLOOMD_BINARY=heirloomd-arm64 sh install.sh'
 
 # Memory of the running service on the real hardware.
 server-rss:

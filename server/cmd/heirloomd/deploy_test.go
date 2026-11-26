@@ -8,12 +8,19 @@ import (
 	"testing"
 )
 
-// The unit file is not Go, so nothing else here would notice a typo in it.
+// The unit is not Go, so nothing else here would notice a typo in it. It lives in install.sh,
+// between <<'UNIT' and UNIT, which writes it.
 func TestUnitFileSaysWhatItMust(t *testing.T) {
-	data, err := os.ReadFile("../../deploy/heirloomd.service")
+	script, err := os.ReadFile("../../../install.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, after, ok := strings.Cut(string(script), "<<'UNIT'\n")
+	data, _, ok2 := strings.Cut(after, "\nUNIT\n")
+	if !ok || !ok2 {
+		t.Fatal("install.sh holds no unit between <<'UNIT' and UNIT")
+	}
+	data += "\n"
 	lines := map[string]bool{}
 	for line := range strings.SplitSeq(string(data), "\n") {
 		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {

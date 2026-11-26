@@ -146,7 +146,7 @@ jobs:
         mkdir -p dist
         cp server/bin/heirloomd dist/heirloomd-linux-amd64
         cp server/bin/heirloomd-arm64 dist/heirloomd-linux-arm64
-        cp server/deploy/heirloomd.service install.sh dist/
+        cp install.sh dist/
         ./dist/heirloomd-linux-amd64 -version
 
     - name: Upload Artifacts
