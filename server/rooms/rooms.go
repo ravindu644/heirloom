@@ -52,6 +52,7 @@ type Message struct {
 	Room       string   `json:"room"`
 	Name       string   `json:"name"`
 	Code       string   `json:"code"`
+	Keeper     string   `json:"keeper"` // the member's id
 	TargetMs   int64    `json:"target_ms"`
 	Ranked     bool     `json:"ranked"`
 	ServerTime int64    `json:"server_time"`
@@ -183,7 +184,7 @@ func (s *Service) Create(account int64, name string) (public string, room int64,
 		for i, b := range code {
 			code[i] = alphabet[b&31]
 		}
-		res, err := tx.Exec("insert into room (public_id, name, code) values (?, ?, ?) on conflict (code) do nothing", public, name, string(code))
+		res, err := tx.Exec("insert into room (public_id, name, code, keeper) values (?, ?, ?, ?) on conflict (code) do nothing", public, name, string(code), account)
 		if err != nil {
 			return "", 0, fmt.Errorf("store room: %w", err)
 		}
@@ -270,6 +271,11 @@ func (s *Service) Leave(account int64, public string) (room int64, err error) {
 	if _, err := tx.Exec("delete from member where room = ? and account = ?", room, account); err != nil {
 		return 0, fmt.Errorf("delete member: %w", err)
 	}
+	// A keeper who leaves hands the room to whoever has been in it longest. The caller
+	// announces the room after any leave, so every member hears who keeps it now.
+	if _, err := tx.Exec("update room set keeper = (select account from member where room = ?1 order by id limit 1) where id = ?1 and keeper = ?2", room, account); err != nil {
+		return 0, fmt.Errorf("hand on room: %w", err)
+	}
 	if _, err := tx.Exec("delete from room where id = ? and not exists (select 1 from member where room = ?)", room, room); err != nil {
 		return 0, fmt.Errorf("delete room: %w", err)
 	}
@@ -279,11 +285,8 @@ func (s *Service) Leave(account int64, public string) (room int64, err error) {
 	return room, nil
 }
 
-// Update changes any of the room's name, target and ranking. Any member may.
+// Update changes any of the room's name, target and ranking. Only its keeper may.
 func (s *Service) Update(account int64, public string, name *string, targetMs *int64, ranked *bool) (room int64, err error) {
-	if name != nil && !validName(*name) || targetMs != nil && (*targetMs < 0 || *targetMs > maxTargetMs) {
-		return 0, auth.ErrBadRequest
-	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("begin update room: %w", err)
@@ -291,6 +294,18 @@ func (s *Service) Update(account int64, public string, name *string, targetMs *i
 	defer tx.Rollback()
 	if room, err = find(tx, account, public); err != nil {
 		return 0, err
+	}
+	// Who is asking comes before what they ask: a member who is not the keeper is told
+	// forbidden, never how their change would have been judged.
+	var keeps bool
+	if err := tx.QueryRow("select keeper is ? from room where id = ?", account, room).Scan(&keeps); err != nil {
+		return 0, fmt.Errorf("read keeper: %w", err)
+	}
+	if !keeps {
+		return 0, auth.ErrForbidden
+	}
+	if name != nil && !validName(*name) || targetMs != nil && (*targetMs < 0 || *targetMs > maxTargetMs) {
+		return 0, auth.ErrBadRequest
 	}
 	// A nil argument is SQL null, and coalesce then keeps what the room has.
 	if _, err := tx.Exec("update room set name = coalesce(?, name), target_ms = coalesce(?, target_ms), ranked = coalesce(?, ranked) where id = ?",
@@ -447,7 +462,8 @@ func (s *Service) Pushed(account int64, won []sync.Cell) (matters bool) {
 func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 	now := s.now().UnixMilli()
 	m := &Message{Type: "room", ServerTime: now}
-	err := s.db.QueryRow("select public_id, name, code, target_ms, ranked from room where id = ?", room).Scan(&m.Room, &m.Name, &m.Code, &m.TargetMs, &m.Ranked)
+	err := s.db.QueryRow(`select r.public_id, r.name, r.code, coalesce(k.public_id, ''), r.target_ms, r.ranked
+		from room r left join account k on k.id = r.keeper where r.id = ?`, room).Scan(&m.Room, &m.Name, &m.Code, &m.Keeper, &m.TargetMs, &m.Ranked)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, nil
 	} else if err != nil {

@@ -256,7 +256,9 @@ func TestInvitationsOverHTTP(t *testing.T) {
 	w.pass(time.Second)
 	_, body = w.call(ravi, phone, "invites/create", nil)
 	second := shape.FindStringSubmatch(body)[1]
-	// The command line's invite is in the list like any other.
+	// The command line's invite is in the list like any other. A second later: two made in
+	// the same millisecond are listed by their codes, which are random.
+	w.pass(time.Second)
 	third, err := newInvite(w.dir, w.now)
 	if err != nil {
 		t.Fatal(err)

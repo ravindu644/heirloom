@@ -220,3 +220,37 @@ func TestEmptyServerHasNoOwnerYet(t *testing.T) {
 		t.Errorf("the first account could not be stored as the owner: %v", err)
 	}
 }
+
+// Rooms from before keepers: each is kept by the member who has been in it longest,
+// whoever that is now, and a room is never kept by somebody outside it.
+func TestRoomsFromBeforeKeepersAreKeptByTheirLongestMember(t *testing.T) {
+	dir := t.TempDir()
+	old, err := open(dsn(filepath.Join(dir, "heirloom.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := len(migrations) - 1
+	for _, m := range migrations[:before] {
+		if _, err := old.Exec(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Room 1 was made by ravi, who left: sachi has been in it longest now. Room 2 is mali's.
+	if _, err := old.Exec(fmt.Sprintf(`pragma user_version = %d;
+		insert into account (id, public_id, username, password, created) values (1, 'a-ravi', 'ravi', '', 0), (2, 'a-sachi', 'sachi', '', 0), (3, 'a-nimal', 'nimal', '', 0), (4, 'a-mali', 'mali', '', 0);
+		insert into room (id, public_id, name, code) values (1, 'r-1', 'One', 'AAAAAAAA'), (2, 'r-2', 'Two', 'BBBBBBBB');
+		insert into member (id, room, account) values (5, 1, 3), (3, 1, 2), (4, 2, 4), (9, 2, 2)`, before)); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	db, err := Open(dir)
+	if err != nil {
+		t.Fatalf("a version %d database does not open: %v", before, err)
+	}
+	defer db.Close()
+	var keepers string
+	if err := db.QueryRow("select group_concat(name || ' ' || keeper, ', ') from (select * from room order by id)").Scan(&keepers); err != nil || keepers != "One 2, Two 4" {
+		t.Errorf("keepers after the migration: %q, %v; want sachi for One and mali for Two", keepers, err)
+	}
+}

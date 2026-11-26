@@ -185,6 +185,7 @@ type msg struct {
 	Room     string
 	Name     string
 	Code     string
+	Keeper   string
 	TargetMs int64 `json:"target_ms"`
 	Ranked   bool
 	Gone     bool

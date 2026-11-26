@@ -185,6 +185,13 @@ create table resets (
 	expires integer not null,
 	used    integer -- when it set a password; null until then
 ) strict;
+`, `
+-- A room's keeper: the one member who may change its name, target and ranking, so a
+-- friend's slip of the thumb cannot rename the room for everyone. Null only for a room
+-- with nobody left in it, which ends in the same transaction. A room from before keepers
+-- is kept by the member who has been in it longest.
+alter table room add column keeper integer references account (id);
+update room set keeper = (select account from member where member.room = room.id order by member.id limit 1);
 `}
 
 func migrate(db *sql.DB) error {

@@ -234,7 +234,7 @@ func TestRoomCreateJoinLeave(t *testing.T) {
 
 	created := ravi.ask("create", map[string]any{"name": "Sachi and me"}).ok(t, "create")
 	m := ravi.room()
-	if m.Room != created.Room || m.Room == "" || m.Name != "Sachi and me" || m.TargetMs != 0 || m.Ranked || m.ServerTime != serverTime.UnixMilli() {
+	if m.Room != created.Room || m.Room == "" || m.Name != "Sachi and me" || m.Keeper != ravi.Account || m.TargetMs != 0 || m.Ranked || m.ServerTime != serverTime.UnixMilli() {
 		t.Errorf("the new room = %s", m.raw)
 	}
 	if !regexp.MustCompile(`^[A-HJ-NP-Z2-9]{8}$`).MatchString(m.Code) {
@@ -396,13 +396,31 @@ func TestRoomIsFullAtEightAndAnAccountAtFive(t *testing.T) {
 	ravi.ask("join", map[string]any{"code": sixth}).ok(t, "joining after leaving one")
 }
 
-func TestAnyMemberMayUpdateARoom(t *testing.T) {
+func TestOnlyTheKeeperUpdatesARoom(t *testing.T) {
 	w := start(t)
 	ravi, sachi, nimal := w.person("ravi", phone, 0), w.person("sachi", laptop, 0), w.person("nimal", tablet, 0)
 	room, _ := together(t, "Sachi and me", ravi, sachi)
 
-	// Not the one who made it, and only one field: the others stay.
-	if raw := sachi.ask("update", map[string]any{"room": room, "target_ms": 36000000}).ok(t, "update").raw; raw != "{}" {
+	// Sachi is in the room but did not make it. Who asks is judged before what is asked:
+	// a change that would be refused anyway is forbidden too, and none of it is stored.
+	for what, fields := range map[string]map[string]any{
+		"a new name":    {"room": room, "name": "Mine now"},
+		"a target":      {"room": room, "target_ms": 36000000},
+		"ranked":        {"room": room, "ranked": true},
+		"an empty name": {"room": room, "name": ""},
+	} {
+		sachi.ask("update", fields).refused(t, "sachi asking for "+what, 403, "forbidden")
+	}
+	ravi.still("only the keeper may change the room")
+	sachi.still("only the keeper may change the room")
+	var name string
+	var target, ranked int
+	if err := w.db.QueryRow("select name, target_ms, ranked from room").Scan(&name, &target, &ranked); err != nil || name != "Sachi and me" || target != 0 || ranked != 0 {
+		t.Errorf("after sachi's refused changes the room is %q, %d, %d, %v", name, target, ranked, err)
+	}
+
+	// The keeper, and only one field: the others stay.
+	if raw := ravi.ask("update", map[string]any{"room": room, "target_ms": 36000000}).ok(t, "update").raw; raw != "{}" {
 		t.Errorf("update answered %s, want {}", raw)
 	}
 	for _, p := range []*person{ravi, sachi} {
@@ -1123,7 +1141,7 @@ func TestNothingOfARoomIsLogged(t *testing.T) {
 	ravi.set(timerCell(running("work", "run-now", "t1", now, lapMs, 0)))
 	ravi.set(sessionCells("run-rang", "work", "rang", now-2*lapMs, ravi.id))
 	sachi.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": "run-rang"}).ok(t, "cheer")
-	sachi.ask("update", map[string]any{"room": room, "name": "Whispers, louder"}).ok(t, "update")
+	ravi.ask("update", map[string]any{"room": room, "name": "Whispers, louder"}).ok(t, "update")
 	nimal.ask("join", map[string]any{"code": "WRONG234"})
 	nimal.ask("cheer", map[string]any{"room": room, "to": ravi.Account, "run": "run-rang"})
 	nimal.ask("join", map[string]any{"code": code}).ok(t, "join")
@@ -1140,5 +1158,55 @@ func TestNothingOfARoomIsLogged(t *testing.T) {
 	}
 	if written.Len() != 0 {
 		t.Errorf("a run where nothing broke wrote to the log: %s", written.String())
+	}
+}
+
+// A keeper who leaves hands the room to whoever has been in it longest, and everyone left
+// hears it at once. The last one out ends the room as before.
+func TestKeeperWhoLeavesHandsTheRoomOn(t *testing.T) {
+	w := start(t)
+	ravi, sachi, nimal := w.person("ravi", phone, 0), w.person("sachi", laptop, 0), w.person("nimal", tablet, 0)
+	room, code := together(t, "Three of us", ravi, sachi, nimal)
+
+	ravi.ask("leave", map[string]any{"room": room}).ok(t, "the keeper leaves")
+	if gone := ravi.room(); !gone.Gone {
+		t.Errorf("ravi was sent %s, want gone", gone.raw)
+	}
+	for _, p := range []*person{sachi, nimal} {
+		if m := p.room(); m.Keeper != sachi.Account || names(m) == "" {
+			t.Errorf("%s sees %s, want sachi, the longest in the room, keeping it", p.Username, m.raw)
+		}
+	}
+	nimal.ask("update", map[string]any{"room": room, "name": "Nimal's"}).refused(t, "nimal is not the keeper", 403, "forbidden")
+	sachi.ask("update", map[string]any{"room": room, "name": "Two of us"}).ok(t, "the new keeper renames it")
+	if m := nimal.room(); m.Name != "Two of us" || m.Keeper != sachi.Account {
+		t.Errorf("nimal sees %s", m.raw)
+	}
+	sachi.settle()
+
+	// Ravi comes back with the code: he is the newest now, and keeps nothing.
+	ravi.ask("join", map[string]any{"code": code}).ok(t, "ravi joins again")
+	for _, p := range []*person{ravi, sachi, nimal} {
+		if m := p.room(); m.Keeper != sachi.Account {
+			t.Errorf("%s sees %s after ravi came back, want sachi still keeping it", p.Username, m.raw)
+		}
+	}
+	// A member who is not the keeper leaving changes no keeper.
+	nimal.ask("leave", map[string]any{"room": room}).ok(t, "nimal leaves")
+	if m := sachi.room(); m.Keeper != sachi.Account || names(m) != "sachi(you) ravi" {
+		t.Errorf("sachi sees %s", m.raw)
+	}
+	ravi.settle()
+	sachi.ask("leave", map[string]any{"room": room}).ok(t, "sachi leaves")
+	if m := ravi.room(); m.Keeper != ravi.Account {
+		t.Errorf("ravi, the last one in, sees %s, want himself keeping it", m.raw)
+	}
+	ravi.ask("leave", map[string]any{"room": room}).ok(t, "the last one leaves")
+	if gone := ravi.room(); !gone.Gone {
+		t.Errorf("the last one out was sent %s, want gone", gone.raw)
+	}
+	var left int
+	if err := w.db.QueryRow("select (select count(*) from room) + (select count(*) from member)").Scan(&left); err != nil || left != 0 {
+		t.Errorf("%d rows of the room are still stored, %v", left, err)
 	}
 }
