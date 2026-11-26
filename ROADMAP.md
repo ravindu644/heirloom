@@ -282,9 +282,9 @@ On the third build the user found no glitches; four things about how it reads an
 
 - [x] [lead] Three welcomes drawn as options; the user chose C2: the mark and name, seven weeks
       of days, "Your days stay yours.", one sentence, the button. DESIGN.md rewritten
-- [ ] [ui] The welcome as chosen, in the phone app and beside the browser's sign-in
-- [ ] [qa] The welcome's tests read the new screen
-- [ ] Gate
+- [x] [ui] The welcome as chosen, in the phone app and beside the browser's sign-in
+- [x] [qa] The welcome's tests read the new screen
+- [ ] Gate: built and checked (170 browser tests); waiting on the user's try on the phone
 
 ## 19. Release 1.0
 
