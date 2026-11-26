@@ -45,6 +45,8 @@ export type Fetch = (
   status: number;
   headers: { get(name: string): string | null };
   json(): Promise<any>;
+  /** Only read for a picture (`getBlob`); a fake that serves none may leave it out. */
+  blob?(): Promise<Blob>;
 }>;
 
 export interface Wire {
@@ -135,14 +137,21 @@ export const health = async (wire: Pick<Wire, 'fetch' | 'schedule'>, server: str
   // the fakes of other lanes compiling; they all read the body only on the paths they know.
   (await askJson(wire, server + '/healthz', { method: 'GET', headers: {} } as Parameters<Fetch>[1], HEALTH_MS)).data;
 
-async function askJson(wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, init: Parameters<Fetch>[1], ms: number) {
+/** `GET` of a file with these headers, in `ms` at most: the file, or null when the answer is not 200. Throws when nothing answered in time. */
+export const getBlob = async (wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, headers: Record<string, string>, ms: number): Promise<Blob | null> =>
+  (await ask(wire, url, { method: 'GET', headers } as Parameters<Fetch>[1], ms, async (res) => (res.ok && res.blob ? res.blob() : null))).data;
+
+const askJson = (wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, init: Parameters<Fetch>[1], ms: number) =>
+  ask(wire, url, init, ms, (res) => res.json().catch(() => null));
+
+async function ask<T>(wire: Pick<Wire, 'fetch' | 'schedule'>, url: string, init: Parameters<Fetch>[1], ms: number, read: (res: Awaited<ReturnType<Fetch>>) => Promise<T>) {
   // A browser's fetch must not be called as a method of another object.
-  const ask = wire.fetch;
+  const fetch = wire.fetch;
   const abort = new AbortController();
   let cancel = never;
   const answered = (async () => {
-    const res = await ask(url, { ...init, signal: abort.signal });
-    return { ok: res.ok, status: res.status, headers: res.headers, data: await res.json().catch(() => null) };
+    const res = await fetch(url, { ...init, signal: abort.signal });
+    return { ok: res.ok, status: res.status, headers: res.headers, data: await read(res) };
   })();
   // If the limit wins, whatever this request does later is nobody's business.
   answered.catch(() => {});

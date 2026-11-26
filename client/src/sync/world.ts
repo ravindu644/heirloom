@@ -76,7 +76,7 @@ export function world() {
         }
         if (answer === 'unreachable') throw new TypeError('fetch failed');
         const { status, body: reply, retryAfter } = answer;
-        return { ok: status === 200, status, headers: { get: () => retryAfter ?? null }, json: async () => reply };
+        return { ok: status === 200, status, headers: { get: () => retryAfter ?? null }, json: async () => reply, blob: async () => new Blob([JSON.stringify(reply)]) };
       },
       openStore: logged,
       utcOffsetMin: () => zone.min,
@@ -127,7 +127,7 @@ export function world() {
         return (habits ??= createHabits(engine, { utcOffsetMin: () => OFFSET, id: () => `id-${++ids}`, schedule: time.schedule }));
       },
       get rooms() {
-        return (rooms ??= createRooms(engine, { utcOffsetMin: () => OFFSET, schedule: time.schedule }));
+        return (rooms ??= createRooms(engine, { utcOffsetMin: () => OFFSET, schedule: time.schedule, together: focus.together, task: () => d.today.next.peek()?.id ?? null }));
       },
       get settings() {
         return (settings ??= createSettings(engine, { utcOffsetMin: () => OFFSET }));

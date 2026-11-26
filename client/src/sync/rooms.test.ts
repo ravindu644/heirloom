@@ -23,6 +23,8 @@ const room = (id: string, members: object[], over: object = {}) => ({
 // The server tells the device about a room.
 const say = (d: Device, msg: ReturnType<typeof room> | { type: 'room'; room: string; gone: true }) => d.wire().handlers.message(msg);
 const lastLap = (cheers: string[] = []) => ({ run: 'run-7f3a', ended: T0 - 5 * MIN, cheers });
+// A member's lane by id: the list is in the live order, not the order they joined.
+const lane = (r: Pick<Device['rooms'], 'list'>, id: string) => r.list.value[0]!.members.find((m) => m.id === id)!;
 const cheers = (w: World) => w.server.requests.filter((request) => request.path === '/api/rooms/cheer');
 
 async function one() {
@@ -41,18 +43,21 @@ describe('the list', () => {
     ], { target_ms: 600 * MIN }));
     assert.deepEqual(r.list.value, [{
       id: 'r_1', name: 'Sachi and me', code: 'K7QW3RXM', target_ms: 600 * MIN, week_ms: 660 * MIN, ranked: false, keeper: null, youKeep: true,
+      // Sachi is on a lap: she comes first.
       members: [
-        { id: ME, name: 'ravi', you: true, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, last: null },
-        { id: SACHI, name: 'sachi', you: false, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN,
+        { id: SACHI, name: 'sachi', you: false, picture: null, away: false, phase: 'work', lap: 2, ends_at: T0 + 10 * MIN, paused: false, task: 'Thinking in React', today_ms: 75 * MIN, today_laps: 3, week_ms: 360 * MIN, laps: [], runStart: null,
           // Nimal cheered and is not in this room: counted in `cheers`, and not among the names.
           last: { run: 'run-7f3a', ended: T0 - 5 * MIN, cheers: [NIMAL], cheered: false, cheerers: [] } },
+        { id: ME, name: 'ravi', you: true, picture: null, away: false, phase: 'idle', lap: 1, ends_at: null, paused: false, task: null, today_ms: 50 * MIN, today_laps: 2, week_ms: 300 * MIN, laps: [], runStart: null, last: null },
       ],
+      // An older server: no week by day, no streak, no call, no notes.
+      week: null, streak: null, call: null, notes: [], newNotes: 0,
     }]);
     // She pauses; the room is renamed.
     say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { phase: 'work', set_index: 1, paused: true })], { name: 'The C book club' }));
     assert.equal(r.list.value.length, 1);
     assert.equal(r.list.value[0]!.name, 'The C book club');
-    assert.deepEqual([r.list.value[0]!.members[1]!.phase, r.list.value[0]!.members[1]!.paused, r.list.value[0]!.members[1]!.ends_at], ['work', true, null]);
+    assert.deepEqual([lane(r, SACHI).phase, lane(r, SACHI).paused, lane(r, SACHI).ends_at], ['work', true, null]);
   });
 
   it('your own lane counts your lap in progress as far as it has run, as Today does, and moves on the minute with nobody sending', async () => {
@@ -61,7 +66,7 @@ describe('the list', () => {
     say(d, room('r_1', [member(ME, 'ravi', { today_ms: 75 * MIN, today_laps: 3, week_ms: 425 * MIN }), member(SACHI, 'sachi', { today_ms: 50 * MIN, week_ms: 100 * MIN })]));
     d.focus.start();
     w.time.advance(11 * MIN);
-    const mine = () => r.list.value[0]!.members[0]!;
+    const mine = () => lane(r, ME);
     // 1h 26m and 7h 16m, as Today and Progress say at the same moment.
     assert.deepEqual([mine().today_ms, mine().today_laps, mine().week_ms], [86 * MIN, 3, 436 * MIN]);
     assert.equal(mine().today_ms, d.focus.race().you_ms + 75 * MIN);
@@ -80,14 +85,14 @@ describe('the list', () => {
     w.time.advance(MIN);
     assert.deepEqual(shown(), [88, 438]);
     // A friend's lap in progress is not in their figure: the message does not say how far it has run.
-    assert.equal(r.list.value[0]!.members[1]!.today_ms, 50 * MIN);
+    assert.equal(lane(r, SACHI).today_ms, 50 * MIN);
   });
 
   it('a friend\'s lap in progress is in their figures from `run`, on since `server_time` while it counts; paused it stands; without it, the rows alone', async () => {
     const { w, d, r } = await one();
     const run = { ms: 14 * MIN, today: true, week: true };
     const sachi = (over: object) => member(SACHI, 'sachi', { phase: 'work', ends_at: T0 + 11 * MIN, today_ms: 50 * MIN, today_laps: 2, week_ms: 100 * MIN, run, ...over });
-    const figures = () => r.list.value[0]!.members.map((m) => [m.today_ms, m.week_ms]);
+    const figures = () => [ME, SACHI].map((id) => [lane(r, id).today_ms, lane(r, id).week_ms]);
     say(d, room('r_1', [member(ME, 'ravi', { week_ms: 10 * MIN, run: { ms: 99 * MIN, today: true, week: true } }), sachi({})]));
     // You are counted from this device's own timer, never from `run`.
     assert.deepEqual(figures(), [[0, 10 * MIN], [64 * MIN, 114 * MIN]]);
@@ -119,7 +124,7 @@ describe('the list', () => {
     let changes = 0;
     const stop = r.list.subscribe(() => changes++);
     w.time.advance(10 * MIN);
-    const sachi = r.list.value[0]!.members[1]!;
+    const sachi = lane(r, SACHI);
     assert.deepEqual([sachi.phase, sachi.today_ms, sachi.week_ms], ['idle', 75 * MIN, 125 * MIN], '+25 to the bell, not +30');
     // Once on subscribing, then at each of the five minutes up to the bell, the bell being the fifth: none after it.
     assert.equal(changes, 6);
@@ -151,15 +156,28 @@ describe('the list', () => {
     assert.deepEqual(r.list.value.map((v) => v.id), ['r_2']);
   });
 
-  it('members stay in the order they joined, side by side, unless the room is ranked: then by their week, most first', async () => {
-    const { d, r } = await one();
-    const three = [member(ME, 'ravi', { week_ms: 100 }), member(SACHI, 'sachi', { week_ms: 300 }), member(NIMAL, 'nimal', { week_ms: 100 })];
-    say(d, room('r_1', three));
-    assert.deepEqual(r.list.value[0]!.members.map((m) => m.name), ['ravi', 'sachi', 'nimal']);
-    say(d, room('r_1', three, { ranked: true }));
-    assert.equal(r.list.value[0]!.ranked, true);
-    assert.deepEqual(r.list.value[0]!.members.map((m) => m.name), ['sachi', 'ravi', 'nimal'], 'level on the week: the order they joined');
-    assert.equal(r.list.value[0]!.week_ms, 500);
+  it('the live order: on a lap, on a break, the rest, each by the week with the order they joined on a tie; ranked, by the week alone', async () => {
+    const { w, d, r } = await one();
+    const LINA = 'a_lina';
+    const AMAYA = 'a_amaya';
+    const five = [
+      member(ME, 'ravi', { week_ms: 100 }),
+      member(SACHI, 'sachi', { week_ms: 300 }),
+      member(NIMAL, 'nimal', { phase: 'short', ends_at: T0 + 5 * MIN, week_ms: 50 }),
+      member(LINA, 'lina', { phase: 'work', paused: true, week_ms: 20 }),
+      member(AMAYA, 'amaya', { phase: 'work', ends_at: T0 + 20 * MIN, week_ms: 20 }),
+    ];
+    const names = () => r.list.value[0]!.members.map((m) => m.name);
+    say(d, room('r_1', five));
+    // Lina and Amaya are on laps (a paused lap is a lap), level on the week: the order they joined.
+    assert.deepEqual(names(), ['lina', 'amaya', 'nimal', 'sachi', 'ravi']);
+    say(d, room('r_1', five, { ranked: true }));
+    assert.deepEqual(names(), ['sachi', 'ravi', 'nimal', 'lina', 'amaya']);
+    assert.equal(r.list.value[0]!.week_ms, 490);
+    // Unranked again: Nimal's break rings, and he is with the rest, by his week.
+    say(d, room('r_1', five));
+    w.time.advance(5 * MIN);
+    assert.deepEqual(names(), ['lina', 'amaya', 'sachi', 'ravi', 'nimal']);
   });
 
   it('a member\'s phase turns idle at `ends_at` with no new message: their bell went, and the server\'s word will follow', async () => {
@@ -171,14 +189,14 @@ describe('the list', () => {
     ]));
     let changes = 0;
     const stop = r.list.subscribe(() => changes++);
-    const phases = () => r.list.value[0]!.members.map((m) => [m.phase, m.ends_at, m.task]);
+    const phases = () => [ME, SACHI, NIMAL].map((id) => lane(r, id)).map((m) => [m.phase, m.ends_at, m.task]);
     w.time.advance(3 * MIN - 1);
     assert.deepEqual(phases(), [['idle', null, null], ['work', T0 + 10 * MIN, 'Hooks'], ['short', T0 + 3 * MIN, null]]);
     w.time.advance(1);
     assert.deepEqual(phases(), [['idle', null, null], ['work', T0 + 10 * MIN, 'Hooks'], ['idle', null, null]]);
     w.time.advance(7 * MIN);
     assert.deepEqual(phases(), [['idle', null, null], ['idle', null, null], ['idle', null, null]]);
-    assert.equal(r.list.value[0]!.members[1]!.lap, 3, 'the lap of the set they are between');
+    assert.equal(lane(r, SACHI).lap, 3, 'the lap of the set they are between');
     assert.equal(changes, 3, 'the signal itself changed at each bell');
     stop();
     assert.equal(w.time.waiting(), 0, 'and no wait is left when nobody is running');
@@ -187,7 +205,7 @@ describe('the list', () => {
   it('someone who has hidden rooms is away: no phase, no task, no last lap, and their week still counts', async () => {
     const { d, r } = await one();
     say(d, room('r_1', [member(ME, 'ravi', { week_ms: 100 }), member(SACHI, 'sachi', { away: true, phase: 'work', ends_at: T0 + MIN, task: 'leaked', last: lastLap(), week_ms: 400 })]));
-    const sachi = r.list.value[0]!.members[1]!;
+    const sachi = lane(r, SACHI);
     assert.deepEqual([sachi.away, sachi.phase, sachi.ends_at, sachi.task, sachi.last], [true, 'idle', null, null, null]);
     assert.equal(r.list.value[0]!.week_ms, 500);
   });
@@ -212,7 +230,7 @@ describe('the list', () => {
     assert.deepEqual(again.rooms.list.value, before);
     // Half an hour offline: her lap must have rung by now.
     w.time.advance(30 * MIN);
-    assert.equal(again.rooms.list.value[0]!.members[1]!.phase, 'idle');
+    assert.equal(lane(again.rooms, SACHI).phase, 'idle');
     await again.connect();
     assert.equal(again.rooms.stale.value, false);
   });
@@ -334,7 +352,7 @@ describe('room requests', () => {
 
 describe('cheering', () => {
   const withSachi = (d: Device, over: object = {}) => say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { last: lastLap(), ...over })]));
-  const sachi = (d: Device) => d.rooms.list.value[0]!.members[1]!;
+  const sachi = (d: Device) => lane(d.rooms, SACHI);
 
   it('online: shown at once, sent now, and still shown when the server\'s own message says it', async () => {
     const { w, d, r } = await one();
@@ -466,7 +484,7 @@ describe('cheering', () => {
     r.cheer('r_nowhere', SACHI);
     // Your own lap is not yours to cheer: not shown as cheered, not queued, not sent.
     r.cheer('r_1', ME);
-    assert.equal(r.list.value[0]!.members[0]!.last?.cheered, false);
+    assert.equal(lane(r, ME).last?.cheered, false);
     assert.equal(d.engine.kept('cheers'), undefined);
     await settle();
     assert.deepEqual(cheers(w), []);
@@ -485,7 +503,7 @@ describe('who cheered', () => {
   it('each lap says who cheered it by name, in the order they cheered, for every screen to say it the same way', async () => {
     const { d, r } = await one();
     say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { last: lastLap([NIMAL, 'a_left_the_room']) }), member(NIMAL, 'nimal')]));
-    const last = () => r.list.value[0]!.members[1]!.last!;
+    const last = () => lane(r, SACHI).last!;
     assert.deepEqual(last().cheerers, [{ id: NIMAL, name: 'nimal' }]);
     assert.deepEqual(last().cheers, [NIMAL, 'a_left_the_room'], 'the ids are all still there');
     r.cheer('r_1', SACHI);
@@ -541,6 +559,271 @@ describe('the offset the server is told', () => {
     // Told. The next pong does not ask for another hello.
     d.wire().handlers.time(0);
     assert.equal(d.wire().agains, 1);
+  });
+});
+
+describe('the week, the streak and the call, as the room says them', () => {
+  it('the week day by day to today, last week whole, ahead of last week at this time, and your part', async () => {
+    const { d, r } = await one();
+    // Tuesday. Monday 60 minutes, today 30 so far; last week 30 a day, 45 by this time.
+    say(d, room('r_1', [member(ME, 'ravi', { week_ms: 50 * MIN }), member(SACHI, 'sachi', { week_ms: 40 * MIN })], {
+      days: [60, 30, 0, 0, 0, 0, 0].map((m) => m * MIN), last_days: Array(7).fill(30 * MIN), last_at_ms: 45 * MIN,
+      streak: { run: 3, marks: ['none', 'kept', 'rest', 'napped', 'open'] },
+    }));
+    assert.deepEqual(r.list.value[0]!.week, {
+      days: [60 * MIN, 90 * MIN, null, null, null, null, null],
+      last: [30, 60, 90, 120, 150, 180, 210].map((m) => m * MIN),
+      ahead_ms: 45 * MIN,
+      you_ms: 50 * MIN,
+    });
+    assert.deepEqual(r.list.value[0]!.streak, { run: 3, marks: ['none', 'kept', 'rest', 'open'] }, 'a day before anything was kept keeps its place; a mark this build does not know is left out');
+  });
+
+  it('the call: who called, when, who is in, and whether you are; the calls you are in for the phone', async () => {
+    const { d, r } = await one();
+    const call = { id: 'c1', by: SACHI, at: T0 + 5 * MIN, in: [SACHI] };
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call }));
+    assert.deepEqual(r.list.value[0]!.call, { id: 'c1', by: { id: SACHI, name: 'sachi' }, at: T0 + 5 * MIN, in: [{ id: SACHI, name: 'sachi' }], you: false, yours: false });
+    assert.deepEqual(r.calledIn.value, []);
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call: { ...call, in: [SACHI, ME] } }));
+    assert.equal(r.list.value[0]!.call!.you, true);
+    assert.deepEqual(r.calledIn.value, [{ room: 'r_1', name: 'Sachi and me', call: 'c1', at: T0 + 5 * MIN, by: 'sachi' }]);
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call: null }));
+    assert.deepEqual([r.list.value[0]!.call, r.calledIn.value], [null, []]);
+  });
+
+  it('saying you are in once the call has begun is answered `call`: the call is gone from the room at once', async () => {
+    const { w, d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call: { id: 'c1', by: SACHI, at: T0 + MIN, in: [SACHI] } }));
+    w.time.advance(MIN);
+    w.server.reply = () => ({ status: 404, body: { error: 'call' } });
+    assert.deepEqual(await r.setIn('r_1', 'c1', true), { ok: false, error: 'call' });
+    const call = () => r.list.value[0]!.call;
+    assert.equal(call(), null);
+    // Any other failure leaves the call as it was.
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call: { id: 'c2', by: SACHI, at: T0 + 5 * MIN, in: [SACHI] } }));
+    w.server.reply = () => ({ status: 404, body: { error: 'room' } });
+    await r.setIn('r_1', 'c2', true);
+    assert.equal(call()?.id, 'c2');
+  });
+
+  it('call, in, remove, a note and a picture are the requests the protocol names', async () => {
+    const { w, d, r } = await one();
+    w.server.reply = (path) => ({ status: 200, body: path === '/api/rooms/call' ? { call: 'c1' } : {} });
+    assert.deepEqual(await r.callLap('r_1', T0 + 10 * MIN), { ok: true });
+    await r.callLap('r_1', null);
+    await r.setIn('r_1', 'c1', true);
+    await r.remove('r_1', SACHI);
+    await r.addNote('r_1', '  back at 4  ');
+    await r.setPicture(new Uint8Array([1, 2, 3]));
+    await r.setPicture(null);
+    const sent = w.server.requests.map(({ path, body }) => [path, Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'token' && key !== 'device'))]);
+    assert.deepEqual(sent, [
+      ['/api/rooms/call', { room: 'r_1', at: T0 + 10 * MIN }],
+      ['/api/rooms/call', { room: 'r_1', at: null }],
+      ['/api/rooms/in', { room: 'r_1', call: 'c1', in: true }],
+      ['/api/rooms/remove', { room: 'r_1', member: SACHI }],
+      ['/api/rooms/note', { room: 'r_1', text: 'back at 4' }],
+      ['/api/me/picture', { picture: 'AQID' }],
+      ['/api/me/picture', { picture: null }],
+    ]);
+    void d;
+  });
+});
+
+describe('lanes', () => {
+  it('a friend\'s laps of today as the room says them, and the lap they are on from where it began; nothing for someone away', async () => {
+    const { w, d, r } = await one();
+    const laps = [[T0 - 3 * 60 * MIN, T0 - 155 * MIN], [T0 - 60 * MIN, T0 - 35 * MIN]];
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { phase: 'work', ends_at: T0 + 11 * MIN, laps, run: { ms: 14 * MIN, today: true, week: true } }), member(NIMAL, 'nimal', { away: true, laps })]));
+    w.time.advance(MIN);
+    assert.deepEqual([lane(r, SACHI).laps, lane(r, SACHI).runStart], [laps, T0 - 14 * MIN]);
+    assert.deepEqual([lane(r, NIMAL).laps, lane(r, NIMAL).runStart], [[], null]);
+    // An older server sends no laps: an empty lane.
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')]));
+    assert.deepEqual([lane(r, SACHI).laps, lane(r, SACHI).runStart], [[], null]);
+  });
+
+  it('your own lane is from your own rows and timer, whatever the message says: the lap you are on, then a lap once it ends', async () => {
+    const { w, d, r } = await one();
+    say(d, room('r_1', [member(ME, 'ravi', { laps: [[1, 2]], run: { ms: 99, today: true, week: true } })]));
+    assert.deepEqual([lane(r, ME).laps, lane(r, ME).runStart], [[], null]);
+    d.focus.start();
+    w.time.advance(10 * MIN);
+    assert.deepEqual([lane(r, ME).laps, lane(r, ME).runStart], [[], T0]);
+    w.time.advance(15 * MIN);
+    // The bell: a lap of today, and nothing running.
+    assert.deepEqual([lane(r, ME).laps, lane(r, ME).runStart], [[[T0, T0 + 25 * MIN]], null]);
+  });
+});
+
+describe('start together', () => {
+  // Rooms is made first: a device's rooms hear only what comes after them.
+  const called = (d: Device, at: number, inIt = [SACHI, ME]) => {
+    void d.rooms.list.value;
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { call: { id: 'c1', by: SACHI, at, in: inIt } }));
+  };
+
+  it('at the minute, an idle timer starts a lap with the call\'s run id, begun at that minute, on the task Focus would start', async () => {
+    const { w, d } = await one();
+    const task = d.today.add('pointers')!;
+    called(d, T0 + 2 * MIN);
+    void d.rooms.list.value;
+    w.time.advance(2 * MIN - 1);
+    assert.equal(d.focus.state.value.phase, 'idle');
+    w.time.advance(1);
+    const s = d.focus.state.value;
+    assert.deepEqual([s.phase, s.run, s.started, s.task], ['work', 'call-c1', T0 + 2 * MIN, task]);
+  });
+
+  it('a timer on a lap or a break is left alone; so is one whose account is not in', async () => {
+    const { w, d } = await one();
+    d.focus.start();
+    called(d, T0 + 2 * MIN);
+    void d.rooms.list.value;
+    w.time.advance(2 * MIN);
+    assert.equal(d.focus.state.value.run, 'run-1');
+    const other = await one();
+    called(other.d, T0 + 2 * MIN, [SACHI]);
+    void other.d.rooms.list.value;
+    other.w.time.advance(2 * MIN);
+    assert.equal(other.d.focus.state.value.phase, 'idle');
+  });
+
+  it('two devices of one account both start it: one lap, one row', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    for (const d of [a, b]) {
+      called(d, T0 + 2 * MIN);
+      void d.rooms.list.value;
+    }
+    w.time.advance(2 * MIN);
+    w.exchange(a, b);
+    assert.deepEqual([a.focus.state.value.run, b.focus.state.value.run], ['call-c1', 'call-c1']);
+    w.time.advance(25 * MIN);
+    w.exchange(a, b);
+    for (const d of [a, b]) assert.deepEqual([d.sessions(), d.engine.rows('session').value.get('call-c1')?.outcome], [['call-c1'], 'rang']);
+  });
+
+  it('never before the last run here ended: a bell or a stop just after the call\'s minute, and the called lap begins there, so no minute counts twice', async () => {
+    // A lap whose bell went 30 s after the call's minute, and the device heard of the call 40 s after it.
+    const { w, d } = await one();
+    w.time.advance(30000);
+    d.focus.start();
+    void d.rooms.list.value;
+    w.time.advance(25 * MIN + 10000);
+    called(d, T0 + 25 * MIN);
+    assert.deepEqual([d.focus.state.value.run, d.focus.state.value.started], ['call-c1', T0 + 25 * MIN + 30000]);
+    // A lap stopped 20 s after the call's minute.
+    const other = await one();
+    other.d.focus.start();
+    other.w.time.advance(2 * MIN + 20000);
+    other.d.focus.stop();
+    other.w.time.advance(20000);
+    called(other.d, T0 + 2 * MIN);
+    assert.deepEqual([other.d.focus.state.value.run, other.d.focus.state.value.started], ['call-c1', T0 + 2 * MIN + 20000]);
+  });
+
+  it('only from what the server has said on this connection: offline, or connected before the room is sent again, a kept call starts nothing', async () => {
+    const { w, d } = await one();
+    called(d, T0 + 2 * MIN);
+    await d.engine.saved();
+    const again = await w.restart(d, { online: false });
+    void again.rooms.list.value;
+    assert.equal(again.rooms.list.value[0]!.call?.id, 'c1', 'the kept call is still shown');
+    w.time.advance(2 * MIN);
+    assert.equal(again.focus.state.value.phase, 'idle', 'offline: it may have been taken back');
+    await again.connect();
+    assert.equal(again.focus.state.value.phase, 'idle', 'connected, and the room not said again yet');
+    called(again, T0 + 2 * MIN);
+    assert.equal(again.focus.state.value.run, 'call-c1', 'the server says the call is still open');
+  });
+
+  it('once per device: stopped in its first minute and the app opened again, it does not start again; opened after the minute, nothing starts', async () => {
+    const { w, d } = await one();
+    called(d, T0 + 2 * MIN);
+    void d.rooms.list.value;
+    w.time.advance(2 * MIN);
+    d.focus.stop();
+    await d.engine.saved();
+    const again = await w.restart(d);
+    called(again, T0 + 2 * MIN);
+    void again.rooms.list.value;
+    assert.equal(again.focus.state.value.phase, 'idle');
+    const late = await one();
+    late.w.time.advance(3 * MIN);
+    called(late.d, T0 + 2 * MIN);
+    void late.d.rooms.list.value;
+    assert.equal(late.d.focus.state.value.phase, 'idle');
+  });
+});
+
+describe('notes', () => {
+  const NOTES = '/api/rooms/notes';
+  const note = (id: string, from: string | null, at: number, text = 'hello') => ({ id, from, at, text });
+
+  it('fetched when the room has a newer one; new are those from others since Notes was last open off a lap, and a lap keeps them new', async () => {
+    const { w, d, r } = await one();
+    let held = [note('n1', SACHI, T0 - MIN)];
+    w.server.reply = (path) => ({ status: 200, body: path === NOTES ? { notes: held } : {} });
+    const since = (id: string) => say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi', { picture: 'ab'.repeat(32) })], { notes_since: id }));
+    since('n1');
+    await settle();
+    assert.deepEqual(r.list.value[0]!.notes, [{ id: 'n1', from: SACHI, name: 'sachi', picture: 'ab'.repeat(32), you: false, at: T0 - MIN, text: 'hello' }]);
+    assert.equal(r.list.value[0]!.newNotes, 1);
+    // On a lap, opening Notes reads nothing: they fold away.
+    d.focus.start();
+    r.markNotesRead('r_1');
+    held = [note('n2', SACHI, T0 + MIN), ...held];
+    w.time.advance(MIN);
+    since('n2');
+    await settle();
+    assert.equal(r.list.value[0]!.newNotes, 2);
+    // The lap ends; Notes is open: none new. Your own line is never new to you, and one from someone who left has no name.
+    w.time.advance(MIN);
+    d.focus.stop();
+    r.markNotesRead('r_1');
+    assert.equal(r.list.value[0]!.newNotes, 0);
+    held = [note('n4', null, T0 + 4 * MIN), note('n3', ME, T0 + 3 * MIN), ...held];
+    since('n4');
+    await settle();
+    assert.deepEqual(r.list.value[0]!.notes.slice(0, 2).map((n) => [n.name, n.you]), [[null, false], ['ravi', true]]);
+    assert.equal(r.list.value[0]!.newNotes, 1);
+    assert.equal(w.server.requests.filter((q) => q.path === NOTES).length, 3, 'one fetch for each newer note, none for the same');
+    // Read survives a restart.
+    r.markNotesRead('r_1');
+    await d.engine.saved();
+    const again = await w.restart(d);
+    say(again, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { notes_since: 'n4' }));
+    await settle();
+    assert.equal(again.rooms.list.value[0]!.newNotes, 0);
+  });
+});
+
+describe('pictures', () => {
+  it('fetched once with the token and kept by hash as a URL; one that cannot be had is asked for again next time', async () => {
+    const { w, r } = await one();
+    const hash = 'cd'.repeat(32);
+    const gets = () => w.server.requests.filter((q) => q.path === `/api/pictures/${hash}`).length;
+    w.server.reply = () => ({ status: 404, body: {} });
+    assert.equal(await r.picture(hash), null);
+    w.server.reply = null;
+    const url = await r.picture(hash);
+    assert.match(url ?? '', /^blob:/);
+    assert.equal(await r.picture(hash), url);
+    assert.equal(gets(), 2);
+    assert.equal(await r.picture('not a hash'), null);
+  });
+
+  it('another account signing in starts with none: each picture is asked for again, under its token', async () => {
+    const { w, d, r } = await one();
+    const hash = 'ef'.repeat(32);
+    await r.picture(hash);
+    await d.engine.signIn('sam', 'another horse');
+    await r.picture(hash);
+    const gets = w.server.requests.filter((q) => q.path === `/api/pictures/${hash}`);
+    assert.equal(gets.length, 2);
   });
 });
 

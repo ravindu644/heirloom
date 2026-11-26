@@ -6,14 +6,18 @@
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { mondayOf } from '../core/progress.ts';
+import { weekday } from '../core/streak.ts';
 import { view } from '../core/timer.ts';
 import { createCounts } from './counts.ts';
 import type { Engine, RoomMessage } from './engine.ts';
+import type { Together } from './focus.ts';
 
 export interface MemberView {
   id: string;
   name: string;
   you: boolean;
+  /** The hash of their picture, for `Rooms.picture`, or null: then the initial of their name. */
+  picture: string | null;
   /** They have hidden rooms: no phase, no task, no last lap; their totals still count. */
   away: boolean;
   phase: 'idle' | 'work' | 'short' | 'long';
@@ -28,6 +32,10 @@ export interface MemberView {
   today_ms: number;
   today_laps: number;
   week_ms: number;
+  /** Their laps of today that have ended, `[started, ended]` in server ms, oldest first: for their lane. Empty from an older server and for someone away. */
+  laps: [number, number][];
+  /** When the lap they are on began, in server ms, so the lane fills it from there to now; null with none. Paused time is not in it. */
+  runStart: number | null;
   /** Their latest lap that rang today, who cheered it, and whether you have. */
   last: {
     run: string;
@@ -48,7 +56,10 @@ export interface RoomView {
   target_ms: number;
   /** The sum of the members' weeks. */
   week_ms: number;
-  /** When true the members are listed by their week, most first; otherwise in the order they joined. */
+  /**
+   * When true the members are listed by their week, most first. Otherwise in the live order: on
+   * a lap, then on a break, then the rest, each by their week, most first; joining order on a tie.
+   */
   ranked: boolean;
   /**
    * The name of the member who keeps the room: only they may change its name, target and
@@ -58,6 +69,70 @@ export interface RoomView {
   /** You may change the room's name, target and ranking: you keep it, or the server names no keeper. */
   youKeep: boolean;
   members: MemberView[];
+  /** For the Week tab. Null from a server that does not send the room's days. */
+  week: RoomWeek | null;
+  /**
+   * The room's streak as the server said it, or null from a server that does not send it. A
+   * `none` day is before the room was made or before anything was kept: no dot, its place kept.
+   */
+  streak: { run: number; marks: ('kept' | 'rest' | 'miss' | 'open' | 'none')[] } | null;
+  /** The open call, or null. */
+  call: CallView | null;
+  /** The last seven days of notes, newest first. Fetched when the room says there is a newer one. */
+  notes: NoteView[];
+  /** Notes from others written since Notes was last open while you were not on a lap. */
+  newNotes: number;
+}
+
+export interface RoomWeek {
+  /** The room's week so far, added up day by day, Monday first: today is `RoomView.week_ms`, laps in progress in it; days to come are null. */
+  days: (number | null)[];
+  /** Last week the same way, all seven days. */
+  last: number[];
+  /** The room's week less last week's as far as the same weekday and time: "4h ahead" when positive. Null when the server did not say. */
+  ahead_ms: number | null;
+  /** Your part of the room's week: your own `week_ms`. */
+  you_ms: number;
+}
+
+export interface CallView {
+  id: string;
+  /** Who called it. */
+  by: { id: string; name: string };
+  /** When the lap starts, in server ms: compare with the engine's `now()`. */
+  at: number;
+  /** Who is in, the caller first. */
+  in: { id: string; name: string }[];
+  /** You are in. */
+  you: boolean;
+  /** You called it: taking it back is `callLap(room, null)`. */
+  yours: boolean;
+}
+
+export interface NoteView {
+  id: string;
+  /** The writer's id, or null for someone who has left. */
+  from: string | null;
+  /** The writer's name, or null for someone who has left ("Someone who left"). */
+  name: string | null;
+  /** Their picture's hash, or null. */
+  picture: string | null;
+  you: boolean;
+  /** Server ms. */
+  at: number;
+  text: string;
+}
+
+/** A called lap you are in, for the phone's notification at its start (`Notifier`, android lane). */
+export interface CalledLap {
+  room: string;
+  /** The room's name. */
+  name: string;
+  call: string;
+  /** Server ms. */
+  at: number;
+  /** Who called it, by name. */
+  by: string;
 }
 
 /** `error` is a code from protocol sections 10 and 15, or `offline`. With `slow_down`, `retry_after` is the seconds to wait when the server said. */
@@ -82,6 +157,26 @@ export interface Rooms {
   update(room: string, fields: { name?: string; target_ms?: number; ranked?: boolean }): Promise<RoomResult>;
   /** Cheers a member's latest lap. Shown at once; sent now, or kept and sent when there is a connection again. */
   cheer(room: string, member: string): void;
+  /** The keeper's only: the member is out, and the room gets a new code. */
+  remove(room: string, member: string): Promise<RoomResult>;
+  /** Calls a lap for `at` (server ms, a whole minute 1 to 30 minutes ahead), or with null takes your own call back. */
+  callLap(room: string, at: number | null): Promise<RoomResult>;
+  /**
+   * Says you are in a call, or takes it back, until it starts. Not for the caller, who is in and
+   * takes it back with `callLap(room, null)`. Answered `call` when the call has started or ended:
+   * the call is gone from the room at once, and there is nothing to say.
+   */
+  setIn(room: string, call: string, isIn: boolean): Promise<RoomResult>;
+  /** One line for the room: 1 to 200 characters, no line break. */
+  addNote(room: string, text: string): Promise<RoomResult>;
+  /** Notes has been opened: what is there now is not new any more. Nothing while you are on a lap, where Notes does not show them. */
+  markNotesRead(room: string): void;
+  /** Every open call you are in, soonest first: for the phone's notification at its start. */
+  readonly calledIn: ReadonlySignal<CalledLap[]>;
+  /** Your picture: the bytes of a square 96 by 96 WebP or JPEG of at most 12000 bytes, made by the screen, or null to take it off. */
+  setPicture(picture: Uint8Array | null): Promise<RoomResult>;
+  /** A member's picture as a URL an `img` can show, or null when it cannot be had now. Kept by hash for as long as the app runs. */
+  picture(hash: string): Promise<string | null>;
   setHidden(hidden: boolean): void;
   setShareTask(share: boolean): void;
 }
@@ -91,6 +186,10 @@ export interface RoomsEnv {
   utcOffsetMin?(): number;
   /** Runs `run` once after `ms`. Returns a function that cancels it. */
   schedule(run: () => void, ms: number): () => void;
+  /** Starts a called lap: `createFocus(...).together`. Left out, a called lap starts nothing here. */
+  together?: Together;
+  /** The task a lap started now would be for, as Focus would start it. */
+  task?(): string | null;
 }
 
 type RoomNow = Extract<RoomMessage, { type: 'room' }>;
@@ -108,6 +207,23 @@ const PHASES = ['idle', 'work', 'short', 'long'] as const;
 const keyOf = (cheer: Cheer) => `${cheer.room}/${cheer.to}/${cheer.run}`;
 const text = (v: unknown, or = '') => (typeof v === 'string' ? v : or);
 const amount = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : 0);
+const seven = (v: unknown): number[] | null => (Array.isArray(v) && v.length === 7 ? v.map(amount) : null);
+const MARKS = ['kept', 'rest', 'miss', 'open', 'none'] as const;
+// On a lap first, then on a break, then the rest.
+const GROUP = { work: 0, short: 1, long: 1, idle: 2 } as const;
+// The calls this device has started, or tried to: kept, so a lap stopped in its first minute is not started again after a restart.
+const TRIED_KEPT = 20;
+
+interface Note {
+  id: string;
+  from: string | null;
+  at: number;
+  text: string;
+}
+const asNotes = (v: unknown): Note[] =>
+  (Array.isArray(v) ? v : []).flatMap((n) =>
+    n && typeof n.id === 'string' && typeof n.at === 'number' && typeof n.text === 'string' ? [{ id: n.id, from: typeof n.from === 'string' ? n.from : null, at: n.at, text: n.text }] : [],
+  );
 
 /**
  * `env.schedule` is how a member turns idle when their bell goes with no new message.
@@ -121,6 +237,16 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   // Cheers this run of the app has sent and had accepted, so they stay shown until the server's message says so itself.
   const accepted = signal<ReadonlySet<string>>(new Set());
   const flying = new Set<string>();
+  // The notes of each room as last fetched, and the `notes_since` each fetch was for (or is in the air for).
+  const notes = signal<ReadonlyMap<string, Note[]>>(new Map());
+  const fetched = new Map<string, unknown>();
+  // For each room, the newest note seen with Notes open: anything later from someone else is new.
+  const read = signal<Readonly<Record<string, number>>>({});
+  let tried: string[] = [];
+  const pictures = new Map<string, Promise<string | null>>();
+  // The rooms the server has spoken of since this connection began. A called lap starts only
+  // from these: a message kept from before may hold a call taken back since.
+  const heard = signal<ReadonlySet<string>>(new Set());
   // getTimezoneOffset counts minutes west of UTC; the contract counts east.
   const counts = createCounts(engine, env.utcOffsetMin ?? (() => -new Date().getTimezoneOffset()));
   const connected = computed(() => engine.sync.value === 'syncing' || engine.sync.value === 'in-step');
@@ -140,12 +266,25 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     untracked(() => {
       const held = engine.kept('rooms');
       const cheers = engine.kept('cheers');
+      const seen = engine.kept('notesRead');
+      const calls = engine.kept('together');
+      tried = Array.isArray(calls) ? calls.filter((id): id is string => typeof id === 'string') : [];
+      fetched.clear();
+      // Another account's pictures are not this one's to see: the server checks each anew.
+      for (const url of pictures.values()) void url.then((got) => got && URL.revokeObjectURL(got));
+      pictures.clear();
       batch(() => {
+        notes.value = new Map();
+        read.value = seen && typeof seen === 'object' ? (seen as Record<string, number>) : {};
         rooms.value = new Map((Array.isArray(held) ? (held as RoomNow[]) : []).filter((msg) => typeof msg?.room === 'string').map((msg) => [msg.room, msg]));
         waiting.value = Array.isArray(cheers) ? (cheers as Cheer[]).filter((c) => [c?.room, c?.to, c?.run].every((part) => typeof part === 'string')) : [];
         accepted.value = new Set();
+        heard.value = new Set();
       });
     });
+  });
+  const stopHeard = effect(() => {
+    if (!connected.value) untracked(() => (heard.value = new Set()));
   });
 
   // A room that is no more, and the cheers waiting for it, which have nowhere to go.
@@ -158,7 +297,10 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     // The whole set: a room it does not name was left, or ended, while this device was away.
     if (msg.type === 'rooms') return forget((id) => !msg.rooms.includes(id));
     if (msg.gone === true) return forget((id) => id === msg.room);
-    remember(new Map(rooms.peek()).set(msg.room, msg));
+    batch(() => {
+      remember(new Map(rooms.peek()).set(msg.room, msg));
+      if (!heard.peek().has(msg.room)) heard.value = new Set([...heard.peek(), msg.room]);
+    });
   });
 
   // A member's bell goes at `ends_at` whether or not the server says so in time. The list is
@@ -168,22 +310,48 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
 
   // Your lap in progress as far as it has run, for your own lane: the server's totals are of rows,
   // and it has none yet. Counted on the day and in the week it began, as Progress counts it.
-  function yours(now: number): { today: number; week: number } {
+  // Your lane: today's laps from your own rows, the open lap in place of a row it has outgrown,
+  // and one past its bell with no row yet is a lap that ended.
+  function yours(now: number): { today: number; week: number; laps: [number, number][]; runStart: number | null } {
     const lap = counts.open(now);
-    if (!lap) return { today: 0, week: 0 };
-    const [began, today] = [counts.today(lap.started), counts.today(now)];
+    const today = counts.today(now);
+    const rows = (counts.byDay.value.get(today) ?? []).filter((row) => row.kind === 'work' && row.outcome !== 'void' && row.id !== lap?.id);
+    const ended = lap?.outcome === 'rang' && counts.today(lap.started) === today ? [lap] : [];
+    const laps = [...rows, ...ended].sort((a, b) => a.started - b.started).map((row): [number, number] => [row.started, row.ended]);
+    if (!lap) return { today: 0, week: 0, laps, runStart: null };
+    const began = counts.today(lap.started);
     const ran = counts.unwritten(now);
-    return { today: began === today ? ran : 0, week: mondayOf(began) === mondayOf(today) ? ran : 0 };
+    return { today: began === today ? ran : 0, week: mondayOf(began) === mondayOf(today) ? ran : 0, laps, runStart: lap.outcome === 'rang' ? null : lap.started };
+  }
+
+  // The room's week day by day, this week to today and last week whole, from the server's rows
+  // per day. Today is the room's week as shown, so the chart ends where the figure stands.
+  function weekOf(msg: RoomNow, week_ms: number, you_ms: number, now: number): RoomWeek | null {
+    const days = seven(msg.days);
+    if (!days) return null;
+    const today = weekday(Date.parse(counts.today(now)));
+    let sum = 0;
+    let before = 0;
+    return {
+      days: days.map((ms, i) => (i < today ? (sum += ms) : i === today ? week_ms : null)),
+      last: (seven(msg.last_days) ?? [0, 0, 0, 0, 0, 0, 0]).map((ms) => (before += ms)),
+      // ponytail: last week "at this time" is as of the server's message; it moves on at the next one.
+      ahead_ms: typeof msg.last_at_ms === 'number' ? week_ms - msg.last_at_ms : null,
+      you_ms,
+    };
   }
 
   // A friend's lap in progress: how far the server said it had run at `server_time`, and on since
   // then while it is not paused, up to its bell. Nothing when the message has no `run` (an older server).
-  function running(member: Record<string, unknown>, said: unknown, ends: number | null, now: number): { today: number; week: number; moving: boolean } {
+  function running(member: Record<string, unknown>, said: unknown, ends: number | null, now: number): { today: number; week: number; moving: boolean; laps: [number, number][]; runStart: number | null } {
     const run = member.run as { ms?: unknown; today?: unknown; week?: unknown } | null | undefined;
-    if (member.away === true || !run || typeof run !== 'object' || typeof run.ms !== 'number' || run.ms < 0) return { today: 0, week: 0, moving: false };
+    const laps = member.away === true || !Array.isArray(member.laps) ? [] : member.laps.filter((lap): lap is [number, number] => Array.isArray(lap) && typeof lap[0] === 'number' && typeof lap[1] === 'number');
+    if (member.away === true || !run || typeof run !== 'object' || typeof run.ms !== 'number' || run.ms < 0) return { today: 0, week: 0, moving: false, laps, runStart: null };
     const moving = member.paused !== true && typeof said === 'number';
     const ran = run.ms + (moving ? Math.max(0, Math.min(now, ends ?? now) - (said as number)) : 0);
-    return { today: run.today === true ? ran : 0, week: run.week === true ? ran : 0, moving: moving && (ends === null || ends > now) };
+    // ponytail: as far back from the message as it had run; a lap paused earlier reads as begun that much later.
+    const runStart = typeof said === 'number' ? said - run.ms : null;
+    return { today: run.today === true ? ran : 0, week: run.week === true ? ran : 0, moving: moving && (ends === null || ends > now), laps, runStart };
   }
 
   // The rooms as shown, and the figures in them that move with a lap in progress: the list is
@@ -220,6 +388,7 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           id,
           name: text(member.name),
           you: member.you === true,
+          picture: typeof member.picture === 'string' ? member.picture : null,
           away,
           phase,
           lap: (typeof member.set_index === 'number' ? member.set_index : 0) + 1,
@@ -229,22 +398,50 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
           today_ms,
           today_laps: amount(member.today_laps),
           week_ms,
+          laps: lap.laps,
+          runStart: lap.runStart,
           last: run ? { run, ended: amount(last?.ended), cheers, cheered: cheers.includes(you), cheerers: cheers.flatMap((cheerer) => (names.has(cheerer) ? [{ id: cheerer, name: names.get(cheerer)! }] : [])) } : null,
         };
       });
       const ranked = msg.ranked === true;
       const keeper = typeof msg.keeper === 'string' ? msg.keeper : null;
+      const week_ms = members.reduce((sum, member) => sum + member.week_ms, 0);
+      const pictureOf = new Map(members.map((member) => [member.id, member.picture]));
+      const named = (who: string) => ({ id: who, name: names.get(who) ?? '' });
+      const call = msg.call as { id?: unknown; by?: unknown; at?: unknown; in?: unknown } | null | undefined;
+      const callIn = Array.isArray(call?.in) ? call.in.filter((who): who is string => typeof who === 'string') : [];
+      const streak = msg.streak as { run?: unknown; marks?: unknown } | null | undefined;
+      const roomNotes = (notes.value.get(msg.room) ?? []).map((note): NoteView => ({
+        ...note,
+        // Someone who has left since is someone who left, whatever the note still says.
+        from: note.from !== null && names.has(note.from) ? note.from : null,
+        name: note.from !== null && names.has(note.from) ? names.get(note.from)! : null,
+        picture: (note.from !== null && pictureOf.get(note.from)) || null,
+        you: note.from !== null && note.from === you,
+      }));
+      const seenAt = read.value[msg.room] ?? -Infinity;
       return {
         id: msg.room,
         name: text(msg.name),
         code: text(msg.code),
         target_ms: amount(msg.target_ms),
-        week_ms: members.reduce((sum, member) => sum + member.week_ms, 0),
+        week_ms,
         ranked,
         keeper: keeper === null ? null : (names.get(keeper) ?? null),
         youKeep: keeper === null || (you !== '' && keeper === you),
-        // The sort is stable: members level on the week stay in the order they joined.
-        members: ranked ? members.toSorted((a, b) => b.week_ms - a.week_ms) : members,
+        // The sort is stable: members level on it stay in the order they joined.
+        members: members.toSorted((a, b) => (ranked ? 0 : GROUP[a.phase] - GROUP[b.phase]) || b.week_ms - a.week_ms),
+        week: weekOf(msg, week_ms, members.find((member) => member.you)?.week_ms ?? 0, now),
+        streak:
+          streak && typeof streak.run === 'number' && Array.isArray(streak.marks)
+            ? { run: streak.run, marks: streak.marks.filter((mark): mark is (typeof MARKS)[number] => MARKS.includes(mark)) }
+            : null,
+        call:
+          call && typeof call.id === 'string' && typeof call.by === 'string' && typeof call.at === 'number'
+            ? { id: call.id, by: named(call.by), at: call.at, in: callIn.map(named), you: you !== '' && callIn.includes(you), yours: call.by === you }
+            : null,
+        notes: roomNotes,
+        newNotes: roomNotes.filter((note) => !note.you && note.at > seenAt).length,
       };
     });
     return { views, moving };
@@ -291,6 +488,67 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     untracked(() => all.forEach((cheer) => void send(cheer)));
   });
 
+  // Notes are fetched when a room says it has a newer one than those held, and again after a
+  // failed fetch at the next change or connection. A room whose notes have all gone has none.
+  async function load(room: string, since: unknown) {
+    fetched.set(room, since);
+    const answer = since === null ? { ok: true as const, data: { notes: [] } } : await engine.request('/api/rooms/notes', { room });
+    if (fetched.get(room) !== since) return;
+    if (!answer.ok) return void fetched.delete(room);
+    notes.value = new Map(notes.peek()).set(room, asNotes(answer.data?.notes));
+  }
+  const stopNotes = effect(() => {
+    if (!connected.value) return;
+    const all = rooms.value;
+    untracked(() => {
+      for (const msg of all.values()) {
+        const since = msg.notes_since ?? null;
+        if (fetched.get(msg.room) !== since && !(since === null && !fetched.has(msg.room))) void load(msg.room, since);
+      }
+    });
+  });
+
+  // You are on a lap: counting or paused, its bell not yet gone. Notes do not show then.
+  const onLap = () => {
+    const s = engine.timer.peek();
+    return s.phase === 'work' && !view(s, engine.now()).over;
+  };
+
+  // The open calls you are in, soonest first.
+  const calledIn = computed(() =>
+    list.value
+      .flatMap((room) => (room.call?.you ? [{ room: room.id, name: room.name, call: room.call.id, at: room.call.at, by: room.call.by.name }] : []))
+      .sort((a, b) => a.at - b.at),
+  );
+
+  // Start together: at a call's minute, a lap with the call's run id, begun at that minute,
+  // when the timer is on nothing. Once per device: a lap stopped in its first minute is not
+  // started again. A device that was not open in that minute starts nothing, and nor does one
+  // offline or not yet told of the room on this connection: the call may have been taken back.
+  const due = signal(0);
+  let cancelDue = () => {};
+  const stopTogether = effect(() => {
+    void due.value;
+    const live = connected.value ? heard.value : new Set<string>();
+    const calls = calledIn.value.filter((call) => live.has(call.room));
+    untracked(() => {
+      cancelDue();
+      cancelDue = () => {};
+      const now = engine.now();
+      let next = Infinity;
+      for (const { call, at } of calls) {
+        if (tried.includes(call)) continue;
+        if (now < at) next = Math.min(next, at);
+        else if (now < at + MIN && env.together) {
+          tried = [...tried, call].slice(-TRIED_KEPT);
+          engine.keep('together', tried);
+          env.together(`call-${call}`, at, env.task?.() ?? null);
+        }
+      }
+      if (Number.isFinite(next)) cancelDue = env.schedule(() => void due.value++, Math.min(next - now, DAY_MS));
+    });
+  });
+
   const setting = (name: string) => computed(() => engine.rows('settings').value.get('current')?.[name] === true);
 
   // Room requests need a connection and are not kept for later: only a cheer is.
@@ -329,6 +587,40 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
       queue([...waiting.peek(), { room, to: member, run: last.run }]);
     },
 
+    remove: (room, member) => ask('/api/rooms/remove', { room, member }),
+    callLap: (room, at) => ask('/api/rooms/call', { room, at }),
+    async setIn(room, call, isIn) {
+      const answer = await ask('/api/rooms/in', { room, call, in: isIn });
+      const held = rooms.peek().get(room);
+      // Too late: the call has begun or ended. Shown so now; the server's next message says the same.
+      if (!answer.ok && answer.error === 'call' && held && (held.call as { id?: unknown } | null)?.id === call) remember(new Map(rooms.peek()).set(room, { ...held, call: null }));
+      return answer;
+    },
+    addNote: (room, line) => ask('/api/rooms/note', { room, text: line.trim() }),
+
+    markNotesRead(room) {
+      const newest = notes.peek().get(room)?.[0]?.at;
+      if (newest === undefined || onLap() || newest <= (read.peek()[room] ?? -Infinity)) return;
+      read.value = { ...read.peek(), [room]: newest };
+      engine.keep('notesRead', read.peek());
+    },
+
+    calledIn,
+
+    setPicture: (picture) => ask('/api/me/picture', { picture: picture && btoa(String.fromCharCode(...picture)) }),
+
+    picture(hash) {
+      let url = pictures.get(hash);
+      if (!url) {
+        url = (engine.picture?.(hash) ?? Promise.resolve(null)).then((blob) => (blob ? URL.createObjectURL(blob) : null));
+        pictures.set(hash, url);
+        // Not had now: asked again next time, not remembered as missing.
+        const asked = url;
+        void url.then((got) => got ?? (pictures.get(hash) === asked && pictures.delete(hash)));
+      }
+      return url;
+    },
+
     setHidden: (hidden) => engine.write('settings', 'current', { rooms_hidden: hidden }),
     setShareTask: (share) => engine.write('settings', 'current', { share_task: share }),
 
@@ -337,7 +629,11 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
       stopRooms();
       stopBell();
       stopSending();
+      stopNotes();
+      stopTogether();
+      stopHeard();
       cancelBell();
+      cancelDue();
     },
   };
 }

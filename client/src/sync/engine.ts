@@ -15,7 +15,7 @@ import { IDLE, act, asTimer } from '../core/timer.ts';
 import type { TimerAction, TimerState } from '../core/timer.ts';
 import { StoreGone } from '../store/store.ts';
 import type { OpenStore, Store, Write } from '../store/store.ts';
-import { connect, health, postJson, smoothOffset } from './transport.ts';
+import { connect, getBlob, health, postJson, smoothOffset } from './transport.ts';
 import type { Connect, Handlers, Push, ServerMessage, Transport, Wire } from './transport.ts';
 
 export interface Env extends Wire {
@@ -140,6 +140,11 @@ export interface Engine {
    * in. The same time limit and codes as the account calls; `offline` when it cannot be asked.
    */
   request(path: string, body: object): Promise<{ ok: true; data: any } | { ok: false; error: string; retry_after?: number }>;
+  /**
+   * A member's picture by its hash (protocol section 15, Pictures), asked with the token. Null
+   * when it cannot be had: offline, signed out, or not shared with this account.
+   */
+  picture?(hash: string): Promise<Blob | null>;
   /**
    * A value kept on this device and never sent: what `keep` last put under `name`. By default
    * it belongs to the signed-in account. With `'device'` it belongs to the install, whoever is
@@ -746,6 +751,12 @@ export async function createEngine(env: Env): Promise<Engine> {
       if (!r) return { ok: false, error: 'offline' };
       const answer = await ask(path, { ...body, token: r.session.token, device: me });
       return answer;
+    },
+
+    async picture(hash) {
+      const r = db;
+      if (!r || !/^[0-9a-f]{64}$/.test(hash)) return null;
+      return getBlob(env, `${env.url}/api/pictures/${hash}`, { authorization: `Bearer ${r.session.token}` }, ASK_MS).catch(() => null);
     },
 
     merge(cells) {

@@ -101,8 +101,15 @@ const AUTO_SUFFIX = '_';
 // The longest the watch waits before looking again: a browser runs a timer set further out than 2^31 ms at once.
 const DAY_MS = 86400000;
 
+/**
+ * Starts a lap called in a room (protocol section 15, Start together): run id `run`, begun at
+ * `at` (or when the last run here ended, if that was later), for `task`. Only when the timer is on no lap and no break (one whose bell has gone is on
+ * neither), and not when it already holds that run. Says whether it started it. Rooms calls it.
+ */
+export type Together = (run: string, at: number, task: string | null) => boolean;
+
 /** `close()` stops the bell watch: for tests and for Node, where a waiting timer keeps the process alive. */
-export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close(): void } {
+export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close(): void; together: Together } {
   const me = engine.device;
   const state = engine.timer;
   const counts = createCounts(engine, env.utcOffsetMin);
@@ -155,7 +162,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
   const written = () => stampMs(timerStamp() ?? '');
 
   // One turn, so one store transaction: the row of the run that ends and the timer cell that ends it.
-  function begin(lap: boolean, task: string | null | undefined) {
+  function begin(lap: boolean, task: string | null | undefined, run = env.runId(), at?: number) {
     const s = state.peek();
     const now = engine.now();
     const v = look(s, now);
@@ -168,12 +175,12 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
       const start: TimerAction = {
         do: 'start',
         phase,
-        run: env.runId(),
+        run,
         task: phase === 'work' ? (task ?? null) : null,
         planned_ms: untracked(() => lengthsFor(of))[`${phase}_ms`],
         ...(fresh && { new_set: true }),
       };
-      put(act(s, start, now));
+      put(act(s, start, at ?? now));
     });
   }
 
@@ -311,6 +318,17 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
     start: (task) => begin(false, task),
     skipBreak: (task) => begin(true, task),
+    together(run, at, task) {
+      const s = state.peek();
+      const v = view(s, engine.now());
+      if (s.run === run || (s.phase !== 'idle' && !v.over)) return false;
+      // Never before what ran here last had ended: a bell or a stop a few seconds after the
+      // call's minute would otherwise overlap the called lap, and those seconds count twice.
+      // The idle cell was written by the stop that ended it.
+      const ended = s.phase === 'idle' ? (timerStamp() === undefined ? at : written()) : (v.ends_at ?? at);
+      begin(true, task, run, Math.max(at, ended));
+      return true;
+    },
     pause: () => change({ do: 'pause' }),
     resume: () => change({ do: 'resume' }),
     extend: () => change({ do: 'extend', ms: EXTEND_MS }),
