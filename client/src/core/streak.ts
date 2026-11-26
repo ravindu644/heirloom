@@ -11,6 +11,8 @@ export interface StreakInput {
   daysMask?: number;
   /** The day the record begins, when it is earlier than the first kept day: the day a habit was made. */
   since?: string;
+  /** Weekdays pinned as rest, the same bits: the focus streak's `settings.rest_days`. None when left out. */
+  pinned?: number;
 }
 
 export interface Streak {
@@ -30,11 +32,22 @@ export const weekday = (ms: number) => (ms / DAY_MS + 3) % 7;
 export const WINDOW_DAYS = 45;
 
 /**
+ * `settings.rest_days` as the streak reads it: 0 for anything but a whole number in 0..127, and
+ * of more than two bits the first two from Monday, so a newer build's value cannot break it.
+ */
+export function pinnedDays(mask: unknown): number {
+  if (typeof mask !== 'number' || !Number.isInteger(mask) || mask < 0 || mask > 127) return 0;
+  let out = 0;
+  for (let bit = 0, n = 0; bit < 7 && n < 2; bit++) if ((mask >> bit) & 1) (out |= 1 << bit), n++;
+  return out;
+}
+
+/**
  * The streak as the screens show it: over the 45 day window, and whether a miss lies inside
  * those days. An empty day there that is not a rest day is a miss.
  */
-export function streakWindow(today: string, kept: readonly string[], daysMask = 127, since?: string): Streak & { missed: boolean } {
-  const s = streak({ today, kept, window: WINDOW_DAYS, daysMask, since });
+export function streakWindow(today: string, kept: readonly string[], daysMask = 127, since?: string, pinned = 0): Streak & { missed: boolean } {
+  const s = streak({ today, kept, window: WINDOW_DAYS, daysMask, since, pinned });
   // The same days the streak counted: back from today if today is kept, else from yesterday.
   const now = Date.parse(today);
   const keptToday = ((daysMask >> weekday(now)) & 1) === 1 && kept.includes(today);
@@ -42,8 +55,10 @@ export function streakWindow(today: string, kept: readonly string[], daysMask = 
   return { ...s, missed: s.of - s.kept > s.rest.filter((day) => day >= from).length };
 }
 
-export function streak({ today, kept, window, daysMask = 127, since }: StreakInput): Streak {
+export function streak({ today, kept, window, daysMask = 127, since, pinned = 0 }: StreakInput): Streak {
   const planned = (ms: number) => ((daysMask >> weekday(ms)) & 1) === 1;
+  const pin = pinnedDays(pinned) & daysMask;
+  const isPinned = (ms: number) => ((pin >> weekday(ms)) & 1) === 1;
   const keptDays = new Set(kept.map((day) => Date.parse(day)).filter(planned));
   if (keptDays.size === 0) return { streak: 0, rest: [], kept: 0, of: 0 };
 
@@ -52,16 +67,23 @@ export function streak({ today, kept, window, daysMask = 127, since }: StreakInp
   const windowStart = end - (window - 1) * DAY_MS;
   const rest: string[] = [];
   let run = 0;
-  let empties = 0;
+  // The week's places for rest not already held by a pinned day.
+  let free = 0;
   let keptInWindow = 0;
   let of = 0;
   const first = Math.min(...keptDays, since === undefined ? Infinity : Date.parse(since));
   for (let ms = first; ms <= end; ms += DAY_MS) {
-    if (weekday(ms) === 0) empties = 0;
+    if (ms === first || weekday(ms) === 0) {
+      // A pinned day holds a place while it is empty or still to come, so it is known at the
+      // week's start; a kept one gives its place back. One before the record holds nothing.
+      free = 2;
+      const monday = ms - weekday(ms) * DAY_MS;
+      for (let day = monday; day < monday + 7 * DAY_MS; day += DAY_MS) if (isPinned(day) && day >= first && !keptDays.has(day)) free -= 1;
+    }
     if (!planned(ms)) continue;
     const isKept = keptDays.has(ms);
     if (isKept) run += 1;
-    else if (++empties <= 2) rest.push(new Date(ms).toISOString().slice(0, 10));
+    else if (isPinned(ms) || free-- > 0) rest.push(new Date(ms).toISOString().slice(0, 10));
     else run = 0;
     if (ms >= windowStart) {
       of += 1;

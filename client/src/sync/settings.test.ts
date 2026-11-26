@@ -43,7 +43,7 @@ describe('settings', () => {
     const { s } = await one();
     assert.deepEqual(s.all.value, {
       work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: false, auto_work: false,
-      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false,
+      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
     });
   });
 
@@ -59,7 +59,7 @@ describe('settings', () => {
     assert.deepEqual(log[0]!.cells!.map((c) => c.field), ['work_ms', 'auto_break', 'day_target', 'sound']);
     assert.deepEqual(d.settings.all.value, {
       work_ms: 50 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: true, auto_work: false,
-      sound: 'bowl', celebrate: true, day_target: 8, share_task: false, rooms_hidden: false,
+      sound: 'bowl', celebrate: true, day_target: 8, share_task: false, rooms_hidden: false, rest_days: 0,
     });
     // And Focus reads the same row: the next lap is fifty minutes.
     d.focus.start();
@@ -82,6 +82,9 @@ describe('settings', () => {
       { sound: '' },
       { work_ms: 30 * MIN, celebrate: 1 },
       { marks: {} },
+      { rest_days: 128 },
+      { rest_days: -1 },
+      { rest_days: 1.5 },
       {},
     ]) {
       assert.equal(s.set(bad as never), false, JSON.stringify(bad));
@@ -103,8 +106,36 @@ describe('settings', () => {
     d.engine.write('settings', 'current', { work_ms: 'long', auto_break: 1, sound: 7, celebrate: null, day_target: 2.5, from_a_newer_build: true });
     assert.deepEqual(s.all.value, {
       work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: false, auto_work: false,
-      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false,
+      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
     });
+  });
+
+  it('rest days: two pinned read as they are, more than two read as the first two from Monday, anything else as none', async () => {
+    const { d, s } = await one();
+    assert.equal(s.set({ rest_days: 96 }), true);
+    assert.equal(s.all.value.rest_days, 96);
+    d.engine.write('settings', 'current', { rest_days: 0b1010110 });
+    assert.equal(s.all.value.rest_days, 0b0000110, 'Tuesday and Wednesday');
+    for (const odd of ['64', 200, -4, 3.5, null]) {
+      d.engine.write('settings', 'current', { rest_days: odd });
+      assert.equal(s.all.value.rest_days, 0, JSON.stringify(odd));
+    }
+  });
+
+  it('rest days pinned on two devices offline: the later stamp wins on both, whichever way they meet', async () => {
+    for (const order of ['ab', 'ba']) {
+      const w = world();
+      const a = await w.device('a', { online: false });
+      const b = await w.device('b', { online: false });
+      a.settings.set({ rest_days: 64 });
+      w.time.advance(1000);
+      b.settings.set({ rest_days: 32 });
+      if (order === 'ab') w.exchange(a, b);
+      else w.exchange(b, a);
+      assert.equal(a.settings.all.value.rest_days, 32, order);
+      assert.equal(b.settings.all.value.rest_days, 32, order);
+      assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
+    }
   });
 
   it('"ring here" is this device\'s: on by default, in no cell, kept across a restart and across a sign out', async () => {

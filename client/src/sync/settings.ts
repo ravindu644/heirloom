@@ -8,6 +8,7 @@ import { stampDevice } from '../core/hlc.ts';
 import { keysKept, lapMarks, taskMarks } from '../core/marks.ts';
 import type { Mark } from '../core/marks.ts';
 import { localDay, stats } from '../core/stats.ts';
+import { pinnedDays } from '../core/streak.ts';
 import { asTask } from '../core/today.ts';
 import { LAP_MAX_MS, createCounts, lapLengths } from './counts.ts';
 import type { Engine } from './engine.ts';
@@ -31,6 +32,8 @@ export interface SettingsView {
   /** Rooms may see the title of the task a lap is for. */
   share_task: boolean;
   rooms_hidden: boolean;
+  /** Weekdays pinned as rest for the focus streak, bit 0 Monday to bit 6 Sunday; at most two read back, 0 for none. */
+  rest_days: number;
 }
 
 export interface Settings {
@@ -77,6 +80,7 @@ const fits: Record<keyof SettingsView, (v: unknown) => boolean> = {
   day_target: (v) => whole(v, 0),
   share_task: (v) => typeof v === 'boolean',
   rooms_hidden: (v) => typeof v === 'boolean',
+  rest_days: (v) => whole(v, 0, 127),
 };
 
 /** `close()` stops watching for marks. */
@@ -96,6 +100,7 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
       day_target: fits.day_target(held?.day_target) ? (held!.day_target as number) : 0,
       share_task: flag('share_task', false),
       rooms_hidden: flag('rooms_hidden', false),
+      rest_days: pinnedDays(held?.rest_days),
     };
   });
 

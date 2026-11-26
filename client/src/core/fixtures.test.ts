@@ -50,7 +50,7 @@ const session: {
 } = load('session.json');
 
 const streakCases: {
-  cases: { name: string; today: string; kept: string[]; days_mask?: number; window: number; expect: Streak }[];
+  cases: { name: string; today: string; kept: string[]; days_mask?: number; pinned_mask?: number; window: number; expect: Streak }[];
 } = load('streak.json');
 
 describe('merge.json stamps', () => {
@@ -212,10 +212,24 @@ describe('today.json squares', () => {
 describe('streak.json', () => {
   for (const c of streakCases.cases) {
     it(c.name, () => {
-      const got = streak({ today: c.today, kept: c.kept, window: c.window, daysMask: c.days_mask });
+      const got = streak({ today: c.today, kept: c.kept, window: c.window, daysMask: c.days_mask, pinned: c.pinned_mask });
       assert.deepEqual(got, c.expect);
     });
   }
+});
+
+// What the fixtures leave to the rule's words: a day not over is still to come, and a pinned day
+// before the record began holds nothing.
+describe('streak, pinned days beyond the fixtures', () => {
+  const kept = ['2026-11-23', '2026-11-26', '2026-11-27', '2026-11-28'];
+  it('a pinned today with no lap yet is still to come and holds its place', () => {
+    assert.deepEqual(streak({ today: '2026-11-29', kept, window: 45, pinned: 64 }), { streak: 3, rest: ['2026-11-24'], kept: 4, of: 6 });
+    assert.deepEqual(streak({ today: '2026-11-29', kept, window: 45 }).rest, ['2026-11-24', '2026-11-25']);
+  });
+  it('a pinned day before the first kept day holds nothing', () => {
+    const got = streak({ today: '2026-11-29', kept: ['2026-11-25', '2026-11-29'], window: 45, pinned: 1 });
+    assert.deepEqual(got, { streak: 1, rest: ['2026-11-26', '2026-11-27'], kept: 2, of: 5 });
+  });
 });
 
 describe('avatar.json', () => {

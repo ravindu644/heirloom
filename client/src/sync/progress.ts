@@ -9,6 +9,7 @@ import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
 import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOf, localDay, stats } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
+import { pinnedDays } from '../core/streak.ts';
 import { asTask } from '../core/today.ts';
 import type { Task } from '../core/today.ts';
 import { createCounts } from './counts.ts';
@@ -120,6 +121,9 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
   // again only when a session row has changed AND someone asks: a computed with nobody reading
   // it does nothing. Task rows, the timer and the clock are not read here, so typing a title or
   // starting a lap leaves it as it is.
+  // The account's pinned rest days: changing them moves the streak's rest, not the history.
+  const restDays = computed(() => pinnedDays(engine.rows('settings').value.get('current')?.rest_days));
+
   let passes = 0;
   const history = computed(() => {
     passes += 1;
@@ -233,8 +237,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       };
     },
 
-    streak: computed(() => streakView(history.value.kept, clock.day.value)),
-    since: computed(() => since(history.value.days, history.value.kept, clock.day.value)),
+    streak: computed(() => streakView(history.value.kept, clock.day.value, restDays.value)),
+    since: computed(() => since(history.value.days, history.value.kept, clock.day.value, restDays.value)),
     bests: computed(() => bests(history.value.days)),
     estimates: computed(() => estimates([...tasks.value.values()], (id) => history.value.taskLaps.get(id) ?? 0, clock.day.value, offset())),
 

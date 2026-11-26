@@ -281,6 +281,23 @@ describe('the streak', () => {
     void w;
   });
 
+  it('the streak follows the pinned rest days in settings, and says which they are', async () => {
+    const { d, p } = await one();
+    // Week of the 16th: Tuesday, Wednesday and Sunday empty. Unpinned, Sunday is the third: a miss.
+    for (const day of ['16', '19', '20', '21', '23']) laps(d, `2026-11-${day}`, 1);
+    const dots = () => p.streak.value.recent.slice(5, 12).map((dot) => `${dot.day.slice(8)} ${dot.state}`);
+    assert.deepEqual([p.streak.value.streak, p.streak.value.pinned], [1, []]);
+    // Sunday pinned holds one place, so Tuesday rests and Wednesday is the miss.
+    d.settings.set({ rest_days: 64 });
+    assert.deepEqual([p.streak.value.streak, p.streak.value.pinned], [4, [6]]);
+    assert.deepEqual(dots(), ['16 kept', '17 rest', '18 empty', '19 kept', '20 kept', '21 kept', '22 rest']);
+    assert.deepEqual(p.since.value.cells.filter((c) => c.rest).map((c) => c.day), ['2026-11-17', '2026-11-22']);
+    // Every day set reads as Monday and Tuesday: Monday was kept, so its place goes back to the week.
+    d.settings.set({ rest_days: 127 });
+    assert.deepEqual([p.streak.value.streak, p.streak.value.pinned], [1, [0, 1]]);
+    assert.deepEqual(dots(), ['16 kept', '17 rest', '18 rest', '19 kept', '20 kept', '21 kept', '22 empty']);
+  });
+
   it('at local midnight the streak moves on by itself: yesterday\'s open day is empty, the new day is open', async () => {
     const { w, d, p } = await one();
     laps(d, '2026-11-23', 1);

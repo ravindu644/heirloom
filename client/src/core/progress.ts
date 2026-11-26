@@ -4,7 +4,7 @@
 
 import { localDay, stats } from './stats.ts';
 import type { Session, Stats } from './stats.ts';
-import { streak, streakWindow, weekday } from './streak.ts';
+import { pinnedDays, streak, streakWindow, weekday } from './streak.ts';
 import type { Task } from './today.ts';
 
 /** Focus and laps per local day, as `stats()` gives them. */
@@ -35,6 +35,8 @@ export interface StreakView {
   missed: boolean;
   /** The last 14 days, oldest first, for the row of dots. Today is `open` until it has a lap. */
   recent: { day: string; state: 'kept' | 'rest' | 'empty' | 'open' }[];
+  /** The weekdays pinned as rest, 0 Monday to 6 Sunday, in that order: at most two, empty for none. */
+  pinned: number[];
 }
 
 export interface YearCell {
@@ -98,26 +100,28 @@ export function weekRace(days: Days, today: string, youToday: number, ghostByNow
  * The forgiving streak over the last 45 days, and the last 14 as dots. `kept` is the days with a
  * lap that rang: a day is earned at a bell, so a day of stopped laps has laps and is not kept.
  */
-export function streakView(kept: ReadonlySet<string>, today: string): StreakView {
-  const s = streakWindow(today, [...kept]);
+export function streakView(kept: ReadonlySet<string>, today: string, restDays = 0): StreakView {
+  const s = streakWindow(today, [...kept], 127, undefined, restDays);
   const rest = new Set(s.rest);
   const recent = Array.from({ length: RECENT_DAYS }, (_, i) => {
     const day = addDays(today, i + 1 - RECENT_DAYS);
     const state = kept.has(day) ? ('kept' as const) : day === today ? ('open' as const) : rest.has(day) ? ('rest' as const) : ('empty' as const);
     return { day, state };
   });
-  return { streak: s.streak, kept: s.kept, of: s.of, missed: s.missed, recent };
+  const pin = pinnedDays(restDays);
+  const pinned = [0, 1, 2, 3, 4, 5, 6].filter((w) => (pin >> w) & 1);
+  return { streak: s.streak, kept: s.kept, of: s.of, missed: s.missed, recent, pinned };
 }
 
 /** A year cell's level, from the day's laps. */
 export const level = (laps: number): number => (laps >= 9 ? 4 : laps >= 7 ? 3 : laps >= 4 ? 2 : laps >= 1 ? 1 : 0);
 
 /** Everything since the first counted session, and one cell per day of it. `kept` is the days with a lap that rang. */
-export function since(days: Days, kept: ReadonlySet<string>, today: string): Since {
+export function since(days: Days, kept: ReadonlySet<string>, today: string, restDays = 0): Since {
   const first = Object.keys(days).sort()[0] ?? null;
   if (first === null) return { first, focus_ms: 0, laps: 0, kept: 0, of: 0, steadiest: null, cells: [] };
 
-  const s = streak({ today, kept: [...kept], window: Infinity });
+  const s = streak({ today, kept: [...kept], window: Infinity, pinned: restDays });
   const rest = new Set(s.rest);
   const cells: YearCell[] = [];
   for (let day = first; day <= today; day = addDays(day, 1)) {
