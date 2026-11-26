@@ -1,7 +1,9 @@
-name: Release APK
+name: Build
 
-# Builds the phone app on every push to main and every pull request, uploads it as an
-# artifact, and on a v* tag (or a manual run with tag_name) publishes it as a release.
+# Builds the phone app and the server on every push to main and every pull request, uploads
+# them as artifacts, and on a v* tag (or a manual run with tag_name) publishes them as a release.
+# The server is heirloomd for linux amd64 and arm64: one static file with the web app inside,
+# so a machine that runs it needs no Go or Node (docs/DEPLOY.md).
 # The APK is signed with the release key when the RELEASE_KEYSTORE (base64 of
 # release.keystore), KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD secrets are set, and with
 # a throwaway key when they are not (a fork, a pull request). Mirrors Droidspaces-OSS's ci.yml.
@@ -100,10 +102,8 @@ jobs:
     - name: Stage & Rename Artifacts
       run: |
         HASH=$(git log -1 --pretty=%h)
-        APK_NAME="heirloom-v${VERSION}-${HASH}.apk"
         mkdir -p dist
-        mv android/app/build/outputs/apk/release/app-release.apk dist/${APK_NAME}
-        (cd dist && sha256sum * > SHA256SUMS)
+        mv android/app/build/outputs/apk/release/app-release.apk dist/heirloom-v${VERSION}-${HASH}.apk
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
@@ -113,9 +113,71 @@ jobs:
         if-no-files-found: error
         retention-days: 14
 
+  server:
+    name: Build heirloomd
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        # `git describe` names the version heirloomd prints
+        fetch-depth: 0
+
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: pnpm
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.26'
+        cache-dependency-path: server/go.sum
+
+    - run: pnpm install --frozen-lockfile
+
+    # The web app, copied into the binary, for this runner (amd64) and for arm64. CGO is off,
+    # so both are static and run on any Linux of their architecture.
+    - run: make server
+
+    # Plain names, so releases/latest/download/heirloomd-linux-<arch> always works
+    - name: Stage Artifacts
+      run: |
+        mkdir -p dist
+        cp server/bin/heirloomd dist/heirloomd-linux-amd64
+        cp server/bin/heirloomd-arm64 dist/heirloomd-linux-arm64
+        cp server/deploy/heirloomd.service dist/
+        ./dist/heirloomd-linux-amd64 -version
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: heirloomd
+        path: dist/
+        if-no-files-found: error
+        retention-days: 14
+
+  release:
+    name: Publish the release
+    needs: [ apk, server ]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
+    if: inputs.tag_name != '' || github.ref_type == 'tag'
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - uses: actions/download-artifact@v4
+      with:
+        path: dist
+        merge-multiple: true
+
+    - run: cd dist && sha256sum * > SHA256SUMS
+
     # A manual run for a tag not made yet ends at HEAD
     - name: Generate Changelog
-      if: env.TAG != ''
       run: |
         END=HEAD
         git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && END="${TAG}"
@@ -125,18 +187,15 @@ jobs:
           echo "## What's Changed"
           git log --no-merges --pretty=format:"* %s (%h)" ${PREV:+${PREV}..}${END}
           echo
-        } > dist/CHANGELOG.md
+        } > CHANGELOG.md
 
     - name: Publish Release
-      if: env.TAG != ''
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ env.TAG }}
         name: heirloom ${{ env.TAG }}
         target_commitish: ${{ github.sha }}
-        files: |
-          dist/*.apk
-          dist/SHA256SUMS
-        body_path: dist/CHANGELOG.md
+        files: dist/*
+        body_path: CHANGELOG.md
         draft: false
         prerelease: false
