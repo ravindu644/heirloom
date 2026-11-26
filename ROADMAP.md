@@ -319,7 +319,15 @@ On the third build the user found no glitches; four things about how it reads an
 - [ ] Gate: built, code-reviewed and checked (190 browser tests); waiting on the user's try.
       Never run by us on a phone: the called lap's notification with the screen off
 
-## 23. Release 1.0
+## 23. Rooms, the fit
+
+- [x] [lead] Drawn in rounds four and five from the user's try (reviews/23/): a panel per person,
+      W1 upright and W2 sideways and on the laptop, six hours, a person's report, Cheer as 🎉,
+      flat coloured pictures; DESIGN.md, the protocol (members' week by day) and the avatar fixture
+- [ ] [server] [core] [ui] [qa] Built as drawn
+- [ ] Gate
+
+## 24. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion

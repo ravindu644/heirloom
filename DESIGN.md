@@ -21,7 +21,7 @@ colors:
   key: "#E4E7E2"
   key-edge: "#121412"
   key-quiet: "#E4E7E2"
-  amber: "#A86A00"
+  amber: "#A46700"
   olive: "#6B7A1E"
   teal: "#0F7B7F"
   sky: "#1F6FB5"
@@ -534,9 +534,16 @@ Built once in `client/src/ui/kit/` and reused.
   of twelve short tries was a wall of rows before the first figure.
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
-- **A person's circle** carries their picture where they set one, and otherwise the first letter
-  of their username, everywhere, also where the words beside it say "You". A picture is cut
-  round, never framed, and drawn the same in both themes.
+- **A person's circle** carries their picture where they set one, and otherwise their colour and
+  letters, everywhere, also where the words beside it say "You". A picture is cut round, never
+  framed, and drawn the same in both themes. **Their colour** is flat, never a gradient: one of
+  amber, olive, teal, sky, indigo, plum, clay or heat-2 (never `you`, never `rest`), picked from
+  the username (protocol section 15, `contracts/fixtures/avatar.json`), so a person is the same
+  colour on every screen and every device. **Their letters**: two when the username splits on
+  `_`, `-` or `.` ("ravi_deshan" is RD), else the first; in the type role nearest 0.4 of the
+  circle (`label` at 24px, `body-strong` at 40 and 48, `title` at 56), the same for two letters;
+  in `on-you` on every hue but heat-2, which takes `ink`, so each stands 4.5:1 or more in both
+  themes (light amber was darkened to #A46700 for it).
 - **The Room screen** (chosen from drawn options, `reviews/22/`): the line that names the room
   ("Study club, kept by lina", with "Code and settings" at its right end), the finding ("1 of 4
   focusing now."), then **tabs**: People, Notes, Week. The call strip stands outside the tabs.
@@ -551,19 +558,37 @@ Built once in `client/src/ui/kit/` and reused.
     reader hears "Notes, 2 new"; the circle is hidden from it. It counts notes written since
     Notes was last open while you were not on a lap. It is on that tab only, never on the
     bottom bar.
-  - **People: the track.** One row a member, in the live order (on a lap, on a break, the rest,
-    each by this week; strictly by this week when the room is ranked): the circle (48px on a
-    phone), the name and phase ("Focusing", "Short break", "Away"), time left in `figure-md`
-    (in `rest` on a break), the task only if shared, today and the week in `label`, who cheered,
-    and Cheer as before. Under the words, the lane: one grey (`raised`) across the whole window,
-    a phone's four hours with now 5/8 across, a laptop's 08:00 to 20:00. A lap that ran is a
-    filled block, yours `you` and everyone else's `muted`; the lap running is filled as far as
-    now. A break is a gap. Nothing else is drawn in a lane: no line of now, no break marks.
-    **The hours carry now:** one row of hours over the lanes, in `ink` over a `stroke` line of
-    `ink` up to now and in `muted` over a `hair` of `line` after, with "now" where the heavy
-    line ends; an hour label within 44px of "now" steps aside. While a lap is called, each person
-    who is in has their circle (24px, a 2px `surface` ring) standing in their lane at the call's
-    start, ahead of now.
+  - **People.** Each person is a panel of their own (`surface`, `rounded.md`, 16px in), 8px
+    apart, in the live order (on a lap, on a break, the rest, each by this week; strictly by this
+    week when the room is ranked). A panel holds the circle (48px on a phone), the name and phase
+    ("Focusing", "Short break", "Away"), the time left in `figure-md` (in `rest` on a break),
+    today and the week in `label`, the task only if shared, who cheered, and the lane.
+    **Upright phone (under 720px):** the words make the panel's top lines and the lane runs its
+    full width under them; the window is six hours with now 5/8 across, the hours sliding under
+    it. **Sideways and laptop (720px up):** the words stand in a column at the panel's left, 220px
+    under 1100px wide (the time left under the name) and 280px above, and the lane takes the rest
+    of the row; the window is 08:00 to 20:00, widened to the hour of an earlier lap.
+    **The lane** is one grey (`raised`) across its window. A lap that ran is a filled block, yours
+    `you` and everyone else's `muted`; the lap running is filled as far as now. A break is a gap.
+    Nothing else is drawn in a lane. **The hours carry now:** one row of hours over the first
+    panel's lane, `ink` over a `stroke` line of `ink` up to now and `muted` over a `hair` of `line`
+    after, "now" where the heavy line ends; hour names at least 56px apart, and the one within
+    44px of "now" steps aside. While a lap is called, each person who is in has their circle
+    (24px, a 2px `surface` ring) standing in their lane at the call's start.
+    **Cheer** is a 40px round button with 🎉 at the end of the person's top line (`key` fill, a
+    `hair` of `key-edge`, named "Cheer lina's lap" to a screen reader), there only while a lap of
+    theirs that rang is not yet cheered by you; once cheered it stays as a `you`-tint circle and
+    the line says who cheered. (The one emoji in the app, the user's choice over a "Cheer" link.)
+    **A tap on a panel** (anywhere but Cheer) opens that person's report.
+  - **A person's report** takes the room's place, on every size, with Back (secondary) first at
+    the top left; the phone's back gesture does the same. The call strip and the bottom bar stay.
+    Their circle (56px), name, phase and time left. **Today:** minutes and laps in figures, and
+    their day on the same hours and lane, from the hour of their first lap to the hour after now,
+    at least six hours ("No laps yet today." when there are none), and their task only if they
+    share it. **This week:** minutes in `figure-lg` over Progress's week chart for them, their week
+    solid (`you` for you, `muted` for anyone else), their own last week dashed `ghost` and labelled
+    where it ends, no target; and one line: "1h 25m ahead of lina's own last week at this time."
+    Your own report also has the split chip and what your next lap would do.
   - **The call strip** stands above the bottom bar on a phone, a band under the finding on a
     laptop, while a call is open: "15:00 lina calls a lap" over "Starts in 7:42. lina is in.",
     and "I'm in" as the screen's one primary button ("I'm out" in quiet once you are). When it
@@ -678,9 +703,16 @@ Built once in `client/src/ui/kit/` and reused.
   - The phone app shows it before the first server step, and the server step's "Back" always
     leads to it, also when the step was opened by "Change" under Sign in: Back means the
     welcome and nothing else. The address the app holds stays in the server field and stays
-    the server until "Use this server" chooses another; leaving by Back changes nothing. The browser shows the drawing, title
-    and sentence beside the sign-in form from 720px and under it below, without the button;
-    there its title is `title`, a step under the form's own heading.
+    the server until "Use this server" chooses another; leaving by Back changes nothing. 
+  - **The browser's sign-in (and join, and set up) from 720px** is two halves (chosen from three
+    drawn, `reviews/23/signin-options.html`, S1): signed out, the shell draws no sidebar column;
+    the mark stands alone at the top left. The left half, on the ground, holds the drawing, its
+    squares scaled to the half (56px at 1440, 40px at 1024, about 36px at 720), then the title in
+    `headline-lg` and the sentence, all on the drawing's left edge, without the button. The right
+    half is a `surface` area its full height holding the form at its 44ch. The drawing's top and
+    the form's heading stand on one line (112px down); each half's block is centred in its half;
+    the free space falls at the bottom. Under 720px the form comes first and the drawing, title
+    and sentence under it, as before.
 - **The launcher icon** is the mark at three quarters of the adaptive icon's safe circle (about
   47 of 108dp tall), so no launcher's mask crowds it; the splash uses the same drawing.
   - (It was first four sentences about a lap and its 25 minutes, then a day drawn as a race with
