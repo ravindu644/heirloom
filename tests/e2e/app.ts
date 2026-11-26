@@ -32,10 +32,13 @@ export const startButton = (page: Page) => page.getByRole('button', { name: 'Sta
 /** After a bell or in a break: the lap that comes next, started at once. */
 export const startNow = (page: Page) => page.getByRole('button', { name: 'Start the next lap now', exact: true });
 
-/** What a ready Focus screen shows: its start, under the line that names today's lap a tap starts ("Lap 2 today", "Lap 2 of 5 today", "Lap 6 today, past your target of 5"). */
-export async function ready(page: Page, lap = 1) {
+/** Focus's line over the bar: empty but for a break, a pause, or a lap begun yesterday. */
+export const lapLine = (page: Page) => page.locator('[class*="lapline"]').filter({ visible: true }).first();
+
+/** What a ready Focus screen shows: its start, under a line that says nothing (DESIGN.md: no "Lap 2 today, next"). */
+export async function ready(page: Page) {
   await expect(startButton(page)).toBeVisible();
-  await expect(page.getByText(new RegExp(`^Lap ${lap}( of \\d+)? today(, past your target of \\d+)?, next$`)).filter({ visible: true }).first()).toBeVisible();
+  await expect(lapLine(page)).toHaveText('');
 }
 
 /**

@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { go, lapLine, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -488,7 +488,7 @@ test('with automatic starts, the lap after the break is on the task of the last 
 
 // 7. A count says of what.
 
-test('a count says of what: with a target of 2 Focus says "Lap 1 of 2 today" and its bar has the target\'s two segments, as Today\'s has; Today says "laps today"; the row "of 3"; no bare "of 4" and no set anywhere on Focus; the room row says "Focusing"', async ({ deviceA: a }) => {
+test('a count says of what: with a target of 2 and a task of 3, Focus\'s bar has the task\'s three segments and no words over it; Today\'s bar has the target\'s two and says "laps today"; the row "of 3"; no bare "of 4" and no set anywhere on Focus; the room row says "Focusing"', async ({ deviceA: a }) => {
   await a.page.setViewportSize(PHONE);
   const { name } = await signedInto(a, 'ofwhat', (node) => {
     node.engine.write('settings', 'current', { day_target: 2 });
@@ -501,12 +501,13 @@ test('a count says of what: with a target of 2 Focus says "Lap 1 of 2 today" and
         .map((line: string) => line.trim())
         .filter((line: string) => /\bof 4\b|\bset\b/.test(line)),
     );
-  await expect(a.page.getByText('Lap 1 of 2 today, next').filter({ visible: true }).first()).toBeVisible();
+  await expect(lapLine(a.page)).toHaveText('');
   expect(await stray(), 'Focus counts the set').toEqual([]);
   const bar = () => a.page.locator('main [aria-hidden="true"]').filter({ has: a.page.locator('i[style*="--i:"]') }).first().evaluate((el) => el.children.length);
-  expect(await bar(), 'Focus\'s bar is not the day\'s target').toBe(2);
+  expect(await bar(), 'Focus\'s bar is not the task\'s estimate').toBe(3);
   await startButton(a.page).click();
-  await expect(a.page.getByText('Lap 1 of 2 today, focus').filter({ visible: true }).first()).toBeVisible();
+  await expect(a.page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(lapLine(a.page)).toHaveText('');
   expect(await stray(), 'Focus counts the set during a lap').toEqual([]);
 
   await go(a.page, 'Today');

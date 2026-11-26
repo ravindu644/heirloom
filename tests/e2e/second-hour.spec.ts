@@ -23,17 +23,17 @@ async function also(d: { page: Page }, name: string) {
 
 // 1. One Stop.
 
-test('Stop past the first minute: lap 2 is next, the first segment stays part filled after a reload and on a second device; a stop in the first seconds is a start taken back, no row, lap 2 still next', async ({ deviceA: a, deviceB: b }) => {
+test('Stop past the first minute: the lap is kept, the task\'s first segment stays part filled after a reload and on a second device; a stop in the first seconds is a start taken back, no row, nothing drawn', async ({ deviceA: a, deviceB: b }) => {
   test.setTimeout(150000);
-  // A day target of 4, so Focus draws a bar (the day's target is the only bar it has). A lap of two
-  // minutes, stopped a little over one in: past the minute a stopped lap is a lap (protocol section 6).
-  const { name } = await signedInto(a, 'onestop', (node) => node.engine.write('settings', 'current', { day_target: 4 }), { work_ms: 120000 });
+  // A task with an estimate of 4, so Focus draws a bar: the task's laps. A lap of two minutes,
+  // stopped a little over one in: past the minute a stopped lap is a lap (protocol section 6).
+  const { name } = await signedInto(a, 'onestop', (node) => node.engine.write('task', 'proofs', { title: 'proofs', estimate: 4, order: 'V' }), { work_ms: 120000 });
   await also(b, name);
   await startButton(a.page).click();
   await expect(a.page.getByText('00:55', { exact: true })).toBeVisible({ timeout: 80000 });
   await expect(button(a.page, 'Stop + log')).toHaveCount(0);
   await button(a.page, 'Stop').click();
-  await ready(a.page, 2);
+  await ready(a.page);
   await expect(a.page.getByText('Lap 1 today stopped at 1 min.').filter({ visible: true })).toBeVisible();
   await expect(button(a.page, "Don't count this lap")).toHaveCount(0);
   const [fill] = await setBar(a.page);
@@ -42,18 +42,18 @@ test('Stop past the first minute: lap 2 is next, the first segment stays part fi
   const rows = await sessionsWhen(name, (r) => r.length === 1);
   expect(rows[0]).toMatchObject({ outcome: 'stopped', kind: 'work' });
 
-  await ready(b.page, 2);
+  await ready(b.page);
   await expect.poll(async () => (await setBar(b.page))[0]).toBeCloseTo(fill!, 2);
   await a.page.reload();
-  await ready(a.page, 2);
+  await ready(a.page);
   await expect.poll(async () => (await setBar(a.page))[0]).toBeCloseTo(fill!, 2);
 
-  // Lap 2 stopped in its first second: a start taken back. No row, nothing drawn, lap 2 still next.
+  // The next lap stopped in its first second: a start taken back. No row, nothing drawn.
   await startButton(a.page).click();
   await button(a.page, 'Stop').click();
   await expect(a.page.getByText('Stopped in its first minute. Not counted as a lap.').filter({ visible: true })).toBeVisible();
   for (const d of [a, b]) {
-    await ready(d.page, 2);
+    await ready(d.page);
     expect((await setBar(d.page))[1] ?? 0, 'a start taken back is drawn').toBe(0);
   }
   await b.page.waitForTimeout(1000);
@@ -99,10 +99,10 @@ test('"Done for now" after a bell and in a break: the timer rests, nothing start
   await expect(button(a.page, 'Skip break')).toHaveCount(0);
   await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
-  await ready(a.page, 2);
+  await ready(a.page);
   await expect(a.page.getByText('Stopped after lap 1 today.').filter({ visible: true })).toBeVisible();
   await a.page.waitForTimeout(1500);
-  await ready(a.page, 2);
+  await ready(a.page);
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
   expect((await timer(name))?.set_index).toBe(1);
 
@@ -111,10 +111,10 @@ test('"Done for now" after a bell and in a break: the timer rests, nothing start
   await button(a.page, 'Start 1 min break').click();
   await expect(startNow(a.page)).toBeVisible();
   await button(a.page, 'Done for now').click();
-  await ready(a.page, 3);
+  await ready(a.page);
   await expect(a.page.getByText('Stopped after lap 2 today.').filter({ visible: true })).toBeVisible();
   await a.page.waitForTimeout(1500);
-  await ready(a.page, 3);
+  await ready(a.page);
   await expect.poll(async () => (await timer(name))?.phase).toBe('idle');
   expect((await timer(name))?.set_index).toBe(2);
   // Two laps that rang, and the break that was cut in its first seconds leaves nothing.
@@ -686,24 +686,24 @@ test('the picker: Pick stands where it was as it opens, as the sliders move and 
 
 // 7. What the code review found after 127 green tests: each, as the person would meet it.
 
-test('the day\'s bar on the result, with a target of 4: after lap 1 rings one segment is full and three empty, on both devices; after lap 4 all four are full', async ({ deviceA: a, deviceB: b }) => {
+test('the task\'s bar on the result, with an estimate of 4: after lap 1 rings one segment is full and three empty, on both devices; after lap 4 all four are full', async ({ deviceA: a, deviceB: b }) => {
   test.setTimeout(90000);
-  const { name } = await signedInto(a, 'setbar', (node) => node.engine.write('settings', 'current', { day_target: 4 }), { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
+  const { name } = await signedInto(a, 'setbar', (node) => node.engine.write('task', 'essay', { title: 'essay', estimate: 4, order: 'V' }), { work_ms: 3000, short_ms: 60000, long_ms: 60000 });
   await also(b, name);
   await startButton(a.page).click();
   for (const d of [a, b]) {
     await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
     await expect.poll(() => setBar(d.page), { message: 'the lap that just rang is not drawn full' }).toEqual([1, 0, 0, 0]);
   }
-  // Laps 2 to 4, each started at once and run to its bell: the lap line names which one rang.
-  for (const lap of [2, 3, 4]) {
+  // Laps 2 to 4 on the same task, each started at once and run to its bell.
+  for (let lap = 2; lap <= 4; lap++) {
     await startNow(a.page).click();
     await expect(button(a.page, 'Pause')).toBeVisible();
-    if (lap < 4) await expect(a.page.getByText(new RegExp(`^Lap ${lap}( of \\d+)? today, done$`)).filter({ visible: true }).first()).toBeVisible({ timeout: 8000 });
+    await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
   }
   for (const d of [a, b]) {
     await expect(startNow(d.page)).toBeVisible({ timeout: 8000 });
-    await expect.poll(() => setBar(d.page), { message: 'the set moment is not four full' }).toEqual([1, 1, 1, 1]);
+    await expect.poll(() => setBar(d.page), { message: 'the estimate\'s last lap is not four full' }).toEqual([1, 1, 1, 1]);
   }
 });
 

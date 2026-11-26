@@ -533,7 +533,7 @@ test('nothing selects: a heading, a task title, a button\'s words and a sentence
   expect(await a.page.evaluate(() => String(getSelection()))).toBe('');
 
   await go(a.page, 'Focus');
-  for (const l of [a.page.getByText(/^Lap 1 today/).first(), startButton(a.page)]) expect(await selectable(l), 'Focus selects').toBe(false);
+  for (const l of [a.page.getByText(/^Start now and it ends at/).first(), startButton(a.page)]) expect(await selectable(l), 'Focus selects').toBe(false);
   await a.page.getByRole('link', { name: `Settings, signed in as ${name}` }).click();
   // Not "keeps step with the server at ...": the address in it is there to be copied.
   expect(await selectable(a.page.getByRole('heading', { name: 'Settings', level: 1 })), 'Settings: the heading selects').toBe(false);

@@ -77,10 +77,10 @@ test('a lap started from the Next row is named on both laptops; it rings, counts
   await expect(list(a.page, 'Next')).toContainText('essay');
   await list(a.page, 'Next').getByRole('button', { name: 'Start', exact: true }).click();
 
-  // Today's bar on A names it; Focus on B names it, with the lap it is on this task.
+  // Today's bar on A names it; Focus on B names it, and its bar is the task's four laps.
   await expect(a.page.getByRole('link', { name: 'Open Focus' })).toContainText('essay');
   await go(b.page, 'Focus');
-  await expect(b.page.getByText('lap 1 on this task, 4 estimated')).toBeVisible();
+  await expect(b.page.locator('main i[style*="--i:"]')).toHaveCount(4);
   await expect(b.page.getByText('essay', { exact: true })).toBeVisible();
 
   await expect(button(b.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });

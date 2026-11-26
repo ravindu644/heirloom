@@ -1,7 +1,7 @@
 // One timer on two laptops, both online: what one does, the other shows, and the session rows the
 // server ends up with (protocol sections 6 and 11).
 import type { Page } from '@playwright/test';
-import { accountWith, digits, ready, sessions, sessionsWhen, signIn, startButton, startNow, username } from './app.ts';
+import { accountWith, digits, lapLine, ready, sessions, sessionsWhen, signIn, startButton, startNow, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -42,11 +42,14 @@ test('a lap started on A shows on B within a second; pause, resume and five more
   const within = { timeout: 1000 };
 
   await seen(test, 'start on A, seen on B', () => startButton(a.page).click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
-  await expect(b.page.getByText('Lap 1 today, focus')).toBeVisible();
+  // A plain lap: the line over the bar says nothing the digits do not.
+  await expect(lapLine(b.page)).toHaveText('');
   await sameSecond(a.page, b.page);
 
   await seen(test, 'pause on B, seen on A', () => button(b.page, 'Pause').click(), () => expect(button(a.page, 'Resume')).toBeVisible(within));
-  await expect(a.page.getByText('Lap 1 today, paused')).toBeVisible();
+  // Held: said under the digits only, and nothing over the bar.
+  await expect(a.page.getByText(/^of \d\d:\d\d, paused since \d\d:\d\d$/).filter({ visible: true })).toBeVisible();
+  await expect(lapLine(a.page)).toHaveText('');
   await sameSecond(a.page, b.page);
 
   await seen(test, 'resume on A, seen on B', () => button(a.page, 'Resume').click(), () => expect(button(b.page, 'Pause')).toBeVisible(within));
@@ -64,8 +67,8 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   const name = await twoLaptops(a, b, 'rings', { work_ms: 4000, short_ms: 60000 });
   await startButton(a.page).click();
   for (const d of [a, b]) {
-    await expect(d.page.getByText('Lap 1 today, done')).toBeVisible({ timeout: 8000 });
-    await expect(button(d.page, 'Start 1 min break')).toBeVisible();
+    await expect(button(d.page, 'Start 1 min break')).toBeVisible({ timeout: 8000 });
+    await expect(lapLine(d.page)).toHaveText('');
     await expect(startNow(d.page)).toBeVisible();
   }
   // Both laptops were in step at the bell, so both may write the row: it must still be one.
@@ -76,7 +79,7 @@ test('a lap rings on both laptops, leaves one rang row, and the break started on
   expect((row!.ended as number) - (row!.started as number)).toBe(4000);
 
   await button(b.page, 'Start 1 min break').click();
-  await expect(a.page.getByText('lap 2 today next')).toBeVisible({ timeout: 1000 });
+  await expect(lapLine(a.page)).toHaveText('Short break', { timeout: 1000 });
   await expect(startNow(a.page)).toBeVisible();
   // A break is not stretched: the offer is for laps.
   for (const d of [a, b]) await expect(button(d.page, '5 more minutes')).toHaveCount(0);
@@ -90,7 +93,7 @@ test('a stop in the first minute is a start taken back: no row, and lap 1 is sti
   // In the page twice, one copy display: none at any width (with the digits, or by the button on a phone).
   await expect(a.page.getByText('Stopped in its first minute. Not counted as a lap.').filter({ visible: true })).toBeVisible();
   // Protocol section 6: under 60000 ms of running it keeps its index, and section 11 writes no row.
-  for (const d of [a, b]) await ready(d.page, 1);
+  for (const d of [a, b]) await ready(d.page);
   await b.page.waitForTimeout(1000);
   expect(await sessions(name)).toEqual([]);
 });
@@ -101,7 +104,7 @@ test('undo after a stop brings the lap back on both laptops, and it then rings a
   await expect(button(b.page, 'Pause')).toBeVisible();
   await button(a.page, 'Stop').click();
   // Stopped in its first seconds: a start taken back, so lap 1 is next again.
-  await ready(b.page, 1);
+  await ready(b.page);
   await button(a.page, 'Undo').click();
   for (const d of [a, b]) await expect(button(d.page, 'Pause')).toBeVisible({ timeout: 1000 });
   await sameSecond(a.page, b.page);

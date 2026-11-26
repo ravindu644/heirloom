@@ -19,7 +19,6 @@ test('a second tab says heirloom is open elsewhere and shows no timer; closing t
 
   await a.page.close();
   await expect(second.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 5000 });
-  await expect(second.getByText('Lap 1 today, focus')).toBeVisible();
   // Counting down, from the lap the first tab started: the clock rounds up, so it reads 25:00 for the first second.
   await expect(digits(second)).toHaveText(/^24:5\d$/, { timeout: 3000 });
 });

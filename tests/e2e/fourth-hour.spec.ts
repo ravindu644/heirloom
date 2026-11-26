@@ -7,7 +7,7 @@ import { localDay } from '../../client/src/core/stats.ts';
 import * as words from '../../client/src/ui/strings.ts';
 import { serverCells, serverRows, table } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
+import { go, lapLine as lapLineOf, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -26,9 +26,8 @@ async function also(d: { page: Page }, name: string) {
   await ready(d.page);
 }
 
-// Focus's line: the words at its left and at its right.
-const lapLine = (page: Page) =>
-  page.locator('[class*="lapline"]').filter({ visible: true }).first().evaluate((line) => [...line.children].map((c) => c.textContent?.trim() ?? ''));
+// Focus's line over the bar, as read.
+const lapLine = (page: Page) => lapLineOf(page).textContent().then((t) => t?.trim() ?? '');
 // Focus's bar, as drawn: its segments, or none.
 const focusBar = (page: Page) => page.locator('main i[style*="--i:"]').count();
 // Words on a screen that name the set of four.
@@ -42,7 +41,7 @@ const setWords = (page: Page) =>
 
 // 1. The set is on no screen.
 
-test('the set is on no screen: through four laps and the long break, Focus, Today, Progress, Room and Settings never name it; the right end says the break each lap earns; the fourth lap is "Four laps. The long break is earned!" and offers it', async ({ deviceA: a }) => {
+test('the set is on no screen: through four laps and the long break, Focus, Today, Progress, Room and Settings never name it; the line over the bar is empty in every lap and on every bell; the break each lap earns is on its button; the fourth lap is "Four laps. The long break is earned!" and offers it', async ({ deviceA: a }) => {
   test.setTimeout(120000);
   await a.page.setViewportSize(PHONE);
   const { name } = await signedInto(a, 'noset', undefined, { work_ms: 3000, short_ms: 5 * MIN, long_ms: 15 * MIN });
@@ -58,30 +57,27 @@ test('the set is on no screen: through four laps and the long break, Focus, Toda
     await go(a.page, 'Focus');
   };
 
-  // No target: no bar on Focus, and the line counts today's laps.
-  expect(await lapLine(a.page)).toEqual(['Lap 1 today, next', '5 min break after']);
-  expect(await focusBar(a.page), 'Focus draws a bar with no target set').toBe(0);
-  const rights: string[] = [];
+  // A lap on nothing: no bar on Focus, and nothing over where it would be.
+  expect(await lapLine(a.page)).toBe('');
+  expect(await focusBar(a.page), 'Focus draws a bar for a lap on nothing').toBe(0);
   for (const lap of [1, 2, 3, 4]) {
     await (lap === 1 ? startButton(a.page) : startNow(a.page)).click();
     await expect(button(a.page, 'Pause')).toBeVisible();
-    const [left, right] = await lapLine(a.page);
-    expect(left).toBe(`Lap ${lap} today, focus`);
-    rights.push(right!);
+    expect(await lapLine(a.page), `lap ${lap}`).toBe('');
     expect(await setWords(a.page), `Focus, lap ${lap}`).toEqual([]);
     if (lap === 2) await everywhere('during lap 2');
     if (lap < 4) {
       await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
-      expect(await lapLine(a.page)).toEqual([`Lap ${lap} today, done`, '5 min break after']);
+      expect(await lapLine(a.page), `lap ${lap} rang`).toBe('');
       await expect(button(a.page, 'Start 5 min break')).toBeVisible();
     }
   }
-  expect(rights).toEqual(['5 min break after', '5 min break after', '5 min break after', '15 min long break after']);
   await expect(a.page.getByText('Four laps. The long break is earned!', { exact: true })).toBeVisible({ timeout: 8000 });
   await expect(button(a.page, 'Start 15 min break')).toBeVisible();
+  expect(await lapLine(a.page), 'lap 4 rang').toBe('');
   expect(await setWords(a.page), 'Focus, the fourth lap done').toEqual([]);
   await button(a.page, 'Start 15 min break').click();
-  await expect.poll(() => lapLine(a.page)).toEqual(['Long break', 'lap 5 today next']);
+  await expect.poll(() => lapLine(a.page)).toBe('Long break');
   await everywhere('in the long break');
   // The room's row in the break: no lap number.
   await go(a.page, 'Room');
@@ -92,18 +88,27 @@ test('the set is on no screen: through four laps and the long break, Focus, Toda
   await expect(me).not.toContainText(/\blap \d|set of/);
 });
 
-test('with a day target Focus counts toward it: "Lap 1 of 2 today", its bar is the target\'s as on Today, past it "Lap 3 today, past your target of 2"; a room row says "Focusing" and no lap', async ({ deviceA: a }) => {
+test('with a day target of 2 and a task of 3, Focus\'s bar is the task\'s three and Today\'s the target\'s two; no words count either on Focus; past the target Focus\'s bar stays the task\'s; a room row says "Focusing" and no lap', async ({ deviceA: a }) => {
   test.setTimeout(90000);
   await a.page.setViewportSize(PHONE);
-  const { name } = await signedInto(a, 'target', (node) => node.engine.write('settings', 'current', { day_target: 2 }), { work_ms: 3000, short_ms: 5 * MIN });
-  await expect.poll(() => lapLine(a.page)).toEqual(['Lap 1 of 2 today, next', '5 min break after']);
-  expect(await focusBar(a.page), 'Focus\'s bar is not the day\'s target').toBe(2);
+  await signedInto(
+    a,
+    'target',
+    (node) => {
+      node.engine.write('settings', 'current', { day_target: 2 });
+      node.engine.write('task', 'essay', { title: 'essay', estimate: 3, order: 'V' });
+    },
+    { work_ms: 3000, short_ms: 5 * MIN },
+  );
+  await expect.poll(() => focusBar(a.page), { message: 'Focus\'s bar is not the task\'s estimate' }).toBe(3);
+  expect(await lapLine(a.page)).toBe('');
   await go(a.page, 'Today');
   const todayBar = await a.page.getByRole('group', { name: 'Day target' }).locator('[aria-hidden="true"]').first().evaluate((bar) => bar.children.length);
   expect(todayBar).toBe(2);
   await go(a.page, 'Focus');
   await startButton(a.page).click();
-  expect((await lapLine(a.page))[0]).toBe('Lap 1 of 2 today, focus');
+  await expect(button(a.page, 'Pause')).toBeVisible();
+  expect(await lapLine(a.page)).toBe('');
   // The room row while the lap runs.
   await go(a.page, 'Room');
   await a.page.getByLabel('Its name').fill('target room');
@@ -113,13 +118,14 @@ test('with a day target Focus counts toward it: "Lap 1 of 2 today", its bar is t
   await expect(me).not.toContainText(/\blap \d|set of/);
   await go(a.page, 'Focus');
   await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
-  await expect.poll(() => lapLine(a.page)).toEqual(['Lap 1 of 2 today, done', '5 min break after']);
+  expect(await lapLine(a.page)).toBe('');
   await startNow(a.page).click();
   await expect(startNow(a.page)).toBeVisible({ timeout: 8000 });
   await startNow(a.page).click();
   await expect(button(a.page, 'Pause')).toBeVisible();
-  expect((await lapLine(a.page))[0]).toBe('Lap 3 today, past your target of 2, focus');
-  expect(await focusBar(a.page)).toBe(2);
+  // The third lap of the day, past the target of 2: Focus's line still counts nothing, its bar is still the task's.
+  expect(await lapLine(a.page)).toBe('');
+  expect(await focusBar(a.page)).toBe(3);
   // Today's strip after a bell is still "Lap done".
   await go(a.page, 'Today');
   await expect(a.page.getByText('Lap done', { exact: true })).toBeVisible({ timeout: 8000 });
@@ -321,7 +327,7 @@ test('a row with nowhere to go does not lift and the hint is not shown; with two
   await a.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await a.page.mouse.down();
   await a.page.waitForTimeout(600);
-  const lifted = await a.page.locator('[class*="lifted"]').count();
+  const lifted = await a.page.locator('[data-lifted]').count();
   await a.page.mouse.up();
   expect(lifted, 'the only open task lifted').toBe(0);
   node.engine.write('task', 'b', { title: 'bravo', order: 'B' });
