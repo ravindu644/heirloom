@@ -115,6 +115,8 @@ type presence struct {
 	endsAt   *int64
 	paused   bool
 	task     *string // the id of the task a lap is for, not its title
+	started  int64
+	ranMs    int64 // how far it had run at now, its pauses left out
 }
 
 // watch reads a timer cell at now. Nothing running, or a run whose bell has gone, is
@@ -124,17 +126,26 @@ func watch(state json.RawMessage, now int64) presence {
 	if !running {
 		return presence{phase: "idle", setIndex: t.SetIndex}
 	}
-	p := presence{phase: t.Phase, setIndex: t.SetIndex, task: t.Task}
+	p := presence{phase: t.Phase, setIndex: t.SetIndex, task: t.Task, started: *t.Started}
 	end, set := t.Ends()
 	if !set {
+		// Held where the pause began. Never past the plan: a lap paused after its bell rang.
 		p.paused = true
+		p.ranMs = min(max(0, *t.PausedAt-*t.Started-t.PausedMs), t.PlannedMs)
 		return p
 	}
 	if now >= end {
 		return presence{phase: "idle", setIndex: p.setIndex}
 	}
 	p.endsAt = &end
+	p.ranMs = max(0, now-*t.Started-t.PausedMs)
 	return p
+}
+
+// weekOf is the Monday, 2026-11-23, of the week ms falls in for someone offsetMin minutes east of UTC.
+func weekOf(ms int64, offsetMin int) string {
+	day := time.UnixMilli(ms + int64(offsetMin)*60000).UTC()
+	return day.AddDate(0, 0, -(int(day.Weekday())+6)%7).Format(time.DateOnly)
 }
 
 // A set has four laps. Anything else in the cell is not passed on to a room.

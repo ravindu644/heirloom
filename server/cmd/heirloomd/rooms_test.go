@@ -445,23 +445,28 @@ func TestPresenceFollowsTheTimer(t *testing.T) {
 	ravi, sachi := w.person("ravi", phone, 330), w.person("sachi", laptop, 330)
 	together(t, "Sachi and me", ravi, sachi)
 	now := func() int64 { return w.ms.Load() }
-	sees := func(what string, phase string, setIndex int, endsAt int64, paused bool) {
+	// ran is the run's ms as the message has it, -1 for no run: every message that says
+	// where the timer is says how far the lap had run too, a pause included.
+	sees := func(what string, phase string, setIndex int, endsAt int64, paused bool, ran int64) {
 		t.Helper()
 		got := who(t, sachi.room(), "ravi")
-		ends := int64(0)
+		ends, ms := int64(0), int64(-1)
 		if got.EndsAt != nil {
 			ends = *got.EndsAt
 		}
-		if got.Phase != phase || got.SetIndex != setIndex || ends != endsAt || got.Paused != paused {
-			t.Errorf("%s: sachi sees %s lap %d, ends %d, paused %v; want %s lap %d, ends %d, paused %v",
-				what, got.Phase, got.SetIndex, ends, got.Paused, phase, setIndex, endsAt, paused)
+		if got.Run != nil {
+			ms = got.Run.Ms
+		}
+		if got.Phase != phase || got.SetIndex != setIndex || ends != endsAt || got.Paused != paused || ms != ran {
+			t.Errorf("%s: sachi sees %s lap %d, ends %d, paused %v, run %d ms; want %s lap %d, ends %d, paused %v, run %d ms",
+				what, got.Phase, got.SetIndex, ends, got.Paused, ms, phase, setIndex, endsAt, paused, ran)
 		}
 	}
 
 	started := now()
 	state := running("work", "run-1", nil, started, lapMs, 1)
 	ravi.set(timerCell(state))
-	sees("start", "work", 1, started+lapMs, false)
+	sees("start", "work", 1, started+lapMs, false, 0)
 	if mine := who(t, ravi.room(), "ravi"); mine.Phase != "work" || !mine.You {
 		t.Errorf("ravi's own devices are told too: %+v", mine)
 	}
@@ -469,12 +474,12 @@ func TestPresenceFollowsTheTimer(t *testing.T) {
 	w.pass(time.Minute)
 	state["paused_at"] = now()
 	ravi.set(timerCell(state))
-	sees("pause", "work", 1, 0, true)
+	sees("pause", "work", 1, 0, true, 60000)
 
 	w.pass(30 * time.Second)
 	state["paused_at"], state["paused_ms"] = nil, 30000
 	ravi.set(timerCell(state))
-	sees("resume", "work", 1, started+30000+lapMs, false)
+	sees("resume", "work", 1, started+30000+lapMs, false, 60000)
 
 	// Ravi's phone goes into a pocket. The alarm is still set, so he is still focusing.
 	ravi.settle()
@@ -483,16 +488,16 @@ func TestPresenceFollowsTheTimer(t *testing.T) {
 
 	stopped := map[string]any{"phase": "idle", "run": nil, "task": nil, "started": nil, "paused_at": nil, "paused_ms": 0, "planned_ms": 0, "set_index": 2}
 	ravi.set(timerCell(stopped))
-	sees("stop", "idle", 2, 0, false)
+	sees("stop", "idle", 2, 0, false, -1)
 
 	// A lap that ends by time alone: nobody pushes anything when the bell goes, and the
 	// room must still say idle.
 	started = now()
 	ravi.set(timerCell(running("short", "run-2", nil, started, 300, 2)))
-	sees("a break", "short", 2, started+300, false)
+	sees("a break", "short", 2, started+300, false, -1)
 	w.pass(299 * time.Millisecond)
 	w.pass(time.Millisecond)
-	sees("the bell, with no push", "idle", 2, 0, false)
+	sees("the bell, with no push", "idle", 2, 0, false, -1)
 	sachi.still("the lap is over and nothing else has happened")
 }
 

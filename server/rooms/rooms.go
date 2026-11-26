@@ -71,7 +71,16 @@ type Member struct {
 	TodayMs   int64   `json:"today_ms"`
 	TodayLaps int     `json:"today_laps"`
 	WeekMs    int64   `json:"week_ms"`
+	Run       *Run    `json:"run"`
 	Last      *Last   `json:"last"`
+}
+
+// Run is the work lap in progress, which the totals leave out: a screen adds ms to the
+// day when today and to the week when week, and lets it grow while the lap is not paused.
+type Run struct {
+	Ms    int64 `json:"ms"`
+	Today bool  `json:"today"`
+	Week  bool  `json:"week"`
 }
 
 type Last struct {
@@ -505,6 +514,10 @@ func (s *Service) fill(m *Member, room, account int64, offsetMin int, now int64)
 	}
 	p := watch(state, now)
 	m.Phase, m.SetIndex, m.EndsAt, m.Paused = p.phase, p.setIndex, p.endsAt, p.paused
+	if p.phase == "work" {
+		// Read by the same offset as the totals, so a lap is never in both or in neither.
+		m.Run = &Run{p.ranMs, localDay(p.started, offsetMin) == t.day, weekOf(p.started, offsetMin) == weekOf(now, offsetMin)}
+	}
 	change = midnight
 	if p.endsAt != nil {
 		change = min(change, *p.endsAt)

@@ -346,3 +346,79 @@ func TestOnlyTheListedFieldsAreRead(t *testing.T) {
 		t.Errorf("a title, which a member may share: %s, %v", v, err)
 	}
 }
+
+// run is the lap in progress, which the totals leave out, read at server_time by the
+// member's own day and week. Colombo is 330 minutes east: its Wednesday began at 18:30
+// UTC on the Tuesday, and its week at 18:30 UTC on Sunday the 22nd.
+func TestRunIsTheLapInProgress(t *testing.T) {
+	w := newWorld(t)
+	ravi, sachi := w.account(t, "ravi", 330), w.account(t, "sachi", 330)
+	_, room, err := w.Create(ravi, "Sachi and me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := w.Join(sachi, w.message(t, room, ravi).Code); err != nil {
+		t.Fatal(err)
+	}
+	const lapMs = 25 * 60 * 1000
+	timer := func(phase string, started time.Time, pausedAt *time.Time, pausedMs int64) {
+		state := map[string]any{"phase": phase, "run": "r1", "task": nil, "started": started.UnixMilli(),
+			"paused_at": nil, "paused_ms": pausedMs, "planned_ms": lapMs, "set_index": 0}
+		if pausedAt != nil {
+			state["paused_at"] = pausedAt.UnixMilli()
+		}
+		w.push(t, ravi, map[[3]string]any{{"timer", "current", "state"}: state})
+	}
+	// Both members read the same: ravi's own message carries it too, and his device ignores it.
+	sees := func(what string, want *Run) {
+		t.Helper()
+		for _, viewer := range []int64{sachi, ravi} {
+			got := w.message(t, room, viewer).Members[0].Run
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("%s, to %d: run = %+v, want %+v", what, viewer, got, want)
+			}
+		}
+	}
+	at := func(d time.Duration) *time.Time { m := wednesday.Add(d); return &m }
+
+	sees("nobody has written a timer", nil)
+
+	timer("work", wednesday.Add(-14*time.Minute), nil, 0)
+	sees("fourteen minutes in", &Run{Ms: 840000, Today: true, Week: true})
+
+	// Ten minutes run, then a pause. However long it lasts, the lap stands where it stopped.
+	w.now = wednesday.Add(-4 * time.Minute)
+	timer("work", wednesday.Add(-14*time.Minute), at(-4*time.Minute), 0)
+	w.now = wednesday.Add(-time.Minute)
+	sees("three minutes into the pause", &Run{Ms: 600000, Today: true, Week: true})
+	w.now = wednesday.Add(4 * time.Minute)
+	sees("five minutes on", &Run{Ms: 600000, Today: true, Week: true})
+	// Resumed after 8 minutes paused, and read 2 minutes later: 12 minutes run.
+	timer("work", wednesday.Add(-14*time.Minute), nil, 8*60000)
+	w.now = wednesday.Add(6 * time.Minute)
+	sees("resumed", &Run{Ms: 720000, Today: true, Week: true})
+
+	// Begun at 23:50 on Tuesday in Colombo, read at 00:10 on Wednesday: not today's, this week's.
+	tuesday := time.Date(2026, 11, 24, 18, 20, 0, 0, time.UTC)
+	w.now = tuesday.Add(20 * time.Minute)
+	timer("work", tuesday, nil, 0)
+	sees("over midnight", &Run{Ms: 1200000, Today: false, Week: true})
+	// Begun at 23:50 on Sunday, read at 00:10 on Monday: last week's, and not this one's.
+	sunday := time.Date(2026, 11, 22, 18, 20, 0, 0, time.UTC)
+	w.now = sunday.Add(20 * time.Minute)
+	timer("work", sunday, nil, 0)
+	sees("over the week's turn", &Run{Ms: 1200000, Today: false, Week: false})
+
+	w.now = wednesday
+	timer("work", wednesday.Add(-25*time.Minute), nil, 0)
+	sees("the bell has gone: its row is coming", nil)
+	timer("short", wednesday.Add(-time.Minute), nil, 0)
+	sees("a break", nil)
+	w.push(t, ravi, map[[3]string]any{{"timer", "current", "state"}: map[string]any{"phase": "idle", "run": nil, "task": nil,
+		"started": nil, "paused_at": nil, "paused_ms": 0, "planned_ms": 0, "set_index": 0}})
+	sees("idle", nil)
+
+	timer("work", wednesday.Add(-14*time.Minute), nil, 0)
+	w.push(t, ravi, map[[3]string]any{{"settings", "current", "rooms_hidden"}: true})
+	sees("away", nil)
+}
