@@ -203,7 +203,8 @@ test('sign in: a wrong password\'s error and the intro are both there and apart;
   await a.page.setViewportSize(PHONE);
   await signIn(a.page, name, 'not the password');
   const error = a.page.getByText('That username and password do not match.').filter({ visible: true });
-  const intro = a.page.getByText(/^Your laps live on this server\./);
+  // The browser's intro: the welcome under the form already says where laps live, so it starts at "Sign in".
+  const intro = a.page.getByText(/^Sign in and this (?:laptop|phone) keeps step with your other devices\.$/);
   await expect(error).toBeVisible();
   await expect(intro).toBeVisible();
   const [e, i] = [(await error.boundingBox())!, (await intro.boundingBox())!];
@@ -414,14 +415,14 @@ test('a project\'s colour: two of the new named colours and a picked one fill th
   expect((await serverRows(server, name, 'project')).get('future')?.color).toBe('chartreuse-ish');
 });
 
-// 8. The welcome, in the browser: beside the form from 720px, under it below. Section 18: one
-// drawing, the title and one sentence; no button, since the form is right there.
+// 8. The welcome, in the browser: the left half from 720px (S1), under the form below. Section
+// 18: one drawing, the title and one sentence; no button, since the form is right there.
 
 /** The welcome's section, wherever it stands. */
 const welcomeOf = (page: Page) => page.locator('section').filter({ has: page.getByRole('heading', { name: about.title, exact: true }) });
 
-test('the browser\'s signed-out screen carries the welcome: beside the form at 1440, under it at 412; one drawing, its title as an h2 and one sentence, no button; the old words and drawings gone; at 1440 the form stands where it would without it and nothing scrolls', async ({ deviceA: a }) => {
-  for (const [size, place] of [[{ width: 1440, height: 900 }, 'beside'], [PHONE, 'under']] as const) {
+test('the browser\'s signed-out screen carries the welcome: the left half at 1440 with the form on the right half and the drawing\'s top on the form heading\'s line, under the form at 412; one drawing, its title as an h2 and one sentence, no button; the old words and drawings gone; at 1440 nothing scrolls', async ({ deviceA: a }) => {
+  for (const [size, place] of [[{ width: 1440, height: 900 }, 'halves'], [PHONE, 'under']] as const) {
     await a.page.setViewportSize(size);
     await a.page.goto('/');
     await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
@@ -441,19 +442,14 @@ test('the browser\'s signed-out screen carries the welcome: beside the form at 1
     // The screen's arrival (it rises into place) must be over, or the form is read a pixel low.
     await settle(a.page);
     const [w, f] = [(await welcome.boundingBox())!, (await a.page.locator('form').boundingBox())!];
-    if (place === 'beside') {
-      expect(w.x + w.width <= f.x || f.x + f.width <= w.x, 'the welcome is not beside the form').toBe(true);
+    if (place === 'halves') {
+      const half = size.width / 2;
+      expect(w.x + w.width, 'the welcome runs past the middle').toBeLessThanOrEqual(half + 1);
+      expect(f.x, 'the form is not on the right half').toBeGreaterThanOrEqual(half - 1);
       const scrolls = await a.page.evaluate(() => [document.scrollingElement!, document.querySelector('main')].filter((el) => el && el.scrollHeight > el.clientHeight + 1).length);
       expect(scrolls, 'at 1440 by 900 the signed-out screen scrolls').toBe(0);
-      // Where the form would stand with no welcome beside it.
-      const alone = await a.page.evaluate((title) => {
-        const section = [...document.querySelectorAll('section')].find((el) => el.querySelector('h2')?.textContent === title)!;
-        section.style.display = 'none';
-        const r = document.querySelector('form')!.getBoundingClientRect();
-        section.style.display = '';
-        return { x: r.x, y: r.y };
-      }, about.title);
-      expect([Math.round(f.x), Math.round(f.y)], 'the welcome moved the form').toEqual([Math.round(alone.x), Math.round(alone.y)]);
+      const [drawing, heading] = [(await welcome.getByRole('img').boundingBox())!, (await a.page.getByRole('heading', { name: 'Sign in', level: 1 }).boundingBox())!];
+      expect(Math.abs(drawing.y - heading.y), `the drawing's top (${drawing.y}) and the form heading's (${heading.y}) are not on one line`).toBeLessThanOrEqual(1);
     } else {
       expect(w.y >= f.y + f.height, 'the welcome is not under the form').toBe(true);
     }

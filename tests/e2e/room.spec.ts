@@ -205,7 +205,7 @@ test('rename and a target; leaving takes a second tap, and the last one out ends
   await target.fill('2.5');
   await target.press('Enter');
   await expect(target, '"2.5" was kept').toHaveValue('20');
-  for (const [typed, kept, said] of [['201', '200', '0m of 200h together this week'], ['-1', '0', '0m together this week'], ['20', '20', '0m of 20h together this week']] as const) {
+  for (const [typed, kept, said] of [['401', '400', '0m of 400h together this week'], ['-1', '0', '0m together this week'], ['20', '20', '0m of 20h together this week']] as const) {
     await target.fill(typed);
     await target.press('Enter');
     await expect(target, `"${typed}" typed`).toHaveValue(kept);
