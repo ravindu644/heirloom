@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The mark from DESIGN.md, the colon of the big timer: you, a filled dot, over the ghost, hollow
-     and dashed (design/logos/colon.svg). 108dp is the adaptive icon canvas; the colon stands 63dp
-     tall inside its 66dp safe circle, so every launcher mask, and the splash's circle, shows it whole.
+     and dashed (design/logos/colon.svg). 108dp is the adaptive icon canvas; drawn at three quarters,
+     the colon stands about 47dp tall, well inside its 66dp safe circle, so a squircle or any other
+     launcher mask, and the splash's circle, has air around it.
      Each dash is its own subpath, so none is cut where the path starts. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="@color/you" android:pathData="M40.389,36.111 a13.611,13.611 0 1,0 27.222,0 a13.611,13.611 0 1,0 -27.222,0" />
-    <path android:strokeColor="@color/ghost" android:strokeWidth="4.278" android:pathData="M51.322,60.734 A11.472,11.472 0 0,1 56.678,60.734 M59.994,62.107 A11.472,11.472 0 0,1 63.782,65.895 M65.155,69.211 A11.472,11.472 0 0,1 65.155,74.567 M63.782,77.883 A11.472,11.472 0 0,1 59.994,81.671 M56.678,83.044 A11.472,11.472 0 0,1 51.322,83.044 M48.006,81.671 A11.472,11.472 0 0,1 44.218,77.883 M42.845,74.567 A11.472,11.472 0 0,1 42.845,69.211 M44.218,65.895 A11.472,11.472 0 0,1 48.006,62.107" />
+    <group android:scaleX="0.75" android:scaleY="0.75" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="@color/you" android:pathData="M40.389,36.111 a13.611,13.611 0 1,0 27.222,0 a13.611,13.611 0 1,0 -27.222,0" />
+        <path android:strokeColor="@color/ghost" android:strokeWidth="4.278" android:pathData="M51.322,60.734 A11.472,11.472 0 0,1 56.678,60.734 M59.994,62.107 A11.472,11.472 0 0,1 63.782,65.895 M65.155,69.211 A11.472,11.472 0 0,1 65.155,74.567 M63.782,77.883 A11.472,11.472 0 0,1 59.994,81.671 M56.678,83.044 A11.472,11.472 0 0,1 51.322,83.044 M48.006,81.671 A11.472,11.472 0 0,1 44.218,77.883 M42.845,74.567 A11.472,11.472 0 0,1 42.845,69.211 M44.218,65.895 A11.472,11.472 0 0,1 48.006,62.107" />
+    </group>
 </vector>

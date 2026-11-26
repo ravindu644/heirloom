@@ -4,6 +4,8 @@
     android:width="48dp" android:height="48dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <path android:fillColor="@color/ground" android:pathData="M10,54 a44,44 0 1,0 88,0 a44,44 0 1,0 -88,0" />
-    <path android:fillColor="@color/you" android:pathData="M40.389,36.111 a13.611,13.611 0 1,0 27.222,0 a13.611,13.611 0 1,0 -27.222,0" />
-    <path android:strokeColor="@color/ghost" android:strokeWidth="4.278" android:pathData="M51.322,60.734 A11.472,11.472 0 0,1 56.678,60.734 M59.994,62.107 A11.472,11.472 0 0,1 63.782,65.895 M65.155,69.211 A11.472,11.472 0 0,1 65.155,74.567 M63.782,77.883 A11.472,11.472 0 0,1 59.994,81.671 M56.678,83.044 A11.472,11.472 0 0,1 51.322,83.044 M48.006,81.671 A11.472,11.472 0 0,1 44.218,77.883 M42.845,74.567 A11.472,11.472 0 0,1 42.845,69.211 M44.218,65.895 A11.472,11.472 0 0,1 48.006,62.107" />
+    <group android:scaleX="0.75" android:scaleY="0.75" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="@color/you" android:pathData="M40.389,36.111 a13.611,13.611 0 1,0 27.222,0 a13.611,13.611 0 1,0 -27.222,0" />
+        <path android:strokeColor="@color/ghost" android:strokeWidth="4.278" android:pathData="M51.322,60.734 A11.472,11.472 0 0,1 56.678,60.734 M59.994,62.107 A11.472,11.472 0 0,1 63.782,65.895 M65.155,69.211 A11.472,11.472 0 0,1 65.155,74.567 M63.782,77.883 A11.472,11.472 0 0,1 59.994,81.671 M56.678,83.044 A11.472,11.472 0 0,1 51.322,83.044 M48.006,81.671 A11.472,11.472 0 0,1 44.218,77.883 M42.845,74.567 A11.472,11.472 0 0,1 42.845,69.211 M44.218,65.895 A11.472,11.472 0 0,1 48.006,62.107" />
+    </group>
 </vector>
