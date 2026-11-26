@@ -11,7 +11,7 @@ S10 := $(S10_USER)@$(S10_ADDR)
 need-s10 = @test -n "$(S10_USER)" -a -n "$(S10_ADDR)" || { echo "No S10 address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
 CHECKS := lint-design contracts test-tools style audit types pure test-core test-server test-sync sim budget e2e
-.PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk deploy s10-rss
+.PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy s10-rss
 
 # -k: one failing check does not hide the others.
 check:
@@ -92,6 +92,22 @@ apk: tokens
 	VITE_APP=1 VITE_SERVER_URL=$(SERVER) pnpm exec vite build --outDir dist-app
 	pnpm exec cap sync android
 	cd android && JAVA_HOME=$(JDK21) ./gradlew assembleDebug
+
+# The APK for friends, signed with release.keystore at the repo root (gitignored) and the
+# passwords KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD from ~/.gradle/gradle.properties; without
+# them it is signed with the debug key. CI does the same from secrets (.github/workflows/ci.yml).
+# The same key must sign every update for as long as the app lives.
+release-apk: tokens
+	VITE_APP=1 VITE_SERVER_URL=$(SERVER) pnpm exec vite build --outDir dist-app
+	pnpm exec cap sync android
+	cd android && JAVA_HOME=$(JDK21) ./gradlew assembleRelease
+
+# One version for the app: "version" in package.json. The APK's versionCode is worked out from it
+# and the commit count (android/app/build.gradle); a v* tag must match it (CI checks).
+bump:
+	@echo "$(NEW)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$' || { echo "Usage: make bump NEW=x.y.z"; exit 1; }
+	@sed -i 's/^  "version": ".*",/  "version": "$(NEW)",/' package.json
+	@echo "[+] Version $$(node -p 'require("./package.json").version') set. Commit it, then tag v$(NEW) to release."
 
 # Puts the binary and its systemd unit on the S10 and restarts the service there. It listens on
 # the container's localhost only; the tunnel is what lets anyone in. The sudo password goes from

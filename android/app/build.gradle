@@ -1,5 +1,31 @@
 apply plugin: 'com.android.application'
 
+// As in Droidspaces: every commit gets its own build number, so CI APKs between version bumps
+// still install over each other. Needs full history: a shallow clone counts 1, and a tarball
+// without .git counts 0.
+def gitCommitCount = 0
+try {
+    gitCommitCount = providers.exec {
+        workingDir rootProject.projectDir.parentFile
+        commandLine 'git', 'rev-list', '--count', 'HEAD'
+    }.standardOutput.asText.get().trim().toInteger()
+} catch (Exception ignored) {}
+
+// One version for the web app and the APK: package.json's at the repo root.
+def appVersionName = new groovy.json.JsonSlurper().parse(file('../../package.json')).version ?: '1.0.0'
+// ponytail: 10000 commits per release before the suffix spills into the next slot; still monotonic, just ugly
+def appVersionCode
+try {
+    def parts = appVersionName.tokenize('.')
+    def major = parts[0]?.toInteger() ?: 1
+    def minor = parts[1]?.toInteger() ?: 0
+    def patch = parts[2]?.toInteger() ?: 0
+    appVersionCode = major * 1000 + minor * 100 + patch * 10
+} catch (Exception ignored) {
+    appVersionCode = 1
+}
+appVersionCode = appVersionCode * 10000 + gitCommitCount
+
 android {
     namespace = "io.github.ravindu644.heirloom"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +33,8 @@ android {
         applicationId "io.github.ravindu644.heirloom"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +42,33 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // release.keystore at the repo root (gitignored) signs debug and release alike, as in
+        // Droidspaces. The passwords come from -P, gradle.properties or ~/.gradle/gradle.properties.
+        // Groovy's ?: also takes an empty -P (a CI secret that is not set) as missing.
+        def keystoreFile = file('../../release.keystore')
+        def keystorePassword = providers.gradleProperty('KEYSTORE_PASSWORD').orNull ?: ''
+        def keyAliasName = providers.gradleProperty('KEY_ALIAS').orNull ?: 'droidspaces'
+        def actualKeyPassword = providers.gradleProperty('KEY_PASSWORD').orNull ?: keystorePassword
+        if (keystoreFile.exists() && keystorePassword) {
+            def sign = { config ->
+                config.storeFile = keystoreFile
+                config.storePassword = keystorePassword
+                config.keyAlias = keyAliasName
+                config.keyPassword = actualKeyPassword
+                config.enableV2Signing = true
+                config.enableV3Signing = true
+                config.enableV4Signing = true
+            }
+            sign(getByName('debug'))
+            sign(create('release'))
+        }
+        // No release key (a fork, a pull request): release signs with the debug config. AGP makes
+        // ~/.android/debug.keystore when it is missing, but only for the config named "debug".
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

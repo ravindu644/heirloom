@@ -104,6 +104,9 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 ## Devices
 - Machine-specific details (the S10 container's address and login, the phone's adb serial) live in
   `.local/ENV.md`, which is gitignored. Ask the user if it is missing; never guess a password.
+- Release signing: `release.keystore` at the repo root (gitignored, never committed) and the Gradle
+  properties `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` in `~/.gradle/gradle.properties`; CI
+  gets the same from secrets, the key as base64 in `RELEASE_KEYSTORE`.
 - Phone: run `adb devices` first, every time. If no line ends in `device`, stop and say so.
 - S10 container: deploy with `make deploy`; never edit files on it by hand.
 
