@@ -14,6 +14,8 @@ import { createInvites } from './invites.ts';
 import type { Invites } from './invites.ts';
 import { createProgress } from './progress.ts';
 import type { Progress } from './progress.ts';
+import { createResets } from './resets.ts';
+import type { Resets } from './resets.ts';
 import { createRooms } from './rooms.ts';
 import type { Rooms } from './rooms.ts';
 import { createServerChoice } from './server.ts';
@@ -56,7 +58,7 @@ export const serverChoice = (first?: string): Promise<ServerChoice> =>
  * replaces, so it must be listening before the first message arrives.
  * `url` is the server when it is not the page's own origin, as in the phone app.
  */
-export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins }> {
+export async function startApp(url?: string): Promise<{ engine: Engine; focus: Focus; today: Today; progress: Progress; habits: Habits; rooms: Rooms; settings: Settings; invites: Invites; admins: Admins; resets: Resets }> {
   const env = browserEnv(url);
   // The wire is made here, so the browser's own word that the network is gone can reach it.
   let wire: Transport | undefined;
@@ -85,5 +87,5 @@ export async function startApp(url?: string): Promise<{ engine: Engine; focus: F
   addEventListener('offline', () => wire?.offline());
   // And a laptop that slept over midnight must not go on showing yesterday until a late timer fires.
   document.addEventListener('visibilitychange', () => document.hidden || wake());
-  return { engine, focus, today: made, progress, habits, rooms, settings, invites: createInvites(engine), admins: createAdmins(engine) };
+  return { engine, focus, today: made, progress, habits, rooms, settings, invites: createInvites(engine), admins: createAdmins(engine), resets: createResets(engine) };
 }

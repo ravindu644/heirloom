@@ -115,6 +115,16 @@ export interface Engine {
   /** Whether the server has no account yet and the next one made owns it (`setup` in /healthz). False when it cannot be asked. */
   needsSetup(): Promise<boolean>;
   signIn(username: string, password: string): Promise<AccountResult>;
+  /**
+   * Whose password a reset link sets (protocol section 10, "A way back in"). Asked with no
+   * token: it is for whoever holds the link. `reset`: unknown, used, taken back or run out.
+   */
+  resetLook(reset: string): Promise<{ ok: true; username: string } | { ok: false; error: string; retry_after?: number }>;
+  /**
+   * Sets the new password with a reset link and signs this device in, as `signIn` does and by
+   * the same rules: the account's own database here is opened, and what it had not sent is sent.
+   */
+  resetUse(reset: string, password: string): Promise<AccountResult>;
   signOut(): Promise<AccountResult>;
   /** Reconnect now: call it when the network returns or the app comes to the front. */
   wake(): void;
@@ -688,6 +698,14 @@ export async function createEngine(env: Env): Promise<Engine> {
 
     register: (invite, username, password) => enter('/api/register', { invite, username, password }),
     signIn: (username, password) => enter('/api/login', { username, password }),
+
+    async resetLook(reset) {
+      const answer = await ask('/api/reset/look', { reset });
+      if (!answer.ok) return answer;
+      // A 200 that names nobody is the server's own fault, and is said as one.
+      return typeof answer.data.username === 'string' ? { ok: true, username: answer.data.username } : { ok: false, error: 'server' };
+    },
+    resetUse: (reset, password) => enter('/api/reset', { reset, password }),
     needsSetup: () => health(env, env.url).then((answer) => answer?.setup === true, () => false),
 
     signOut: () =>

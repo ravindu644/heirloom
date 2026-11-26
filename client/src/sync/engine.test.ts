@@ -53,6 +53,8 @@ function fakeAccounts() {
     fail: null as null | { status: number; error: string; retryAfter?: string; times?: number },
     /** Set, and the next logout waits for it: the request is on its way and has not come back. */
     logoutWaits: null as null | Promise<void>,
+    /** Reset links that are good, and whose password each sets. */
+    resets: {} as Record<string, string>,
     /** What /healthz says. 'hangs' never answers. */
     health: { ok: true, version: 'test', sqlite: 'test' } as unknown,
   };
@@ -74,7 +76,9 @@ function fakeAccounts() {
     if (server.fail && fail) {
       return { ok: false, status: fail.status, headers: { get: () => fail.retryAfter ?? null }, json: async () => ({ error: fail.error }) };
     }
-    const reply = path === '/api/logout' ? {} : { token: `token-of-${body.username}`, account: `acct-${body.username}`, username: body.username };
+    const username = path.startsWith('/api/reset') ? server.resets[body.reset] : body.username;
+    if (path.startsWith('/api/reset') && !username) return { ok: false, status: 403, headers: { get: () => null }, json: async () => ({ error: 'reset' }) };
+    const reply = path === '/api/logout' ? {} : path === '/api/reset/look' ? { username } : { token: `token-of-${username}`, account: `acct-${username}`, username };
     return { ok: true, status: 200, headers: { get: () => null }, json: async () => reply };
   };
   return { server, fetch };
@@ -1245,6 +1249,53 @@ describe('accounts', () => {
     assert.deepEqual(await d.engine.signOut(), { ok: false, error: 'unsent' });
     assert.equal((await (await d.stores('heirloom-acct-ravi')).load()).cells.length, 1);
     assert.equal(title(d), 'not sent yet');
+  });
+
+  it('a reset is looked at with the link alone and used with the device id, as a sign in is: the session survives a restart, and a full hashing line is waited out', async () => {
+    const d = await device();
+    d.server.resets.q7Xk = 'sam';
+    assert.deepEqual(await d.engine.resetLook('q7Xk'), { ok: true, username: 'sam' });
+    assert.deepEqual(await d.engine.resetLook('nothing'), { ok: false, error: 'reset' });
+    assert.deepEqual(d.server.calls.map((call) => [call.path, call.body]), [['/api/reset/look', { reset: 'q7Xk' }], ['/api/reset/look', { reset: 'nothing' }]]);
+    assert.equal(d.engine.account.value, null);
+    d.server.calls.length = 0;
+    d.server.fail = { status: 429, error: 'slow_down', retryAfter: '1', times: 1 };
+    const used = d.engine.resetUse('q7Xk', 'a new password');
+    await settle();
+    d.time.advance(1000);
+    assert.deepEqual(await used, { ok: true });
+    assert.deepEqual(d.server.calls.map((call) => [call.path, call.body]), Array(2).fill(['/api/reset', { reset: 'q7Xk', password: 'a new password', device: d.engine.device }]));
+    assert.deepEqual(d.engine.account.value, { account: 'acct-sam', username: 'sam' });
+    assert.equal(d.wire().handlers.hello().token, 'token-of-sam');
+    await d.engine.stop();
+    assert.equal((await device({ stores: d.stores })).engine.account.value?.username, 'sam');
+    // A link that is not good signs nobody in, and whoever is signed in stays so.
+    const other = await signedIn();
+    assert.deepEqual(await other.engine.resetUse('nothing', 'a new password'), { ok: false, error: 'reset' });
+    assert.equal(other.engine.account.value?.username, 'ravi');
+  });
+
+  it('refused by the server and then closed: opened again the unsent edit is still there, still refused, and goes when the same account signs in', async () => {
+    const d = await signedIn();
+    d.engine.write('task', 't1', { title: 'unsent when the token died' });
+    await d.engine.saved();
+    d.wire().handlers.message({ type: 'bye', reason: 'token' });
+    await d.engine.stop();
+    const again = await device({ stores: d.stores });
+    assert.equal(again.engine.account.value?.username, 'ravi');
+    assert.equal(again.engine.unsent.value, 1);
+    again.wire().handlers.message({ type: 'bye', reason: 'token' });
+    assert.equal(again.engine.sync.value, 'signed-out');
+    assert.deepEqual(await again.engine.signIn('ravi', 'a new password'), { ok: true });
+    again.wire().welcome();
+    await again.engine.saved();
+    assert.deepEqual(again.wire().sent.map((push) => push.cells.map((c) => c.value)), [['unsent when the token died']]);
+    again.wire().ack(0, 1);
+    assert.equal(again.engine.unsent.value, 0);
+    // Once: the next conversation has nothing to send.
+    again.wire().welcome(1);
+    await again.engine.saved();
+    assert.equal(again.wire().sent.length, 1);
   });
 
   it('bye token: signed out, the wire stopped, the data and the outbox kept, and signing in again sends it', async () => {

@@ -13,6 +13,7 @@ import { createFocus } from './focus.ts';
 import { createHabits } from './habits.ts';
 import { createInvites } from './invites.ts';
 import { createProgress } from './progress.ts';
+import { createResets } from './resets.ts';
 import { createRooms } from './rooms.ts';
 import { createSettings } from './settings.ts';
 import { createToday } from './today.ts';
@@ -34,6 +35,8 @@ export function world() {
   type Answer = { status: number; body: object; retryAfter?: string } | 'unreachable';
   const server = {
     requests: [] as { path: string; body: any; from: string }[],
+    /** Reset links that are good, and whose password each sets. */
+    resets: new Map<string, string>(),
     reply: null as null | ((path: string, body: any) => Answer | Promise<Answer>),
   };
   // Set to 1 and every look at the clock finds it a millisecond later, as a real one may.
@@ -63,8 +66,11 @@ export function world() {
         const path = new URL(url).pathname;
         // /healthz is a GET and has no body. It is the test's to answer, as every call but the account's is.
         const body = JSON.parse(init.body ?? 'null');
-        let answer: Answer = { status: 200, body: { token: `token-${name}`, account: body?.username === 'ravi' ? 'acct' : `acct-${body?.username}`, username: body?.username } };
-        if (!['/api/login', '/api/register', '/api/logout'].includes(path)) {
+        // A reset signs in as whoever it is for, and is used up; one that is not good is refused.
+        const username = path === '/api/reset' ? server.resets.get(body?.reset) : body?.username;
+        let answer: Answer = { status: 200, body: { token: `token-${name}`, account: username === 'ravi' ? 'acct' : `acct-${username}`, username } };
+        if (path === '/api/reset' && !server.resets.delete(body?.reset)) answer = { status: 403, body: { error: 'reset' } };
+        if (!['/api/login', '/api/register', '/api/logout', '/api/reset'].includes(path)) {
           server.requests.push({ path, body, from: name });
           answer = (await server.reply?.(path, body)) ?? { status: 200, body: {} };
         }
@@ -105,6 +111,7 @@ export function world() {
     let settings: ReturnType<typeof createSettings> | undefined;
     let invites: ReturnType<typeof createInvites> | undefined;
     let admins: ReturnType<typeof createAdmins> | undefined;
+    let resets: ReturnType<typeof createResets> | undefined;
 
     const d = {
       name,
@@ -131,9 +138,13 @@ export function world() {
       get admins() {
         return (admins ??= createAdmins(engine));
       },
+      get resets() {
+        return (resets ??= createResets(engine));
+      },
       close() {
         invites?.close();
         admins?.close();
+        resets?.close();
         focus.close();
         today?.close();
         progress?.close();
