@@ -294,3 +294,17 @@ For the lead:
   elements it does not render goes in `data-` attributes.
 - **Review a merged picture, not the lane's word.** The first carry frames looked right in the
   lane's report; the design review measured classes frame by frame and found the lift gone.
+
+## 14. Lessons from the room's fit
+
+- **Peers in one space are one size.** A room's sheet passed every review with a switch's words,
+  group names and the notes under them in four or five sizes; the user saw it at once. The audit
+  never opened sheets (a `display: contents` wrapper hid them). Now the kit marks each job
+  (`data-job`: name, note, switch, person, heading, sheet) and the audit's `job` rule holds each
+  to its DESIGN.md role. A note is `Note`, a group's name is `Name` (kit/note.tsx); never a
+  screen's own `.note` or `.legend` with its own size.
+- **A number the user gives as an example is not a limit.** "3 is enough" meant "not five for one
+  job", not a cap on the app's sizes. Ask what the number protects before writing it into a rule.
+- **A picture shown in one place is shown in all.** The header had the profile picture and the
+  Admins list a letter, because the list carried no picture. When a person is drawn, grep every
+  `<Person` and `<Face` for a missing `picture`.

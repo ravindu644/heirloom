@@ -313,6 +313,20 @@ number updates, so digits do not jiggle.
 The result sentence of a finished lap is `headline` on the phone and `headline-lg` on the laptop;
 buttons and panel headings are `body-strong`; the split chip's figure is `figure-sm`.
 
+**A size follows the job, never the screen.** Things that do the same job in one space (a
+panel, a sheet, a row of controls) are the same size, and the same job is the same size on every
+screen. The app may use any role this file defines where it suits; what it may not do is set two
+peers apart, as a room's sheet did when its switch's words, its group names and the notes under
+each came in four or five sizes. Figures (a code, a count, a time) are their `figure-*` role. The
+words of a panel or a sheet, by job:
+- `label` (13px): the name of a field, a setting or a group ("Its name", "Together in a week",
+  "Who is in"), a sheet's header, and every note or helper under something ("Whoever has it can
+  join.", "Most focus first, for everyone in this room.").
+- `body` (16px), `body-strong` at the same size: a sentence that says something, whatever is typed
+  or picked, a switch row's words ("Order by this week"), a person's name in a list, a panel's
+  heading and a button (`body-strong`).
+- `title` (24px): a screen's own heading where it has one.
+
 Files, latin subset, OFL 1.1, in `design/fonts/`: barlow-condensed-500 (21 KB), -600 (22 KB),
 barlow-400, -500, -600 (22 to 23 KB each). About 110 KB for the whole app; load the timer weight
 first, the rest after first paint.
@@ -752,9 +766,8 @@ Built once in `client/src/ui/kit/` and reused.
   has six dashes, or it fades on a screen of one pixel to the point. Where only one colour is allowed (the status bar, a themed icon) the
   upper is filled and the lower dashed: eight dashes, six under 24dp, where eight run together.
   Chosen 2026-11-25 from five; the others are kept in `design/logos/`.
-- **The person:** a `raised` circle with the first letter of the username in `body-strong`, and
-  the username beside it in `label`. In the header and in a room. Which side the circle is on:
-  see The header.
+- **The person:** their circle (A person's circle) and the username beside it, in `body` in a
+  list or a panel and in `label` in the header's chip. Which side the circle is on: see The header.
 - **The server step:** the phone app's first screen, and what "Change" on the sign-in screen
   opens. The header's mark and name, a headline, one field ("Server", with the hint that an invite
   link works too, and an address as its placeholder so the shape is seen before the first try) and one primary button under it; the sentence that answers a refusal takes the
