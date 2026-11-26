@@ -159,3 +159,85 @@ test('two every-day habits made together ten days ago, one first checked in nine
   expect(late, 'the later one says no "of the last N planned days"').not.toBeNull();
   expect(early, `made together, "early" counts ${early} planned days and "late" ${late}`).toBe(late);
 });
+
+// 5. A friend's lane counts their lap in progress, and stops while it is held.
+
+/** "1h 5m" as minutes. */
+const asMin = (t: string) => {
+  const m = t.match(/^(?:(\d+)h )?(\d+)m$/);
+  if (!m) throw new Error(`not a total: "${t}"`);
+  return Number(m[1] ?? 0) * 60 + Number(m[2]);
+};
+
+test('a friend\'s lane counts their lap in progress: B\'s lane on A says what B\'s Today and Progress say, the room\'s week is the sum, it stands still while B\'s lap is paused and grows again once resumed', async ({ deviceA: a, deviceB: b }) => {
+  test.setTimeout(360000);
+  const since = Date.now() - Date.parse(`${day(0)}T00:00:00Z`) + OFF * MIN;
+  test.skip(since < 40 * MIN, 'too near midnight for a lap earlier today');
+  for (const d of [a, b]) await d.page.setViewportSize(PHONE);
+  // A lap of whole minutes earlier today for each, so the sum has two parts and no rounding of its own.
+  await signedInto(a, 'lanea', (node) => lap(node, 'a1', Date.now() - 35 * MIN));
+  const { name: nameB } = await signedInto(b, 'laneb', (node) => lap(node, 'b1', Date.now() - 35 * MIN));
+
+  // A makes the room, B joins with its code.
+  await go(a.page, 'Room');
+  await a.page.getByLabel('Its name').fill('two of us');
+  await button(a.page, 'Make the room').click();
+  await button(a.page, 'Code and settings').click();
+  const sheet = a.page.getByRole('dialog', { name: 'This room' });
+  const code = (await sheet.getByRole('region', { name: 'The code to share' }).locator('p').first().innerText()).replace(/\s/g, '');
+  await sheet.getByRole('button', { name: 'Close', exact: true }).click();
+  await go(b.page, 'Room');
+  await b.page.getByLabel('The code a friend gave you').fill(code);
+  await button(b.page, 'Join').click();
+  const lanes = a.page.getByRole('region', { name: 'Who is focusing now' }).locator('article');
+  await expect(lanes).toHaveCount(2, { timeout: 5000 });
+  const laneB = lanes.filter({ has: a.page.getByText(new RegExp(`^.${nameB}$`)) });
+
+  /** B's lane as A sees it, and the room's week, from A's Room. */
+  const onA = async () => {
+    await go(a.page, 'Room');
+    const text = (await laneB.innerText()).replace(/\s+/g, ' ');
+    const m = text.match(/((?:\d+h )?\d+m) today in \d+ laps?, ((?:\d+h )?\d+m) this week\./);
+    if (!m) throw new Error(`B's lane on A says "${text}"`);
+    const together = minutes((await a.page.getByText(/together this week\.$/).first().innerText()));
+    return { today: m[1]!, week: m[2]!, together };
+  };
+
+  await go(b.page, 'Focus');
+  await startButton(b.page).click();
+  await expect(button(b.page, 'Pause')).toBeVisible();
+  await b.page.waitForTimeout(75000);
+
+  // A's view, B's own Today and Progress, A's view again: the two A readings agree, so all fell in one minute.
+  let read: { lane: Awaited<ReturnType<typeof onA>>; today: string; week: string } | null = null;
+  for (let tries = 0; tries < 3 && !read; tries++) {
+    const first = await onA();
+    await go(b.page, 'Today');
+    const today = minutes(await b.page.locator('main dl > div').filter({ hasText: 'Focused' }).innerText());
+    await go(b.page, 'Progress');
+    const week = minutes(((await b.page.getByRole('img', { name: /^This week .* so far\./ }).first().getAttribute('aria-label')) ?? '').replace(/^This week /, ''));
+    const again = await onA();
+    if (JSON.stringify(first) === JSON.stringify(again)) read = { lane: first, today, week };
+  }
+  expect(read, 'the minute turned on every try').not.toBeNull();
+  expect({ today: read!.lane.today, week: read!.lane.week }, 'B\'s lane on A against B\'s own Today and Progress').toEqual({ today: read!.today, week: read!.week });
+  // A's own week is the one 25 minute lap.
+  expect(asMin(read!.lane.together), 'the room\'s week is not A\'s and B\'s together').toBe(25 + asMin(read!.lane.week));
+  expect(asMin(read!.lane.today), 'B\'s running lap is not counted on A').toBeGreaterThan(25);
+
+  // Paused: B's lane on A stands still a minute on.
+  await go(b.page, 'Focus');
+  await button(b.page, 'Pause').click();
+  await expect(button(b.page, 'Resume')).toBeVisible();
+  await a.page.waitForTimeout(3000);
+  const held = await onA();
+  await a.page.waitForTimeout(65000);
+  expect(await onA(), 'B\'s lane went on growing while the lap was paused').toEqual(held);
+
+  // Resumed: it grows again.
+  await button(b.page, 'Resume').click();
+  await expect(button(b.page, 'Pause')).toBeVisible();
+  await a.page.waitForTimeout(65000);
+  const grown = await onA();
+  expect(asMin(grown.today), 'B\'s lane did not grow once the lap was resumed').toBeGreaterThan(asMin(held.today));
+});
