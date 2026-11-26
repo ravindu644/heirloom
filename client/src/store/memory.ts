@@ -35,7 +35,7 @@ export function memoryStores(): OpenStore {
         const w = structuredClone(write);
         for (const cell of w.cells ?? []) held.cells.set(cellKey(cell), cell);
         for (const [key, waiting] of w.outbox ?? []) waiting ? held.outbox.add(key) : held.outbox.delete(key);
-        for (const [key, value] of Object.entries(w.meta ?? {})) held.meta.set(key, value);
+        for (const [key, value] of Object.entries(w.meta ?? {})) value === undefined ? held.meta.delete(key) : held.meta.set(key, value);
       },
       close() {
         open = false;

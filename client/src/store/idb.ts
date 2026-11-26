@@ -74,7 +74,9 @@ function wrap(db: IDBDatabase, askOnce: () => void, remove: () => IDBOpenDBReque
           for (const [key, waiting] of write.outbox ?? []) {
             waiting ? tx.objectStore('outbox').put(1, key) : tx.objectStore('outbox').delete(key);
           }
-          for (const [name, value] of Object.entries(write.meta ?? {})) tx.objectStore('meta').put(value, name);
+          for (const [name, value] of Object.entries(write.meta ?? {})) {
+            value === undefined ? tx.objectStore('meta').delete(name) : tx.objectStore('meta').put(value, name);
+          }
           if (write.cells?.length) askOnce();
         } catch (err) {
           // A value IndexedDB cannot store throws here, after earlier puts were queued: take them all back.

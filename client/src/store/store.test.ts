@@ -62,6 +62,13 @@ for (const [kind, make] of kinds) {
       assert.deepEqual(snap.meta, { cursor: 2, offset: 20 });
     });
 
+    it('a meta name written as undefined is deleted, and the others stay', async () => {
+      const store = await make()('a');
+      await store.write({ meta: { cursor: 1, 'local.pictures': ['ab'] } });
+      await store.write({ meta: { 'local.pictures': undefined } });
+      assert.deepEqual((await store.load()).meta, { cursor: 1 });
+    });
+
     it('outbox entries are added and taken out in the order written', async () => {
       const store = await make()('a');
       await store.write({ outbox: [['k1', true], ['k2', true], ['k3', true]] });

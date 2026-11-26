@@ -17,7 +17,7 @@ export interface Write {
   cells?: Cell[];
   /** `[key, true]` adds the key to the outbox, `[key, false]` takes it out. */
   outbox?: [key: string, waiting: boolean][];
-  /** Set by name. Names left out keep their value. */
+  /** Set by name. Names left out keep their value; a name set to undefined is deleted. */
   meta?: Record<string, unknown>;
 }
 

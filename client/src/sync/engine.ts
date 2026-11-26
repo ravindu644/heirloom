@@ -148,10 +148,10 @@ export interface Engine {
   /**
    * A value kept on this device and never sent: what `keep` last put under `name`. By default
    * it belongs to the signed-in account. With `'device'` it belongs to the install, whoever is
-   * signed in or nobody: it outlives a sign out.
+   * signed in or nobody: it outlives a sign out. Undefined when nothing is kept.
    */
   kept(name: string, scope?: 'account' | 'device'): unknown;
-  /** An account's value is saved with whatever else is being written and goes with its database at sign out. A device's goes into the install's own store. */
+  /** An account's value is saved with whatever else is being written and goes with its database at sign out. A device's goes into the install's own store. Null or undefined takes the name out. */
   keep(name: string, value: unknown, scope?: 'account' | 'device'): void;
   /** Every cell held, for tests and the simulator to compare devices. */
   cells(): Cell[];
@@ -784,15 +784,15 @@ export async function createEngine(env: Env): Promise<Engine> {
     kept: (name, scope) => (scope === 'device' ? mine.get(name) : db?.local.get(name)),
 
     keep(name, value, scope) {
-      if (scope === 'device') {
-        mine.set(name, value);
-        // The install's store is written on its own. If it refuses, the value holds until the app closes.
-        return void install.write({ meta: { [LOCAL + name]: value } }).catch(() => {});
-      }
+      // Nothing to keep takes the name out, so it is not loaded again at every start.
+      const v = value ?? undefined;
       const r = db;
-      if (!r) return;
-      r.local.set(name, value);
-      save(r, { meta: { [LOCAL + name]: value } });
+      const held = scope === 'device' ? mine : r?.local;
+      if (!held) return;
+      v === undefined ? held.delete(name) : held.set(name, v);
+      // The install's store is written on its own. If it refuses, the value holds until the app closes.
+      if (scope === 'device') return void install.write({ meta: { [LOCAL + name]: v } }).catch(() => {});
+      save(r!, { meta: { [LOCAL + name]: v } });
     },
 
     async saved() {

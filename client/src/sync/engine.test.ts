@@ -294,6 +294,22 @@ describe('a local edit', () => {
     assert.equal(again.engine.kept('rooms'), undefined);
   });
 
+  it('keeping null takes the name out of memory and the store, for the account and for the device', async () => {
+    const d = await signedIn();
+    d.engine.keep('rooms', [{ room: 'r_1' }]);
+    d.engine.keep('ring', true, 'device');
+    d.engine.keep('rooms', null);
+    d.engine.keep('ring', undefined, 'device');
+    assert.equal(d.engine.kept('rooms'), undefined);
+    assert.equal(d.engine.kept('ring', 'device'), undefined);
+    await d.engine.saved();
+    await d.engine.stop();
+    for (const name of ['heirloom', 'heirloom-acct-ravi']) {
+      const meta = (await (await d.stores(name)).load()).meta;
+      assert.ok(!('local.rooms' in meta) && !('local.ring' in meta), `${name} holds nothing under the name`);
+    }
+  });
+
   it('request: the token and device are put in, the server\'s code comes back, and signed out it answers offline without asking', async () => {
     const d = await signedIn();
     assert.equal((await d.engine.request('/api/rooms/leave', { room: 'r_1' })).ok, true);

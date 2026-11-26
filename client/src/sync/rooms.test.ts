@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { Write } from '../store/store.ts';
 import { T0, settle } from './fakes.ts';
 import { MIN, OFFSET, world } from './world.ts';
 
@@ -833,6 +834,104 @@ describe('pictures', () => {
     assert.equal(await r.picture(hash), url);
     assert.equal(gets(), 2);
     assert.equal(await r.picture('not a hash'), null);
+  });
+
+  it('kept on the device: after a cold start a picture is there at once, offline, with no request', async () => {
+    const { w, d, r } = await one();
+    const hash = 'ab'.repeat(32);
+    const gets = () => w.server.requests.filter((q) => q.path === `/api/pictures/${hash}`).length;
+    assert.equal(r.pictureNow(hash), null, 'not kept yet');
+    await r.picture(hash);
+    await d.engine.saved();
+    const again = await w.restart(d, { online: false });
+    const url = again.rooms.pictureNow(hash);
+    assert.match(url ?? '', /^blob:/);
+    assert.equal(again.rooms.pictureNow(hash), url, 'one URL per hash per app life');
+    assert.equal(await again.rooms.picture(hash), url);
+    assert.equal(gets(), 1);
+    // The bytes are the ones the server sent.
+    assert.equal(await (await fetch(url!)).text(), JSON.stringify({}));
+  });
+
+  it('the 50 used last are kept: the 51st puts out the one used longest ago', async () => {
+    const { w, d, r } = await one();
+    const hash = (n: number) => n.toString(16).padStart(64, '0');
+    for (let n = 0; n < 50; n++) await r.picture(hash(n));
+    // Shown again: now the first is used more lately than the second.
+    r.pictureNow(hash(0));
+    await r.picture(hash(50));
+    await d.engine.saved();
+    const again = await w.restart(d, { online: false });
+    assert.equal(again.rooms.pictureNow(hash(1)), null);
+    assert.notEqual(again.rooms.pictureNow(hash(0)), null);
+    assert.notEqual(again.rooms.pictureNow(hash(50)), null);
+    assert.equal((again.engine.kept('pictures') as string[]).length, 50);
+    assert.equal(again.engine.kept(`picture.${hash(1)}`), undefined, 'its bytes are gone, not kept as an empty value');
+  });
+
+  it('one put out of the 50 keeps its URL this app life: still on screen, it is not fetched again', async () => {
+    const { w, r } = await one();
+    const hash = (n: number) => n.toString(16).padStart(64, '0');
+    const first = await r.picture(hash(0));
+    for (let n = 1; n <= 50; n++) await r.picture(hash(n));
+    assert.equal(r.pictureNow(hash(0)), first);
+    assert.equal(await r.picture(hash(0)), first);
+    assert.equal(w.server.requests.filter((q) => q.path === `/api/pictures/${hash(0)}`).length, 1);
+    assert.equal(await (await fetch(first!)).text(), JSON.stringify({}), 'and the URL still works');
+  });
+
+  it('bytes that cannot be read settle as null, and the picture is asked for again', async () => {
+    const { d, r } = await one();
+    const hash = '34'.repeat(32);
+    const real = d.engine.picture!;
+    d.engine.picture = async () => ({ type: 'image/webp', arrayBuffer: () => Promise.reject(new Error('read failed')) }) as unknown as Blob;
+    assert.equal(await r.picture(hash), null);
+    d.engine.picture = real;
+    assert.match((await r.picture(hash)) ?? '', /^blob:/);
+  });
+
+  it('the order is written when a shown picture moves, once a turn, and not at a paint that moves nothing', async () => {
+    const log: Write[] = [];
+    const w = world();
+    const d = await w.device('a', { log });
+    const r = d.rooms;
+    const hash = (n: number) => n.toString(16).padStart(64, '0');
+    for (let n = 0; n < 3; n++) await r.picture(hash(n));
+    await d.engine.saved();
+    const orders = () => log.filter((write) => write.meta && 'local.pictures' in write.meta).length;
+    const before = orders();
+    r.pictureNow(hash(2));
+    r.pictureNow(hash(2));
+    await d.engine.saved();
+    assert.equal(orders(), before, 'the last used stays last: nothing to write');
+    for (let n = 0; n < 10; n++) r.pictureNow(hash(n % 2));
+    await d.engine.saved();
+    assert.equal(orders(), before + 1);
+    const again = await w.restart(d, { online: false });
+    assert.deepEqual(again.engine.kept('pictures'), [hash(2), hash(0), hash(1)]);
+  });
+
+  it('the account signal turns over at each account change, with the URLs from before let go', async () => {
+    const { d, r } = await one();
+    const at = r.account.value;
+    await d.engine.signIn('sam', 'another horse');
+    assert.equal(r.account.value, at + 1);
+  });
+
+  it('kept per account: another account signing in sees none of them, and the first finds its own again', async () => {
+    const { w, d, r } = await one();
+    const hash = '12'.repeat(32);
+    const gets = () => w.server.requests.filter((q) => q.path === `/api/pictures/${hash}`).length;
+    const first = await r.picture(hash);
+    await d.engine.signIn('sam', 'another horse');
+    assert.equal(r.pictureNow(hash), null);
+    await r.picture(hash);
+    assert.equal(gets(), 2);
+    await d.engine.signIn('ravi', 'correct horse');
+    const back = r.pictureNow(hash);
+    assert.match(back ?? '', /^blob:/);
+    assert.notEqual(back, first, 'a new URL: the old one was let go at the change');
+    assert.equal(gets(), 2);
   });
 
   it('another account signing in starts with none: each picture is asked for again, under its token', async () => {

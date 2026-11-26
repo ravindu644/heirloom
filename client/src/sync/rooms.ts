@@ -180,8 +180,16 @@ export interface Rooms {
   readonly calledIn: ReadonlySignal<CalledLap[]>;
   /** Your picture: the bytes of a square 96 by 96 WebP or JPEG of at most 12000 bytes, made by the screen, or null to take it off. */
   setPicture(picture: Uint8Array | null): Promise<RoomResult>;
-  /** A member's picture as a URL an `img` can show, or null when it cannot be had now. Kept by hash for as long as the app runs. */
+  /**
+   * A member's picture as a URL an `img` can show, or null when it cannot be had now. Kept on
+   * the device by hash (the 50 used last), so it is there at once on a cold start and offline;
+   * only a hash not kept is fetched.
+   */
   picture(hash: string): Promise<string | null>;
+  /** The same, at once, from what the device keeps: for the first paint. Null when it is not kept yet; then `picture` fetches it. */
+  pictureNow(hash: string): string | null;
+  /** Turns over at each account change, when every picture URL given before is let go: drop any state holding one when it changes. */
+  readonly account: ReadonlySignal<number>;
   setHidden(hidden: boolean): void;
   setShareTask(share: boolean): void;
 }
@@ -218,6 +226,16 @@ const MARKS = ['kept', 'rest', 'miss', 'open', 'none'] as const;
 const GROUP = { work: 0, short: 1, long: 1, idle: 2 } as const;
 // The calls this device has started, or tried to: kept, so a lap stopped in its first minute is not started again after a restart.
 const TRIED_KEPT = 20;
+// Pictures kept on the device, each about 5 KB: the ones used last.
+const PICTURES_KEPT = 50;
+const HASH = /^[0-9a-f]{64}$/;
+const toBase64 = (bytes: Uint8Array) => {
+  let out = '';
+  // In pieces: one call with every byte as an argument runs out of stack on a larger file.
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(out);
+};
+const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
 interface Note {
   id: string;
@@ -248,7 +266,15 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   // For each room, the newest note seen with Notes open: anything later from someone else is new.
   const read = signal<Readonly<Record<string, number>>>({});
   let tried: string[] = [];
-  const pictures = new Map<string, Promise<string | null>>();
+  // Pictures: the URLs made this app life, the fetches in the air, and the hashes kept on the
+  // device, least recently used first. Each kept picture is its own value, `picture.<hash>`, so
+  // keeping one does not write the others again. `account` turns over at each account change,
+  // and a fetch begun for another account keeps nothing.
+  const urls = new Map<string, string>();
+  const asking = new Map<string, Promise<string | null>>();
+  let order: string[] = [];
+  let ordering = false;
+  const account = signal(0);
   // The rooms the server has spoken of since this connection began. A called lap starts only
   // from these: a message kept from before may hold a call taken back since.
   const heard = signal<ReadonlySet<string>>(new Set());
@@ -275,10 +301,14 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
       const calls = engine.kept('together');
       tried = Array.isArray(calls) ? calls.filter((id): id is string => typeof id === 'string') : [];
       fetched.clear();
-      // Another account's pictures are not this one's to see: the server checks each anew.
-      for (const url of pictures.values()) void url.then((got) => got && URL.revokeObjectURL(got));
-      pictures.clear();
+      // Another account's pictures are not this one's to see: its own kept ones, and the server checks each anew.
+      for (const url of urls.values()) URL.revokeObjectURL(url);
+      urls.clear();
+      asking.clear();
+      const kept = engine.kept('pictures');
+      order = Array.isArray(kept) ? kept.filter((hash): hash is string => typeof hash === 'string' && HASH.test(hash)) : [];
       batch(() => {
+        account.value += 1;
         notes.value = new Map();
         read.value = seen && typeof seen === 'object' ? (seen as Record<string, number>) : {};
         rooms.value = new Map((Array.isArray(held) ? (held as RoomNow[]) : []).filter((msg) => typeof msg?.room === 'string').map((msg) => [msg.room, msg]));
@@ -557,6 +587,34 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
     });
   });
 
+  // Using a kept picture moves it to the end of the order. The order is written once per turn,
+  // and only when something moved: this runs at every paint.
+  function use(hash: string) {
+    if (!order.includes(hash) || order.at(-1) === hash) return;
+    order = [...order.filter((other) => other !== hash), hash];
+    if (ordering) return;
+    ordering = true;
+    const mine = account.peek();
+    queueMicrotask(() => {
+      ordering = false;
+      if (mine === account.peek()) engine.keep('pictures', order);
+    });
+  }
+
+  // A picture as a URL made once per app life. One put out of the kept 50 keeps its URL until
+  // the account changes: it may still be on screen, and taking it away would fetch it again.
+  function pictureNow(hash: string): string | null {
+    use(hash);
+    let url = urls.get(hash);
+    if (!url && order.includes(hash)) {
+      const held = engine.kept(`picture.${hash}`) as { type?: unknown; data?: unknown } | undefined;
+      if (typeof held?.data !== 'string') return null;
+      url = URL.createObjectURL(new Blob([fromBase64(held.data)], { type: typeof held.type === 'string' ? held.type : '' }));
+      urls.set(hash, url);
+    }
+    return url ?? null;
+  }
+
   const setting = (name: string) => computed(() => engine.rows('settings').value.get('current')?.[name] === true);
 
   // Room requests need a connection and are not kept for later: only a cheer is.
@@ -615,19 +673,38 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
 
     calledIn,
 
-    setPicture: (picture) => ask('/api/me/picture', { picture: picture && btoa(String.fromCharCode(...picture)) }),
+    setPicture: (picture) => ask('/api/me/picture', { picture: picture && toBase64(picture) }),
 
     picture(hash) {
-      let url = pictures.get(hash);
+      const now = pictureNow(hash);
+      if (now !== null || !HASH.test(hash)) return Promise.resolve(now);
+      let url = asking.get(hash);
       if (!url) {
-        url = (engine.picture?.(hash) ?? Promise.resolve(null)).then((blob) => (blob ? URL.createObjectURL(blob) : null));
-        pictures.set(hash, url);
+        const mine = account.peek();
+        url = (engine.picture?.(hash) ?? Promise.resolve(null))
+          .then(async (blob) => {
+            if (!blob || mine !== account.peek()) return null;
+            const held = { type: blob.type, data: toBase64(new Uint8Array(await blob.arrayBuffer())) };
+            if (mine !== account.peek()) return null;
+            engine.keep(`picture.${hash}`, held);
+            order = [...order.filter((other) => other !== hash), hash];
+            // The one used longest ago goes; a hash never changes, so nothing kept needs fetching again.
+            for (const gone of order.splice(0, Math.max(0, order.length - PICTURES_KEPT))) engine.keep(`picture.${gone}`, null);
+            engine.keep('pictures', order);
+            return pictureNow(hash);
+          })
+          // Bytes that cannot be read are a picture not had now: every caller settles, and it is asked again.
+          .catch(() => null);
+        asking.set(hash, url);
         // Not had now: asked again next time, not remembered as missing.
         const asked = url;
-        void url.then((got) => got ?? (pictures.get(hash) === asked && pictures.delete(hash)));
+        void url.then(() => asking.get(hash) === asked && asking.delete(hash));
       }
       return url;
     },
+
+    pictureNow,
+    account,
 
     setHidden: (hidden) => engine.write('settings', 'current', { rooms_hidden: hidden }),
     setShareTask: (share) => engine.write('settings', 'current', { share_task: share }),
