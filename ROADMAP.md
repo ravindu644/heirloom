@@ -345,5 +345,5 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
 - [ ] [qa] Budgets: bundle, tap latency on the phone, live timer arrival
 - [x] [lead] README for friends: install the APK, open the web app, join a room
-- [ ] [lead] Signed release APK; tag `v1.0.0`
+- [x] [lead] Signed release APK; tag `v1.0.0` (after a security review of the server, the installer and CI: no findings)
 - [ ] Gate
