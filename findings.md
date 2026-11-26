@@ -104,3 +104,6 @@ when it is done.
 - [23] Copy pass: "You started this lap together at 16:34." does not say who with (DESIGN.md wants "lina and you started together at 15:00."); the forgot-password note runs three lines where one muted line is asked.
 - [23] design-audit never runs at 720 or 1024 and opens no picker at a page's end: the S1 edge and the picker behind the bar were found by hand.
 - [23] first-hour.spec.ts:589 (reduced motion, habit sheet on Enter) failed once in a full run, not reproduced in 23 tries; likely the row re-rendered on the server's ack under the focused button.
+- [23] Habits: a past day part done (1 of 2) draws the rest ring half under the fill (seen in docs/resources/readme/04-habits.png).
+- [23] Room: scrolled, about 8px of a panel shows between the header and the stuck tabs.
+- [23] A screen opened from the bottom bar keeps the previous screen's scroll (reported twice by the README shoot).
