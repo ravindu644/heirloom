@@ -80,15 +80,15 @@ export function Said({ undo, class: extra }: { undo: string; class?: string }) {
 /**
  * For something docked at the foot of the screen, over which the bar must rise (a room's call
  * on a phone): its height, measured as it changes, is the bar's lift, for as long as it is
- * there and docked (`position: sticky`). One measure, kept on the page, read by the bar's CSS.
+ * there and `docked`. One measure, kept on the page, read by the bar's CSS.
  * Called by a component that is drawn only while the docked thing is.
  */
-export function useUnderSaid(docked: RefObject<HTMLElement | null>) {
+export function useUnderSaid(under: RefObject<HTMLElement | null>, docked: boolean) {
   useLayoutEffect(() => {
-    const el = docked.current;
+    const el = under.current;
     if (!el) return;
     const root = document.documentElement.style;
-    const measure = () => root.setProperty('--under-said', getComputedStyle(el).position === 'sticky' ? `${el.offsetHeight}px` : '0px');
+    const measure = () => root.setProperty('--under-said', docked ? `${el.offsetHeight}px` : '0px');
     const seen = new ResizeObserver(measure);
     seen.observe(el);
     addEventListener('resize', measure);
@@ -98,5 +98,5 @@ export function useUnderSaid(docked: RefObject<HTMLElement | null>) {
       removeEventListener('resize', measure);
       root.removeProperty('--under-said');
     };
-  }, []);
+  }, [docked]);
 }

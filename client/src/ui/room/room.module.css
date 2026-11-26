@@ -25,7 +25,13 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .tab { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
 /* The call: a band of its own, at the foot of a phone's screen, over the bottom bar. */
-.call { position: sticky; bottom: 0; z-index: 1; order: 9; margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: calc(var(--space-md) * -1); padding: var(--space-sm) 0; }
+/* The fold the call opens in: on a phone it is what sticks to the foot, under the panel. */
+.dock { position: sticky; bottom: 0; z-index: 1; order: 9; margin-top: auto; margin-bottom: calc(var(--space-md) * -1); }
+.dock:empty { display: none; }
+/* While the call is docked the bar can rise over it: a bar's height stays free over the call, so
+   the last thing of the room can be scrolled clear of the bar. Before the call, which is ordered last. */
+.room:has(> .dock .call)::after { content: ""; flex: none; height: var(--layout-touch); }
+.call { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) 0; }
 /* Its surface runs from edge to edge of the screen, under the words that keep the column's edge. */
 .call::before { content: ""; position: absolute; inset: 0 calc(var(--layout-margin) * -1); z-index: -1; border-top: var(--layout-hair) solid var(--line); background: var(--surface); }
 .callWords { display: grid; gap: var(--space-xs); min-width: 0; }
@@ -100,7 +106,9 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
   .door button, .rename button { justify-self: start; }
   /* With a sidebar the call is a band under the finding, and the content follows it. */
   .room { min-height: 0; }
-  .call { position: relative; order: 0; margin: 0; margin-top: 0; padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+  .dock { position: static; order: 0; margin: 0; }
+  .room:has(> .dock .call)::after { content: none; }
+  .call { padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
   .call::before { content: none; }
   /* A row: who, the time left, the lane, and today and the week with Cheer. */
   .wideRow { display: grid; grid-template-columns: var(--layout-sidebar) calc(var(--layout-touch) + var(--space-md)) minmax(0, 1fr) calc(var(--layout-sidebar) - var(--space-xl) - var(--space-md)); align-items: center; gap: var(--space-lg); }

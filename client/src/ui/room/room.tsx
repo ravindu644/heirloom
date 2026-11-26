@@ -313,7 +313,8 @@ function Caller({ rooms, room, now, onDone }: { rooms: Rooms; room: string; now:
 /** The call's band: on a phone it is docked at the foot of the screen, and the bar that says what a tap did rises over it. */
 function Docked({ class: extra, children }: { class?: string; children: ComponentChildren }) {
   const band = useRef<HTMLElement>(null);
-  useUnderSaid(band);
+  // Docked at the foot only on a phone: with a sidebar it is a band under the finding.
+  useUnderSaid(band, !useSidebar());
   return (
     <section ref={band} class={extra}>
       {children}
@@ -336,6 +337,9 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
   const wide = useSidebar();
   const base = useId();
   const room = list.find((one) => one.id === at) ?? list[0];
+  // A call made anywhere answers the picker: it does not open again by itself when that call ends.
+  const called = !!room?.call;
+  useEffect(() => void (called && setCalling(false)), [called]);
   const pictures = usePictures(rooms, [...(room?.members.map((m) => m.picture) ?? []), ...(room?.notes.map((note) => note.picture) ?? [])]);
 
   // Time left, a call's count down and the hours move by themselves, once a second while
@@ -400,7 +404,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
   const face = (name: string, picture: string | null, size?: 'sm' | 'lg') => <Face name={name} picture={pictures[picture ?? '']} size={size} />;
 
   const callStrip = call && call.at > now && (
-    <Docked class={css.call}>
+    <Docked key={call.id} class={css.call}>
       <h2 class="sr">{s.room.calledLap}</h2>
       <div class={css.callWords}>
         <p>
@@ -579,7 +583,8 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
         </div>
       )}
       {/* A band under the finding with a sidebar; on a phone it stands over the bottom bar. */}
-      {callStrip}
+      {/* It opens in time, as any part does, and moves nothing in a jump. */}
+      <Fold class={css.dock}>{callStrip}</Fold>
 
       <Tabs
         base={base}
@@ -595,9 +600,10 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
       <div {...tabPanel(base, tab)} class={css.tab}>
         {tab === 'people' && (
           <>
-            {!call && (
-              <Fold>
-                {calling ? (
+            {/* One fold for every way the picker closes: Not now, a call made here, or one made elsewhere. */}
+            <Fold>
+              {!call &&
+                (calling ? (
                   <Caller key="caller" rooms={rooms} room={room.id} now={() => engine.now()} onDone={() => setCalling(false)} />
                 ) : (
                   <p key="together" class={css.together}>
@@ -606,9 +612,8 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
                       {s.room.callTogether}
                     </Button>
                   </p>
-                )}
-              </Fold>
-            )}
+                ))}
+            </Fold>
             {people}
           </>
         )}
