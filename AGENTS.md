@@ -30,6 +30,7 @@ One **lead** session runs the roadmap and is the only one that commits. It split
 | android | `android-engineer` | `android/`, `client/src/platform/` |
 | qa | `qa-engineer` | `tests/`, `tools/sim/` |
 | design review | `design-reviewer` | nothing; writes `reviews/<section>/<screen>.md` |
+| design options | `product-designer` | nothing in the app; draws options as one page for the user to pick |
 
 A lane that needs a change outside its folder asks the lead in its report; it never edits there.
 `contracts/` changes only through the lead, and both sides re-run fixtures after.

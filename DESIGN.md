@@ -644,6 +644,10 @@ Built once in `client/src/ui/kit/` and reused.
   47 of 108dp tall), so no launcher's mask crowds it; the splash uses the same drawing.
   - (It was first four sentences about a lap and its 25 minutes, then a day drawn as a race with
     a key and three small drawings; the user found that cluttered and chose this from three.)
+- **A room's keeper.** The room's sheet shows the code and "Copy the code" to everyone. Its
+  name, target and ranking are controls for the keeper alone; to anyone else they are the same
+  values as plain words, with one muted line under them: "Only sachi can change these." The
+  keeper's own sheet says nothing about keeping. Leaving is everyone's.
 - **About** is the last block of Settings, for everyone: the mark and "heirloom", one line of
   what it is ("A free Pomodoro, tasks and habits app, made in free time."), the version as
   "Version 1.0.0 (ac7fe13)", the commit in the figures face so it can be read out in a bug

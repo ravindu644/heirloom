@@ -89,6 +89,14 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | A shared weekly total the room fills together, with a target | Collaboration plus mild competition worked best (Sailer & Homner) |
 | One tap to cheer a friend's finished pomodoro | Kudos made runners run more (Franken 2022) |
 | No ranking by default; an opt-in "ranked this week" view per room | Rankings make the slower friend the permanent loser (Park & Kim 2021) |
+| A room has a keeper, the friend who made it: only the keeper renames it, sets its target or ranks it; the code stays everyone's to share | A friend who joined could rename the room or rank everyone (the user's find, 2026-11-26) |
+| A room's members in a live order: on a lap first, then on a break, then the rest, each by this week's focus; the keeper may switch to the strict weekly order | Who is working now is what a room is opened for; a fixed league table makes the slower friend the permanent loser (Park & Kim 2021) |
+| Start together: a member calls a lap for a minute ("a lap at 15:00"), others say they are in, and each phone starts its own lap then | Committing to a time to start is among the best-supported ways to begin (implementation intentions, Gollwitzer & Sheeran 2006) |
+| Break notes: one-line text notes in the room, written and read only when you are not on a lap, kept a week, no images, no notifications during a lap | A chat that cannot interrupt a lap; Focus To-Do's chat had no notifications and was half a feature |
+| A picture of yourself, shrunk on the device before it is sent (about 5 KB); your initial stays the default | Lanes are known at a glance; Focus To-Do let people set one |
+| The room's streak: days in a row on which everyone in the room ran a lap that rang, with two rest days a week | Friends on a shared streak were 22% more likely to do the day's lesson (Duolingo 2024); shared, so nobody is behind |
+| The room against its own last week, at this time of the week | The ghost, for the group: competition with no loser among friends |
+| The keeper can remove a member, and a new code then stops the old one working | A room must not be stuck with someone who joined by a code passed on |
 | Task titles hidden from the room unless switched on | Privacy first |
 | A switch to hide rooms entirely | Long-time Focus To-Do users valued it |
 
@@ -151,4 +159,6 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-26 | From the user's fifth hour: Focus's bar is the chosen task's laps (its estimate, and how many are done), and nothing over it explains it; the day's target is Today's alone. A row carried to the top of Today is shown as Next while it is still carried |
 | 2026-11-26 | The welcome made quiet: of three drawn options the user chose one drawing of seven weeks, the mark and name, "Your days stay yours." and one sentence |
 | 2026-11-26 | About in Settings: name, version and commit, and the source on GitHub (private for now) |
+| 2026-11-26 | Rooms get a keeper: the maker alone changes the room's name, target and ranking; it passes to the longest member when the keeper leaves |
+| 2026-11-26 | The room's second pass, chosen by the user from a list: a live member order, start together, break notes, pictures, the room's streak, the room against its last week, removing a member. Badges and a ranked board by default were left out |
 | 2026-11-26 | A lap stopped within its first minute is a start taken back: no row, no lap of the day, no place in the four. (For one build every stopped lap counted, and the day's bar on Focus filled with slips of the thumb.) A lap stopped after a minute is still a lap that ended early |

@@ -299,7 +299,24 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [qa] Each as a test
 - [ ] Gate: built and checked (182 browser tests); waiting on the user's try
 
-## 21. Release 1.0
+## 21. A room's keeper
+
+- [x] [lead] Protocol, PRODUCT, DESIGN: the room's maker keeps it; only the keeper changes its
+      name, target and ranking; it passes to the longest member when the keeper leaves
+- [x] [server] `keeper` stored and sent; update refused to anyone else; handed on at leaving
+- [x] [core] [ui] The sheet: controls for the keeper, plain words and one line for everyone else
+- [x] [qa] A member cannot change the room; the keeper can; the keeper leaves and it passes on
+- [ ] Gate: built and checked (184 browser tests); waiting on the user's try
+
+## 22. Rooms, the second pass
+
+- [x] [lead] PRODUCT rows: live order, start together, break notes, pictures, the room's streak,
+      the room against its last week, removing a member
+- [ ] [lead] Three room layouts drawn as options; the user picks one; DESIGN.md and the protocol
+- [ ] [server] [core] [ui] [qa] Built as chosen
+- [ ] Gate
+
+## 23. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
