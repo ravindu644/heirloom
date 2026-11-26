@@ -7,6 +7,8 @@ import type { Engine } from './engine.ts';
 export interface AdminView {
   username: string;
   role: 'owner' | 'admin';
+  /** The hash of their picture (protocol section 15), or null for their initial. */
+  picture: string | null;
 }
 
 /** `error` is a code from protocol section 10 (`forbidden`, `unknown`, `bad_request`, `slow_down`, `server`) or `offline`. */
@@ -41,7 +43,8 @@ export function createAdmins(engine: Pick<Engine, 'request' | 'account'>): Admin
     if (!answer.ok) return answer;
     const held = list.peek();
     // Before the first answer there is no list to keep right: `refresh` brings it whole.
-    if (held) list.value = [...held.filter((it) => it.username !== name), ...(role === 'admin' ? [{ username: name, role }] : [])].sort(order);
+    // One raised here shows the initial until the next list names their picture.
+    if (held) list.value = [...held.filter((it) => it.username !== name), ...(role === 'admin' ? [{ username: name, role, picture: null }] : [])].sort(order);
     return { ok: true };
   }
 
@@ -53,7 +56,10 @@ export function createAdmins(engine: Pick<Engine, 'request' | 'account'>): Admin
       // Not when it was answered for someone who has since signed out.
       if (!answer.ok || engine.account.peek() !== who) return;
       const said: unknown[] = Array.isArray(answer.data.admins) ? answer.data.admins : [];
-      list.value = said.filter((it: any): it is AdminView => typeof it?.username === 'string' && (it.role === 'owner' || it.role === 'admin')).sort(order);
+      list.value = said
+        .filter((it: any) => typeof it?.username === 'string' && (it.role === 'owner' || it.role === 'admin'))
+        .map((it: any): AdminView => ({ username: it.username, role: it.role, picture: typeof it.picture === 'string' && /^[0-9a-f]{64}$/.test(it.picture) ? it.picture : null }))
+        .sort(order);
     },
     raise: (username) => set(username, 'admin'),
     lower: (username) => set(username, 'member'),

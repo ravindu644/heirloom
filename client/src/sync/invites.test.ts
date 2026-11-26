@@ -224,8 +224,10 @@ describe('invites', () => {
 });
 
 describe('admins', () => {
-  const RAVI = { username: 'ravi', role: 'owner' };
-  async function owner(held = [RAVI, { username: 'sam', role: 'admin' }], members = ['dilu', 'anu']) {
+  const HASH = 'ab'.repeat(32);
+  const RAVI = { username: 'ravi', role: 'owner', picture: HASH };
+  const SAM = { username: 'sam', role: 'admin', picture: null };
+  async function owner(held: { username: string; role: string; picture?: string | null }[] = [RAVI, SAM], members = ['dilu', 'anu']) {
     const w = world();
     const d = await w.device('laptop');
     await d.connect('owner');
@@ -241,10 +243,11 @@ describe('admins', () => {
   }
 
   it('nothing is known until the server has answered once; then the owner first and the admins by name', async () => {
-    const o = await owner([{ username: 'sam', role: 'admin' }, RAVI, { username: 'anu', role: 'admin' }, { username: 'x', role: 'member' }, null as never]);
+    // A picture that is no hash is no picture: the initial, not a fetch of whatever it says.
+    const o = await owner([{ username: 'sam', role: 'admin', picture: '../x' }, RAVI, { username: 'anu', role: 'admin' }, { username: 'x', role: 'member' }, null as never]);
     assert.equal(o.list(), null);
     await o.admins.refresh();
-    assert.deepEqual(o.list(), [RAVI, { username: 'anu', role: 'admin' }, { username: 'sam', role: 'admin' }]);
+    assert.deepEqual(o.list(), [RAVI, { username: 'anu', role: 'admin', picture: null }, SAM]);
     assert.deepEqual(o.w.server.requests, [{ path: '/api/admins/list', body: { token: 'token-laptop', device: o.d.engine.device }, from: 'laptop' }]);
   });
 
@@ -253,7 +256,8 @@ describe('admins', () => {
     await o.admins.refresh();
     assert.deepEqual(await o.admins.raise(' Dilu '), { ok: true });
     assert.deepEqual(o.w.server.requests.at(-1)!.body, { username: 'dilu', role: 'admin', token: 'token-laptop', device: o.d.engine.device });
-    assert.deepEqual(o.list(), [RAVI, { username: 'dilu', role: 'admin' }, { username: 'sam', role: 'admin' }]);
+    // Its picture is not known until the next list.
+    assert.deepEqual(o.list(), [RAVI, { username: 'dilu', role: 'admin', picture: null }, SAM]);
     // Already so is fine, and is not listed twice.
     assert.deepEqual(await o.admins.raise('dilu'), { ok: true });
     assert.equal(o.list()!.length, 3);
