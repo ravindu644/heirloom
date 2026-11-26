@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'preact/hooks';
+import { avatar } from '../../core/avatar.ts';
 import { cx } from './cx.ts';
 import css from './person.module.css';
 
 /**
  * A person's circle: their picture, cut round, where they set one and it loads, and otherwise
- * the first letter of their username. The picture is the circle's own background, shown once it
- * has loaded, so one that fails leaves the letter and never a broken image, and the circle is
- * the same element with or without one. `size`: `sm` 24px (a note, a lane, the call), the
- * 40px of a chip by default, `lg` 48px (a room's row on a phone).
+ * their colour and letters, from their username, so they are the same on every screen and device.
+ * The picture is the circle's own background, shown once it has loaded, so one that fails leaves
+ * the letters and never a broken image, and the circle is the same element with or without one.
+ * `size`: `sm` 24px (a note, a lane, the call), the 40px of a chip by default, `lg` 48px (a
+ * room's panel on a phone), `xl` 56px (a person's report).
  */
-export function Face({ name, picture, size }: { name: string; picture?: string | null; size?: 'sm' | 'lg' }) {
+export function Face({ name, picture, size }: { name: string; picture?: string | null; size?: 'sm' | 'lg' | 'xl' }) {
+  const { hue, letters } = avatar(name);
   const [shown, setShown] = useState<string | null>(null);
   useEffect(() => {
     setShown(null);
@@ -20,8 +23,12 @@ export function Face({ name, picture, size }: { name: string; picture?: string |
     return () => void (image.onload = null);
   }, [picture]);
   return (
-    <i class={cx(css.face, size && css[size], shown && css.pictured)} style={shown ? `background-image:url("${shown}")` : undefined} aria-hidden="true">
-      {name.charAt(0).toUpperCase()}
+    <i
+      class={cx(css.face, size && css[size], hue === 'heat-2' && css.inked, shown && css.pictured)}
+      style={shown ? `background-image:url("${shown}")` : `background-color:var(--${hue})`}
+      aria-hidden="true"
+    >
+      {letters}
     </i>
   );
 }

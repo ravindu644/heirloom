@@ -34,7 +34,11 @@ import * as s from './strings.ts';
 // server rules. Anything unknown is Focus. Settings is a screen, but not one of the five.
 type Screen = Destination | 'settings';
 function useScreen(): Screen {
-  const read = (): Screen => (location.hash === '#/settings' ? 'settings' : (DESTINATIONS.find((id) => location.hash === `#/${id}`) ?? 'focus'));
+  // The first part of the address names the screen: `#/room/<member>` is the Room, with a report open.
+  const read = (): Screen => {
+    const first = location.hash.slice(2).split('/')[0];
+    return first === 'settings' ? 'settings' : (DESTINATIONS.find((id) => id === first && (id === 'room' || location.hash === `#/${id}`)) ?? 'focus');
+  };
   const [screen, setScreen] = useState(read);
   useEffect(() => {
     const change = () => setScreen(read());
@@ -187,7 +191,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
       ) : screen === 'habits' ? (
         <HabitsScreen focus={focus} habits={habits} onReminderSet={onReminderSet} app={canSave === false} />
       ) : screen === 'room' ? (
-        <RoomScreen engine={engine} rooms={rooms} />
+        <RoomScreen engine={engine} rooms={rooms} lapMs={settings.all.value.work_ms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
         <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />

@@ -805,6 +805,25 @@ export const room = {
   partOf: (room: number) => `of the room’s ${total(room)} this week`,
   partToday: (ran: boolean) => (ran ? 'You have run a lap today, so you count for the streak.' : 'A lap that rings today, and you count for the streak.'),
 
+  // A person's report: their day and their week.
+  openReport: (name: string) => `${name}: the day and the week`,
+  phaseLeft: (phase: string, ms: number | null) => (ms === null ? phase : `${phase}, ${clock(ms)} left`),
+  today: 'Today',
+  lapsCount: (n: number) => plural(n, 'lap', 'laps'),
+  noLapsYet: 'No laps yet today.',
+  thisWeek: 'This week',
+  ownWeek: (name: string, ms: number) =>
+    ms >= MIN ? `${cap(length(ms))} ahead of ${name}’s own last week at this time.` : ms <= -MIN ? `${cap(length(-ms))} behind ${name}’s own last week at this time.` : `Level with ${name}’s own last week at this time.`,
+  yourWeek: (ms: number) =>
+    ms >= MIN ? `${cap(length(ms))} ahead of your last week at this time.` : ms <= -MIN ? `${cap(length(-ms))} behind your last week at this time.` : 'Level with your last week at this time.',
+  // What your next lap would do, behind: draw you level, or how many it takes.
+  nextLaps: (behind: number, lap: number) => {
+    const laps = Math.ceil(behind / lap);
+    return laps <= 1 ? 'Your next lap draws you level.' : `${laps} laps draw you level.`;
+  },
+  weekKey: (yours: boolean) => (yours ? 'Solid is this week, dashed is your last week.' : 'Solid is this week, dashed is their last week.'),
+  weekSaid: (week: number, lastNow: number, lastAll: number) => `This week ${total(week)} so far. Last week ${total(lastNow)} by now, ${total(lastAll)} in all.`,
+
   // The keeper's way to take someone out.
   whoIsIn: 'Who is in',
   removeNote: 'Removed, they are out, and the room gets a new code: the old one stops working.',
@@ -848,7 +867,9 @@ export const room = {
   notSharing: 'Not sharing what they are on.',
   yoursHidden: 'Your task is not shown to the room.',
   cheer: 'Cheer',
-  cheerLabel: (name: string, ended: number) => `Cheer ${name} for the lap that ended at ${wall(ended)}`,
+  // The one emoji in the app, the user's choice: on the round Cheer button and the tinted circle after.
+  cheerMark: '🎉',
+  cheerLabel: (name: string) => `Cheer ${name}'s lap`,
   cheeredBy: (who: string[], yours: boolean) => `${names(who)} cheered ${yours ? 'your last lap' : 'this lap'}.`,
 
   open: 'Code and settings',

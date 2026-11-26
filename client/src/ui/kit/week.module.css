@@ -39,3 +39,8 @@
 .target { position: absolute; right: 0; left: 0; height: var(--layout-hair); background: var(--ink); }
 .target span { position: absolute; left: calc(100% + var(--space-sm)); transform: translateY(-50%); font: var(--type-label); color: var(--muted); }
 .targeted .ghostTotal { right: auto; left: calc(100% + var(--space-sm)); margin-top: 0; transform: none; }
+
+/* Someone else's week, in a room: their line muted, as their laps are on a lane; the figure in ink. */
+.muted .you { stroke: var(--muted); }
+.muted .dot { background: var(--muted); }
+.muted .yourTotal { color: var(--ink); }

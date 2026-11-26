@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import type { ComponentChildren, TargetedSubmitEvent } from 'preact';
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { addDays, mondayOf } from '../../core/progress.ts';
 import { localDay } from '../../core/stats.ts';
 import { view } from '../../core/timer.ts';
@@ -21,6 +21,7 @@ import { Tabs, tabPanel } from '../kit/tabs.tsx';
 import { Hours, Lane, Mark } from '../kit/track.tsx';
 import type { Window } from '../kit/track.tsx';
 import { WeekChart } from '../kit/week.tsx';
+import { SplitChip } from '../kit/race.tsx';
 import { useSidebar } from '../kit/wide.ts';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { Sheet } from '../kit/sheet.tsx';
@@ -240,17 +241,45 @@ const phase = (m: MemberView) =>
             ? s.room.longBreak
             : s.room.shortBreak;
 
-// The stretch of the day the lanes show: a phone's four hours with now five eighths across, a
-// laptop's 08:00 to 20:00 (a phone's stretch outside those hours).
-function stretch(now: number, wide: boolean): Window {
-  if (wide) {
-    const day = new Date(now);
-    const from = day.setHours(8, 0, 0, 0);
-    const to = day.setHours(20, 0, 0, 0);
-    if (now > from && now < to) return { from, to };
-  }
-  return { from: now - 2.5 * HOUR, to: now + 1.5 * HOUR };
+// The hour a moment falls in, by this device's clock.
+const hourOf = (ms: number) => new Date(ms).setMinutes(0, 0, 0);
+
+// The stretch of the day the lanes show: an upright phone's six hours with now five eighths
+// across; from 720px 08:00 to 20:00, widened to the hour of anyone's earlier lap and to now.
+function stretch(now: number, wide: boolean, members: MemberView[]): Window {
+  if (!wide) return { from: now - 3.75 * HOUR, to: now + 2.25 * HOUR };
+  const first = Math.min(now, ...members.flatMap((m) => m.laps.map(([start]) => start)));
+  const day = new Date(now);
+  return { from: Math.min(day.setHours(8, 0, 0, 0), hourOf(first)), to: Math.max(day.setHours(20, 0, 0, 0), hourOf(now) + HOUR) };
 }
+
+// One person's day on their report: from the hour of their first lap to the hour after now, at least six hours.
+function dayOf(m: MemberView, now: number): Window | null {
+  const first = m.laps[0]?.[0] ?? m.runStart;
+  if (first === null || first === undefined) return null;
+  const from = hourOf(first);
+  return { from, to: Math.max(hourOf(now) + 2 * HOUR, from + 6 * HOUR) };
+}
+
+// Which member's report is open, by the address: `#/room/<member>`. The phone's back gesture and
+// the browser's Back step out of it as out of any page.
+const reportIn = () => /^#\/room\/(.+)$/.exec(location.hash)?.[1] ?? null;
+function useReport() {
+  const [id, setId] = useState(reportIn);
+  useEffect(() => {
+    const change = () => setId(reportIn());
+    addEventListener('hashchange', change);
+    return () => removeEventListener('hashchange', change);
+  }, []);
+  return id;
+}
+// Opened from the room here, Back is a step back; opened straight from an address, it is the room.
+let opened = false;
+const openReport = (id: string) => {
+  opened = true;
+  location.hash = `#/room/${encodeURIComponent(id)}`;
+};
+const closeReport = () => (opened ? ((opened = false), history.back()) : location.replace('#/room'));
 
 // A member's laps today, start to end in server ms, and the one in progress as far as now.
 // ponytail: a paused lap is drawn to now as well; the moment it paused is not in the room message.
@@ -327,7 +356,7 @@ function Docked({ class: extra, children }: { class?: string; children: Componen
  * and three tabs: People on a track of the day's hours, Notes read on a break, and the Week the
  * room fills together. Never a ranking unless the room itself has switched one on.
  */
-export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) {
+export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Rooms; lapMs: number }) {
   const list = rooms.list.value;
   const stale = rooms.stale.value;
   const [at, setAt] = useState<string | undefined>();
@@ -336,6 +365,7 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
   const [calling, setCalling] = useState(false);
   const wide = useSidebar();
   const base = useId();
+  const reporting = useReport();
   const room = list.find((one) => one.id === at) ?? list[0];
   // A call made anywhere answers the picker: it does not open again by itself when that call ends.
   const called = !!room?.call;
@@ -398,10 +428,10 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
     );
 
   const me = room.members.find((m) => m.you);
-  const w = stretch(now, wide);
+  const w = stretch(now, wide, room.members);
   const call = room.call;
   const together = timer.run?.startsWith('call-') && onLap && timer.started !== null ? timer.started : null;
-  const face = (name: string, picture: string | null, size?: 'sm' | 'lg') => <Face name={name} picture={pictures[picture ?? '']} size={size} />;
+  const face = (name: string, picture: string | null, size?: 'sm' | 'lg' | 'xl') => <Face name={name} picture={pictures[picture ?? '']} size={size} />;
 
   const callStrip = call && call.at > now && (
     <Docked key={call.id} class={css.call}>
@@ -431,21 +461,26 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
     </Docked>
   );
 
-  // People: the hours, then a lane each, in the order the room gives.
+  // People: a panel each, in the order the room gives, the hours over the first one's lane.
   const callFaces = (m: MemberView) =>
     call && call.at > now && call.in.some((one) => one.id === m.id) && (
       <Mark window={w} at={call.at}>
         {face(m.name, m.picture, 'sm')}
       </Mark>
     );
+  // Cheer: only while a lap of theirs that rang is not yet cheered by you; then a tinted circle.
   const cheer = (m: MemberView) =>
-    m.last &&
-    !m.you &&
-    !m.last.cheered && (
-      <Button aria-label={s.room.cheerLabel(m.name, m.last.ended)} onClick={() => rooms.cheer(room.id, m.id)}>
-        {s.room.cheer}
-      </Button>
-    );
+    m.last && !m.you ? (
+      m.last.cheered ? (
+        <span class={css.cheered} aria-hidden="true">
+          {s.room.cheerMark}
+        </span>
+      ) : (
+        <button type="button" class={css.cheer} aria-label={s.room.cheerLabel(m.name)} onClick={() => rooms.cheer(room.id, m.id)}>
+          <span aria-hidden="true">{s.room.cheerMark}</span>
+        </button>
+      )
+    ) : null;
   const left = (m: MemberView) =>
     m.ends_at !== null &&
     (m.you || !stale) && (
@@ -459,74 +494,72 @@ export function RoomScreen({ engine, rooms }: { engine: Engine; rooms: Rooms }) 
     const who = m.last?.cheerers.map((one) => (one.id === me?.id ? s.room.you : one.name)) ?? [];
     return who.length > 0 && <p class={css.small}>{s.room.cheeredBy(who, m.you)}</p>;
   };
-  const named = (m: MemberView) => (
+  const named = (m: MemberView, withPhase = true) => (
     <p class={css.name}>
-      <b>{m.you ? s.room.you : m.name}</b> <span>{phase(m)}</span>
+      <b>{m.you ? s.room.you : m.name}</b>
+      {withPhase && <span> {phase(m)}</span>}
     </p>
   );
+  // The panel is one target: a button that covers it, named for the report it opens. Cheer stands over it.
+  const cover = (m: MemberView) => <button type="button" class={css.cover} aria-label={s.room.openReport(m.you ? s.room.you : m.name)} onClick={() => openReport(m.id)} />;
+  const hours = <Hours window={w} now={now} hour={s.room.hour} nowWord={s.room.now} />;
 
   const people = (
-    <section class={css.track} aria-label={s.room.members}>
-      {wide ? (
-        <div class={css.wideRow}>
-          <span />
-          <span />
-          <Hours window={w} now={now} step={2} hour={s.room.hour} nowWord={s.room.now} />
-          <span />
-        </div>
-      ) : (
-        <Hours window={w} now={now} hour={s.room.hour} nowWord={s.room.now} />
-      )}
-      <Fold list gap="xs" class={css.rows}>
-        {room.members.map((m) =>
-          wide ? (
-            <article key={m.id} class={css.wideRow}>
-              <div class={css.who}>
-                {face(m.name, m.picture)}
-                <div>
-                  {named(m)}
-                  {task(m)}
-                  {cheered(m)}
-                </div>
-              </div>
-              <span>{left(m)}</span>
-              <Lane window={w} laps={lapsOf(m, now)} mine={m.you}>
-                {callFaces(m)}
-              </Lane>
-              <div class={css.totals}>
-                <p>{s.room.todayOnly(m.today_ms)}</p>
-                <p>{s.room.weekOnly(m.week_ms)}</p>
-                {cheer(m)}
-              </div>
-            </article>
-          ) : (
-            <article key={m.id} class={css.row}>
-              <div class={css.head2}>
-                {face(m.name, m.picture, 'lg')}
-                <div>
-                  {named(m)}
-                  <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
-                </div>
-                {left(m)}
-              </div>
-              <Lane window={w} laps={lapsOf(m, now)} mine={m.you}>
-                {callFaces(m)}
-              </Lane>
-              {(task(m) || cheered(m) || cheer(m)) && (
-                <div class={css.foot}>
+    <section class={css.people} aria-label={s.room.members}>
+      <div class={css.hoursRow}>
+        <span />
+        {hours}
+      </div>
+      <Fold list gap="sm" class={css.rows}>
+        {room.members.map((m) => (
+          <article key={m.id} class={cx(css.person, wide && css.side)}>
+            {cover(m)}
+            {wide ? (
+              <div class={css.words}>
+                <div class={css.top}>
+                  {face(m.name, m.picture)}
                   <div>
-                    {task(m)}
-                    {cheered(m)}
+                    {named(m, false)}
+                    <p class={css.phaseLeft}>
+                      <span>{phase(m)}</span> {left(m)}
+                    </p>
                   </div>
                   {cheer(m)}
                 </div>
-              )}
-            </article>
-          ),
-        )}
+                <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
+                {task(m)}
+                {cheered(m)}
+              </div>
+            ) : (
+              <>
+                <div class={css.top}>
+                  {face(m.name, m.picture, 'lg')}
+                  <div>
+                    {named(m)}
+                    <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
+                  </div>
+                  {left(m)}
+                  {cheer(m)}
+                </div>
+                {task(m)}
+              </>
+            )}
+            <Lane window={w} laps={lapsOf(m, now)} mine={m.you}>
+              {callFaces(m)}
+            </Lane>
+            {!wide && cheered(m)}
+          </article>
+        ))}
       </Fold>
     </section>
   );
+
+  // A person's report takes the room's place, with Back first; the call stays.
+  const person = reporting && room.members.find((m) => m.id === decodeURIComponent(reporting));
+  if (person)
+    return (
+      <Report person={person} now={now} lapMs={lapMs} face={face} shareTask={rooms.shareTask.value} call={<Fold class={css.dock}>{callStrip}</Fold>} phase={phase(person)} />
+    );
 
   const notes = onLap ? (
     <section class={css.panel}>
@@ -740,6 +773,78 @@ function WeekTab({ room, me, now }: { room: RoomView; me: MemberView | undefined
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** One person, their day and their week: what a tap on their panel opens, in place of the room. */
+function Report({ person: m, now, lapMs, face, shareTask, call, phase }: { person: MemberView; now: number; lapMs: number; face: (name: string, picture: string | null, size?: 'sm' | 'lg' | 'xl') => ComponentChildren; shareTask: boolean; call: ComponentChildren; phase: string }) {
+  const top = useRef<HTMLDivElement>(null);
+  // A report opens at its top, wherever the room was scrolled.
+  useLayoutEffect(() => void top.current?.closest('main')?.scrollTo({ top: 0 }), [m.id]);
+  const name = m.you ? s.room.you : m.name;
+  const day = dayOf(m, now);
+  const today = localDay(now, -new Date(now).getTimezoneOffset());
+  const monday = mondayOf(today);
+  const w = m.week;
+  const race: WeekRace | null = w && {
+    monday,
+    days: w.days.map((ms, i) => ({ day: addDays(monday, i), you_ms: ms, ghost_ms: w.last[i] ?? 0 })),
+    you_ms: m.week_ms,
+    ghost_now_ms: m.week_ms - (w.ahead_ms ?? 0),
+    ghost_total_ms: w.last[6] ?? 0,
+    split_ms: w.ahead_ms,
+  };
+  const ahead = w?.ahead_ms ?? null;
+  return (
+    <div ref={top} class={css.room}>
+      <div class={css.back}>
+        <Button onClick={closeReport}>{s.settings.back}</Button>
+      </div>
+      <header class={css.who}>
+        {face(m.name, m.picture, 'xl')}
+        <div>
+          <h1>{name}</h1>
+          <p class={css.small}>{s.room.phaseLeft(phase, m.ends_at === null ? null : Math.max(0, m.ends_at - now))}</p>
+        </div>
+      </header>
+      {call}
+      <section class={css.panel}>
+        <h2 class={css.partTitle}>{s.room.today}</h2>
+        {day ? (
+          <>
+            <p class={css.figure}>
+              <b>{s.total(m.today_ms)}</b> <span>{s.room.lapsCount(m.today_laps)}</span>
+            </p>
+            <div class={css.dayLane}>
+              <Hours window={day} now={now} hour={s.room.hour} nowWord={s.room.now} />
+              <Lane window={day} laps={lapsOf(m, now)} mine={m.you} />
+            </div>
+            {m.phase === 'work' && m.task && (!m.you || shareTask) && <p>{m.task}</p>}
+          </>
+        ) : (
+          <p>{s.room.noLapsYet}</p>
+        )}
+      </section>
+      <section class={cx(css.panel, css.weekPanel)}>
+        <h2 class={css.partTitle}>{s.room.thisWeek}</h2>
+        <p class={css.figure}>
+          <b>{s.total(m.week_ms)}</b>
+          {m.you && ahead !== null && <SplitChip text={s.race.split(ahead)} tone={ahead > 0 ? 'ahead' : ahead < 0 ? 'behind' : 'level'} />}
+        </p>
+        {race && (
+          <>
+            <WeekChart week={race} today={today} muted={!m.you} label={s.room.weekSaid(m.week_ms, race.ghost_now_ms, race.ghost_total_ms)} />
+            {ahead !== null && (
+              <p>
+                {m.you ? s.room.yourWeek(ahead) : s.room.ownWeek(m.name, ahead)}
+                {m.you && ahead <= -MIN && ` ${s.room.nextLaps(-ahead, lapMs)}`}
+              </p>
+            )}
+            <p class={css.small}>{s.room.weekKey(m.you)}</p>
+          </>
+        )}
+      </section>
     </div>
   );
 }

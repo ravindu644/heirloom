@@ -6,6 +6,9 @@ import css from './track.module.css';
 const HOUR = 3600000;
 // An hour's name closer to "now" than this, in px, steps aside for it.
 const CLEAR = 44;
+// Hour names stand at least this far apart, in px: every hour, or every second, third... as the width allows.
+const APART = 56;
+const STEPS = [1, 2, 3, 4, 6, 12];
 
 /** A stretch of a day, server ms: what one row of hours and the lanes under it show. */
 export interface Window {
@@ -18,31 +21,46 @@ const at = (w: Window, ms: number) => Math.min(100, Math.max(0, ((ms - w.from) /
 /**
  * The hours over a set of lanes, carrying now: the names of the hours, in ink with a heavy line
  * under them as far as now and muted over a hair after it, and "now" where the heavy line ends.
- * `step` is how many hours apart the names stand; `hour(ms)` writes one. Drawn for eyes only.
+ * The names stand every hour, or every few, at least 56px apart; `hour(ms)` writes one. Drawn
+ * for eyes only.
  */
-export function Hours({ window: w, now, step = 1, hour, nowWord }: { window: Window; now: number; step?: number; hour: (ms: number) => string; nowWord: string }) {
+export function Hours({ window: w, now, hour, nowWord }: { window: Window; now: number; hour: (ms: number) => string; nowWord: string }) {
   const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
+  // The row's width, and an hour name's: "now" is about as wide, and is always there to measure.
+  const [size, setSize] = useState({ width: 0, label: 0 });
   useLayoutEffect(() => {
-    const seen = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
+    const seen = new ResizeObserver(([entry]) => setSize({ width: entry!.contentRect.width, label: box.current!.querySelector('b')!.offsetWidth }));
     seen.observe(box.current!);
     return () => seen.disconnect();
   }, []);
+  const { width, label } = size;
   const x = at(w, now);
-  // The hours of the local day, every `step`th of them.
-  const hours: number[] = [];
+  const px = (ms: number) => (at(w, ms) / 100) * width;
+  // Where a name is read: half a name in at either end of the row, where it stands inside it.
+  const where = (h: number) => (at(w, h) === 0 ? label / 2 : at(w, h) === 100 ? width - label / 2 : px(h));
   const day = new Date(w.from);
   day.setMinutes(0, 0, 0);
-  for (let h = day.getTime(); h <= w.to; h += HOUR) if (h >= w.from && new Date(h).getHours() % step === 0) hours.push(h);
+  // The hours of the local day, every `step`th: the fewest steps at which every name stands 56px
+  // from the next. A name that would cross the row's end, or stands within 44px of "now", goes.
+  const named = (step: number) => {
+    const hours: number[] = [];
+    for (let h = day.getTime(); h <= w.to; h += HOUR) {
+      const x = where(h);
+      if (h < w.from || new Date(h).getHours() % step !== 0 || x < label / 2 || x > width - label / 2 || Math.abs(x - px(now)) < CLEAR) continue;
+      hours.push(h);
+    }
+    return hours;
+  };
+  const apart = (hours: number[]) => hours.every((h, i) => i === 0 || where(h) - where(hours[i - 1]!) >= APART);
+  // Drawn once the row has been measured.
+  const hours = width > 0 ? (STEPS.map(named).find(apart) ?? []) : [];
   return (
     <div ref={box} class={css.hours} aria-hidden="true">
-      {hours
-        .filter((h) => Math.abs(((at(w, h) - x) / 100) * width) >= CLEAR)
-        .map((h) => (
-          <span key={h} class={cx(h <= now && css.gone, at(w, h) === 0 && css.first, at(w, h) === 100 && css.last)} style={`left:${at(w, h)}%`}>
-            {hour(h)}
-          </span>
-        ))}
+      {hours.map((h) => (
+        <span key={h} class={cx(h <= now && css.gone, at(w, h) === 0 && css.first, at(w, h) === 100 && css.last)} style={`left:${at(w, h)}%`}>
+          {hour(h)}
+        </span>
+      ))}
       <b class={cx(x > 95 && css.last)} style={`left:${x}%`}>
         {nowWord}
       </b>

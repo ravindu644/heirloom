@@ -182,6 +182,7 @@ const member = (id: string, name: string, more: Partial<MemberView> = {}): Membe
   picture: null,
   laps: [],
   runStart: null,
+  week: null,
   away: false,
   phase: 'idle',
   lap: 1,
@@ -239,7 +240,10 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     member('tharu', 'tharu', { today_ms: 0, today_laps: 0, week_ms: 45 * MIN }),
     four[3]!,
   ];
-  const members = seed.members === 'alone' ? [{ ...you, last: lap(1, 9) }] : seed.members === 'eight' ? eight : four;
+  // Each one's week against their own last, for their report: you a little behind, the others ahead.
+  const withWeek = (m: MemberView): MemberView =>
+    m.away ? m : { ...m, week: { days: [m.week_ms * 0.45, m.week_ms, null, null, null, null, null], last: [0.4, 0.95, 1.4, 1.7, 1.9, 2.1, 2.2].map((k) => k * m.week_ms * (m.you ? 1.1 : 0.85)), ahead_ms: m.you ? -30 * MIN : 85 * MIN } };
+  const members = (seed.members === 'alone' ? [{ ...you, last: lap(1, 9) }] : seed.members === 'eight' ? eight : four).map(withWeek);
   // The room's week, added up day by day: the demo's day is a Tuesday.
   const weekOf = (people: MemberView[]) => {
     const week = people.reduce((sum, m) => sum + m.week_ms, 0);

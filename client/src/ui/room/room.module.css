@@ -43,21 +43,40 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 /* Started together, and the way to call a lap: one line over the track. */
 .together { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--space-md); font: var(--type-label); color: var(--muted); }
 
-/* People: the hours, then a row each. */
-.track { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+/* People: a panel each, 8px apart, the hours over the first one's lane. */
+.people { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+/* The hours stand where the lanes do: inside a panel's 16px, and with a sidebar in the lane's column. */
+.hoursRow { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 var(--space-md); }
+.hoursRow > span { display: none; }
 .rows { padding: 0; list-style: none; }
-.rows > li + li > article { border-top: var(--layout-hair) solid var(--line); }
-.row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-sm) 0; }
-.head2 { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); }
-.name b { font: var(--type-body-strong); }
-.name span { font: var(--type-label); color: var(--muted); }
+/* A panel is one target: a tap anywhere on it but Cheer opens the person's report. */
+.person { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+/* What is drawn in the panel lets a tap through to the button under it, all but Cheer. */
+.person > :not(.cover) { position: relative; pointer-events: none; }
+.cover { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
+.top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-sm); }
+.top > div { display: grid; gap: var(--space-xs); min-width: 0; }
+.name { font: var(--type-label); color: var(--muted); }
+.name b { font: var(--type-body-strong); color: var(--ink); }
 .left { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 /* A break is the green of the calyx, here as everywhere. */
 .left.rest { color: var(--rest); }
+.phaseLeft { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); font: var(--type-label); color: var(--muted); }
 /* Three lines hold any title a person would share, as on a task's own row. */
 .task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.foot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-md); }
-.foot > div { display: grid; gap: var(--space-xs); min-width: 0; }
+/* Cheer: a 40px circle whose target reaches 48px, and once cheered the same circle in the you tint. */
+.cheer, .cheered { display: grid; flex: none; place-items: center; width: var(--space-xl); height: var(--space-xl); border-radius: var(--radius-full); font: var(--type-body-strong); }
+.cheer { position: relative; box-sizing: border-box; padding: 0; border: var(--layout-hair) solid var(--key-edge); background: var(--key); cursor: pointer; pointer-events: auto; }
+/* Placed from inside the border: the hair is added back, so the target is the full 48px. */
+.cheer::after { content: ""; position: absolute; inset: calc((var(--space-xl) - var(--layout-touch)) / 2 - var(--layout-hair)); border-radius: var(--radius-full); }
+.cheer:hover { background: color-mix(in srgb, var(--key), var(--ink) var(--state-hover)); }
+.cheered { background: var(--you-tint); }
+
+/* A person's report. */
+.back { display: flex; }
+.who { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-md); }
+.who h1 { font: var(--type-title); overflow-wrap: anywhere; }
+.dayLane { display: grid; gap: var(--space-sm); }
 
 /* Notes: newest first, a circle, the name and time, the line. */
 .notes { padding: 0; list-style: none; }
@@ -110,14 +129,17 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
   .room:has(> .dock .call)::after { content: none; }
   .call { padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
   .call::before { content: none; }
-  /* A row: who, the time left, the lane, and today and the week with Cheer. */
-  .wideRow { display: grid; grid-template-columns: var(--layout-sidebar) calc(var(--layout-touch) + var(--space-md)) minmax(0, 1fr) calc(var(--layout-sidebar) - var(--space-xl) - var(--space-md)); align-items: center; gap: var(--space-lg); }
-  .rows > li > .wideRow { padding: var(--space-md) 0; }
-  .who { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-sm); }
-  .who > div { display: grid; gap: var(--space-xs); min-width: 0; }
-  .totals { display: grid; justify-items: start; gap: var(--space-xs); font: var(--type-label); }
-  .totals button { margin-top: var(--space-xs); }
+  /* Words in a column at the panel's left, 220px, the lane the rest of the row. */
+  .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) - var(--space-md) + var(--space-xs)) minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
+  .hoursRow > span { display: block; }
+  .words { display: grid; gap: var(--space-xs); min-width: 0; }
+  .side .top { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .weekPanel { max-width: calc(var(--layout-canvas) * 2 / 3); }
   .notes, .tab > .panel:only-child { max-width: calc(var(--layout-canvas) * 2 / 3); }
+}
+@media (min-width: 1100px) {
+  /* Wider, 280px of words. */
+  .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) + var(--space-xl) + var(--space-sm)) minmax(0, 1fr); }
 }
 @media (min-width: 1280px) {
   /* The chart takes eight of twelve columns, the streak and your part the other four. */

@@ -1,18 +1,28 @@
 .person { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; font: var(--type-label); color: var(--ink); }
+/* Flat, one hue of the palette, never a gradient; letters 0.4 of the circle, 0.34 for two. */
 .face {
+  --side: var(--space-xl);
   display: grid;
   flex: none;
   place-items: center;
   overflow: hidden;
-  width: var(--space-xl);
-  height: var(--space-xl);
+  width: var(--side);
+  height: var(--side);
   border-radius: var(--radius-full);
-  background: var(--raised);
-  color: var(--ink);
+  /* The letters in on-you on every hue but heat-2, where ink stands 4.5:1 and on-you does not.
+     Worked out from DESIGN.md's palette, light and dark: on-you on amber, olive, teal, sky,
+     indigo, plum and clay is 4.44, 4.74, 5.05, 5.25, 6.57, 6.49, 5.82 to 1 in light and 7.7
+     or more in dark; on heat-2 ink is 8.81 and 7.04. Amber in light is the one under 4.5 either
+     way, and on-you is the nearer. */
+  color: var(--on-you);
   font: var(--type-body-strong);
 }
-.sm { width: var(--space-lg); height: var(--space-lg); font: var(--type-label); }
-.lg { width: var(--layout-touch); height: var(--layout-touch); }
+/* ponytail: the letters take the type role nearest 0.4 of the circle (label, body-strong,
+   title); the exact 0.4 and 0.34 need a role of their own in DESIGN.md's type scale. */
+.inked { color: var(--ink); }
+.sm { --side: var(--space-lg); font: var(--type-label); }
+.lg { --side: var(--layout-touch); }
+.xl { --side: calc(var(--layout-touch) + var(--space-sm)); font: var(--type-title); }
 /* A picture fills its circle, drawn the same in both themes; the letter stays, unseen, under it. */
 .pictured { background-position: center; background-size: cover; color: transparent; }
 /* A long name is cut where the room runs out; the circle is never squeezed. */
