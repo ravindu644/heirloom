@@ -25,6 +25,7 @@ import { HabitsScreen } from './habits/habits.tsx';
 import { RoomScreen } from './room/room.tsx';
 import { ProgressScreen } from './progress/progress.tsx';
 import { ResetPage, ResetSignedIn, resetIn } from './reset.tsx';
+import { ownPicture, usePicture } from './picture.ts';
 import { SignIn } from './signin.tsx';
 import { TodayScreen } from './today/today.tsx';
 import * as s from './strings.ts';
@@ -128,6 +129,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
   const screen = useScreen();
   const invite = useInvite();
   const link = useReset();
+  const picture = usePicture(rooms, ownPicture(rooms));
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -167,6 +169,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
     // The status line keeps its space only where buttons sit at the bottom of a phone screen: Focus.
     <Shell
       person={account.username}
+      picture={picture}
       at={screen === 'settings' || reset ? undefined : screen}
       page={reset ? 'reset' : undefined}
       without={rooms.hidden.value ? 'room' : undefined}
@@ -187,7 +190,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
         <RoomScreen engine={engine} rooms={rooms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
-        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

@@ -1,13 +1,19 @@
 .person { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; font: var(--type-label); color: var(--ink); }
-.person i {
+.face {
   display: grid;
   flex: none;
   place-items: center;
+  overflow: hidden;
   width: var(--space-xl);
   height: var(--space-xl);
   border-radius: var(--radius-full);
   background: var(--raised);
+  color: var(--ink);
   font: var(--type-body-strong);
 }
+.sm { width: var(--space-lg); height: var(--space-lg); font: var(--type-label); }
+.lg { width: var(--layout-touch); height: var(--layout-touch); }
+/* A picture fills its circle, drawn the same in both themes; the letter stays, unseen, under it. */
+.pictured { background-position: center; background-size: cover; color: transparent; }
 /* A long name is cut where the room runs out; the circle is never squeezed. */
-.person span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

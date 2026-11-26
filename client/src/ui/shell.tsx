@@ -18,6 +18,8 @@ export type Destination = (typeof DESTINATIONS)[number];
 interface Props {
   /** Who is signed in. Left out, nobody is: the frame has no person and no destinations. */
   person?: string;
+  /** Their picture, where they set one: the circle of the header chip. */
+  picture?: string;
   /** The destination being shown, if it is one of the five. */
   at?: Destination;
   /** A name for what is shown when it is not a destination: a change of it is a change of screen, and comes in as one. */
@@ -36,7 +38,7 @@ interface Props {
  * and the name in one place, the person at the right of the header (at the foot of the sidebar
  * on a laptop), the screen, what the connection has to say, and the five destinations.
  */
-export function Shell({ person, at, page = at, without, status = '', keepStatus, children }: Props) {
+export function Shell({ person, picture, at, page = at, without, status = '', keepStatus, children }: Props) {
   const sidebar = useSidebar();
   // What the last tap did was said of the screen it was made on.
   useEffect(() => () => say(null), [page]);
@@ -81,7 +83,7 @@ export function Shell({ person, at, page = at, without, status = '', keepStatus,
   // The person is the way to Settings, and to nothing else: one target.
   const who = person && (
     <a key="person" class={css.person} href="#/settings" aria-label={s.settings.open(person)}>
-      <Person name={person} />
+      <Person name={person} picture={picture} />
     </a>
   );
   // CSS places the parts; the page is written in the order the eye meets them, which is what Tab

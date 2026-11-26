@@ -1,0 +1,17 @@
+/* The hours: their names over a line that is heavy in ink as far as now and a hair after it. */
+.hours { position: relative; height: calc(1lh + var(--space-sm)); font: var(--type-label); color: var(--muted); }
+.hours span, .hours b { position: absolute; bottom: var(--space-xs); transform: translateX(-50%); white-space: nowrap; }
+.hours .gone { color: var(--ink); }
+.hours .first { transform: none; }
+.hours .last { transform: translateX(-100%); }
+.hours b { font: var(--type-label); font-weight: inherit; color: var(--ink); }
+.past, .after { position: absolute; bottom: 0; }
+.past { left: 0; height: var(--layout-stroke); background: var(--ink); }
+.after { right: 0; height: var(--layout-hair); background: var(--line); }
+
+/* A lane: one grey across the whole stretch, a filled block for each lap that ran. Square ended. */
+.lane { position: relative; height: var(--layout-lane-set); background: var(--raised); }
+.lap { position: absolute; top: 0; bottom: 0; background: var(--muted); }
+.mine { background: var(--you); }
+/* A circle standing in the lane, ringed in the surface so it reads over a block. */
+.mark { position: absolute; top: 0; display: block; line-height: 0; border-radius: var(--radius-full); box-shadow: 0 0 0 var(--layout-stroke) var(--surface); transform: translateX(-50%); }

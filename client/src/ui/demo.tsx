@@ -30,6 +30,8 @@ import type { ServerChoice } from '../sync/server.ts';
 import { ServerStep } from './server.tsx';
 import { FirstRun } from './welcome.tsx';
 import { hueHex } from './kit/hue.ts';
+import { say } from './kit/said.tsx';
+import * as s from './strings.ts';
 
 const MIN = 60000;
 const LENGTHS = { work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN };
@@ -41,7 +43,7 @@ interface Scene {
   /** The time on the wall, on Tuesday 24 November 2026. */
   at?: [hour: number, minute: number];
   /** The timer: the phase, which lap of the set (0 to 3), time left, and whether it is paused. `left` of 0 is over. */
-  run?: { phase: Phase; lap: number; left: number; paused?: boolean; task?: string; planned?: number };
+  run?: { phase: Phase; lap: number; left: number; paused?: boolean; task?: string; planned?: number; id?: string };
   /** Idle, with this lap next. */
   next?: number;
   /** Focus today before the run in progress, and laps that rang. */
@@ -333,6 +335,7 @@ const HABIT_SCENES: Record<string, Scene> = {
 };
 
 // Room: no room first, then a room of one, the mockup's four, and eight.
+const shortBreak = { phase: 'short', lap: 1, left: 2 * MIN + 58000 } as const;
 const ROOM_SCENES: Record<string, Scene> = {
   'room-none': { ...week, about: 'Room: not in one yet', room: { rooms: 'none' } },
   'room-none-offline': { ...week, about: 'Not in a room, and no connection', sync: 'offline', room: { rooms: 'none', stale: true } },
@@ -349,6 +352,21 @@ const ROOM_SCENES: Record<string, Scene> = {
   'room-leaving': { ...week, about: 'Leaving, the second tap', run: onKr, room: {}, tap: ['Code and settings', 'Leave the room'] },
   'room-another': { ...week, about: 'Making or joining another room', run: onKr, room: {}, tap: 'Make or join' },
   'room-hidden': { ...week, about: 'Rooms hidden: Room leaves the navigation', room: {}, prefs: { rooms_hidden: true } },
+  // Section 22, the room as chosen: on a break with a lap called, on a lap started together, and each tab.
+  'room-call': { ...week, about: 'On a break, sachi has called a lap: the call over the bottom bar, I am in, a note waiting', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', newNotes: 1, pictures: true } },
+  'room-call-in': { ...week, about: 'A called lap you are in: I am out, and your circle at its start in your lane', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'in', pictures: true } },
+  'room-call-said': { ...week, about: 'A lap called, and the bar that says what a tap did: it rises over the call', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', pictures: true }, tap: 'demo:say' },
+  'room-call-mine': { ...week, about: 'A lap you called: you can call it off', run: shortBreak, room: { onBreak: true, call: 'mine', pictures: true } },
+  'room-together': { ...week, about: 'On a lap started together: the line that says so, and two notes waiting', run: { ...onKr, id: 'call-c1' }, room: { keeper: 'sachi', newNotes: 2, pictures: true } },
+  'room-no-call': { ...week, about: 'On a break, no lap called: the way to call one', run: shortBreak, room: { onBreak: true, keeper: 'sachi', pictures: true } },
+  'room-calling': { ...week, about: 'Calling a lap: how many minutes from now', run: shortBreak, room: { onBreak: true, keeper: 'sachi', pictures: true }, tap: 'Call a lap together' },
+  'room-notes': { ...week, about: 'Notes on a break: open, so the count is gone; the new one says so', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', newNotes: 1, pictures: true }, tap: 'Notes' },
+  'room-notes-lap': { ...week, about: 'Notes on a lap: folded, two waiting', run: onKr, room: { keeper: 'sachi', newNotes: 2, pictures: true }, tap: 'Notes' },
+  'room-notes-empty': { ...week, about: 'Notes with none this week', run: shortBreak, room: { onBreak: true, keeper: 'sachi', noNotes: true, pictures: true }, tap: 'Notes' },
+  'room-week': { ...week, about: 'Week on a break: ahead of last week, the chart with its target, the streak and your part', run: shortBreak, room: { onBreak: true, keeper: 'sachi', call: 'theirs', newNotes: 1, pictures: true, target: 30 }, tap: 'Week' },
+  'room-week-lap': { ...week, about: 'Week on a lap', run: onKr, room: { keeper: 'sachi', newNotes: 2, pictures: true, target: 30 }, tap: 'Week' },
+  'room-pictures-broken': { ...week, about: 'Pictures that fail to load: each circle falls back to its initial', run: onKr, room: { pictures: 'broken' } },
+  'room-sheet-remove': { ...week, about: 'The keeper\'s sheet: who is in, each with Remove, asked twice', run: onKr, room: { pictures: true }, tap: ['Code and settings', 'Remove'] },
 };
 
 // Settings in full, and the marks in their moments.
@@ -409,6 +427,7 @@ const SERVER: Record<string, Scene> = {
   'reset-dead': { about: 'A reset link that no longer works', signedOut: true, reset: 'dead' },
   'reset-signed-in': { ...idleAt2, about: 'A reset link opened where an account is open: sign out first', day: day(), reset: 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy' },
   'signin-phone-reset-pasted': { about: 'A reset link pasted where the phone app asks for an invite: it is for a browser', signedOut: true, serverAt: 'https://heirloom.example', tap: ['I have an invite', 'fill:invite=https://heirloom.example/#/reset/q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy', 'fill:username=sachi', 'fill:password=long enough', 'submit:username'] },
+  'settings-picture': { ...idleAt2, about: 'Settings with your picture set: shown in the account and the header, with the way to change it or take it off', settings: true, day: day(), room: { pictures: true } },
   'settings-about': { ...idleAt2, about: 'Settings scrolled to its foot: About, with the version, the build and the source', settings: true, day: day(), tap: 'demo:end' },
   'settings-plain': { ...owner, about: 'Settings in the phone app on a plain http server', role: 'member', serverAt: LAN },
 };
@@ -491,7 +510,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     run
       ? {
           phase: run.phase,
-          run: 'demo-0',
+          run: run.id ?? 'demo-0',
           task: run.task ?? null,
           // "Over" opened five seconds after the bell, so it is a result found, not one watched.
           started: start - (planned - run.left) - (run.left === 0 ? 5000 : 0) - (run.paused ? 2 * MIN : 0),
@@ -741,6 +760,9 @@ const find = <T extends Element>(selector: string, words: string): T => {
       find<HTMLElement>(words.slice(4), words).click();
     } else if (words.startsWith('submit:')) {
       find<HTMLInputElement>(`input[name="${words.slice(7)}"]`, words).form!.requestSubmit();
+    } else if (words === 'demo:say') {
+      // The bar, said over whatever is docked at the foot of the screen.
+      say({ lead: s.today.saidDone, title: 'Linked lists: insert and delete', undo: () => say(null) });
     } else if (words === 'demo:end') {
       // Scrolled to the foot of the screen, as a thumb would.
       const main = find<HTMLElement>('main', words);

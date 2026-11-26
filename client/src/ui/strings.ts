@@ -208,6 +208,9 @@ export const ring = {
   lapDone: 'Lap done.',
   breakOver: 'Break over.',
   lapNext: 'Time for the next lap.',
+  // A lap called in a room starts: the room, and who called it unless it was you.
+  callTitle: 'The lap together starts',
+  callBody: (room: string, caller?: string) => (caller ? `${room}, with ${caller}` : room),
   // Beside the countdown in the phone's notification shade, while a phase runs.
   // The notification's own buttons and its word for a lap that is held.
   pause: 'Pause',
@@ -258,6 +261,13 @@ export const settings = {
   title: 'Settings',
   back: 'Back',
   account: 'Account',
+  // Your circle in the rooms, beside your name.
+  picture: 'Your picture',
+  pictureNote: 'Your rooms see it beside your name. It is made small here before it is sent.',
+  pictureChoose: 'Choose a picture',
+  pictureChange: 'Choose another',
+  pictureOff: 'Take it off',
+  pictureUnread: 'That picture could not be read. Try another one.',
   where: (device: string, server: string) => `This ${device} keeps step with the server at ${server}.`,
   refused: (device: string, server: string) => `The server at ${server} signed this ${device} out. Your laps are safe on it.`,
 
@@ -554,6 +564,8 @@ export const progress = {
   hours: (h: number) => `${h}h`,
   byNow: (ms: number, day: string) => `Last week had ${total(ms)} by this time on ${weekdayName(day)}.`,
   noLastWeek: 'Last week has nothing to race. This week becomes the one to beat.',
+  // A room's week chart: its top line.
+  target: 'target',
   chart: (you: number, ghostNow: number, ghostTotal: number) =>
     ghostTotal > 0 ? `This week ${total(you)} so far. Last week ${total(ghostNow)} by now, ${total(ghostTotal)} in all.` : `This week ${total(you)} so far.`,
   total,
@@ -644,6 +656,8 @@ export const progress = {
 const COUNT_WORDS = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
 const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
 /** "Sachi", "Sachi and Dilan", "Sachi, Dilan and Amaya". */
+// A small count in words: "all four have run a lap".
+const word = (n: number) => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'][n] ?? String(n);
 const names = (list: string[]) => (list.length < 3 ? list.join(' and ') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
 
 export const habits = {
@@ -722,7 +736,80 @@ export const habits = {
 };
 
 export const room = {
-  label: (name: string) => `Room: ${name}`,
+  // The line that names the room, and who keeps it.
+  keptBy: (name: string, keeper: string | null, yours: boolean) => (yours && keeper ? `${name}, kept by you` : keeper ? `${name}, kept by ${keeper}` : name),
+  people: 'People',
+  notes: 'Notes',
+  weekTab: 'Week',
+  notesSaid: (n: number) => (n > 0 ? `Notes, ${n} new` : 'Notes'),
+  hour: (ms: number) => wall(ms),
+  now: 'now',
+  todayWeek: (today: number, week: number) => (today < MIN ? `Nothing today yet, ${total(week)} this week.` : `${total(today)} today, ${total(week)} this week.`),
+  todayOnly: (today: number) => (today < MIN ? 'Nothing today yet' : `${total(today)} today`),
+  weekOnly: (week: number) => `${total(week)} this week`,
+
+  // A lap called for a minute: who called it, when it starts, and who is in.
+  calls: (by: string, yours: boolean) => (yours ? 'You call a lap' : `${by} calls a lap`),
+  // `who` in the call's order, the caller first, you marked: "lina and you are in."
+  startsIn: (ms: number, who: { name: string; you: boolean }[]) => {
+    const seconds = Math.max(0, Math.ceil(ms / 1000));
+    const said = names(who.map((one, i) => (one.you ? (i === 0 ? 'You' : 'you') : one.name)));
+    return `Starts in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}. ${said} ${who.length === 1 && !who[0]!.you ? 'is' : 'are'} in.`;
+  },
+  imIn: "I'm in",
+  imOut: "I'm out",
+  // The caller's own way out: taking the call back ends it for everyone.
+  callOff: 'Take it back',
+  callTogether: 'Call a lap together',
+  calledLap: 'A lap called',
+  callWhen: 'When it starts',
+  callIn: (minutes: number, at: number) => `in ${plural(minutes, 'minute', 'minutes')}, at ${wall(at)}`,
+  callLess: 'A minute sooner',
+  callMore: 'A minute later',
+  callGo: 'Call the lap',
+  notNow: 'Not now',
+  callErrors: {
+    call: 'Someone has just called a lap here. It is above.',
+    bad_request: 'A lap is called 1 to 30 minutes ahead.',
+    slow_down: 'That is 6 calls today, the most there can be.',
+  } as Record<string, string>,
+  startedTogether: (at: number) => `You started this lap together at ${wall(at)}.`,
+
+  // Notes: one line each, read on a break.
+  noteField: 'A line for the room',
+  noteGo: 'Add',
+  notesNote: 'Kept for a week. Notes fold away while you are on a lap.',
+  notesNone: 'No notes this week.',
+  noteNew: 'new',
+  noteLeft: 'Someone who left',
+  noteWhen: (at: number, now: number) => (new Date(at).toDateString() === new Date(now).toDateString() ? wall(at) : `${new Date(at).toLocaleDateString('en-GB', { weekday: 'short' })} ${wall(at)}`),
+  notesFolded: (n: number, end: number | null) =>
+    `${n > 0 ? `${plural(n, 'new note', 'new notes')}. ` : ''}${end === null ? 'They open when this lap ends.' : `They open when this lap ends, at ${wall(end)}.`}`,
+  noteErrors: {
+    bad_request: 'A note is one line of up to 200 characters.',
+    slow_down: 'That is 30 notes today, the most there can be. More tomorrow.',
+  } as Record<string, string>,
+
+  // Week: the room against its own last week, its week, its streak and your part in it.
+  ahead: (ms: number) =>
+    ms >= MIN ? `The room is ${total(ms)} ahead of last week at this time.` : ms <= -MIN ? `The room is ${total(-ms)} behind last week at this time.` : 'The room is level with last week at this time.',
+  togetherOf: (target: number) => (target > 0 ? `of ${total(target)} together this week` : 'together this week'),
+  chartSaid: (week: number, lastNow: number, lastAll: number, target: number) =>
+    `This week ${total(week)} so far${target > 0 ? ` of ${total(target)}` : ''}. Last week ${total(lastNow)} by now, ${total(lastAll)} in all.`,
+  chartKey: (target: number) => (target > 0 ? 'Solid is this week, dashed is last week. The top line is the room’s target.' : 'Solid is this week, dashed is last week.'),
+  streakDays: (run: number) => (run === 1 ? 'day in a row, everyone in' : 'days in a row, everyone in'),
+  streakSaid: (run: number) => `${plural(run, 'day', 'days')} in a row on which everyone ran a lap`,
+  restWas: (ms: number) => `${new Date(ms).toLocaleDateString('en-GB', { weekday: 'long' })} the ${ordinal(new Date(ms).getDate())} was a rest day. Two a week keep it going.`,
+  todayNeeds: (ran: number, of: number) => (ran >= of ? `Today is kept: all ${word(of)} have run a lap.` : `Today counts once all ${word(of)} have run a lap: ${ran} of ${of} so far.`),
+  yourPart: 'Your part',
+  partOf: (room: number) => `of the room’s ${total(room)} this week`,
+  partToday: (ran: boolean) => (ran ? 'You have run a lap today, so you count for the streak.' : 'A lap that rings today, and you count for the streak.'),
+
+  // The keeper's way to take someone out.
+  whoIsIn: 'Who is in',
+  removeNote: 'Removed, they are out, and the room gets a new code: the old one stops working.',
+  remove: 'Remove',
+  removeAsk: (name: string) => `Remove ${name}?`,
   noRoom: 'You are not in a room yet.',
   about: 'A room is a few friends who see each other focusing: whether they are on a lap or a break, and the time left. Task titles stay hidden unless you share yours in Settings.',
   make: 'Make a room',
@@ -747,8 +834,6 @@ export const room = {
   findingStale: (members: number, focusing: number) =>
     members === 1 ? 'Only you here.' : focusing === 0 ? 'Nobody was on a lap when the room was last heard from.' : `${focusing} of ${members} were focusing when the room was last heard from.`,
   week: 'Together this week',
-  weekAt: (ms: number, target: number) => (target > 0 ? `${total(ms)} of ${total(target)} together this week.` : `${total(ms)} together this week.`),
-  share: (name: string, ms: number) => `${name} ${total(ms)}`,
   you: 'You',
   members: 'Who is focusing now',
   // No lap number: a friend's count is theirs, and the timer's set of four is on no screen.
@@ -762,8 +847,6 @@ export const room = {
   left: (ms: number) => `${clock(ms)} left`,
   notSharing: 'Not sharing what they are on.',
   yoursHidden: 'Your task is not shown to the room.',
-  totals: (today: number, laps: number, week: number) =>
-    laps === 0 && today < MIN ? `Nothing today yet, ${total(week)} this week.` : `${total(today)} today in ${plural(laps, 'lap', 'laps')}, ${total(week)} this week.`,
   cheer: 'Cheer',
   cheerLabel: (name: string, ended: number) => `Cheer ${name} for the lap that ended at ${wall(ended)}`,
   cheeredBy: (who: string[], yours: boolean) => `${names(who)} cheered ${yours ? 'your last lap' : 'this lap'}.`,

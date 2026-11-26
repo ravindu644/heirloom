@@ -1,5 +1,5 @@
 import type { WeekRace } from '../../sync/progress.ts';
-import { cx } from '../kit/cx.ts';
+import { cx } from './cx.ts';
 import * as s from '../strings.ts';
 import css from './week.module.css';
 
@@ -14,9 +14,10 @@ const FLOOR = 0.8;
  * that ends in a dot with its figure, last week's dashed in ghost with its total. The lines are
  * drawn in the data's own units and stretched to the plot, with strokes that do not stretch; the
  * words stand outside the drawing, so type keeps its size at every width. No fill, no legend.
+ * A room's week gives `target`: the top line, ink, named at its end; and its own `label`.
  */
-export function WeekChart({ week, today }: { week: WeekRace; today: string }) {
-  const most = Math.max(week.ghost_total_ms, week.you_ms, HOUR);
+export function WeekChart({ week, today, target = 0, label }: { week: WeekRace; today: string; target?: number; label?: string }) {
+  const most = Math.max(week.ghost_total_ms, week.you_ms, target, HOUR);
   const step = STEPS.find((hours) => hours * 4 * HOUR >= most) ?? Math.ceil(most / HOUR / 4);
   const top = step * 4 * HOUR;
   const y = (ms: number) => 1 - ms / top;
@@ -26,8 +27,13 @@ export function WeekChart({ week, today }: { week: WeekRace; today: string }) {
   const ghost = week.ghost_total_ms > 0;
 
   return (
-    <div class={css.chart} role="img" aria-label={s.progress.chart(week.you_ms, week.ghost_now_ms, week.ghost_total_ms)}>
+    <div class={cx(css.chart, target > 0 && css.targeted)} role="img" aria-label={label ?? s.progress.chart(week.you_ms, week.ghost_now_ms, week.ghost_total_ms)}>
       <div class={css.plot} aria-hidden="true">
+        {target > 0 && (
+          <i class={css.target} style={`top:${y(target) * 100}%`}>
+            <span>{s.progress.target}</span>
+          </i>
+        )}
         {[0, 1, 2, 3, 4].map((k) => (
           <i key={k} class={css.grid} style={`bottom:${k * 25}%`}>
             <span>{s.progress.hours(k * step)}</span>

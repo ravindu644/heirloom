@@ -1,12 +1,15 @@
-.room { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); padding-bottom: var(--space-md); }
+/* The room is one column: what it says at the top, the call, the tabs and the panel under them.
+   On a phone the call stands at the foot, over the bottom bar, wherever the panel is scrolled. */
+.room { display: flex; flex-direction: column; gap: var(--space-md); min-height: 100%; padding-bottom: var(--space-md); }
 
-/* The heading is a finding. The line over it says which room. */
+/* The heading is a finding. The line over it says which room, and who keeps it. */
 .head { display: grid; gap: var(--space-xs); }
 .head p { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); font: var(--type-label); color: var(--muted); }
 .head p span { min-width: 0; overflow-wrap: anywhere; }
 .head h1 { font: var(--type-title); text-wrap: balance; }
 .quiet { color: var(--muted); text-wrap: pretty; }
-.link { justify-self: start; }
+.small { font: var(--type-label); color: var(--muted); text-wrap: pretty; }
+.link { align-self: flex-start; }
 a.link { display: flex; align-items: center; min-height: var(--layout-touch); font: var(--type-label); color: var(--muted); text-decoration: underline; text-underline-offset: var(--space-xs); }
 /* A room's name can be forty characters: its choice cuts it short, not the row. */
 .pick { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -18,34 +21,64 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .go { display: grid; grid-template-columns: minmax(0, 1fr); }
 .told { padding-top: var(--space-sm); }
 
-/* The week the room fills together: one lane, a share for each person. */
-.week { display: grid; gap: var(--space-sm); }
-.bar { display: flex; gap: var(--layout-heat-gap); height: var(--layout-lane-set); background: var(--line); }
-.bar i { min-width: var(--layout-stroke); background: var(--ink); }
-.bar .mine { background: var(--you); }
+.panel { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+.tab { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
-/* Side by side, each in a lane of their own, and all the same height in a row. */
-.member { display: flex; flex-direction: column; padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
-/* The lane's lines fill it, and the part that holds the button takes what is left. */
-.lane { flex: 1; }
-.lane > div:has(.foot) { flex: 1; }
-/* Your own lane has your colour down its edge. */
-.you { box-shadow: inset var(--layout-stroke) 0 0 var(--you); }
-.who { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
-.who > span { min-width: 0; }
-/* In a lane there is room under the name: a long one wraps and is read whole. */
-.who > span span { overflow-wrap: anywhere; white-space: normal; }
-.who b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+/* The call: a band of its own, at the foot of a phone's screen, over the bottom bar. */
+.call { position: sticky; bottom: 0; z-index: 1; order: 9; margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: calc(var(--space-md) * -1); padding: var(--space-sm) 0; }
+/* Its surface runs from edge to edge of the screen, under the words that keep the column's edge. */
+.call::before { content: ""; position: absolute; inset: 0 calc(var(--layout-margin) * -1); z-index: -1; border-top: var(--layout-hair) solid var(--line); background: var(--surface); }
+.callWords { display: grid; gap: var(--space-xs); min-width: 0; }
+.callWords > p:first-child { display: flex; align-items: baseline; gap: var(--space-sm); font: var(--type-body-strong); }
+.callWords b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+.callIn { display: flex; align-items: center; gap: var(--space-sm); font: var(--type-label); color: var(--muted); }
+.faces { display: flex; gap: var(--space-xs); }
+
+/* Started together, and the way to call a lap: one line over the track. */
+.together { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--space-md); font: var(--type-label); color: var(--muted); }
+
+/* People: the hours, then a row each. */
+.track { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+.rows { padding: 0; list-style: none; }
+.rows > li + li > article { border-top: var(--layout-hair) solid var(--line); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding: var(--space-sm) 0; }
+.head2 { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); }
+.name b { font: var(--type-body-strong); }
+.name span { font: var(--type-label); color: var(--muted); }
+.left { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 /* A break is the green of the calyx, here as everywhere. */
-.who .rest { color: var(--rest); }
-.phase { font: var(--type-body-strong); }
+.left.rest { color: var(--rest); }
 /* Three lines hold any title a person would share, as on a task's own row. */
 .task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.totals { font: var(--type-label); color: var(--muted); }
-/* What is left of the lane under the words is the button's: it stands on the lane's foot, so
-   the buttons of a row share one line. */
-.foot { display: flex; flex: 1; align-items: flex-end; padding-top: var(--space-xs); }
-.foot button { flex: 1; }
+.foot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-md); }
+.foot > div { display: grid; gap: var(--space-xs); min-width: 0; }
+
+/* Notes: newest first, a circle, the name and time, the line. */
+.notes { padding: 0; list-style: none; }
+.note { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-sm); }
+.note p:last-child { overflow-wrap: anywhere; }
+.note b { font-weight: inherit; color: var(--ink); }
+
+/* Week. */
+.week { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+.ahead { font: var(--type-title); text-wrap: balance; }
+.weekCols, .side { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-md); }
+.figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); }
+.figure b { margin-left: var(--layout-figure-bearing); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); }
+.part { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); }
+.part b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
+.partTitle { font: var(--type-body-strong); }
+/* The room's week as one bar, your part in you. */
+.share { display: block; height: var(--layout-lane); background: var(--raised); }
+.share i { display: block; height: 100%; background: var(--you); }
+/* The streak's days: kept in you, a rest day the rest ring, a miss empty, today open. */
+.dots { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.dots i { box-sizing: border-box; width: var(--layout-dot); height: var(--layout-dot); border-radius: var(--radius-full); background: var(--raised); }
+.dots .kept { background: var(--you); }
+.dots .rest { border: var(--layout-stroke) solid var(--rest); background: none; }
+.dots .open { box-shadow: inset 0 0 0 var(--layout-hair) var(--ink); }
+/* A day before the room, or before anything was kept: its place in the row, and nothing drawn. */
+.dots .none { visibility: hidden; }
 
 /* In the room's sheet. */
 .legend { font: var(--type-label); color: var(--muted); }
@@ -57,12 +90,28 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 /* Its ink on the sheet's edge, as every large figure's is. */
 .code { margin-left: var(--layout-figure-bearing); font: var(--type-figure-lg); font-feature-settings: var(--feature-figure-lg); user-select: all; }
 .rename { display: grid; gap: var(--space-md); }
+/* Who is in, each with the keeper's way to take them out. */
+.out { display: grid; padding: 0; list-style: none; }
+.out li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--layout-touch); }
 
 @media (min-width: 720px) {
   .quiet { max-width: 60ch; }
   .doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .door button, .rename button { justify-self: start; }
-  .foot button { flex: none; }
-  /* Lanes side by side: the column of the phone becomes a grid, and a lane that comes or goes fades in its cell. */
-  div.members { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--layout-sidebar) + var(--space-md)), 1fr)); gap: var(--layout-gap); }
+  /* With a sidebar the call is a band under the finding, and the content follows it. */
+  .room { min-height: 0; }
+  .call { position: relative; order: 0; margin: 0; margin-top: 0; padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
+  .call::before { content: none; }
+  /* A row: who, the time left, the lane, and today and the week with Cheer. */
+  .wideRow { display: grid; grid-template-columns: var(--layout-sidebar) calc(var(--layout-touch) + var(--space-md)) minmax(0, 1fr) calc(var(--layout-sidebar) - var(--space-xl) - var(--space-md)); align-items: center; gap: var(--space-lg); }
+  .rows > li > .wideRow { padding: var(--space-md) 0; }
+  .who { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-sm); }
+  .who > div { display: grid; gap: var(--space-xs); min-width: 0; }
+  .totals { display: grid; justify-items: start; gap: var(--space-xs); font: var(--type-label); }
+  .totals button { margin-top: var(--space-xs); }
+  .notes, .tab > .panel:only-child { max-width: calc(var(--layout-canvas) * 2 / 3); }
+}
+@media (min-width: 1280px) {
+  /* The chart takes eight of twelve columns, the streak and your part the other four. */
+  .weekCols { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 }

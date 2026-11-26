@@ -4,6 +4,8 @@ import type { Admins } from '../sync/admins.ts';
 import type { Engine } from '../sync/engine.ts';
 import type { Invites } from '../sync/invites.ts';
 import type { Resets } from '../sync/resets.ts';
+import type { Rooms } from '../sync/rooms.ts';
+import { makePicture, ownPicture, usePicture } from './picture.ts';
 import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
 import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
@@ -51,6 +53,7 @@ interface Props {
   invites: Invites;
   admins: Admins;
   resets: Resets;
+  rooms: Rooms;
   /** The phone app's server; left out in a browser. */
   server?: ServerChoice;
   canSave?: boolean;
@@ -59,7 +62,7 @@ interface Props {
   onSignIn: () => void;
 }
 
-export function Settings({ engine, settings, invites, admins, resets, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
+export function Settings({ engine, settings, invites, admins, resets, rooms, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -102,9 +105,38 @@ export function Settings({ engine, settings, invites, admins, resets, server: ch
     file.current!.value = '';
   };
 
+  // Your picture: as your rooms show it, or as it was just made here until they do. What was
+  // made is let go once the rooms say a picture other than the one they said when it was made:
+  // this one arrived, or another device changed it since.
+  const picked = useRef<HTMLInputElement>(null);
+  const [made, setMade] = useState<{ url: string | null; over: string | null } | null>(null);
+  const [pictureSaid, setPictureSaid] = useState('');
+  const hash = ownPicture(rooms);
+  const shown = usePicture(rooms, hash);
+  useEffect(() => {
+    if (made && hash !== made.over) setMade(null);
+  }, [hash]);
+  // A picture's URL holds its bytes until it is let go: replaced, taken off or the screen left.
+  useEffect(() => () => void (made?.url && URL.revokeObjectURL(made.url)), [made]);
+  const mine = made ? (made.url ?? undefined) : shown;
+  const sendPicture = async (bytes: Uint8Array | null) => {
+    const result = await rooms.setPicture(bytes);
+    if (!result.ok) return setPictureSaid(s.people.errors[result.error] ?? s.people.failed);
+    setPictureSaid('');
+    setMade({ url: bytes ? URL.createObjectURL(new Blob([bytes.slice()])) : null, over: hash });
+  };
+  const choosePicture = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const bytes = await makePicture(file);
+    if (!bytes) return setPictureSaid(s.settings.pictureUnread);
+    await sendPicture(bytes);
+  };
+
   const accountPanel = (
     <Panel title={s.settings.account}>
-      <Person name={account.username} />
+      <Person name={account.username} picture={mine} />
       {/* The sentence holds the server's address, which is there to be copied. */}
       <p class="copies">{refused ? s.settings.refused(s.device(), server) : s.settings.where(s.device(), server)}</p>
       {/* Said once more here, under the account: a fact, not an alarm. */}
@@ -119,6 +151,21 @@ export function Settings({ engine, settings, invites, admins, resets, server: ch
         <Button onClick={signOut}>{s.status.signOut}</Button>
       </div>
       {refusal && <p role="alert">{refusal}</p>}
+      {/* Your circle in the rooms: chosen here, made small here, and shown above as it will be seen. */}
+      <div class={css.picture}>
+        <h3 class={css.legend}>{s.settings.picture}</h3>
+        <p class={css.note}>{s.settings.pictureNote}</p>
+        <div class={css.actions}>
+          <Button onClick={() => picked.current!.click()}>{mine ? s.settings.pictureChange : s.settings.pictureChoose}</Button>
+          {mine && (
+            <Button kind="quiet" onClick={() => void sendPicture(null)}>
+              {s.settings.pictureOff}
+            </Button>
+          )}
+          <input ref={picked} type="file" accept="image/*" hidden onChange={(event) => void choosePicture(event.currentTarget)} />
+        </div>
+        <Fold role="alert">{pictureSaid && <p>{pictureSaid}</p>}</Fold>
+      </div>
     </Panel>
   );
 

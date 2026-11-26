@@ -6,6 +6,9 @@
 .settings p:empty { display: none; }
 .note { color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* Your picture: a part of the account, a line apart. */
+.picture { display: grid; gap: var(--space-sm); padding-top: var(--space-md); border-top: var(--layout-hair) solid var(--line); }
+.legend { font: var(--type-body-strong); }
 /* About's heading is the mark and the name, as the header draws them. */
 .brand { display: flex; align-items: center; }
 /* The commit in the figures face: what is read out in a bug report. */

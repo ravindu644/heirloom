@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import type { RefObject } from 'preact';
 import { useLayoutEffect, useRef } from 'preact/hooks';
 import { SAID_MS, UNDO_MS } from '../../sync/focus.ts';
 import { Button } from './button.tsx';
@@ -74,4 +75,28 @@ export function Said({ undo, class: extra }: { undo: string; class?: string }) {
       <Kept>{said && <Bar key={said.id} said={said} undo={undo} />}</Kept>
     </div>
   );
+}
+
+/**
+ * For something docked at the foot of the screen, over which the bar must rise (a room's call
+ * on a phone): its height, measured as it changes, is the bar's lift, for as long as it is
+ * there and docked (`position: sticky`). One measure, kept on the page, read by the bar's CSS.
+ * Called by a component that is drawn only while the docked thing is.
+ */
+export function useUnderSaid(docked: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = docked.current;
+    if (!el) return;
+    const root = document.documentElement.style;
+    const measure = () => root.setProperty('--under-said', getComputedStyle(el).position === 'sticky' ? `${el.offsetHeight}px` : '0px');
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    addEventListener('resize', measure);
+    measure();
+    return () => {
+      seen.disconnect();
+      removeEventListener('resize', measure);
+      root.removeProperty('--under-said');
+    };
+  }, []);
 }

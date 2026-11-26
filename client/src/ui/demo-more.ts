@@ -138,12 +138,50 @@ export interface DemoRoom {
   keeper?: 'you' | string | null;
   /** Who cheered your latest lap, for the Focus result. */
   cheered?: string[];
+  /** A lap called for a few minutes from now: by a friend, by a friend with you in, or by you. */
+  call?: 'theirs' | 'in' | 'mine';
+  /** You are on a short break, not on the lap the four are drawn with. */
+  onBreak?: boolean;
+  /** Notes from others written since Notes was last open; and no notes at all. */
+  newNotes?: number;
+  noNotes?: boolean;
+  /** Pictures for the friends who set one; `broken`, ones that fail to load. */
+  pictures?: boolean | 'broken';
+}
+
+// A picture as a phone would make one, drawn from the tokens: a head and shoulders on a ground.
+// The demo's only; a real one comes from the server by its hash.
+const drawn = new Map<string, string>();
+function picture(hash: string): string {
+  const held = drawn.get(hash);
+  if (held) return held;
+  const tone = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const [ground, body, head] = [['--heat-1', '--rest', '--muted'], ['--raised', '--you', '--heat-3'], ['--heat-2', '--ink', '--heat-1'], ['--line', '--muted', '--heat-2']][hash.charCodeAt(1) % 4]!;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 96;
+  const pen = canvas.getContext('2d')!;
+  pen.fillStyle = tone(ground!);
+  pen.fillRect(0, 0, 96, 96);
+  pen.fillStyle = tone(body!);
+  pen.beginPath();
+  pen.ellipse(48, 104, 40, 34, 0, 0, Math.PI * 2);
+  pen.fill();
+  pen.fillStyle = tone(head!);
+  pen.beginPath();
+  pen.arc(48, 40, 20, 0, Math.PI * 2);
+  pen.fill();
+  const url = canvas.toDataURL();
+  drawn.set(hash, url);
+  return url;
 }
 
 const member = (id: string, name: string, more: Partial<MemberView> = {}): MemberView => ({
   id,
   name,
   you: false,
+  picture: null,
+  laps: [],
+  runStart: null,
   away: false,
   phase: 'idle',
   lap: 1,
@@ -161,11 +199,17 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
   const at = now();
   const who = (id: string) => ({ id, name: id === 'me' ? 'ravi' : id });
   const lap = (n: number, ago: number, cheers: string[] = []) => ({ run: `run-${n}`, ended: at - ago * MIN, cheers, cheered: cheers.includes('me'), cheerers: cheers.map(who) });
+  // Laps of 25 minutes that began this many minutes ago.
+  const ran = (...ago: number[]): [number, number][] => ago.map((m) => [at - m * MIN, at - m * MIN + 25 * MIN]);
+  const pic = (id: string) => (seed.pictures ? (seed.pictures === 'broken' ? `x${id}` : `p${id}`) : null);
   const you = member('me', 'ravi', {
     you: true,
-    phase: 'work',
+    picture: pic('me'),
+    laps: ran(170, 140, 110, 80, 40),
+    ...(seed.onBreak
+      ? { phase: 'short' as const, ends_at: at + 2 * MIN + 58000 }
+      : { phase: 'work' as const, ends_at: at + 18 * MIN + 42000, runStart: at - 6 * MIN - 18000 }),
     lap: 2,
-    ends_at: at + 18 * MIN + 42000,
     task: 'K&R 5.1 to 5.5: pointers and arrays',
     today_ms: 125 * MIN,
     today_laps: 5,
@@ -174,8 +218,8 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
   });
   const four = [
     you,
-    member('sachi', 'sachi', { phase: 'work', lap: 3, ends_at: at + 11 * MIN + 5000, task: 'Linked lists: insert and delete', today_ms: 75 * MIN, today_laps: 3, week_ms: 6 * HOUR, last: lap(2, 14) }),
-    member('dilan', 'dilan', { phase: 'short', lap: 4, ends_at: at + 3 * MIN + 20000, today_ms: 100 * MIN, today_laps: 4, week_ms: 4 * HOUR + 10 * MIN, last: lap(3, 2, ['me', 'sachi']) }),
+    member('sachi', 'sachi', { picture: pic('sachi'), laps: ran(150, 120, 45), runStart: at - 14 * MIN, phase: 'work', lap: 3, ends_at: at + 11 * MIN + 5000, task: 'Linked lists: insert and delete', today_ms: 75 * MIN, today_laps: 3, week_ms: 6 * HOUR, last: lap(2, 14) }),
+    member('dilan', 'dilan', { picture: pic('dilan'), laps: ran(200, 165, 95, 30), phase: 'short', lap: 4, ends_at: at + 3 * MIN + 20000, today_ms: 100 * MIN, today_laps: 4, week_ms: 4 * HOUR + 10 * MIN, last: lap(3, 2, ['me', 'sachi']) }),
     member('amaya', 'amaya', { away: true, today_ms: 50 * MIN, today_laps: 2, week_ms: 2 * HOUR + 5 * MIN }),
   ];
   const eight = [
@@ -196,9 +240,37 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     four[3]!,
   ];
   const members = seed.members === 'alone' ? [{ ...you, last: lap(1, 9) }] : seed.members === 'eight' ? eight : four;
+  // The room's week, added up day by day: the demo's day is a Tuesday.
+  const weekOf = (people: MemberView[]) => {
+    const week = people.reduce((sum, m) => sum + m.week_ms, 0);
+    const last = [5, 9.5, 14, 18, 21.5, 24, 27.5].map((h) => h * HOUR);
+    return { days: [week * 0.45, week, null, null, null, null, null], last, ahead_ms: week - 8 * HOUR, you_ms: you.week_ms };
+  };
+  const call = () =>
+    seed.call && {
+      id: 'c1',
+      by: seed.call === 'mine' ? who('me') : who('sachi'),
+      at: Math.floor(at / MIN) * MIN + 8 * MIN,
+      in: seed.call === 'mine' ? [who('me')] : seed.call === 'in' ? [who('sachi'), who('me')] : [who('sachi')],
+      you: seed.call !== 'theirs',
+      yours: seed.call === 'mine',
+    };
+  const notes = seed.noNotes
+    ? []
+    : [
+        { id: 'n4', from: 'sachi', name: 'sachi', picture: pic('sachi'), you: false, at: at - 12 * MIN, text: 'Question 4 is the one with the enzyme graph.' },
+        { id: 'n3', from: 'dilan', name: 'dilan', picture: pic('dilan'), you: false, at: at - 70 * MIN, text: 'Library closes at 18:00 today.' },
+        { id: 'n2', from: 'me', name: 'ravi', picture: pic('me'), you: true, at: at - 3 * HOUR, text: 'Bringing my flashcards tomorrow.' },
+        { id: 'n1', from: null, name: null, picture: null, you: false, at: at - 22 * HOUR, text: 'Out tomorrow morning, back after lunch.' },
+      ];
   const room = (id: string, name: string, people: MemberView[], target: number): RoomView => ({
     id,
     name,
+    week: weekOf(people),
+    streak: { run: 12, marks: ['miss', 'kept', 'rest', 'kept', 'kept', 'kept', 'kept', 'kept', 'kept', 'rest', 'kept', 'kept', 'kept', 'open'] },
+    call: call() || null,
+    notes,
+    newNotes: seed.newNotes ?? 0,
     code: id === 'r1' ? 'K7QW3RXM' : 'P4HN8TDC',
     target_ms: target * HOUR,
     week_ms: people.reduce((sum, m) => sum + m.week_ms, 0),
@@ -250,6 +322,31 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
       }),
     cheer: (id, to) =>
       change(id, (one) => ({ ...one, members: one.members.map((m) => (m.id === to && m.last && !m.you ? { ...m, last: { ...m.last, cheers: [...m.last.cheers, 'me'], cheered: true, cheerers: [...m.last.cheerers, who('me')] } } : m)) })),
+    remove: (id, gone) =>
+      answer('', () => {
+        change(id, (one) => ({ ...one, code: 'Q8ZR4TWE', members: one.members.filter((m) => m.id !== gone) }));
+        return { ok: true };
+      }),
+    callLap: (id, when) =>
+      answer('', () => {
+        change(id, (one) => ({ ...one, call: when === null ? null : { id: 'c2', by: who('me'), at: when, in: [who('me')], you: true, yours: true } }));
+        return { ok: true };
+      }),
+    setIn: (id, _call, isIn) =>
+      answer('', () => {
+        change(id, (one) => ({ ...one, call: one.call && { ...one.call, you: isIn, in: isIn ? [...one.call.in, who('me')] : one.call.in.filter((m) => m.id !== 'me') } }));
+        return { ok: true };
+      }),
+    addNote: (id, text) =>
+      answer(text, () => {
+        change(id, (one) => ({ ...one, notes: [{ id: `n${one.notes.length + 9}`, from: 'me', name: 'ravi', picture: pic('me'), you: true, at: now(), text }, ...one.notes] }));
+        return { ok: true };
+      }),
+    markNotesRead: (id) => change(id, (one) => ({ ...one, newNotes: 0 })),
+    calledIn: signal([]),
+    setPicture: () => answer('', () => ({ ok: true })),
+    // A broken one is a picture the image cannot show: the initial stands in.
+    picture: async (hash) => (hash.startsWith('x') ? 'data:image/webp;base64,AAAA' : picture(hash)),
     setHidden: (rooms_hidden) => void prefs.set({ rooms_hidden }),
     setShareTask: (share_task) => void prefs.set({ share_task }),
   };

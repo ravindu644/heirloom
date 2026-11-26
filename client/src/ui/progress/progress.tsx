@@ -13,7 +13,7 @@ import { Day } from './day.tsx';
 import { cx } from '../kit/cx.ts';
 import said from '../kit/said.module.css';
 import css from './progress.module.css';
-import { Guesses, WeekChart } from './week.tsx';
+import { Guesses, WeekChart } from '../kit/week.tsx';
 
 const MIN = 60000;
 const YEAR_DAYS = 371;
