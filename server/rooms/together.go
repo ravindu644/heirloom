@@ -369,10 +369,11 @@ func (s *Service) SetPicture(account int64, picture *string) (hash string, chang
 }
 
 // Picture is the picture by this hash, for an account that shares a room with its owner,
-// or is its owner. Anyone else is told there is none, as if the hash named nothing.
+// is its owner, or is the server's owner and it is an admin's. Anyone else is told there is none, as if the hash named nothing.
 func (s *Service) Picture(viewer int64, hash string) (data []byte, contentType string, err error) {
 	err = s.db.QueryRow(`select a.picture from account a where a.picture_hash = ?1 and (a.id = ?2 or exists (
-		select 1 from member theirs join member mine on mine.room = theirs.room and mine.account = ?2 where theirs.account = a.id))
+		select 1 from member theirs join member mine on mine.room = theirs.room and mine.account = ?2 where theirs.account = a.id)
+		or (a.role in ('owner', 'admin') and exists (select 1 from account o where o.id = ?2 and o.role = 'owner')))
 		limit 1`, hash, viewer).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrPicture

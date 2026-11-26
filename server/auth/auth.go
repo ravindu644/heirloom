@@ -314,10 +314,12 @@ func (s *Service) RevokeInvite(caller int64, invite string) error {
 	return nil
 }
 
-// Person is a username and its role, as the owner is shown them.
+// Person is a username, its role and its picture's hash (nil for the initial), as the
+// owner is shown them.
 type Person struct {
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	Username string  `json:"username"`
+	Role     string  `json:"role"`
+	Picture  *string `json:"picture"`
 }
 
 // Admins lists the owner and then the admins by name, for the owner only. Members are
@@ -326,7 +328,7 @@ func (s *Service) Admins(caller int64) ([]Person, error) {
 	if err := s.may(caller, Owner); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query("select username, role from account where role in ('owner', 'admin') order by role = 'owner' desc, username")
+	rows, err := s.db.Query("select username, role, picture_hash from account where role in ('owner', 'admin') order by role = 'owner' desc, username")
 	if err != nil {
 		return nil, fmt.Errorf("read admins: %w", err)
 	}
@@ -334,7 +336,7 @@ func (s *Service) Admins(caller int64) ([]Person, error) {
 	admins := []Person{}
 	for rows.Next() {
 		var p Person
-		if err := rows.Scan(&p.Username, &p.Role); err != nil {
+		if err := rows.Scan(&p.Username, &p.Role, &p.Picture); err != nil {
 			return nil, fmt.Errorf("read admins: %w", err)
 		}
 		admins = append(admins, p)

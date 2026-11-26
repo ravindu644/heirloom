@@ -367,7 +367,7 @@ func TestRolesOverHTTP(t *testing.T) {
 	may("an admin", sam, laptop, "invites")
 	// The owner first, then admins by name. Members are in no list anyone can ask for.
 	w.call(ravi, phone, "admins/set", map[string]any{"username": "mali", "role": "admin"})
-	if status, body := w.call(ravi, phone, "admins/list", nil); status != 200 || body != `{"admins":[{"username":"ravi","role":"owner"},{"username":"mali","role":"admin"},{"username":"sam","role":"admin"}]}` {
+	if status, body := w.call(ravi, phone, "admins/list", nil); status != 200 || body != `{"admins":[{"username":"ravi","role":"owner","picture":null},{"username":"mali","role":"admin","picture":null},{"username":"sam","role":"admin","picture":null}]}` {
 		t.Errorf("admins/list = %d %s", status, body)
 	}
 	w.call(ravi, phone, "admins/set", map[string]any{"username": "mali", "role": "member"})

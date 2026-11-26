@@ -410,6 +410,42 @@ func TestPictures(t *testing.T) {
 	}
 }
 
+// The owner sees the admins' faces in Settings > Admins, with no room between them. Nobody
+// else gets an admin's picture for being an admin.
+func TestAdminPictures(t *testing.T) {
+	w := start(t)
+	ravi, mali, sam, nimal := w.person("ravi", phone, 0), w.person("mali", laptop, 0), w.person("sam", tablet, 0), w.person("nimal", phone, 0)
+	for _, p := range []*person{mali, sam} {
+		w.call(ravi.session, ravi.id, "admins/set", map[string]any{"username": p.Username, "role": "admin"})
+	}
+	webp := append([]byte("RIFF\x00\x10\x00\x00WEBPVP8 "), bytes.Repeat([]byte{9}, 3000)...)
+	var out map[string]string
+	if status, _ := w.post("/api/me/picture", map[string]any{"token": mali.Token, "device": mali.id, "picture": base64.StdEncoding.EncodeToString(webp)}, &out); status != 200 {
+		t.Fatalf("mali setting a picture = %d", status)
+	}
+	hash := out["picture"]
+	want := `{"admins":[{"username":"ravi","role":"owner","picture":null},{"username":"mali","role":"admin","picture":"` + hash + `"},{"username":"sam","role":"admin","picture":null}]}`
+	if status, body := w.call(ravi.session, ravi.id, "admins/list", nil); status != 200 || body != want {
+		t.Errorf("admins/list = %d %s, want %s", status, body, want)
+	}
+	for who, c := range map[string]struct {
+		token string
+		code  int
+	}{"ravi, the owner": {ravi.Token, 200}, "sam, another admin": {sam.Token, 404}, "nimal, a member": {nimal.Token, 404}} {
+		req, _ := http.NewRequest(http.MethodGet, w.url+"/api/pictures/"+hash, nil)
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != c.code || (c.code == 200 && !bytes.Equal(body, webp)) {
+			t.Errorf("%s fetching mali's picture: %d, want %d", who, res.StatusCode, c.code)
+		}
+	}
+}
+
 // A lap that ends is in the member's laps at once: its row is news, as today's totals are.
 func TestALapEndingSendsTheRoom(t *testing.T) {
 	w := start(t)

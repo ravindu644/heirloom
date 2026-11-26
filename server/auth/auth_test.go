@@ -731,7 +731,7 @@ func TestRolesAreCheckedOnEveryCall(t *testing.T) {
 	}
 	w.SetRole(ravi, "zed", Admin)
 	admins, err := w.Admins(ravi)
-	if err != nil || !slices.Equal(admins, []Person{{"ravi", Owner}, {"sam", Admin}, {"zed", Admin}}) {
+	if err != nil || !slices.Equal(admins, []Person{{"ravi", Owner, nil}, {"sam", Admin, nil}, {"zed", Admin, nil}}) {
 		t.Errorf("admins = %v, %v; want the owner, then the admins by name, and no members", admins, err)
 	}
 	// And lowers sam: at once, sam is a member again.
