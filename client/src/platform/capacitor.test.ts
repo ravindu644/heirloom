@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeTime, settle } from '../sync/fakes.ts';
-import { RING_ID, createCapacitorNotifier, whenResumed } from './capacitor.ts';
+import { CALL_ID, RING_ID, createCapacitorNotifier, whenResumed } from './capacitor.ts';
 import type { Alarms, Countdown } from './capacitor.ts';
 import { createWebNotifier } from './web.ts';
 
@@ -674,3 +674,94 @@ describe('in front again, on the phone', () => {
   });
 });
 
+
+describe('a called lap, on the phone', () => {
+  const call = (inMs: number, body = 'Study club, with lina') => ({ at: T0 + inMs, title: 'The lap together starts', body });
+
+  it('an exact alarm at its minute, on the reminders’ channel, with its own id', async () => {
+    const { notifier, done, held } = rig({ remind: 'Reminders' });
+    notifier.call(call(10 * MIN));
+    await done();
+    const n = held.get(CALL_ID);
+    assert.equal(n.title, 'The lap together starts');
+    assert.equal(n.body, 'Study club, with lina');
+    assert.equal(n.channelId, 'remind');
+    assert.equal(n.schedule.at.getTime(), T0 + 10 * MIN);
+    assert.equal(n.schedule.allowWhileIdle, true);
+    assert.notEqual(n.isExactNotification, false);
+  });
+
+  it('a new call replaces the last on the same id; null cancels it and takes it out of the shade', async () => {
+    const { notifier, done, held, calls } = rig({ remind: 'Reminders' });
+    notifier.call(call(10 * MIN));
+    notifier.call(call(15 * MIN, 'Night owls, with ravi'));
+    await done();
+    assert.deepEqual([...held.keys()], [CALL_ID]);
+    assert.equal(held.get(CALL_ID).body, 'Night owls, with ravi');
+    const before = calls.length;
+    notifier.call(call(15 * MIN, 'Night owls, with ravi'));
+    await done();
+    assert.equal(calls.length, before);
+    notifier.call(null);
+    await done();
+    assert.equal(held.size, 0);
+    assert.deepEqual(calls.slice(before), ['cancel', `remove ${CALL_ID}`]);
+  });
+
+  it('one already past sets nothing; the same call again after its minute leaves its notification in the shade', async () => {
+    const past = rig({ remind: 'Reminders' });
+    past.notifier.call(call(-MIN));
+    await past.done();
+    assert.equal(past.held.size, 0);
+    assert.ok(!past.calls.includes('schedule'));
+
+    const { notifier, done, time, calls } = rig({ remind: 'Reminders' });
+    notifier.call(call(10 * MIN));
+    await done();
+    time.jump(10 * MIN + 20_000);
+    const before = calls.length;
+    notifier.call(call(10 * MIN));
+    await done();
+    assert.deepEqual(calls.slice(before), []);
+    // The call ends a minute after its start and main says null: the notification stays where it is.
+    time.jump(MIN);
+    notifier.call(null);
+    await done();
+    assert.deepEqual(calls.slice(before), []);
+    // A new call later is set as any other.
+    notifier.call(call(30 * MIN));
+    await done();
+    assert.equal(calls.at(-1), 'schedule');
+  });
+
+  it('nothing is touched until main says; its first null clears one left from the app’s last life', async () => {
+    const { notifier, done, held, calls } = rig({ remind: 'Reminders' });
+    held.set(CALL_ID, { id: CALL_ID });
+    notifier.ringHere(true);
+    await done();
+    assert.ok(held.has(CALL_ID));
+    notifier.call(null);
+    await done();
+    assert.ok(!held.has(CALL_ID));
+    assert.ok(calls.includes(`remove ${CALL_ID}`));
+  });
+
+  it('nothing without permission or with ring here off; reminders being rebuilt leave it alone', async () => {
+    const denied = rig({ remind: 'Reminders', display: 'denied' });
+    denied.notifier.call(call(10 * MIN));
+    await denied.done();
+    assert.equal(denied.held.size, 0);
+
+    const { notifier, done, held } = rig({ remind: 'Reminders' });
+    notifier.call(call(10 * MIN));
+    notifier.reminders([]);
+    await done();
+    assert.ok(held.has(CALL_ID));
+    notifier.ringHere(false);
+    await done();
+    assert.ok(!held.has(CALL_ID));
+    notifier.ringHere(true);
+    await done();
+    assert.ok(held.has(CALL_ID));
+  });
+});

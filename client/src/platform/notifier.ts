@@ -43,6 +43,14 @@ export interface Paused {
 
 export const isPaused = (plan: Ring | Paused | null): plan is Paused => plan !== null && 'paused' in plan;
 
+/** A called lap this account is in (protocol.md section 15, Start together): a notification at
+ * `at`, this device's own clock, in ms, that it starts. The words come from the caller. */
+export interface Call {
+  at: number;
+  title: string;
+  body: string;
+}
+
 /** A plan closer than this to now is a phase already ending, such as a tap on finish: no bell. */
 export const MOMENT_MS = 1000;
 
@@ -73,4 +81,10 @@ export interface Notifier {
   canRing(): Promise<boolean>;
   /** Every habit reminder wanted, whole: what this device holds is made to match it and nothing else. */
   reminders(set: Reminder[]): void;
+  /**
+   * The called lap this account is in, or null: out of it, taken back, or the call over. One at a
+   * time; a new one replaces the last. A call whose time has passed sets nothing, and the same call
+   * given again after its time leaves its notification where it is.
+   */
+  call(next: Call | null): void;
 }

@@ -364,3 +364,65 @@ describe('habit reminders, in an open tab', () => {
   });
 });
 
+
+describe('a called lap, in an open tab', () => {
+  const call = (inMs: number, body = 'Study club, with lina') => ({ at: T0 + inMs, title: 'The lap together starts', body });
+
+  it('out of sight, a notification at its minute; in view, nothing: the app starts the lap', () => {
+    const hidden = rig({ hidden: true });
+    hidden.notifier.call(call(10 * MIN));
+    hidden.time.advance(10 * MIN - 1);
+    assert.deepEqual(hidden.shown, []);
+    hidden.time.advance(1);
+    assert.deepEqual(hidden.shown, [{ title: 'The lap together starts', body: 'Study club, with lina' }]);
+    hidden.notifier.call(call(10 * MIN));
+    hidden.time.advance(MIN);
+    assert.equal(hidden.shown.length, 1);
+
+    const visible = rig();
+    visible.notifier.call(call(10 * MIN));
+    visible.time.advance(20 * MIN);
+    assert.deepEqual([visible.shown, visible.rings], [[], []]);
+  });
+
+  it('a new call replaces the last, null clears it, and one already past sets nothing', () => {
+    const { time, shown, notifier } = rig({ hidden: true });
+    notifier.call(call(10 * MIN, 'Study club, with lina'));
+    notifier.call(call(15 * MIN, 'Night owls, with ravi'));
+    time.advance(20 * MIN);
+    assert.deepEqual(shown.map((n) => n.body), ['Night owls, with ravi']);
+
+    notifier.call(call(30 * MIN));
+    time.advance(5 * MIN);
+    notifier.call(null);
+    time.advance(20 * MIN);
+    assert.equal(shown.length, 1);
+
+    notifier.call(call(-MIN));
+    time.advance(MIN);
+    assert.equal(shown.length, 1);
+  });
+
+  it('held back by the throttle, it still shows when the same call comes again after its minute', () => {
+    const { time, shown, notifier } = rig({ hidden: true });
+    notifier.call(call(10 * MIN));
+    time.jump(10 * MIN + 30_000);
+    notifier.call(call(10 * MIN));
+    assert.equal(shown.length, 1);
+  });
+
+  it('nothing with ring here off; on again before its minute, it is set again', () => {
+    const { time, shown, notifier } = rig({ hidden: true });
+    notifier.call(call(10 * MIN));
+    notifier.ringHere(false);
+    time.advance(5 * MIN);
+    notifier.ringHere(true);
+    time.advance(5 * MIN);
+    assert.equal(shown.length, 1);
+    const off = rig({ hidden: true });
+    off.notifier.ringHere(false);
+    off.notifier.call(call(10 * MIN));
+    off.time.advance(20 * MIN);
+    assert.deepEqual(off.shown, []);
+  });
+});

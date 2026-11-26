@@ -117,6 +117,14 @@ async function start() {
     }
     notifier.plan(plan);
   });
+  // A called lap you are in rings at its minute, on the phone too (protocol section 15, Start
+  // together): the soonest one, in this device's time. The lap itself is started by sync.
+  effect(() => {
+    const next = app.rooms.calledIn.value[0];
+    const me = engine.account.value?.username;
+    notifier.call(next ? { at: next.at - (engine.now() - Date.now()), title: ring.callTitle, body: ring.callBody(next.name, next.by === me ? undefined : next.by) } : null);
+  });
+
   // The countdown's buttons do what the same buttons on Focus do: this page stays the one
   // writer of the timer, and a tap made while the app was away is done when it is back.
   // A button of a notification left over from an earlier run does nothing.

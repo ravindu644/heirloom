@@ -19,7 +19,7 @@
 //   page rings by itself if it looks first and the bell is under LATE_MS old.
 
 import { MOMENT_MS, isPaused } from './notifier.ts';
-import type { Notifier, Ring } from './notifier.ts';
+import type { Call, Notifier, Ring } from './notifier.ts';
 import { createPush } from './push.ts';
 import { upcoming } from './reminders.ts';
 import type { Reminder } from './reminders.ts';
@@ -143,9 +143,29 @@ export function createWebNotifier(env: WebEnv): Notifier {
     // A timer that fires early finds nothing due yet and is set again.
     stopReminding = next ? env.schedule(remind, next.at - now) : () => {};
   };
+  // A called lap. In view the app starts the lap itself, so a notification would be noise; out of
+  // sight, one at its minute while the tab is open. No push: a closed tab misses it, as it would a reminder.
+  let call: Call | null = null;
+  let stopCall = () => {};
+  const callAt = () => {
+    stopCall();
+    stopCall = () => {};
+    const c = call;
+    if (!c || !here) return;
+    const late = env.now() - c.at;
+    // A timer that fires early by the wall clock is set again.
+    if (late < 0) return void (stopCall = env.schedule(callAt, -late));
+    call = null;
+    if (late <= LATE_MS && granted() && env.hidden()) {
+      try {
+        new env.Notification!(c.title, { body: c.body, tag: 'heirloom-call' });
+      } catch {}
+    }
+  };
   env.onShow(() => {
     if (!look()) arm();
     remind();
+    callAt();
   });
 
   const plan = (next: Ring | null) => {
@@ -178,6 +198,11 @@ export function createWebNotifier(env: WebEnv): Notifier {
       habits = set;
       remind();
     },
+    call(next) {
+      // Past its time: nothing, unless it is the call already waiting here, held back by the throttle.
+      call = next && (next.at > env.now() || next.at === call?.at) ? next : null;
+      callAt();
+    },
     ringHere(on) {
       const first = !told;
       told = true;
@@ -188,6 +213,7 @@ export function createWebNotifier(env: WebEnv): Notifier {
       }
       here = on;
       remind();
+      callAt();
       if (on) {
         plan(wanted);
         subscribe();

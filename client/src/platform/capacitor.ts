@@ -10,7 +10,7 @@ import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { MOMENT_MS, isPaused } from './notifier.ts';
-import type { Act, Actions, Notifier, Paused, Ring } from './notifier.ts';
+import type { Act, Actions, Call, Notifier, Paused, Ring } from './notifier.ts';
 import { AHEAD_DAYS, MAX_DUE, isReminderId, upcoming } from './reminders.ts';
 import type { Reminder } from './reminders.ts';
 import { bellOnDemand } from './sound.ts';
@@ -23,6 +23,8 @@ import { createWebNotifier, timer } from './web.ts';
  */
 export const RING_ID = 1;
 const otherId = (id: number) => (id === RING_ID ? RING_ID + 1 : RING_ID);
+/** A called lap's notification: one at a time, beside the countdown's 7400 and 7401. */
+export const CALL_ID = 7402;
 
 /** The names of the channels in the phone's notification settings. The words come from the caller. */
 export interface Channels {
@@ -226,11 +228,48 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
         });
     });
 
+  // A called lap (protocol.md section 15): an exact alarm at its minute, on the reminders' channel
+  // and path. Its tap opens the app, which starts the lap if this device is idle.
+  // Undefined until main first says, so nothing is touched before it knows the rooms.
+  let call: Call | null | undefined;
+  // What Android was handed: the call's words and time, or null. Undefined until the first look,
+  // which clears one left from the app's last life.
+  let callGiven: { key: string; at: number } | null | undefined;
+  const callNow = () =>
+    run(async () => {
+      if (call === undefined) return;
+      let c = here && call && channels.remind && (await alarms.checkPermissions()).display === 'granted' ? call : null;
+      const at = c && Math.round(c.at);
+      // Its minute has come: Android has shown it, and a room message a moment later must not take
+      // it out of the shade. One never handed over is not shown late.
+      if (c && at! <= now()) {
+        if (callGiven?.at === at) return;
+        c = null;
+      }
+      // Nothing wanted after the held call's minute (the call is over, a minute on): it is Android's
+      // and the person's now, so it is forgotten and left in the shade. Only one taken back before
+      // its minute is taken off.
+      if (!c && callGiven && callGiven.at <= now()) {
+        callGiven = null;
+        return;
+      }
+      const key = JSON.stringify(c && [at, c.title, c.body]);
+      if (callGiven !== undefined && key === (callGiven?.key ?? 'null')) return;
+      await alarms.cancel({ notifications: [{ id: CALL_ID }] });
+      if (!c) await alarms.removeDeliveredNotificationsById({ ids: [CALL_ID] });
+      else
+        await alarms.schedule({
+          notifications: [{ id: CALL_ID, title: c.title, body: c.body, channelId: 'remind', autoCancel: true, schedule: { at: new Date(at!), allowWhileIdle: true } }],
+        });
+      callGiven = c && { key, at: at! };
+    });
+
   // Permission may have been given in Android's settings while the person was away; and days
   // further on come into the reminders' fourteen.
   onResume(() => {
     fill();
     remind();
+    callNow();
   });
 
   const settle = () => {
@@ -266,10 +305,15 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
       here = on;
       settle();
       remind();
+      callNow();
     },
     reminders(set) {
       habits = set;
       remind();
+    },
+    call(next) {
+      call = next;
+      callNow();
     },
     // The phone's own alarm needs nothing from the account; a sign out stops the timer, which plans null.
     account() {},
@@ -299,6 +343,7 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
       if (ok) {
         fill();
         remind();
+        callNow();
       }
       return ok;
     },
