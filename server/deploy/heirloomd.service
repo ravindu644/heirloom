@@ -1,5 +1,5 @@
-# heirloomd on the S10's container (Ubuntu 24.04, systemd 255). Installed by `make deploy`;
-# see README.md beside this file. Every line below says why it is there.
+# heirloomd as a systemd service. docs/DEPLOY.md says how to install it; every line below
+# says why it is there.
 
 [Unit]
 Description=heirloom server
