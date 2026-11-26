@@ -102,6 +102,11 @@ type Member struct {
 	WeekMs    int64   `json:"week_ms"`
 	Run       *Run    `json:"run"`
 	Last      *Last   `json:"last"`
+	// Their focus per local day of this week and last, Monday first, and last week as far
+	// as this moment of it: the room's own three, for one member.
+	Days     [7]int64 `json:"days"`
+	LastDays [7]int64 `json:"last_days"`
+	LastAtMs int64    `json:"last_at_ms"`
 	// The work laps of their local day so far, [started, ended], oldest first: the rows,
 	// so not the lap in progress (that is run) and not a lap set aside.
 	Laps [][2]int64 `json:"laps"`
@@ -551,11 +556,17 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 		if p.You {
 			viewerOffset = p.offset
 		}
-		for d := range 7 {
-			m.Days[d] += t.days[d]
-			m.LastDays[d] += t.lastDays[d]
+		// The member's own week, by their own calendar, and the room's is the sum of them.
+		// An away member shows zeros, but what they did still counts toward the room.
+		days, lastDays, lastAt := t.days, t.lastDays, focusBefore(t.lastWeek, now-7*dayMs, p.offset)
+		if !p.Away {
+			p.Days, p.LastDays, p.LastAtMs = days, lastDays, lastAt
 		}
-		m.LastAtMs += focusBefore(t.lastWeek, now-7*dayMs, p.offset)
+		for d := range 7 {
+			m.Days[d] += days[d]
+			m.LastDays[d] += lastDays[d]
+		}
+		m.LastAtMs += lastAt
 		m.Members = append(m.Members, p.Member)
 	}
 

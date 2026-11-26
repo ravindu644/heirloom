@@ -452,12 +452,7 @@ func (h *Hub) tell(c *conn, in []int64) error {
 		before := c.shown[room].msg
 		c.shown[room] = shown{msg, next}
 		if before != nil {
-			was, is := *before, *msg
-			// last_at_ms moves too while this moment of last week falls inside one of its laps,
-			// and a screen does not move it on: neither is a change worth a message by itself.
-			was.ServerTime, is.ServerTime = 0, 0
-			was.LastAtMs, is.LastAtMs = 0, 0
-			if reflect.DeepEqual(was, is) {
+			if reflect.DeepEqual(news(*before), news(*msg)) {
 				continue
 			}
 		}
@@ -466,6 +461,19 @@ func (h *Hub) tell(c *conn, in []int64) error {
 		}
 	}
 	return nil
+}
+
+// news is the part of a room message that is worth sending by itself. server_time moves
+// with every reading, and last_at_ms (the room's and each member's) while this moment of
+// last week falls inside one of its laps; a screen does not move that on, so neither is
+// news alone. The members are copied: the message itself is what this device was shown.
+func news(m rooms.Message) rooms.Message {
+	m.ServerTime, m.LastAtMs = 0, 0
+	m.Members = slices.Clone(m.Members)
+	for i := range m.Members {
+		m.Members[i].LastAtMs = 0
+	}
+	return m
 }
 
 // A cursor past the head comes from a server whose data was restored from an older copy.

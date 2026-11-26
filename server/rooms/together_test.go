@@ -92,6 +92,17 @@ func TestTheRoomsWeekAndEachMembersDay(t *testing.T) {
 	if want := int64(2 * lapMs); m.LastAtMs != want {
 		t.Errorf("last_at_ms = %d, want %d: last Monday's lap and last Wednesday's before 04:30", m.LastAtMs, want)
 	}
+	// Each member's own, by their own calendar: Sachi's lap is on her Wednesday, Ravi's
+	// last week is his alone.
+	for _, c := range []struct {
+		who            int
+		days, lastDays [7]int64
+		lastAt         int64
+	}{{0, [7]int64{lapMs, 0, lapMs + short}, [7]int64{lapMs, 0, 2 * lapMs}, 2 * lapMs}, {1, [7]int64{0, 0, lapMs}, [7]int64{}, 0}} {
+		if got := m.Members[c.who]; got.Days != c.days || got.LastDays != c.lastDays || got.LastAtMs != c.lastAt {
+			t.Errorf("%s: days %v, last_days %v, last_at_ms %d; want %v, %v, %d", got.Name, got.Days, got.LastDays, got.LastAtMs, c.days, c.lastDays, c.lastAt)
+		}
+	}
 	want := [][2]int64{{at(25, 3, 0).UnixMilli(), at(25, 3, 25).UnixMilli()}, {at(25, 3, 40).UnixMilli(), at(25, 3, 50).UnixMilli()}}
 	if got := m.Members[0].Laps; !reflect.DeepEqual(got, want) {
 		t.Errorf("ravi's laps = %v, want his two work laps of today, oldest first, without the break or the lap set aside", got)
@@ -102,8 +113,12 @@ func TestTheRoomsWeekAndEachMembersDay(t *testing.T) {
 
 	// Away: no laps shown, the totals still real.
 	w.push(t, sachi, map[[3]string]any{{"settings", "current", "rooms_hidden"}: true})
-	if got := w.message(t, room, ravi).Members[1]; got.Laps == nil || len(got.Laps) != 0 || got.TodayMs != lapMs {
-		t.Errorf("away sachi = %+v, want laps [] and her totals", got)
+	away := w.message(t, room, ravi)
+	if got := away.Members[1]; got.Laps == nil || len(got.Laps) != 0 || got.TodayMs != lapMs || got.Days != [7]int64{} || got.LastDays != [7]int64{} || got.LastAtMs != 0 {
+		t.Errorf("away sachi = %+v, want laps [], days and last week zeros, and her totals", got)
+	}
+	if away.Days != m.Days {
+		t.Errorf("with sachi away the room's days are %v, want %v: what she did still counts", away.Days, m.Days)
 	}
 
 	// At most the newest 48.
