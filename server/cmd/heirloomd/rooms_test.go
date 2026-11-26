@@ -366,23 +366,23 @@ func TestLeavingAndRejoiningBeforeADeviceLooksKeepsTheRoom(t *testing.T) {
 	}
 }
 
-func TestRoomIsFullAtEightAndAnAccountAtFive(t *testing.T) {
+func TestRoomIsFullAtSixteenAndAnAccountAtFive(t *testing.T) {
 	w := start(t)
 	ravi := w.person("ravi", phone, 0)
 	_, code := together(t, "Batch of 26", ravi)
-	var eighth session
-	for i := range 7 {
-		eighth = w.signUp(fmt.Sprintf("friend_%d", i), laptop)
-		w.ask(eighth.Token, laptop, "join", map[string]any{"code": code}).ok(t, "join")
+	var last session
+	for i := range 15 {
+		last = w.signUp(fmt.Sprintf("friend_%d", i), laptop)
+		w.ask(last.Token, laptop, "join", map[string]any{"code": code}).ok(t, "join")
 	}
-	if got := ravi.settle(); len(got) == 0 || len(got[len(got)-1].Members) != 8 {
-		t.Fatalf("the room holds %d members, want 8", len(got[len(got)-1].Members))
+	if got := ravi.settle(); len(got) == 0 || len(got[len(got)-1].Members) != 16 {
+		t.Fatalf("the room holds %d members, want 16", len(got[len(got)-1].Members))
 	}
-	ninth := w.signUp("one_too_many", laptop)
-	w.ask(ninth.Token, laptop, "join", map[string]any{"code": code}).refused(t, "a ninth member", 409, "full")
-	ravi.still("a ninth was turned away")
+	extra := w.signUp("one_too_many", laptop)
+	w.ask(extra.Token, laptop, "join", map[string]any{"code": code}).refused(t, "a seventeenth member", 409, "full")
+	ravi.still("a seventeenth was turned away")
 	// Someone already inside is not turned away from their own room.
-	w.ask(eighth.Token, laptop, "join", map[string]any{"code": code}).ok(t, "a member joining a full room again")
+	w.ask(last.Token, laptop, "join", map[string]any{"code": code}).ok(t, "a member joining a full room again")
 
 	// Five rooms an account, whether made or joined.
 	for i := range 4 {
@@ -448,7 +448,7 @@ func TestOnlyTheKeeperUpdatesARoom(t *testing.T) {
 		"an empty name":           {"room": room, "name": ""},
 		"a name of 41":            {"room": room, "name": strings.Repeat("n", 41)},
 		"a target below zero":     {"room": room, "target_ms": -1},
-		"a target past any week":  {"room": room, "target_ms": 8*7*24*3600*1000 + 1},
+		"a target past any week":  {"room": room, "target_ms": 16*7*24*3600*1000 + 1},
 		"a name that is not text": {"room": room, "name": 7},
 	} {
 		ravi.ask("update", fields).refused(t, what, 400, "bad_request")

@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	maxMembers = 8
+	maxMembers = 16
 	maxRooms   = 5 // rooms one account may be in
 	maxName    = 40
-	// A room of eight focusing every hour of the week. A target past that is a typo.
+	// A room of sixteen focusing every hour of the week. A target past that is a typo.
 	maxTargetMs = maxMembers * 7 * dayMs
 	dayMs       = 24 * 60 * 60 * 1000
 	// A cheer shows only on the day of the lap it was for. A week covers every offset
