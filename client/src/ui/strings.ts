@@ -62,6 +62,14 @@ export function pastDay(day: string, today: string): string {
 
 export const brand = 'heirloom';
 
+/** The last block of Settings: what it is, which build, and where its source lives. */
+export const about = {
+  what: 'A free Pomodoro, tasks and habits app, made in free time.',
+  // The commit is what a bug report needs: the build exactly. Without one, the version alone.
+  version: (version: string, commit: string) => (commit ? `Version ${version} (${commit})` : `Version ${version}`),
+  source: 'Source on GitHub',
+};
+
 export const nav = {
   label: 'Screens',
   focus: 'Focus',

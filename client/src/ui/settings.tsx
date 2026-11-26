@@ -14,6 +14,7 @@ import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
 import { AdminsPanel, InvitesPanel, ResetsPanel } from './people.tsx';
+import { Brand } from './kit/brand.tsx';
 import { Stepper } from './kit/stepper.tsx';
 import { Switch } from './kit/switch.tsx';
 import { useWide } from './kit/wide.ts';
@@ -36,6 +37,14 @@ const TARGET_MAX = 24;
  * a choice. Each change is saved as it is made, and reaches the person's other devices, except
  * "ring here", which is this device's own.
  */
+// The build, set by vite.config.ts from package.json and git.
+const VERSION: string = import.meta.env.VITE_VERSION ?? '';
+const COMMIT: string = import.meta.env.VITE_COMMIT ?? '';
+const SOURCE = 'https://github.com/ravindu644/heirloom';
+// The line as the words have it, and where the commit stands in it, to draw it in its own face.
+const version = s.about.version(VERSION, COMMIT);
+const at = COMMIT ? version.lastIndexOf(COMMIT) : version.length;
+
 interface Props {
   engine: Engine;
   settings: SettingsData;
@@ -184,6 +193,27 @@ export function Settings({ engine, settings, invites, admins, resets, server: ch
         </div>
         {/* What became of the copy opens in place; the region is always there for a screen reader. */}
         <Fold role="status">{copy && <p>{copy}</p>}</Fold>
+      </Panel>
+
+      {/* About, last and for everyone: the name, what it is, the build, and where its source lives. */}
+      <Panel
+        title={
+          <span class={css.brand}>
+            <Brand name={s.brand} />
+          </span>
+        }
+      >
+        <p class={css.note}>{s.about.what}</p>
+        <p>
+          {/* The commit in the figures face, to be read out in a bug report. */}
+          {version.slice(0, at)}
+          {COMMIT && <span class={css.commit}>{COMMIT}</span>}
+          {version.slice(at + COMMIT.length)}
+        </p>
+        {/* A new tab in a browser; in the phone app the WebView hands a link off its own address to the system's browser. */}
+        <a class={css.source} href={SOURCE} target="_blank" rel="noopener">
+          {s.about.source}
+        </a>
       </Panel>
     </>
   );

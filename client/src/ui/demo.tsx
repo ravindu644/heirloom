@@ -405,6 +405,7 @@ const SERVER: Record<string, Scene> = {
   'reset-dead': { about: 'A reset link that no longer works', signedOut: true, reset: 'dead' },
   'reset-signed-in': { ...idleAt2, about: 'A reset link opened where an account is open: sign out first', day: day(), reset: 'q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy' },
   'signin-phone-reset-pasted': { about: 'A reset link pasted where the phone app asks for an invite: it is for a browser', signedOut: true, serverAt: 'https://heirloom.example', tap: ['I have an invite', 'fill:invite=https://heirloom.example/#/reset/q7XkVb3n0Pz8Lw2mRt5YcH1aJe9sKd4fUg6oNi0QxBy', 'fill:username=sachi', 'fill:password=long enough', 'submit:username'] },
+  'settings-about': { ...idleAt2, about: 'Settings scrolled to its foot: About, with the version, the build and the source', settings: true, day: day(), tap: 'demo:end' },
   'settings-plain': { ...owner, about: 'Settings in the phone app on a plain http server', role: 'member', serverAt: LAN },
 };
 
@@ -736,6 +737,10 @@ const find = <T extends Element>(selector: string, words: string): T => {
       find<HTMLElement>(words.slice(4), words).click();
     } else if (words.startsWith('submit:')) {
       find<HTMLInputElement>(`input[name="${words.slice(7)}"]`, words).form!.requestSubmit();
+    } else if (words === 'demo:end') {
+      // Scrolled to the foot of the screen, as a thumb would.
+      const main = find<HTMLElement>('main', words);
+      main.scrollTop = main.scrollHeight;
     } else if (words === 'demo:start') {
       // A lap started where this screen was not looking: Today's row on another device.
       staged!.focus.start('ex');

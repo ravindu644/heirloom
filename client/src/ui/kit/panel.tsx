@@ -7,7 +7,7 @@ import css from './panel.module.css';
  * is a column of parts: a line, a block or a whole picture that comes or goes does so in time,
  * so no screen writes that for its panels.
  */
-export function Panel({ title, children }: { title: string; children: ComponentChildren }) {
+export function Panel({ title, children }: { title: ComponentChildren; children: ComponentChildren }) {
   return (
     <section class={css.panel}>
       <h2>{title}</h2>

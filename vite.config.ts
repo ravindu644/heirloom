@@ -1,4 +1,6 @@
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import preact from '@preact/preset-vite';
@@ -52,6 +54,18 @@ self.addEventListener('notificationclick', (e) => {
     });
   },
 });
+
+// What About in Settings names: package.json's version (the one `make bump` sets) and the commit
+// the build came from, the same pair in the browser and in the APK. Vite hands VITE_ variables
+// from the environment to the app.
+process.env.VITE_VERSION ??= JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
+process.env.VITE_COMMIT ??= (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+})();
 
 export default defineConfig({
   root: 'client',

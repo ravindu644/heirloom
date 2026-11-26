@@ -6,6 +6,12 @@
 .settings p:empty { display: none; }
 .note { color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* About's heading is the mark and the name, as the header draws them. */
+.brand { display: flex; align-items: center; }
+/* The commit in the figures face: what is read out in a bug report. */
+.commit { font: var(--type-figure-sm); font-feature-settings: var(--feature-figure-sm); }
+/* The one link out: on a line of its own, a full target for a thumb, as a link in a line is drawn. */
+a.source { justify-self: start; display: flex; align-items: center; min-height: var(--layout-touch); margin: calc((1lh - var(--layout-touch)) / 2) 0; font: var(--type-label); color: var(--muted); text-decoration: underline; text-underline-offset: var(--space-xs); }
 /* On a phone the buttons fill the row, as every button row does. */
 .actions > * { flex: 1; }
 @media (min-width: 720px) {
