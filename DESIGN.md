@@ -609,33 +609,28 @@ Built once in `client/src/ui/kit/` and reused.
   says so and who to ask. The sign-in screen says, in one muted line, where a forgotten
   password leads: to whoever runs the server. Nothing asks for an email, and nothing says
   "recover".
-- **The welcome:** what heirloom is, for someone who has never seen it, shown and not
-  explained. The mark and name, the headline, one sentence of what it does, then **one
-  drawing**: a day as a race, two lanes on one scale. Yours is made of laps as filled blocks
-  in `you`, with the breaks between them as slivers in `rest` and a wider one after the
-  fourth, the last lap still filling; under it last week's you, the same shape hollow and
-  dashed in `ghost`, a lap shorter, and the split between them as its chip. Under the drawing
-  stands **its key** on one line: three of the app's own marks, each with two to five words
-  (a lap, a break, you a week ago), so the first real screen is already half read. Then **small drawings** in two columns that end on one line,
-  each with one line under it: at the left a habit's week (seven day boxes under their
-  letters, five kept and two of rest, drawn as Habits draws them) and under it a task's
-  squares with its count (2 of 3); at the right a room (three friends as the Room shows them,
-  two with "18:42 left" on their lap and one on a break: a bare "18:42" read as a time of
-  day). The key names only what the race draws: a lap, a break, you a week ago. A key of seven entries was tried first and
-  read as a list of features with pictures for bullets. Then one line on where it lives (a server you or a
-  friend runs), and in the phone app one primary button to the server step, which keeps the foot of the
-  screen on a phone of any height while the drawings scroll above it.
-  - Everything in it is drawn by the kit's own pieces from tokens: nothing in the drawing is
-    a mark the app does not use, there is no picture file, no icon, no figure of a person, and
-    dark is the same drawing on the dark tokens.
-  - It moves once: your laps fill from the left in turn, each in `motion-fill`, the chip
-    last, and then it is still. Nothing loops. Reduced motion shows the end at once.
-  - Each drawing is one image to a screen reader, with one sentence that says what it shows;
-    the key is a list whose marks are not read.
-  - The phone app shows it once, before the server step; the browser shows it beside the
-    sign-in form from 720px and under it below. No pictures of screens, no pages to swipe, no
-    feature grid. (It was four sentences that explained a lap and its 25 minutes, as any
-    timer's would; the user asked for it drawn.)
+- **The welcome:** one screen with one idea: your days stay yours. From the top: the header
+  line every screen starts with (the mark and "heirloom", 48px, at the left), **one drawing**,
+  the free space, then the title ("Your days stay yours."), one sentence ("Laps, tasks and habits
+  live on a server that you or a friend runs, and nowhere else. It is free.") and in the phone
+  app the one primary button, "Connect to a server", together at the foot in reach of a thumb.
+  Nothing else: no key, no list of what it does, no second drawing.
+  - The drawing is seven weeks of days as Progress draws a year: squares in the heat steps
+    (`raised` for a day with no lap, then `heat-1` to `heat-3`, `you` for the fullest), a
+    column per week, growing darker toward today, which is the last square drawn and carries
+    the outline Progress gives today (1px `hair`); some days of no laps carry the rest mark. 48px squares, 6px apart, the
+    drawing's left edge on the column's. It is made from tokens, so dark is the same drawing on
+    the dark tokens; no picture file, no icon, no figure of a person.
+  - It is still. It is one image to a screen reader, with one sentence that says what it shows.
+  - The title is the screen's heading in `headline-lg`; the sentence is `body` in
+    `muted`. Its words say why the next step asks for a server, so the button needs no other.
+  - The phone app shows it once, before the server step. The browser shows the drawing, title
+    and sentence beside the sign-in form from 720px and under it below, without the button;
+    there its title is `title`, a step under the form's own heading.
+- **The launcher icon** is the mark at three quarters of the adaptive icon's safe circle (about
+  47 of 108dp tall), so no launcher's mask crowds it; the splash uses the same drawing.
+  - (It was first four sentences about a lap and its 25 minutes, then a day drawn as a race with
+    a key and three small drawings; the user found that cluttered and chose this from three.)
 - **Links in a line:** a small action inside a sentence or beside a figure ("Change", "Undo",
   "5 more minutes") is underlined text in `label`, in ink or muted, with a 48px touch target made by padding
   and an equal negative margin, so the line it sits in keeps its height.

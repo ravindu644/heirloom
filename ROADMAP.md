@@ -278,7 +278,15 @@ On the third build the user found no glitches; four things about how it reads an
 - [ ] Gate: built, checked and reviewed (design, stranger, code); waiting on the user's try.
       Never run by us on a phone: a carry with a finger, where the hold and the glide are felt
 
-## 18. Release 1.0
+## 18. A quieter welcome
+
+- [x] [lead] Three welcomes drawn as options; the user chose C2: the mark and name, seven weeks
+      of days, "Your days stay yours.", one sentence, the button. DESIGN.md rewritten
+- [ ] [ui] The welcome as chosen, in the phone app and beside the browser's sign-in
+- [ ] [qa] The welcome's tests read the new screen
+- [ ] Gate
+
+## 19. Release 1.0
 
 - [x] [qa] Soak: simulator for an hour against the S10 with random network drops; no divergence
 - [x] [qa] Accessibility: contrast from DESIGN.md, screen reader labels, reduced motion
