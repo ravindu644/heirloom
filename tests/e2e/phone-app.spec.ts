@@ -25,7 +25,7 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
 const field = (page: Page, name: string) => page.getByRole('textbox', { name: new RegExp(`^${name}\\b`) });
 const plain = 'This address is plain http. Anyone on the same network can read what is sent, the password too.';
 
-const WELCOME = 'Work in laps. Race the you of last week.';
+const WELCOME = welcome.title;
 
 // To the server step from a page that has none kept: through the welcome when it is shown. The
 // rules decide only that it is not shown again once an address is kept; the welcome test holds that.
@@ -153,19 +153,28 @@ test('the phone app keeps a pasted link\'s invite across a restart, until it is 
   await expect(startButton(a.page)).toBeVisible();
 });
 
-test('the welcome: the phone app\'s first screen shows what heirloom is in one sentence and three drawings, fits a 412 by 915 phone with no scroll and cuts nothing at 206; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {
+test('the welcome: the phone app\'s first screen is the header, one drawing, its title and one sentence, and "Connect to a server" in the lower part of a 412 by 915 phone with nothing scrolled; it cuts nothing at 206; its button leads to the server step and Back returns; once an address is kept it is not shown again', async ({ deviceA: a }) => {
   await a.page.setViewportSize({ width: 412, height: 915 });
   await a.page.goto(appUrl());
-  await expect(a.page.getByRole('heading', { name: WELCOME })).toBeVisible();
+  await expect(a.page.getByRole('heading', { name: WELCOME, level: 1 })).toBeVisible();
   await expect(a.page.getByText(welcome.what, { exact: true })).toBeVisible();
-  await expect(a.page.getByText(/^It is free\. Everything you do is kept on a server/)).toBeVisible();
-  for (const gone of ['A lap is one stretch of focus', '25 minutes unless you change it', 'Plan the day in laps']) await expect(a.page.getByText(gone)).toHaveCount(0);
-  expect(await a.page.getByRole('img').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([welcome.drawn, welcome.weekDrawn, welcome.tasksDrawn, welcome.roomDrawn]);
-  await expect(a.page.getByRole('listitem')).toHaveCount(Object.keys(welcome.key).length);
-  // The whole of it, button and all, on one phone screen.
+  // The shell's header: the mark and the name.
+  await expect(a.page.getByRole('link', { name: 'heirloom', exact: true })).toBeVisible();
+  for (const gone of ['Work in laps.', 'Race the you of last week', 'It is free. Everything you do is kept on a server', 'A lap is one stretch of focus', 'Plan the day in laps']) await expect(a.page.getByText(gone)).toHaveCount(0);
+  // One drawing, said by its own words, and no key.
+  expect(await a.page.getByRole('img').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([welcome.drawn]);
+  await expect(a.page.getByRole('listitem')).toHaveCount(0);
+  // The whole of it on one phone screen, the button in its lower part, in reach of the thumb.
   const scroll = () => a.page.evaluate(() => [document.scrollingElement!, ...document.querySelectorAll('main')].filter((el) => el.scrollHeight > el.clientHeight + 1).map((el) => `${el.tagName} ${el.scrollHeight} in ${el.clientHeight}`));
   expect(await scroll(), 'the welcome does not fit a 412 by 915 phone').toEqual([]);
-  await expect(button(a.page, 'Connect to a server')).toBeInViewport();
+  const go = button(a.page, 'Connect to a server');
+  await expect(go).toBeInViewport();
+  const at = (await go.boundingBox())!;
+  expect(at.y, 'the button is not in the lower part of the screen').toBeGreaterThan(915 / 2);
+  expect(at.y + at.height).toBeLessThanOrEqual(915);
+  // The drawing over the words, the words over the button.
+  const [img, title] = [(await a.page.getByRole('img').boundingBox())!, (await a.page.getByRole('heading', { name: WELCOME }).boundingBox())!];
+  expect(img.y + img.height <= title.y && title.y + title.height <= at.y, 'not drawing, then title, then button').toBe(true);
   // At 206 (a phone at 200%): nothing wider than the box it stands in.
   await a.page.setViewportSize({ width: 206, height: 457 });
   await a.page.waitForTimeout(200);

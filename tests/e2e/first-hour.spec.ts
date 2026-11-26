@@ -414,55 +414,43 @@ test('a project\'s colour: two of the new named colours and a picked one fill th
   expect((await serverRows(server, name, 'project')).get('future')?.color).toBe('chartreuse-ish');
 });
 
-// 8. The welcome, in the browser: beside the form from 720px, under it below. Section 14: shown,
-// not explained: one sentence, one drawing with its key, two small drawings.
+// 8. The welcome, in the browser: beside the form from 720px, under it below. Section 18: one
+// drawing, the title and one sentence; no button, since the form is right there.
 
 /** The welcome's section, wherever it stands. */
-const welcomeOf = (page: Page) => page.locator('section').filter({ has: page.getByRole('heading', { name: /^Work in laps\./ }) });
+const welcomeOf = (page: Page) => page.locator('section').filter({ has: page.getByRole('heading', { name: about.title, exact: true }) });
 
-test('the browser\'s signed-out screen carries the welcome: beside the form at 1440, under it at 412; its one sentence, three drawings read once each, a key of four read once each, the old sentences gone; at 1440 the form stands where it would without it and nothing scrolls', async ({ deviceA: a }) => {
+test('the browser\'s signed-out screen carries the welcome: beside the form at 1440, under it at 412; one drawing, its title as an h2 and one sentence, no button; the old words and drawings gone; at 1440 the form stands where it would without it and nothing scrolls', async ({ deviceA: a }) => {
   for (const [size, place] of [[{ width: 1440, height: 900 }, 'beside'], [PHONE, 'under']] as const) {
     await a.page.setViewportSize(size);
     await a.page.goto('/');
     await expect(a.page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible();
     const welcome = welcomeOf(a.page);
     await expect(welcome).toBeVisible();
+    await expect(welcome.getByRole('heading', { name: about.title, exact: true, level: 2 })).toBeVisible();
     await expect(welcome.getByText(about.what, { exact: true })).toBeVisible();
-    await expect(a.page.getByText(/^It is free\. Everything you do is kept on a server/)).toHaveCount(1);
-    for (const gone of ['A lap is one stretch of focus', '25 minutes unless you change it', 'Plan the day in laps', 'Habits get a box to tick', 'In a room, friends see']) {
+    for (const gone of ['Work in laps.', 'Race the you of last week', 'It is free. Everything you do is kept on a server', 'A lap is one stretch of focus', 'Plan the day in laps']) {
       await expect(a.page.getByText(gone), `"${gone}" is still there`).toHaveCount(0);
     }
-    // The pictures, each said once by its own words, and nothing inside them said again.
-    const images = welcome.getByRole('img');
-    expect(await images.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([about.drawn, about.weekDrawn, about.tasksDrawn, about.roomDrawn]);
-    // The key: its entries, each a list item, each said once.
-    const key = welcome.getByRole('listitem');
-    await expect(key).toHaveCount(Object.keys(about.key).length);
-    // What a screen reader reads of each: the words, without the drawn mark (hidden from it).
-    const heard = await key.evaluateAll((items) =>
-      items.map((li) => {
-        const copy = li.cloneNode(true) as HTMLElement;
-        copy.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
-        return copy.textContent?.trim();
-      }),
-    );
-    expect(heard).toEqual(Object.values(about.key));
-    for (const entry of Object.values(about.key)) {
-      await expect(a.page.getByText(entry), `"${entry}" is read more than once`).toHaveCount(1);
-    }
+    // One picture, said once by its own words; no key.
+    expect(await a.page.getByRole('img').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([about.drawn]);
+    await expect(welcome.getByRole('listitem')).toHaveCount(0);
+    // The form is the way in here: the phone app's button is not.
+    await expect(a.page.getByRole('button', { name: about.go })).toHaveCount(0);
+    await expect(welcome.getByRole('button')).toHaveCount(0);
     const [w, f] = [(await welcome.boundingBox())!, (await a.page.locator('form').boundingBox())!];
     if (place === 'beside') {
       expect(w.x + w.width <= f.x || f.x + f.width <= w.x, 'the welcome is not beside the form').toBe(true);
       const scrolls = await a.page.evaluate(() => [document.scrollingElement!, document.querySelector('main')].filter((el) => el && el.scrollHeight > el.clientHeight + 1).length);
       expect(scrolls, 'at 1440 by 900 the signed-out screen scrolls').toBe(0);
       // Where the form would stand with no welcome beside it.
-      const alone = await a.page.evaluate(() => {
-        const section = [...document.querySelectorAll('section')].find((el) => el.querySelector('h1, h2')?.textContent?.startsWith('Work in laps.'))!;
+      const alone = await a.page.evaluate((title) => {
+        const section = [...document.querySelectorAll('section')].find((el) => el.querySelector('h2')?.textContent === title)!;
         section.style.display = 'none';
         const r = document.querySelector('form')!.getBoundingClientRect();
         section.style.display = '';
         return { x: r.x, y: r.y };
-      });
+      }, about.title);
       expect([Math.round(f.x), Math.round(f.y)], 'the welcome moved the form').toEqual([Math.round(alone.x), Math.round(alone.y)]);
     } else {
       expect(w.y >= f.y + f.height, 'the welcome is not under the form').toBe(true);
@@ -470,48 +458,27 @@ test('the browser\'s signed-out screen carries the welcome: beside the form at 1
   }
 });
 
-/**
- * When the sixth lap of the welcome's race first stood in the page, and when its fill reached
- * its end, in ms: read every frame from the first script on, so a test's own latency adds nothing.
- */
-const watchRace = () => {
-  const seen: { first: number | null; done: number | null; last: string | null } = { first: null, done: null, last: null };
-  (window as unknown as { race: typeof seen }).race = seen;
-  const look = () => {
-    const lap = [...document.querySelectorAll<HTMLElement>('[role="img"] span:not([class*="past"]) > i')].find((i) => i.style.getPropertyValue('--i').trim() === '5' && i.style.getPropertyValue('--share').trim() === '0.6');
-    if (lap) {
-      seen.first ??= performance.now();
-      const now = getComputedStyle(lap, '::after').transform;
-      if (now !== seen.last) seen.done = null;
-      if (/^matrix\(0\.6, 0, 0, 1, 0, 0\)$/.test(now)) seen.done ??= performance.now();
-      seen.last = now;
-    }
-    requestAnimationFrame(look);
-  };
-  requestAnimationFrame(look);
-};
-
-test('the welcome\'s race: with reduced motion it stands in its end state at once; with motion its sixth lap has filled within 2 s and nothing moves for a second after', async ({ deviceA: a }) => {
-  await a.page.addInitScript(watchRace);
-  const read = () => a.page.evaluate(() => (window as unknown as { race: { first: number | null; done: number | null; last: string | null } }).race);
-  await a.page.emulateMedia({ reducedMotion: 'reduce' });
-  await a.page.goto('/');
-  await expect(welcomeOf(a.page).getByRole('img').first()).toBeVisible();
-  await expect.poll(async () => (await read()).done).not.toBeNull();
-  let race = await read();
-  expect(race.done! - race.first!, 'under reduced motion the race moved').toBeLessThanOrEqual(100);
-
+test('the welcome stands still: with motion allowed, nothing in it animates as it is shown, and a second on nothing on the page moves', async ({ deviceA: a }) => {
   await a.page.emulateMedia({ reducedMotion: 'no-preference' });
-  await a.page.reload();
-  await expect(welcomeOf(a.page).getByRole('img').first()).toBeVisible();
-  await expect.poll(async () => (await read()).done, { timeout: 3000 }).not.toBeNull();
-  race = await read();
-  expect(race.done! - race.first!, 'the race took more than 2 s to fill').toBeLessThanOrEqual(2000);
-  const settled = race.last;
+  await a.page.goto('/');
+  await expect(welcomeOf(a.page).getByRole('img')).toBeVisible();
+  // Every running animation, and whether it is the welcome's own: the screen's own arrival
+  // (the shell's canvas, round every screen alike) is not the welcome's.
+  const moving = (mine: boolean) =>
+    a.page.evaluate(
+      ({ mine, title }) =>
+        document
+          .getAnimations()
+          .filter((x) => x.playState === 'running')
+          .map((x) => ({ x, el: (x.effect as KeyframeEffect | null)?.target as HTMLElement | null }))
+          .filter(({ el }) => !mine || !!el?.closest('section')?.querySelector('h2')?.textContent?.includes(title))
+          .map(({ x, el }) => `${el?.nodeName.toLowerCase()}.${el?.className} (${(x as CSSAnimation).animationName ?? (x as CSSTransition).transitionProperty ?? 'script'})`),
+      { mine, title: about.title },
+    );
+  // The old race filled for 2 s and the drawings faded in.
+  expect(await moving(true), 'something in the welcome moves as it is shown').toEqual([]);
   await a.page.waitForTimeout(1000);
-  race = await read();
-  expect(race.last, 'the race moved again after it filled').toBe(settled);
-  expect(await a.page.evaluate(() => document.getAnimations().filter((x) => x.playState === 'running').length), 'something in the welcome is still moving').toBe(0);
+  expect(await moving(false), 'something on the signed-out screen still moves a second on').toEqual([]);
 });
 
 // 9. Nothing selects, but fields and what is there to be copied.
