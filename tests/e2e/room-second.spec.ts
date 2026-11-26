@@ -70,6 +70,8 @@ const nextMinute = (node: Node) => Math.ceil((node.engine.now() + MIN + 1000) / 
 test('the live order: on a lap first, then a break, then the rest, whatever the week; ranked, by the week alone; the tabs by click and by arrow keys; the hours say now and each lane draws its laps, yours in you', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
   test.setTimeout(120000);
   const now = Date.now();
+  // A lane draws today's laps: C's, two hours back, must still be today.
+  test.skip(now - new Date(new Date(now).toDateString()).getTime() < 150 * MIN, 'too near midnight for laps earlier today');
   // C has the most this week, A the least: the live order must not follow the week.
   const pa = await person(a, 'lo_a');
   const pb = await person(b, 'lo_b', (n) => lap(n, 'b1', now - 3 * 60 * MIN), { work_ms: 3000, short_ms: 5 * MIN });

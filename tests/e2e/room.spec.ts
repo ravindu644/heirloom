@@ -119,7 +119,8 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
 
   // B cheers A: shown at once, once.
   const cheer = lane(b.page, nameA).getByRole('button', { name: /^Cheer / });
-  await expect(cheer).toHaveAccessibleName(/^Cheer .* for the lap that ended at \d\d:\d\d$/);
+  // DESIGN.md: named "Cheer lina's lap" to a screen reader.
+  await expect(cheer).toHaveAccessibleName(`Cheer ${nameA}'s lap`);
   await cheer.click();
   // Given, the cheer is a sentence, and nothing more to press.
   await expect(lane(b.page, nameA)).toContainText('You cheered this lap.');
