@@ -296,7 +296,7 @@ beside what is listed, as the room calls do (section 15).
 | `/api/invites/list` | | `{"invites":[...]}`: every invite not used and not run out, oldest first | admin, owner |
 | `/api/invites/renew` | `{"invite":"k3J9..."}` | `{"invite":{...}}`: 7 days from now. One that had run out comes back with a new `invite`, so its old link stays dead | admin, owner |
 | `/api/invites/revoke` | `{"invite":"k3J9..."}` | `{}`. An invite that is not there is `{}` too | admin, owner |
-| `/api/admins/list` | | `{"admins":[{"username":"ravi","role":"owner"},{"username":"sam","role":"admin"}]}`: the owner first, then admins by name | owner |
+| `/api/admins/list` | | `{"admins":[{"username":"ravi","role":"owner","picture":"<hash>"},{"username":"sam","role":"admin","picture":null}]}`: the owner first, then admins by name; `picture` as a member's (section 15, Pictures) | owner |
 | `/api/admins/set` | `{"username":"sam","role":"admin"}` (or `"member"`) | `{}`. Already so is `{}` too | owner |
 
 | Status | Code | When |
@@ -669,8 +669,9 @@ errors as section 10, and these of their own:
 
 **Pictures.** An account's picture is kept by the server as it was sent and named by the sha-256
 of its bytes (`hash`, hex). Members carry `picture` (that hash, or `null` for the initial).
-`GET /api/pictures/<hash>` with the token as `Authorization: Bearer <token>` returns it, to an
-account that shares a room with its owner (else 404), with `Cache-Control: private, max-age=31536000,
+`GET /api/pictures/<hash>` with the token as `Authorization: Bearer <token>` returns it, to its
+own account, to an account that shares a room with its owner, and to the server's owner for an
+admin's (else 404), with `Cache-Control: private, max-age=31536000,
 immutable`: a new picture is a new hash. The device makes it before it sends it: cut square, 96 by
 96, WebP (JPEG where WebP cannot be made), so it is about 5 KB.
 
