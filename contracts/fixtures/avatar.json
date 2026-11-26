@@ -1,0 +1,80 @@
+{
+  "_about": "A person with no picture: hue = FNV-1a 32-bit over the UTF-8 bytes of the lowercased username, modulo 8, into the hues in order; letters = the first letters of the first two parts when the username splits on _ - or ., else its first letter, upper case. contracts/protocol.md section 15, Pictures.",
+  "hues": [
+    "amber",
+    "olive",
+    "teal",
+    "sky",
+    "indigo",
+    "plum",
+    "clay",
+    "heat-2"
+  ],
+  "cases": [
+    {
+      "username": "ravindu644",
+      "hue": "amber",
+      "letters": "R"
+    },
+    {
+      "username": "ravindu755",
+      "hue": "plum",
+      "letters": "R"
+    },
+    {
+      "username": "lina",
+      "hue": "sky",
+      "letters": "L"
+    },
+    {
+      "username": "sam",
+      "hue": "indigo",
+      "letters": "S"
+    },
+    {
+      "username": "ravi_deshan",
+      "hue": "plum",
+      "letters": "RD"
+    },
+    {
+      "username": "sachi",
+      "hue": "olive",
+      "letters": "S"
+    },
+    {
+      "username": "amaya",
+      "hue": "indigo",
+      "letters": "A"
+    },
+    {
+      "username": "maya",
+      "hue": "plum",
+      "letters": "M"
+    },
+    {
+      "username": "a.b",
+      "hue": "indigo",
+      "letters": "AB"
+    },
+    {
+      "username": "x-y_z",
+      "hue": "indigo",
+      "letters": "XY"
+    },
+    {
+      "username": "Ravi",
+      "hue": "plum",
+      "letters": "R"
+    },
+    {
+      "username": "nimal",
+      "hue": "teal",
+      "letters": "N"
+    },
+    {
+      "username": "dilan",
+      "hue": "olive",
+      "letters": "D"
+    }
+  ]
+}

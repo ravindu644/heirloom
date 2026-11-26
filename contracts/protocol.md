@@ -674,6 +674,11 @@ account that shares a room with its owner (else 404), with `Cache-Control: priva
 immutable`: a new picture is a new hash. The device makes it before it sends it: cut square, 96 by
 96, WebP (JPEG where WebP cannot be made), so it is about 5 KB.
 
+A member with no picture is drawn from their username alone, the same on every device and in
+every version (`contracts/fixtures/avatar.json`): a hue picked by FNV-1a 32 bit over the UTF-8
+bytes of the lowercased username, modulo 8, into amber, olive, teal, sky, indigo, plum, clay,
+heat-2, in that order; and one letter, or two when the username splits on `_`, `-` or `.`.
+
 A room's `code` is 8 characters of `A-Z 2-9` without the look-alikes (`I`, `O`, `0`, `1`), made
 by the server. Whoever has it can join; any member can read it.
 
@@ -731,6 +736,10 @@ name: it was not there to hear `gone`.
   cheered, never a break, never one's own, and never a member who is away.
 - A member's local midnight changes their `today_ms`, so it sends the message like any other change.
 - `picture` on each member: see **Pictures**.
+- `days`, `last_days` and `last_at_ms` on each member: that member's own focus per local day of
+  this week and of last week (seven numbers each, rows only, their own calendar) and their last
+  week as far as the same weekday and time, for the person's report. Zeros and 0 for an away
+  member.
 - `laps` on each member: their work laps of their local day so far, from their session rows,
   oldest first, each `[started, ended]` in server ms (paused time inside a lap is not cut out;
   a lap set aside is not there). The lap in progress is not in it: it is `run`. `[]` when there is
