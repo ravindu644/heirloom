@@ -4,24 +4,15 @@
    sentence that explains it directly above. The one stretch of free space lies between them. */
 .focus { display: flex; flex-direction: column; gap: var(--space-lg); min-height: 100%; }
 
-/* The line over the bar, and the bar. Both keep their height when they have nothing to show, so
-   the digits under them stand still from a task with an estimate to one without. */
-.lapline { min-height: 1lh; font: var(--type-label); color: var(--muted); }
-/* What the state is, in ink; the rest of the line muted. One weight: DESIGN.md has no bold label. */
-.lapline b { font-weight: inherit; color: var(--ink); }
+/* The bar keeps its height when there is none, so the digits stand still from a task with an
+   estimate to one without. */
 .nobar { display: block; height: var(--layout-lane); }
 /* The task and its bar are one block: the bar sits under the title, with what it counts. */
 .named { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-/* On a result: the line over them, then the task and its bar. */
+/* On a result: the task and its bar. */
 .laps { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
-.rest {
-  display: inline-block;
-  width: var(--space-sm);
-  height: var(--space-sm);
-  margin-right: var(--space-sm);
-  border-radius: var(--radius-full);
-  background: var(--rest);
-}
+/* A break in the project's place: its mark is the project square's size, round and in `rest`. */
+.rest { width: var(--layout-lane); height: var(--layout-lane); border-radius: var(--radius-full); background: var(--rest); }
 
 .clock { display: flex; flex-direction: column; gap: var(--space-lg); }
 /* The task and the time are one block. */

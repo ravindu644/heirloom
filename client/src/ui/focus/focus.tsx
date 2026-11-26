@@ -163,22 +163,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // The break this lap will earn, by the timer's own count and at the task's own length: the one
   // thing the set of four decides that a person feels. It is said on the button that takes it.
   const breakMs = lengths[(ready ? view.next.set_index === 3 : view.next.phase === 'long') ? 'long_ms' : 'short_ms'];
-  // The line over the bar says only what the digits cannot: a break and its name, a lap that
-  // began yesterday. A lap held is said once, under the digits ("paused since 16:38"). Otherwise
-  // the line is empty and keeps its height, so the digits never move.
-  const lapLine = (
-    <p class={css.lapline}>
-      {isBreak ? (
-        <>
-          <i class={css.rest} />
-          <b>{state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak}</b>
-          {view.over && s.focus.breakOver}
-        </>
-      ) : (
-        stale && <b>{s.focus.lapYesterday}</b>
-      )}
-    </p>
-  );
   // The bar is the task's: one segment for each lap of its estimate, more where laps went past
   // it, each as full as it ran. In a lap and on its result it is that lap's task; otherwise the
   // one a start would begin. No task, or one with no estimate, has no bar, and its place is kept.
@@ -206,41 +190,60 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // Before a start there is a choice to show whenever there is a task to choose.
   const title = named?.title ?? (typeof row?.title === 'string' ? row.title : (inLap || result ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
   const upNext = open.filter((task) => task !== named).slice(0, 3);
+  // The first row says what the digits cannot, in the project's place: a break and its name, a
+  // lap that began yesterday. Otherwise the task's project. A lap held is said once, under the
+  // digits ("paused since 16:38"). The row is there in every state, so the digits never move.
+  const about = (
+    <span class={css.about}>
+      {isBreak ? (
+        <span class={css.project}>
+          <i class={css.rest} />
+          {state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak}
+          {view.over && s.focus.breakOver}
+        </span>
+      ) : stale ? (
+        <span class={css.project}>{s.focus.lapYesterday}</span>
+      ) : named?.project ? (
+        <span class={css.project}>
+          <Square color={named.project.color} />
+          {named.project.name}
+        </span>
+      ) : (
+        // How far the task is, the bar says: the words would only repeat it. With nothing on the list, nothing is said.
+        title && !named && !row && s.focus.freeLabel
+      )}
+      {/* The one word drawn as a link: the two lines are pressed as one. */}
+      {ready && title && <u class={css.change}>{s.focus.change}</u>}
+    </span>
+  );
   const lines = (
     <>
-      <span class={css.about}>
-        {named?.project && (
-          <span class={css.project}>
-            <Square color={named.project.color} />
-            {named.project.name}
-          </span>
-        )}
-        {/* How far the task is, the bar says: the words would only repeat it. */}
-        {!named && !row && s.focus.freeLabel}
-        {/* The one word drawn as a link: the two lines are pressed as one. */}
-        {ready && <u class={css.change}>{s.focus.change}</u>}
-      </span>
+      {about}
       <span class={css.title} title={title}>
         {title}
       </span>
     </>
   );
   // A bar sits with what it counts: the task's laps under the task's title, between it and the
-  // digits, so it is never read as the day's. Its place is kept when there is none.
-  const task = (more: { big?: boolean; lighting?: boolean } = {}) => (
-    <div class={css.named}>
-      {/* Before a start the two lines are the way to choose what the lap is for; once it runs they are words. */}
-      {title &&
-        (ready ? (
+  // digits, so it is never read as the day's. Its place is kept for a task with no estimate. With
+  // nothing on the list there is no title, no bar and nothing to choose: only a break or a lap
+  // from yesterday is said, and with neither there is no row at all, so no empty band.
+  const task = (more: { big?: boolean; lighting?: boolean } = {}) =>
+    title ? (
+      <div class={css.named}>
+        {/* Before a start the two lines are the way to choose what the lap is for; once it runs they are words. */}
+        {ready ? (
           <button type="button" class={css.task} aria-label={s.focus.choose(title)} aria-haspopup="dialog" onClick={() => setChoosing(true)}>
             {lines}
           </button>
         ) : (
           <div class={css.task}>{lines}</div>
-        ))}
-      {bar(more)}
-    </div>
-  );
+        )}
+        {bar(more)}
+      </div>
+    ) : (
+      (isBreak || stale) && about
+    );
 
   if (result) {
     const l = lanes(race, lengths.work_ms, now);
@@ -256,10 +259,8 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
     return (
       <div class={cx(css.focus, css.result, live && (allIn ? css.setMoment : css.lapMoment))}>
         <h1 class="sr">{s.focus.title}</h1>
-        <div class={css.laps}>
-          {lapLine}
-          {task({ big: allIn, lighting: live && allIn })}
-        </div>
+        {/* No task and nothing to say of the lap: the headline is the first row, where Today's heading is. */}
+        {(title || stale) && <div class={css.laps}>{task({ big: allIn, lighting: live && allIn })}</div>}
         <div class={css.told}>
           <p class={cx(css.headline, css.words)} role="status">
             {headline}
@@ -329,7 +330,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
     <div class={css.focus}>
       <h1 class="sr">{s.focus.title}</h1>
       <div class={css.clock}>
-        {lapLine}
         <div class={css.face}>
           {task()}
           <div class={css.time}>
