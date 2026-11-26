@@ -125,12 +125,14 @@ test('totals after short laps, a cheer once and then only a sentence, never on y
   // A's own Focus result names who cheered.
   await expect(a.page.getByText(`${nameB} cheered.`)).toBeVisible({ timeout: 2000 });
 
-  // Ranked: B, with two laps, first.
-  await button(c.page, 'Code and settings').click();
-  await c.page.getByRole('dialog', { name: 'This room' }).getByRole('checkbox', { name: 'Order by this week' }).click();
-  await c.page.getByRole('dialog', { name: 'This room' }).getByRole('button', { name: 'Close' }).click();
+  // Ranked, by A, who made the room and so keeps it: B, with two laps, first, for everyone.
   await go(a.page, 'Room');
+  await button(a.page, 'Code and settings').click();
+  await a.page.getByRole('dialog', { name: 'This room' }).getByRole('checkbox', { name: 'Order by this week' }).click();
+  await a.page.getByRole('dialog', { name: 'This room' }).getByRole('button', { name: 'Close' }).click();
   await expect.poll(() => order(a.page)).toEqual([nameB, 'You', nameC]);
+  await go(c.page, 'Room');
+  await expect.poll(() => order(c.page)).toEqual([nameB, nameA, 'You']);
 });
 
 test('privacy: the task title only while A shares it, gone at once when A stops; C hides rooms, loses Room, is away to A, and C\'s lap still counts', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
