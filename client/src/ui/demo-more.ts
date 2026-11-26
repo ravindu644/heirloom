@@ -508,9 +508,12 @@ export function demoResets(seed: number, page: Pick<Resets, 'look' | 'use'>): Re
   };
 }
 
-/** The owner and whoever the owner has let invite. A username that is nobody's here is `nobody_here`. */
+/**
+ * The owner and whoever the owner has let invite: the first admin with a picture, the rest and the
+ * owner (whose rooms in these states show none) with their initial. A username that is nobody's here is `nobody_here`.
+ */
 export function demoAdmins(seed: string[]): Admins {
-  const list = signal<readonly AdminView[] | null>([{ username: 'ravi', role: 'owner' }, ...seed.map((username): AdminView => ({ username, role: 'admin' }))]);
+  const list = signal<readonly AdminView[] | null>([{ username: 'ravi', role: 'owner', picture: null }, ...seed.map((username, i): AdminView => ({ username, role: 'admin', picture: i ? null : `p${username}` }))]);
   const later = <T>(answer: T) => new Promise<T>((done) => setTimeout(() => done(answer), 200));
   return {
     list,
@@ -518,7 +521,7 @@ export function demoAdmins(seed: string[]): Admins {
     raise(username) {
       if (username === 'nobody_here') return later({ ok: false, error: 'unknown' });
       if (username === 'ravi') return later({ ok: false, error: 'bad_request' });
-      const admins = [...list.value!.slice(1).filter((one) => one.username !== username), { username, role: 'admin' as const }].sort((a, b) => a.username.localeCompare(b.username));
+      const admins = [...list.value!.slice(1).filter((one) => one.username !== username), { username, role: 'admin' as const, picture: null }].sort((a, b) => a.username.localeCompare(b.username));
       list.value = [list.value![0]!, ...admins];
       return later({ ok: true });
     },

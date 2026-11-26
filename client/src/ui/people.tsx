@@ -2,6 +2,7 @@ import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { Admins } from '../sync/admins.ts';
 import { UNDO_MS } from '../sync/focus.ts';
+import type { Rooms } from '../sync/rooms.ts';
 import type { InviteView, Invites } from '../sync/invites.ts';
 import type { ResetLink, Resets } from '../sync/resets.ts';
 import { Button } from './kit/button.tsx';
@@ -13,6 +14,7 @@ import links from './kit/links.module.css';
 import { Panel } from './kit/panel.tsx';
 import { Person } from './kit/person.tsx';
 import css from './people.module.css';
+import { type Holder, usePicture } from './picture.ts';
 import * as s from './strings.ts';
 
 // Each panel has its own words for the codes that mean something else in the other; `token` is a
@@ -151,7 +153,13 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
  * member; that can be taken back for as long as any Undo lasts, so it is done at once. Then the
  * one field that makes an admin of someone who has an account here.
  */
-export function AdminsPanel({ admins }: { admins: Admins }) {
+// One per row: each admin's picture is a hook of its own.
+function Admin({ name, hash, rooms, holder }: { name: string; hash: string | null; rooms: Rooms; holder: Holder }) {
+  const picture = usePicture(rooms, hash, holder);
+  return <Person name={name} picture={picture} pending={picture === undefined} />;
+}
+
+export function AdminsPanel({ admins, rooms, holder }: { admins: Admins; rooms: Rooms; holder: Holder }) {
   const list = admins.list.value;
   const [said, setSaid] = useState('');
   const [lowered, setLowered] = useState<string | null>(null);
@@ -189,7 +197,7 @@ export function AdminsPanel({ admins }: { admins: Admins }) {
           {list.map((one) => (
             <div key={one.username} class={css.row}>
               <span class={css.who}>
-                <Person name={one.username} />
+                <Admin name={one.username} hash={one.picture} rooms={rooms} holder={holder} />
                 <span>{one.role === 'owner' ? s.people.owner : s.people.admin}</span>
               </span>
               {one.role === 'admin' && (

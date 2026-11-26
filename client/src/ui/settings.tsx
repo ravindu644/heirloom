@@ -173,7 +173,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
   const people = (
     <>
       {role !== 'member' && <InvitesPanel invites={invites} />}
-      {role === 'owner' && <AdminsPanel admins={admins} />}
+      {role === 'owner' && <AdminsPanel admins={admins} rooms={rooms} holder={holderOf(engine, rooms)} />}
       {/* The owner's alone: an admin could otherwise take any account, the owner's too, by resetting it. */}
       {role === 'owner' && <ResetsPanel resets={resets} />}
     </>
