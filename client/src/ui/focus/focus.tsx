@@ -51,7 +51,7 @@ function lanes(race: RaceNow, workMs: number, now: number) {
   };
 }
 
-// `inLap`: a lap of today's is running, so finishing it moves today's race. One from yesterday does not, and nothing is promised of it.
+// `inLap`: a lap is running, so finishing it moves today's race.
 function RacePanel({ race, inLap, left, workMs, now }: { race: RaceNow; inLap: boolean; left: number; workMs: number; now: number }) {
   const l = lanes(race, workMs, now);
   const say = () => {
@@ -94,9 +94,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // break this lap will earn, and after the fourth lap in a row the one sentence that marks it.
   const set = result && view.next.phase === 'long';
   const fig = today.figures();
-  // A lap begun before midnight and still running counts on the day it began: it has no number today.
-  // Running, rung or stopped, it is said as that and never as a lap of today.
-  const stale = state.phase === 'work' && !ready && state.started !== null && dayOf(state.started) !== dayOf(now);
 
   // The task this lap is for, and the one the next lap will be for. Starting needs no task: with
   // none next, a lap is for nothing in particular. One deleted while its lap runs keeps the lap,
@@ -150,7 +147,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   const rang = useRef(false);
   if (!ready) rang.current = state.phase === 'work' && view.over;
   const last = focus.lastStop.value;
-  const line = ready && last ? stopSaid(last, fig.laps, now, rang.current) : '';
+  const line = ready && last ? stopSaid(last, fig.laps, rang.current) : '';
   const [note, setNote] = useState('');
   useEffect(() => {
     if (line || !ready) setNote(line);
@@ -196,8 +193,8 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   // Before a start there is a choice to show whenever there is a task to choose.
   const title = named?.title ?? (typeof row?.title === 'string' ? row.title : gone ? s.focus.lapGone : (inLap || result ? today.list.value.length > 0 : ready && open.length > 0) ? s.focus.freeTitle : '');
   const upNext = open.filter((task) => task !== named).slice(0, 3);
-  // The first row says what the digits cannot, in the project's place: a break and its name, a
-  // lap that began yesterday. Otherwise the task's project. A lap held is said once, under the
+  // The first row says what the digits cannot, in the project's place: a break and its name.
+  // Otherwise the task's project. A lap held is said once, under the
   // digits ("paused since 16:38"). The row is there in every state, so the digits never move.
   const about = (
     <span class={css.about}>
@@ -207,8 +204,6 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
           {state.phase === 'long' ? s.focus.longBreak : s.focus.shortBreak}
           {view.over && s.focus.breakOver}
         </span>
-      ) : stale ? (
-        <span class={css.project}>{s.focus.lapYesterday}</span>
       ) : named?.project ? (
         <span class={css.project}>
           <Square color={named.project.color} />
@@ -232,8 +227,8 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
   );
   // A bar sits with what it counts: the task's laps under the task's title, between it and the
   // digits, so it is never read as the day's. Its place is kept for a task with no estimate. With
-  // nothing on the list there is no title, no bar and nothing to choose: only a break or a lap
-  // from yesterday is said, and with neither there is no row at all, so no empty band.
+  // nothing on the list there is no title, no bar and nothing to choose: only a break is said,
+  // and without one there is no row at all, so no empty band.
   const task = (more: { big?: boolean; lighting?: boolean } = {}) =>
     title ? (
       <div class={css.named}>
@@ -248,7 +243,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         {bar(more)}
       </div>
     ) : (
-      (isBreak || stale) && about
+      isBreak && about
     );
 
   if (result) {
@@ -266,7 +261,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
       <div class={cx(css.focus, css.result, live && (allIn ? css.setMoment : css.lapMoment))}>
         <h1 class="sr">{s.focus.title}</h1>
         {/* No task and nothing to say of the lap: the headline is the first row, where Today's heading is. */}
-        {(title || stale) && <div class={css.laps}>{task({ big: allIn, lighting: live && allIn })}</div>}
+        {title && <div class={css.laps}>{task({ big: allIn, lighting: live && allIn })}</div>}
         <div class={css.told}>
           <p class={cx(css.headline, css.words)} role="status">
             {headline}
@@ -291,11 +286,10 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
                 <SplitChip {...l.chip} turning={live && !allIn} /> <span class={css.words} data-live>{s.race.at(now)} </span>
               </>
             )}
-            {/* The break is said once, on the button that starts it. A lap from yesterday is none of
-                today's: the day's count is not said beside it. The task's count is said only where
-                no bar draws it: a task with no estimate. */}
+            {/* The break is said once, on the button that starts it. The task's count is said only
+                where no bar draws it: a task with no estimate. */}
             <span class={css.words}>
-              {[!stale && s.result.laps(focus.lapsToday()), lapTask && lapTask.estimate === null && s.result.task(lapTask.title, lapTask.laps, lapTask.estimate), rooms.cheered.value.length > 0 && s.result.cheered(rooms.cheered.value)].filter(Boolean).join(' ')}
+              {[s.result.laps(focus.lapsToday()), lapTask && lapTask.estimate === null && s.result.task(lapTask.title, lapTask.laps, lapTask.estimate), rooms.cheered.value.length > 0 && s.result.cheered(rooms.cheered.value)].filter(Boolean).join(' ')}
             </span>
           </p>
             <Button kind="link" class={css.far} onClick={focus.stop}>
@@ -363,7 +357,7 @@ export function FocusScreen({ engine, focus, today, rooms, settings }: { engine:
         </div>
       </div>
       <div class={css.rail}>
-        <RacePanel race={race} inLap={inLap && !stale} left={view.left_ms} workMs={lengths.work_ms} now={now} />
+        <RacePanel race={race} inLap={inLap} left={view.left_ms} workMs={lengths.work_ms} now={now} />
         {upNext.length > 0 && (
           <div class={css.upnext}>
             {/* What Today calls the rest of its open tasks, in the same words. */}

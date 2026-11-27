@@ -13,10 +13,9 @@ export type Stop = NonNullable<Focus['lastStop']['value']>;
  * the stop, in which a counted lap is the last. `rang`: the lap's bell had gone, so nothing was
  * cut short and the line says which lap the timer rests after.
  */
-export function stopSaid(stop: Stop, laps: number, now: number, rang = false): string {
-  // A lap begun before midnight is yesterday's and has no number today: 0 says that.
-  const lap = stop.phase === 'work' && dayOf(stop.started) !== dayOf(now) ? 0 : laps;
-  if (stop.phase !== 'work' || rang) return s.focus.stoppedAfter(lap);
+export function stopSaid(stop: Pick<Stop, 'phase' | 'ran_ms' | 'counted'>, laps: number, rang = false): string {
+  // A lap is the day's it ended on, so one just stopped is always today's, even begun before midnight.
+  if (stop.phase !== 'work' || rang) return s.focus.stoppedAfter(laps);
   // A start taken back is in no count, so it is never numbered.
-  return stop.counted ? s.focus.stopped(lap, stop.ran_ms) : s.focus.takenBack;
+  return stop.counted ? s.focus.stopped(laps, stop.ran_ms) : s.focus.takenBack;
 }

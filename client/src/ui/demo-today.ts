@@ -129,8 +129,8 @@ export function demoToday(seed: DemoDay, timer: ReadonlySignal<TimerState>, lap:
     // Nothing in the demo reminds: the platform reads this, not a screen.
     timed: signal([]),
     figures() {
-      // A lap begun before midnight counts on the day it began: nothing of it is today's, rung or not.
-      const inLap = timer.value.phase === 'work' && new Date(timer.value.started ?? 0).getDate() === new Date(now()).getDate() ? lap() : null;
+      // A running lap is today's, begun before midnight or not; `lap()` holds only its minutes since midnight.
+      const inLap = timer.value.phase === 'work' ? lap() : null;
       const left_laps = open.value.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
       return {
         done_ms: day.ms + (inLap?.ms ?? 0),

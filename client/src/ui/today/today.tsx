@@ -87,9 +87,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     const onIt = isDone && state.phase === 'work' && state.task === task.id && !view.over;
     today.setDone(task.id, isDone);
     if (!isDone) return say(null);
-    // The stop as the core recorded it, in the words Focus has for it: a lap by the day's count, yesterday's as that, a start taken back as that.
+    // The stop as the core recorded it, in the words Focus has for it: a lap by the day's count, a start taken back as that.
     const stop = onIt ? focus.lastStop.peek() : null;
-    const lapEnds = !stop ? undefined : stop.phase === 'work' && !stop.counted ? s.today.noLap : stopSaid(stop, today.figures().laps, engine.now());
+    const lapEnds = !stop ? undefined : stop.phase === 'work' && !stop.counted ? s.today.noLap : stopSaid(stop, today.figures().laps);
     // A repeating task has made its next one by now: say when that is, from the row itself.
     const series = task.id.replace(/-\d{8}$/, '');
     const again = task.repeat && today.upcoming.value.find((other) => other.id !== task.id && other.id.startsWith(`${series}-`));

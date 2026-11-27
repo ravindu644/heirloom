@@ -312,6 +312,8 @@ const PROGRESS: Record<string, Scene> = {
   'progress-paused': { about: 'Progress with the lap paused: the day list ends on it, said as paused, up to the pause', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: { live: 'paused' } },
   'progress-to-today': { ...week, about: 'Progress scrolled to its foot, then Today from the bar: Today opens at its top', record: {}, tap: ['demo:end', 'css:nav a[href="#/today"]'] },
   'progress-day': { ...week, about: 'A day chosen in the year: its timeline, and the way back to today', record: {}, tap: 'demo:day' },
+  'progress-midnight': { ...week, about: 'A lap from 23:46 to 00:32: today\'s timeline starts at midnight, and its list says the lap\'s real times', record: { midnight: true } },
+  'progress-midnight-before': { ...week, about: 'The day before: the same lap at the end of its timeline, drawn up to midnight', record: { midnight: true }, tap: 'demo:day:ArrowUp' },
   'progress-earlier': { about: 'The twelve sessions of today and the lap in progress, opened from the five latest', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), record: {}, tap: '8 earlier today' },
   'progress-aside': { ...week, about: 'Just after a lap is set aside in the timeline: Undo', record: {}, tap: "Don't count it" },
   'progress-note': { ...week, about: 'The look back with a note at its longest', record: { note: 'Pointers finally clicked once I drew the array as boxes and stopped reading a[i] as magic. The second lap after lunch went on two devices by mistake, the laptop was still running. Tomorrow: exercise 5-3 first, before the lecture, while the picture of the boxes is still in my head.' } },
@@ -497,10 +499,10 @@ const SCENES: Record<string, Scene> = {
   'focus-360-running': { about: 'That lap a second in: seven characters, 5:59:59', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'focus-100-running': { about: 'A long lap with 100 minutes left: the last moment it reads hours, 1:40:00', run: { ...onKr, planned: 360 * MIN, left: 100 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'focus-99-running': { about: 'The same lap just under 100 minutes: minutes and seconds again', run: { ...onKr, planned: 360 * MIN, left: 100 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
-  'focus-yesterday': { about: 'A long lap begun before midnight and still running: it counts on the day it began', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
+  'focus-midnight': { about: 'A long lap begun before midnight and still running: it is today\'s lap, and its minutes from midnight are today\'s', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
   'focus-choose-started': { ...idleAt2, about: 'A lap started on another device while the chooser was open: the chooser closes and Focus is on that lap', day: day(), tap: ['css:[aria-haspopup=dialog]', 'demo:start'] },
-  'focus-yesterday-done': { about: 'A lap begun before midnight whose bell has gone: it is said as yesterday\'s, and the day\'s count is not said beside it', at: [0, 10], run: { ...onKr, left: 0 }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
-  'focus-yesterday-stopped': { about: 'That long lap stopped: the line names it as yesterday\'s and says how far it ran as the clock would', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }), tap: 'Stop' },
+  'focus-midnight-done': { about: 'A lap begun before midnight whose bell has gone: lap 1 today', at: [0, 10], run: { ...onKr, left: 0 }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }) },
+  'focus-midnight-stopped': { about: 'That long lap stopped: lap 1 today, and how far it ran as the clock would say it', at: [0, 20], run: { ...onKr, planned: 360 * MIN, left: 280 * MIN }, you: 0, laps: 0, ghost: tuesday, day: day(TASKS, { laps: 0, done_ms: 0 }), tap: 'Stop' },
   'focus-taken-back': { about: 'A lap stopped twenty seconds in: a start taken back, said as that and never numbered', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'Stop' },
   'today-taken-back': { about: 'The task marked done twenty seconds into its lap, from its sheet opened by the strip: the bar says it is done and that the lap was not counted', run: { ...onKr, left: 25 * MIN - 20000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), today: true, tap: ['K&R 5.1', 'Mark done'] },
   'stopped-elsewhere': { about: 'A lap stopped from the notification: Focus says so and offers Undo, as after its own Stop', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day(), tap: 'demo:stop' },
@@ -558,8 +560,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   };
   const over = () => view(state.value, now()).over;
   const lapOpen = () => state.value.phase === 'work';
-  // A lap begun before midnight is yesterday's: none of today's focus and none of today's laps, as the real count has it.
-  const mine = () => lapOpen() && new Date(state.value.started ?? 0).getDate() === new Date(now()).getDate();
+  // A lap is the day's it ends on, and only its minutes from midnight are today's, as the real count has it.
+  // ponytail: a pause before midnight is counted as after it.
+  const todays = () => Math.min(ran(), now() - new Date(now()).setHours(0, 0, 0, 0));
   // How full each lap of this set that was stopped is, by its place in the set. One that rang is whole.
   const part = new Map<number, number>();
   // What the real one does when a run ends: a lap that rang counts, and a stopped one keeps its
@@ -567,14 +570,12 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const close = () => {
     if (!lapOpen()) return;
     const task = state.value.task;
-    // One begun before midnight is yesterday's: the task has its square, and today nothing.
-    // And one stopped in its first minute is a start taken back: it leaves nothing anywhere.
+    // One stopped in its first minute is a start taken back: it leaves nothing anywhere.
     if (!over() && ran() < MIN) return;
-    const here = mine();
-    if (here && over()) laps++;
-    else if (here) part.set(state.value.set_index, ran() / state.value.planned_ms);
-    if (here) you += ran();
-    today.credit(task, over() ? 1 : ran() / state.value.planned_ms, here ? ran() : null);
+    if (over()) laps++;
+    else part.set(state.value.set_index, ran() / state.value.planned_ms);
+    you += todays();
+    today.credit(task, over() ? 1 : ran() / state.value.planned_ms, todays());
   };
   // What a run begun now for that task would get: the task's own lengths where it has them.
   const lengthsFor = (task: string | null) => {
@@ -589,7 +590,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     if (phase === 'work' && state.value.set_index === 0) part.clear();
   };
   // A scene with no list still has a day: its laps, against the usual target.
-  const today = demoToday(scene.day ?? { tasks: [], laps: scene.laps, target: 8 }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: ran(), over: over() }), now);
+  const today = demoToday(scene.day ?? { tasks: [], laps: scene.laps, target: 8 }, state, () => ({ share: ran() / (state.value.planned_ms || 1), ms: todays(), over: over() }), now);
 
   // Ten seconds to take a stop back, as the real one gives.
   const undoable = signal(false);
@@ -604,7 +605,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     const was = state.value;
     if (was.phase === 'idle') return;
     before = { state: was, you, laps };
-    lastStop.value = { phase: was.phase, task: was.task, started: was.started ?? now(), ran_ms: ran(), counted: lapOpen() && (over() || ran() >= MIN) };
+    lastStop.value = { phase: was.phase, task: was.task, ran_ms: ran(), counted: lapOpen() && (over() || ran() >= MIN) };
     close();
     state.value = act(was, { do: 'stop' }, now());
     undoable.value = true;
@@ -632,12 +633,11 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     },
     ran,
     race() {
-      // Yesterday's lap is not today's focus.
-      const you_ms = you + (mine() && !(scene.newDay && state.value.run === 'demo-0') ? ran() : 0);
+      const you_ms = you + (lapOpen() && !(scene.newDay && state.value.run === 'demo-0') ? todays() : 0);
       const ghost = scene.ghost ? { day: '2026-11-17', ms: scene.ghost[0], total_ms: scene.ghost[1] } : null;
       return { you_ms, ghost, split_ms: ghost ? you_ms - ghost.ms : null };
     },
-    lapsToday: () => laps + (mine() && over() ? 1 : 0),
+    lapsToday: () => laps + (lapOpen() && over() ? 1 : 0),
     start(task) {
       const next = view(state.value, now()).next.phase;
       close();
@@ -827,9 +827,9 @@ const find = <T extends Element>(selector: string, words: string): T => {
       const at = (y: number) => ({ bubbles: true, pointerId: 1, isPrimary: true, clientX: box.left + box.width / 2, clientY: y });
       row.dispatchEvent(new PointerEvent('pointerdown', at(box.top + box.height / 2)));
       setTimeout(() => dispatchEvent(new PointerEvent('pointermove', at(next.top + next.height / 2))), 500);
-    } else if (words === 'demo:day') {
-      // A week back in the year, by the keyboard.
-      document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    } else if (words.startsWith('demo:day')) {
+      // A week back in the year, by the keyboard, or with `demo:day:ArrowUp` a day.
+      document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: words.slice(9) || 'ArrowLeft', bubbles: true }));
     } else {
       const button = [...document.querySelectorAll('button')].find((one) => (one.textContent || one.ariaLabel)?.startsWith(words));
       if (!button) throw new Error(`demo state "${name}": no button starts with "${words}"`);

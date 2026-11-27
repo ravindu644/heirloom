@@ -548,7 +548,9 @@ Built once in `client/src/ui/kit/` and reused.
   states differ by shape as well as colour.
 - **A day's timeline:** a `lane-set` lane on an hour axis, each hour's label centred on its hour
   (only a label at the lane's very end is pulled in): laps in `you`, breaks in `rest`, a
-  lap set aside hollow. Two laps that ran on two devices at once sit on two rows and say so
+  lap set aside hollow. The axis runs inside the day, never before its 00:00 or past its 24:00;
+  a lap across midnight is drawn on each day only where it ran that day, and its row keeps its
+  real times ("23:46 to 00:32"). Two laps that ran on two devices at once sit on two rows and say so
   in words. Under it the same sessions as rows, because a block is too small to press: the
   five latest, in the order of the day, and over them one link that says how many more there
   are ("7 earlier today") and opens them in place; open, it says "Show the latest 5". A day
@@ -586,7 +588,7 @@ Built once in `client/src/ui/kit/` and reused.
     today and the week in `label`, the task only if shared, who cheered, and the lane.
     **Upright phone (under 720px):** the words make the panel's top lines and the lane runs its
     full width under them; the window is six hours with now 5/8 across, the hours sliding under
-    it. **Sideways and laptop (720px up):** the words stand in a column at the panel's left, 220px
+    it, but never starting before today's 00:00 (in the day's first hours now sits further left). **Sideways and laptop (720px up):** the words stand in a column at the panel's left, 220px
     under 1100px wide (the time left under the name) and 280px above, and the lane takes the rest
     of the row; the window is 08:00 to 20:00, widened to the hour of an earlier lap.
     **The lane** is one grey (`raised`) across its window. A lap that ran is a filled block, yours
@@ -1024,7 +1026,7 @@ Each is a rule for every screen, not for the one where it was seen.
   first row is the task's project with "Change task", and it starts where Today's heading starts
   (an empty line held open there read as a hole). What the digits cannot say takes the project
   row's place instead, in the same row: in a break its name ("Short break", "Long break", and
-  "Break over" when it is so), and for a lap begun before midnight "A lap from yesterday". The
+  "Break over" when it is so). The
   rows are the same in every state where there is something to put in them, so the digits never
   move from a lap to its break; with nothing on the list and no break, the row and the bar's
   place are not drawn at all rather than held open empty. Paused is said once,
@@ -1035,8 +1037,8 @@ Each is a rule for every screen, not for the one where it was seen.
   earned!" (not "in a row": the four may be hours apart). A bell says "Lap done." and the break
   it has earned; a room's row says "Focusing" and the time left. Today's figures say "past your
   target of 5" where the day goes over it: "planned" is Today's word for estimates.
-  A lap begun before midnight is "A lap from yesterday" in every state it can be in, running,
-  rung or stopped; it is never "Lap 0", and nothing promises it will add to today.
+  A lap that runs past midnight is today's lap in every state, running, rung or stopped (it ends
+  today), and only its minutes since midnight add to today; the ones before stay with yesterday.
 - **A count says of what.** "3 of 5 laps today" is the day's target; "1 of 2" on a row is the
   task's estimate; neither stands without its noun where both can be seen. Today's strip after
   a bell says "Lap done" and no number, since the row under it says "3 of 4" of the task.

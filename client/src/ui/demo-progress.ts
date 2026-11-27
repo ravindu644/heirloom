@@ -33,6 +33,8 @@ export interface DemoRecord {
   live?: 'running' | 'paused';
   /** Pinned rest days, as `settings.rest_days` holds them. */
   rest?: number;
+  /** A lap from 23:46 the day before to 00:32 today, on both days' timelines. */
+  midnight?: boolean;
 }
 
 // The reference's days: the ones its words talk about are fixed, the rest come from the same
@@ -172,7 +174,14 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   const turned = signal(new Map<string, TimelineEntry['outcome']>());
   // The lap in progress, after the scripted day's last break, as far as it has run: no row yet, so the core says it is live.
   const open = (): TimelineEntry[] => (lapNow() > 0 ? [lap('run', 16, 40, { outcome: 'stopped', ended: at(DAY, 16, 40) + lapNow(), ran_ms: lapNow(), live: record.live ?? 'running' })] : []);
-  const timeline = (day: string) => [...(day === DAY && record.scripted !== false ? scripted.value : plain(day)), ...(day === DAY && record.scripted !== false ? open() : [])].map((entry) => ({ ...entry, outcome: turned.value.get(entry.id) ?? entry.outcome }));
+  const late = { ...lap('late', 0, 0), started: at(addDays(DAY, -1), 23, 46), ended: at(DAY, 0, 32), ran_ms: 46 * MIN };
+  const timeline = (day: string) =>
+    [
+      ...(record.midnight && day === DAY ? [late] : []),
+      ...(day === DAY && record.scripted !== false ? scripted.value : plain(day)),
+      ...(day === DAY && record.scripted !== false ? open() : []),
+      ...(record.midnight && day === addDays(DAY, -1) ? [late] : []),
+    ].map((entry) => ({ ...entry, outcome: turned.value.get(entry.id) ?? entry.outcome }));
   const turn = (id: string, to: 'void' | null) => {
     const entry = timeline(DAY).find((one) => one.id === id);
     if (entry) moved.value += (to ? -1 : 1) * Math.round(entry.ran_ms / MIN);

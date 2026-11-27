@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { addDays } from '../../core/progress.ts';
 import { say } from '../kit/said.tsx';
 import type { Progress, TimelineEntry } from '../../sync/progress.ts';
 import { Button } from '../kit/button.tsx';
@@ -36,16 +37,21 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const [all, setAll] = useState(false);
   useEffect(() => setAll(false), [day]);
 
-
-  // The day's stretch: whole hours around what ran, never fewer than four.
-  // Whole hours on the wall, which are not whole hours of UTC everywhere: Sri Lanka is half an hour off.
-  const first = entries[0];
-  const zone = first ? new Date(first.started).getTimezoneOffset() * 60000 : 0;
-  const from = first ? Math.floor((first.started - zone) / HOUR) * HOUR + zone : 0;
-  const until = Math.max(from + 4 * HOUR, ...entries.map((entry) => Math.ceil((entry.ended - zone) / HOUR) * HOUR + zone));
+  // The day's stretch: whole hours around what ran, never fewer than four, and never past the
+  // day's own midnights: a lap from 23:46 to 00:32 is drawn on each day only as far as it ran in it.
+  // Counted from the day's midnight, the hours are whole on the wall, which they are not in UTC
+  // everywhere: Sri Lanka is half an hour off.
+  const start = new Date(`${day}T00:00:00`).getTime();
+  const end = new Date(`${addDays(day, 1)}T00:00:00`).getTime();
+  const within = (ms: number) => Math.min(end, Math.max(start, ms));
+  const hour = (ms: number, round: (n: number) => number) => start + round((within(ms) - start) / HOUR) * HOUR;
+  const first = hour(entries[0]?.started ?? start, Math.floor);
+  const until = Math.min(end, Math.max(first + 4 * HOUR, ...entries.map((entry) => hour(entry.ended, Math.ceil))));
+  // Late in the day the four hours reach back from midnight instead.
+  const from = Math.max(start, Math.min(first, until - 4 * HOUR));
   const hours = (until - from) / HOUR;
   const every = [1, 2, 3, 4, 6].find((n) => hours / n <= 6) ?? 6;
-  const x = (ms: number) => ((ms - from) / (until - from)) * 100;
+  const x = (ms: number) => ((within(ms) - from) / (until - from)) * 100;
   const two = entries.some((entry) => entry.row === 1);
 
   const act = (entry: TimelineEntry) => (entry.outcome === 'void' ? s.progress.countAgain : s.progress.setAside);

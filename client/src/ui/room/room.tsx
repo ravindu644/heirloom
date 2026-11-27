@@ -250,21 +250,29 @@ const phase = (m: MemberView) =>
 
 // The hour a moment falls in, by this device's clock.
 const hourOf = (ms: number) => new Date(ms).setMinutes(0, 0, 0);
+// Today's midnight: a lap begun before it is today's, but only its part after it is drawn, so no
+// stretch of today reaches back into yesterday.
+const midnightOf = (now: number) => new Date(now).setHours(0, 0, 0, 0);
 
 // The stretch of the day the lanes show: an upright phone's six hours with now five eighths
-// across; from 720px 08:00 to 20:00, widened to the hour of anyone's earlier lap and to now.
+// across, or from midnight in the first hours; from 720px 08:00 to 20:00, widened to the hour of
+// anyone's earlier lap and to now.
 function stretch(now: number, wide: boolean, members: MemberView[]): Window {
-  if (!wide) return { from: now - 3.75 * HOUR, to: now + 2.25 * HOUR };
-  const first = Math.min(now, ...members.flatMap((m) => m.laps.map(([start]) => start)));
+  const midnight = midnightOf(now);
+  if (!wide) {
+    const from = Math.max(midnight, now - 3.75 * HOUR);
+    return { from, to: from + 6 * HOUR };
+  }
+  const first = Math.max(midnight, Math.min(now, ...members.flatMap((m) => m.laps.map(([start]) => start))));
   const day = new Date(now);
   return { from: Math.min(day.setHours(8, 0, 0, 0), hourOf(first)), to: Math.max(day.setHours(20, 0, 0, 0), hourOf(now) + HOUR) };
 }
 
-// One person's day on their report: from the hour of their first lap to the hour after now, at least six hours.
+// One person's day on their report: from the hour of their first lap, or midnight, to the hour after now, at least six hours.
 function dayOf(m: MemberView, now: number): Window | null {
   const first = m.laps[0]?.[0] ?? m.runStart;
   if (first === null || first === undefined) return null;
-  const from = hourOf(first);
+  const from = hourOf(Math.max(midnightOf(now), first));
   return { from, to: Math.max(hourOf(now) + 2 * HOUR, from + 6 * HOUR) };
 }
 

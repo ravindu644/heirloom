@@ -85,8 +85,6 @@ export const focus = {
 
   // The line over the bar says only what the digits cannot. Nothing counts laps there: the bar
   // is the task's, and "Lap 3 of 5 today, next" explained what nobody had asked.
-  // A lap begun before midnight: it counts on the day it began, so it has no number today.
-  lapYesterday: 'A lap from yesterday',
   shortBreak: 'Short break',
   longBreak: 'Long break',
   breakOver: ', over',
@@ -107,15 +105,15 @@ export const focus = {
   // One way out for someone finished for the day, after a bell and in a break: both buttons there start something.
   doneForNow: 'Done for now',
   // What it did: the timer is at rest after that lap, counted by the day.
-  // No lap of today: the one that last ended began before midnight, and there is no "lap 0".
+  // No lap of today: a break that ran past midnight, after a lap that ended before it. There is no "lap 0".
   stoppedAfter: (lap: number) => (lap > 0 ? `Stopped after lap ${lap} today.` : "Stopped after yesterday's lap."),
 
   // A lap stopped in its first minute is a start taken back: it is in no count, so it has no number.
   takenBack: 'Stopped in its first minute. Not counted as a lap.',
   // What Stop did: which lap of the day ended and how far it ran, as the clock says it: "at 12 min",
-  // and from an hour "at 4h 40m". Lap 0 is one begun before midnight, which has no number today.
+  // and from an hour "at 4h 40m". A lap is the day's it ended on, so a stopped one is always today's.
   stopped: (lap: number, ran: number) =>
-    `${lap > 0 ? `Lap ${lap} today` : "Yesterday's lap"} stopped ${ran < MIN ? 'in its first minute' : `at ${ran < 60 * MIN ? `${mins(ran)} min` : total(ran)}`}.`,
+    `Lap ${lap} today stopped ${ran < MIN ? 'in its first minute' : `at ${ran < 60 * MIN ? `${mins(ran)} min` : total(ran)}`}.`,
   undo: 'Undo',
 
   // At the end of an Up next row: how far the task is.
