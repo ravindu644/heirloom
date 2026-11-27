@@ -43,6 +43,9 @@ export interface Settings {
   /** "Ring here": this device rings at the bell. Per device, kept locally, never synced. On unless switched off. */
   readonly ringHere: ReadonlySignal<boolean>;
   setRingHere(ring: boolean): void;
+  /** The phone keeps step while the app is closed (its background connection). Per device like `ringHere`: on unless switched off. */
+  readonly keepInStep: ReadonlySignal<boolean>;
+  setKeepInStep(on: boolean): void;
   /**
    * The marks earned by the latest thing that happened on this device, oldest first, for the
    * moment that follows it; empty when celebrations are off. Each mark is given once: `seen()`
@@ -106,6 +109,7 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
 
   // "Ring here" is this device's, whoever is signed in: it lives in the install's own store, not in any cell.
   const ringHere = signal(engine.kept('ring_here', 'device') !== false);
+  const keepInStep = signal(engine.kept('keep_in_step', 'device') !== false);
 
   // What has been achieved, from the sessions and from the tasks. Each is worked out again only
   // when its own rows change, and not at all while celebrations are off: nothing reads them then.
@@ -167,6 +171,12 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
     setRingHere(ring) {
       ringHere.value = ring;
       engine.keep('ring_here', ring, 'device');
+    },
+
+    keepInStep,
+    setKeepInStep(on) {
+      keepInStep.value = on;
+      engine.keep('keep_in_step', on, 'device');
     },
 
     marks,

@@ -1048,6 +1048,41 @@ describe('accounts', () => {
     assert.equal(d.engine.sync.value, 'signed-out');
   });
 
+  it('link: who this device keeps step as, null signed out or refused, and new only when the server, account or token is', async () => {
+    const d = await device();
+    const links: unknown[] = [];
+    const stop = effect(() => void links.push(d.engine.link.value));
+    assert.equal(d.engine.cursor(), 0);
+    assert.deepEqual(await d.engine.register('invite-code', 'ravi', 'correct horse'), { ok: true });
+    const ravi = { server: 'https://heirloom.test', account: 'acct-ravi', token: 'token-of-ravi', device: d.engine.device };
+    assert.deepEqual(d.engine.link.value, ravi);
+    // The cursor is read when wanted; its moves and new cells do not touch the link.
+    d.wire().welcome(5);
+    d.wire().cells(0, 5, [theirs(1, 't1', 'title', 'one')]);
+    d.engine.write('task', 't2', { title: 'two' });
+    assert.equal(d.engine.cursor(), 5);
+    assert.equal(links.length, 2);
+    // Someone else signs in on this device: one change, straight to them.
+    assert.deepEqual(await d.engine.signIn('sam', 'pw'), { ok: true });
+    assert.deepEqual(links.slice(2), [{ ...ravi, account: 'acct-sam', token: 'token-of-sam' }]);
+    assert.equal(d.engine.cursor(), 0, 'their own database, their own cursor');
+    // A refused token is no link: the service would only be refused too. A sign in brings it back.
+    d.wire().handlers.message({ type: 'bye', reason: 'token' });
+    assert.equal(d.engine.link.value, null);
+    assert.deepEqual(await d.engine.signIn('sam', 'pw'), { ok: true });
+    assert.equal(d.engine.link.peek()?.token, 'token-of-sam');
+    d.wire().welcome();
+    assert.deepEqual(await d.engine.signOut(), { ok: true });
+    assert.equal(d.engine.link.value, null);
+    assert.equal(d.engine.cursor(), 0);
+    stop();
+    assert.equal(links.length, 6);
+    // A restart signed in has the link from the start, before any connection.
+    assert.deepEqual(await d.engine.signIn('ravi', 'correct horse'), { ok: true });
+    await d.engine.stop();
+    assert.deepEqual((await device({ stores: d.stores })).engine.link.value, ravi);
+  });
+
   it('the engine says which server it keeps step with', async () => {
     const d = await device();
     assert.equal(d.engine.server, 'https://heirloom.test');

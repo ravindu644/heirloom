@@ -62,6 +62,15 @@ export type Role = 'member' | 'admin' | 'owner';
  */
 export type AccountResult = { ok: true } | { ok: false; error: string; retry_after?: number };
 
+/** What the phone's background service needs to hold its own socket (ARCHITECTURE section 6). */
+export interface Link {
+  server: string;
+  /** The account id: opaque, as the server gave it. */
+  account: string;
+  token: string;
+  device: string;
+}
+
 export interface Engine {
   readonly sync: ReadonlySignal<SyncState>;
   /** Who is signed in on this device. Stays set when the server refuses the token: the data is still theirs. */
@@ -88,6 +97,14 @@ export interface Engine {
   readonly device: string;
   /** The server this device keeps step with: the address the app was started with. */
   readonly server: string;
+  /**
+   * Who this device keeps step as, for the phone's background service. Null signed out, and when
+   * the server has refused the token. A new value only when the server, account, token or device
+   * changes: never as the cursor moves.
+   */
+  readonly link: ReadonlySignal<Link | null>;
+  /** The last sequence number this device has applied: what the next hello sends. 0 signed out. Not a signal: it moves with every frame. */
+  cursor(): number;
   /** Server-corrected time in ms. Everything stamped or shown uses this, never the device's own clock. */
   now(): number;
   /** Every row of a dataset, by id. The same signal each call; it changes when any cell of the dataset does. */
@@ -244,6 +261,8 @@ export async function createEngine(env: Env): Promise<Engine> {
   let turn: Promise<unknown> = Promise.resolve();
 
   const account = signal<Account | null>(null);
+  // The open session, token and all. Set and cleared with `account`, but a new token for the same account is a change too.
+  const opened = signal<Session | null>(null);
   // What the server last said of the open account. Nobody signed in is a member, whatever is held.
   const said = signal<Role>('member');
   const role = computed<Role>(() => (account.value ? said.value : 'member'));
@@ -267,6 +286,11 @@ export async function createEngine(env: Env): Promise<Engine> {
   const sets = new Map<string, Signal<ReadonlyMap<string, Row>>>();
   const roomListeners = new Set<(msg: RoomMessage) => void>();
   const zone = () => env.utcOffsetMin?.() ?? 0;
+
+  const link = computed<Link | null>(() => {
+    const s = opened.value;
+    return s && !refused.value ? { server: env.url, account: s.account, token: s.token, device: me } : null;
+  });
 
   const sync = computed<SyncState>(() => {
     if (!account.value || refused.value) return 'signed-out';
@@ -350,8 +374,11 @@ export async function createEngine(env: Env): Promise<Engine> {
             // Nothing to write and nobody to write for: this engine is signed out too.
             r.pending = null;
             if (db === r) {
-              detach(r);
-              account.value = null;
+              batch(() => {
+                detach(r);
+                account.value = null;
+                opened.value = null;
+              });
             }
             break;
           }
@@ -568,6 +595,7 @@ export async function createEngine(env: Env): Promise<Engine> {
     batch(() => {
       for (const [dataset, set] of sets) set.value = build(dataset);
       account.value = { account: session.account, username: session.username };
+      opened.value = session;
       said.value = held;
       refused.value = false;
       // A device that says it has no network is offline now, not after a socket has failed to say so.
@@ -656,6 +684,8 @@ export async function createEngine(env: Env): Promise<Engine> {
     timer,
     device: me,
     server: env.url,
+    link,
+    cursor: () => db?.cursor ?? 0,
     now,
     rows,
 
@@ -730,6 +760,7 @@ export async function createEngine(env: Env): Promise<Engine> {
         batch(() => {
           detach(r);
           account.value = null;
+          opened.value = null;
         });
         // Best effort: offline with nothing to send, the device still signs out. The token is forgotten here either way.
         await ask('/api/logout', { token: r.session.token }, LOGOUT_MS);

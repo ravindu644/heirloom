@@ -38,6 +38,30 @@ describe('starting and the timer', () => {
     assert.equal(d.focus.ran(), 6 * MIN);
   });
 
+  it('stamp is the timer cell\'s, and an effect never sees a new state beside an old stamp, here or from another device', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    assert.equal(a.focus.stamp.value, null);
+    const seen: [string | null, string | null][] = [];
+    const stop = effect(() => void seen.push([a.focus.state.value.run, a.focus.stamp.value]));
+    a.focus.start();
+    await a.settle();
+    w.exchange(a, b);
+    w.time.advance(MIN);
+    b.focus.pause();
+    await b.settle();
+    w.exchange(b, a);
+    stop();
+    assert.equal(a.focus.stamp.value, a.engine.stamp('timer', 'current', 'state'));
+    assert.equal(a.focus.stamp.value, b.focus.stamp.value);
+    // Each state with the stamp of the very cell it came from, and no step where only one had moved.
+    assert.deepEqual(seen.map(([run]) => run), [null, 'run-1', 'run-1']);
+    assert.equal(seen[0]![1], null);
+    assert.ok(seen[1]![1]! < seen[2]![1]!);
+    assert.equal(seen[2]![1], a.focus.stamp.value);
+  });
+
   it('lengths come from the settings row, and a value no timer could use falls back to the default', async () => {
     const w = world();
     const d = await w.device('a');

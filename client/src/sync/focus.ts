@@ -23,6 +23,8 @@ export type { Race } from '../core/stats.ts';
 export interface Focus {
   /** The timer cell. Changes only when someone acts, on any device. */
   readonly state: ReadonlySignal<TimerState>;
+  /** The stamp of the timer cell `state` was read from; null when there is none. Moves with `state`, never a step behind it. */
+  readonly stamp: ReadonlySignal<string | null>;
   /** The account's lengths for a lap, a short break and a long break, from settings or their defaults. */
   readonly lengths: ReadonlySignal<{ work_ms: number; short_ms: number; long_ms: number }>;
   /**
@@ -114,6 +116,8 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
   const state = engine.timer;
   const counts = createCounts(engine, env.utcOffsetMin);
   const { rows, timerStamp, today, current, covered, rangOnce } = counts;
+  // From the same rows signal as `state`, so whoever reads both in one effect gets the pair from one cell.
+  const stamp = computed(() => (void engine.rows('timer').value, timerStamp() ?? null));
   const lengths = computed(() => lapLengths(engine.rows('settings').value.get('current')));
   // Read when a run begins, by the device that begins it: the timer cell carries the length from
   // there, so a task edited mid-lap changes the next run and not this one.
@@ -308,6 +312,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
 
   return {
     state,
+    stamp,
     lengths,
     lengthsFor,
     view: () => look(state.value, engine.now()),

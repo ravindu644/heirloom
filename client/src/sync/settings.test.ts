@@ -160,6 +160,29 @@ describe('settings', () => {
   });
 });
 
+describe('keep in step', () => {
+  it('is this device\'s, like "ring here": on by default, in no cell, kept across a restart and a sign out, apart from ring here', async () => {
+    const { w, d, s } = await one();
+    assert.equal(s.keepInStep.value, true);
+    s.setKeepInStep(false);
+    assert.equal(s.keepInStep.value, false);
+    assert.equal(s.ringHere.value, true);
+    await d.engine.saved();
+    assert.deepEqual(d.engine.cells(), []);
+    const again = await w.restart(d);
+    assert.equal(again.settings.keepInStep.value, false);
+    assert.equal(again.settings.ringHere.value, true);
+    assert.deepEqual(await again.engine.signOut(), { ok: true });
+    again.close();
+    await again.engine.stop();
+    const later = await w.device('a', { stores: again.stores });
+    assert.equal(later.settings.keepInStep.value, false);
+    later.settings.setKeepInStep(true);
+    assert.equal(later.settings.keepInStep.value, true);
+    assert.equal(later.engine.kept('keep_in_step', 'device'), true);
+  });
+});
+
 describe('marks', () => {
   it('the first lap that rings is a mark, shown once; the next laps are not, until the fourth', async () => {
     const { w, d, s } = await one();
