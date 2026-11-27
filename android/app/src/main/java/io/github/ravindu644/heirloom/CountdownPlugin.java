@@ -107,6 +107,13 @@ public class CountdownPlugin extends Plugin {
         call.resolve();
     }
 
+    /** A room message the page heard live: a call that is over leaves the shade (Shade.ended). */
+    @PluginMethod
+    public void room(PluginCall call) {
+        Shade.ended(getContext(), call.getData());
+        call.resolve();
+    }
+
     /** What the background service needs (ARCHITECTURE section 6). Nothing given is a sign-out: stop, wipe. */
     @PluginMethod
     public void keep(PluginCall call) {

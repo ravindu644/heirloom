@@ -351,7 +351,7 @@ final class Shade {
         JSONObject h = held(c);
         if (next != null && !NotificationManagerCompat.from(c).areNotificationsEnabled()) next = null;
         try {
-            if (next != null) next = new JSONObject().put("id", next.optString("id")).put("at", next.optLong("at")).put("title", next.optString("title")).put("body", next.optString("body")).put("from", page ? "page" : "keep");
+            if (next != null) next = new JSONObject().put("id", next.optString("id")).put("room", next.optString("room")).put("at", next.optLong("at")).put("title", next.optString("title")).put("body", next.optString("body")).put("from", page ? "page" : "keep");
             switch (call(h.optJSONObject("call"), next, System.currentTimeMillis(), page)) {
                 case FORGET:
                     h.put("call", JSONObject.NULL);
@@ -520,6 +520,7 @@ final class Shade {
                 save(c);
                 return false;
             }
+            ended(c, m);
             JSONObject r = rooms.optJSONObject(id);
             boolean first = r == null;
             if (first) r = new JSONObject();
@@ -542,7 +543,8 @@ final class Shade {
                 if (cw != null && !front) {
                     String time = wall(call.optLong("at") - h.optLong("offset"));
                     String title = fill(cw.optString("title"), "name", names.optString(call.optString("by")), "time", time);
-                    announce(c, cw, id, callId, title, name, time, false, false);
+                    announce(c, cw, id, callId, title, name, time, call.optLong("at") - h.optLong("offset") + MIN_MS, false, false);
+                    r.put("noted", callId);
                 }
             }
             r.put("call", callId == null ? JSONObject.NULL : callId);
@@ -597,12 +599,13 @@ final class Shade {
         if (sw == null) return;
         JSONObject next = null;
         for (Iterator<String> it = rooms == null ? null : rooms.keys(); it != null && it.hasNext(); ) {
-            JSONObject r = rooms.optJSONObject(it.next());
+            String roomId = it.next();
+            JSONObject r = rooms.optJSONObject(roomId);
             JSONObject in = r == null ? null : r.optJSONObject("in");
             if (in == null || (next != null && next.optLong("at") <= in.optLong("at") - h.optLong("offset"))) continue;
             String name = r.optString("name");
             String body = in.optString("by").equals(r.optString("me")) ? fill(sw.optString("body"), "room", name) : fill(sw.optString("with"), "room", name, "name", r.getJSONObject("names").optString(in.optString("by")));
-            next = new JSONObject().put("id", in.optString("id")).put("at", in.optLong("at") - h.optLong("offset")).put("title", sw.optString("title")).put("body", body);
+            next = new JSONObject().put("id", in.optString("id")).put("room", roomId).put("at", in.optLong("at") - h.optLong("offset")).put("title", sw.optString("title")).put("body", body);
         }
         call(c, next, false);
     }
@@ -716,18 +719,77 @@ final class Shade {
     }
 
     // The new call's notification in one of its forms. Its button is the service's one write.
-    private static void announce(Context c, JSONObject cw, String room, String call, String title, String name, String time, boolean in, boolean failed) {
+    // `until`: a minute past the call's start, in this phone's time, when the call is over and the
+    // notification leaves by itself, heard of or not.
+    private static void announce(Context c, JSONObject cw, String room, String call, String title, String name, String time, long until, boolean in, boolean failed) {
         String[] f = form(cw, name, time, in, failed);
         Intent open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
         if (open != null) open.putExtra(OPEN, "room");
         NotificationCompat.Builder n = builder(c, "rooms", title, f[0], open, CALLED);
         Intent answer = new Intent(c, Receiver.class).setAction(Receiver.IN)
             .putExtra("room", room).putExtra("call", call).putExtra("in", !in)
-            .putExtra("title", title).putExtra("name", name).putExtra("time", time);
+            .putExtra("title", title).putExtra("name", name).putExtra("time", time).putExtra("until", until);
         n.addAction(new NotificationCompat.Action.Builder(0, f[1], PendingIntent.getBroadcast(c, room.hashCode(), answer, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT)).build());
         // Redrawn in place with new words: it buzzed once already.
         n.setOnlyAlertOnce(true);
+        n.setTimeoutAfter(Math.max(1, until - System.currentTimeMillis()));
         show(c, room, CALLED, n);
+    }
+
+    /** A call ends a minute after its start (protocol section 15). */
+    static final long MIN_MS = 60000;
+
+    /** Whether the new-call notification shown for `noted` must go: the room's call is now gone (null), another one, or over (`at`, this phone's time). */
+    static boolean dropsNote(String noted, String id, long at, long now) {
+        return noted != null && (id == null || !noted.equals(id) || at + MIN_MS <= now);
+    }
+
+    /** Whether the call alarm `held` is for this room's call and you are no longer in it: gone, another call, or out. */
+    static boolean dropsAlarm(JSONObject held, String room, String id, boolean in) {
+        return held != null && room.equals(held.optString("room")) && !(id != null && id.equals(held.optString("id")) && in);
+    }
+
+    /**
+     * A room's call as a room message now says it, from either feeder: the service's socket, or the
+     * page's (it forwards each message it hears live, never one it kept). A new-call notification
+     * for a call taken back, replaced or over leaves the shade; the alarm of a call of this room you
+     * are no longer in is taken off, or forgotten once its minute has come, as call() does.
+     */
+    static synchronized void ended(Context c, JSONObject m) {
+        JSONObject h = held(c);
+        String room = m.optString("room");
+        JSONObject call = m.optBoolean("gone") ? null : m.optJSONObject("call");
+        String id = call == null ? null : call.optString("id");
+        long now = System.currentTimeMillis();
+        String me = "";
+        JSONArray members = m.optJSONArray("members");
+        for (int i = 0; members != null && i < members.length(); i++) {
+            JSONObject member = members.optJSONObject(i);
+            if (member != null && member.optBoolean("you")) me = member.optString("id");
+        }
+        boolean in = call != null && call.optJSONArray("in") != null && call.optJSONArray("in").toString().contains(JSONObject.quote(me));
+        JSONObject rooms = h.optJSONObject("rooms");
+        JSONObject r = rooms == null ? null : rooms.optJSONObject(room);
+        boolean changed = false;
+        if (r != null && dropsNote(r.isNull("noted") ? null : r.optString("noted"), id, call == null ? 0 : call.optLong("at") - h.optLong("offset"), now)) {
+            NotificationManagerCompat.from(c).cancel(room, CALLED);
+            r.remove("noted");
+            changed = true;
+        }
+        JSONObject held = h.optJSONObject("call");
+        if (dropsAlarm(held, room, id, in)) {
+            try {
+                if (call(held, null, now, false) == OFF) {
+                    alarms(c).cancel(alarm(c, Receiver.CALL, CALL, null));
+                    NotificationManagerCompat.from(c).cancel(CALL);
+                }
+                h.put("call", JSONObject.NULL);
+            } catch (JSONException ignored) {
+                // put never throws for NULL.
+            }
+            changed = true;
+        }
+        if (changed) save(c);
     }
 
     static final int JOINED = 0;
@@ -757,7 +819,7 @@ final class Shade {
         String call = i.getStringExtra("call");
         boolean wanted = i.getBooleanExtra("in", true);
         if (cw == null || room == null || call == null) return;
-        announce(c, cw, room, call, i.getStringExtra("title"), i.getStringExtra("name"), i.getStringExtra("time"), ok == wanted, !ok);
+        announce(c, cw, room, call, i.getStringExtra("title"), i.getStringExtra("name"), i.getStringExtra("time"), i.getLongExtra("until", 0), ok == wanted, !ok);
         JSONObject rooms = h.optJSONObject("rooms");
         JSONObject r = rooms == null ? null : rooms.optJSONObject(room);
         if (!ok || r == null || !call.equals(r.optString("call"))) return;

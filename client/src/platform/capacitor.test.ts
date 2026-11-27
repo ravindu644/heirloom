@@ -88,6 +88,9 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     async preview(options) {
       sent.push(['preview', options]);
     },
+    async room(options) {
+      sent.push(['room', options]);
+    },
     async addListener(_event, heard) {
       tap = heard;
     },
@@ -388,7 +391,7 @@ describe('keeping step while closed', () => {
 });
 
 describe('a called lap, on the phone', () => {
-  const call = (inMs: number, body = 'Study club, with lina') => ({ id: 'c1', at: T0 + inMs + 0.3, title: 'The lap together starts', body });
+  const call = (inMs: number, body = 'Study club, with lina') => ({ id: 'c1', room: 'r_1', at: T0 + inMs + 0.3, title: 'The lap together starts', body });
   const calls = (sent: [string, any][]) => sent.filter(([what]) => what === 'call').map(([, o]) => o);
 
   it('goes to the native side in whole ms, once per change; nothing until main says', async () => {
@@ -399,6 +402,13 @@ describe('a called lap, on the phone', () => {
     notifier.call(null);
     await done();
     assert.deepEqual(calls(sent), [{ ...call(10 * MIN), at: T0 + 10 * MIN }, null]);
+  });
+
+  it('each room message the page hears goes to the phone, which ends a call taken back', async () => {
+    const { notifier, sent, done } = rig();
+    notifier.room({ type: 'room', room: 'r_1', call: null } as { type: 'room'; room: string });
+    await done();
+    assert.deepEqual(sent, [['room', { type: 'room', room: 'r_1', call: null }]]);
   });
 
   it('ring here off takes it off, on again sets it; coming back sends it again', async () => {

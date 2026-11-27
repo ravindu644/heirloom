@@ -34,6 +34,8 @@ export interface Countdown {
   keep(options: Keep | null): Promise<void>;
   background(): Promise<{ unrestricted: boolean }>;
   askUnrestricted(): Promise<void>;
+  /** A room message the page heard live: Shade.ended. */
+  room(options: { type: 'room'; room: string }): Promise<void>;
   /** One bell from Settings, played by the phone as a notification sounds. */
   preview(options: { sound: string }): Promise<void>;
   /** A tap on a button, from ActionActivity. One made while the app was away arrives when this is called. */
@@ -233,6 +235,9 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     },
     askUnrestricted() {
       run(() => countdown.askUnrestricted());
+    },
+    room(msg) {
+      run(() => countdown.room(msg));
     },
     preview(sound) {
       void countdown.preview({ sound }).catch(warn);

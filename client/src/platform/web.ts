@@ -249,6 +249,7 @@ export function createWebNotifier(env: WebEnv): Notifier {
     },
     background: async () => ({ unrestricted: true }),
     askUnrestricted() {},
+    room() {},
     preview: (sound) => env.preview?.(sound),
   };
 }

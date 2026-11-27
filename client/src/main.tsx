@@ -178,8 +178,12 @@ async function start() {
   effect(() => {
     const next = app.rooms.calledIn.value[0];
     const me = engine.account.value?.username;
-    notifier.call(next ? { id: next.call, at: next.at - (engine.now() - Date.now()), title: ring.callTitle, body: ring.callBody(next.name, next.by === me ? undefined : next.by) } : null);
+    notifier.call(next ? { id: next.call, room: next.room, at: next.at - (engine.now() - Date.now()), title: ring.callTitle, body: ring.callBody(next.name, next.by === me ? undefined : next.by) } : null);
   });
+
+  // Each room message as it is heard, so the phone takes off a called lap's notification and alarm
+  // once the call is taken back or over, whichever feeder heard it first.
+  engine.onRoom((msg) => msg.type === 'room' && notifier.room(msg));
 
   // The countdown's buttons do what the same buttons on Focus do: this page stays the one
   // writer of the timer, and a tap made while the app was away is done when it is back.

@@ -351,4 +351,26 @@ public class ShadeTest {
         assertArrayEquals(new int[] { 0, 0 }, Shade.bell(armed, r, T0, false));
         assertArrayEquals("another run's bell at the same moment", new int[] { 1, 1 }, Shade.bell(armed, ring(at, "Lap done.").put("answers", answers).put("actions", new JSONObject().put("run", "run-2")), T0, false));
     }
+
+    @Test
+    public void aCallsNotificationGoesWhenTheCallIsTakenBackReplacedOrOver() {
+        long at = T0 + 10 * MIN;
+        assertTrue("taken back: the room's call is gone", Shade.dropsNote("c1", null, 0, T0));
+        assertTrue("another call in its place", Shade.dropsNote("c1", "c2", at, T0));
+        assertFalse("still the same call, still to come", Shade.dropsNote("c1", "c1", at, T0));
+        assertFalse("at its minute it has only started", Shade.dropsNote("c1", "c1", at, at + 59000));
+        assertTrue("a minute past its start the call is over", Shade.dropsNote("c1", "c1", at, at + MIN));
+        assertFalse("nothing shown, nothing to take", Shade.dropsNote(null, null, 0, T0));
+    }
+
+    @Test
+    public void aCallAlarmGoesWhenThatRoomsCallIsNoLongerYours() throws Exception {
+        JSONObject held = call("c1", T0 + 10 * MIN).put("room", "r_1").put("from", "keep");
+        assertTrue("taken back, from either feeder, whoever set the alarm", Shade.dropsAlarm(held, "r_1", null, false));
+        assertTrue("another call", Shade.dropsAlarm(held, "r_1", "c2", true));
+        assertTrue("you said you are out", Shade.dropsAlarm(held, "r_1", "c1", false));
+        assertFalse("still in", Shade.dropsAlarm(held, "r_1", "c1", true));
+        assertFalse("another room's message says nothing of it", Shade.dropsAlarm(held, "r_2", null, false));
+        assertFalse(Shade.dropsAlarm(null, "r_1", null, false));
+    }
 }

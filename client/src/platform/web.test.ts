@@ -430,7 +430,7 @@ describe('habit reminders, in an open tab', () => {
 
 
 describe('a called lap, in an open tab', () => {
-  const call = (inMs: number, body = 'Study club, with lina') => ({ id: 'c1', at: T0 + inMs, title: 'The lap together starts', body });
+  const call = (inMs: number, body = 'Study club, with lina') => ({ id: 'c1', room: 'r_1', at: T0 + inMs, title: 'The lap together starts', body });
 
   it('out of sight, a notification at its minute; in view, nothing: the app starts the lap', () => {
     const hidden = rig({ hidden: true });

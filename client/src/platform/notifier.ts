@@ -56,6 +56,8 @@ export const isPaused = (plan: Ring | Paused | null): plan is Paused => plan !==
 export interface Call {
   /** The call's id: the page and the phone's background service may each say the same call. */
   id: string;
+  /** Its room: a room message that says the call is over takes its alarm off. */
+  room: string;
   at: number;
   title: string;
   body: string;
@@ -153,6 +155,12 @@ export interface Notifier {
   askUnrestricted(): void;
   /** Plays one bell once, from a tap in Settings: as a notification sounds, following the device's mode. */
   preview(sound: Sound): void;
+  /**
+   * A room message heard live from the server (protocol section 15), never one kept from before:
+   * the phone takes a called lap's notification and alarm off when the call is taken back, replaced
+   * or over. The browser has nothing of the kind.
+   */
+  room(msg: { type: 'room'; room: string }): void;
 }
 
 /**
