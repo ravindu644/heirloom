@@ -188,7 +188,7 @@ test('notes: B writes one, A sees "1" on Notes and not on the bottom bar; on a l
 
   await go(b.page, 'Room');
   await tab(b.page, 'Notes').click();
-  const field = b.page.getByLabel('A line for the room');
+  const field = b.page.getByLabel('Leave a note for the room');
   await field.fill('back at four');
   await field.press('Enter');
   await expect(b.page.getByRole('tabpanel')).toContainText('back at four');
