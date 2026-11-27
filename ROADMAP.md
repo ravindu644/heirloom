@@ -119,7 +119,7 @@ The first thing the user can touch: one timer, live on two screens.
 ## 8. Rewards and words
 
 - [x] [ui] Milestones with our own named tiers; within-estimate and best-week marks; all switchable
-- [ ] [ui] Sounds: a small set, licensed, under 200 KB in total
+- [x] [ui] Sounds: a small set, under 200 KB in total (section 27: drawn by tools/bells.mjs, so no licence)
 - [x] [ui] Settings screen complete: durations, auto-start, sounds, celebrations, ring here
 - [x] [lead] Copy pass over every string against the voice rules in DESIGN.md
 - [x] [design-review] Every screen, empty states included, at both sizes, light and dark
@@ -358,3 +358,12 @@ On the third build the user found no glitches; four things about how it reads an
 - [x] [qa] Each act on the web followed on the phone: screen off, forced Doze, swiped away, after a reboot (2026-11-27)
 - [ ] [qa] Two overnight battery runs, Wi-Fi and mobile data
 - [ ] Gate: the user lives with it for a day
+
+## 27. A bell you hear and feel, and notifications you can answer
+
+- [x] [lead] Three bells drawn by `tools/bells.mjs` (school, struck, chime; 55 KB); the `sound` enum; DESIGN's bell panel and answers; the phone's "I'm in" in protocol section 15
+- [ ] [core] `sound` read with its default; `vibrate` and `ringOnSilent` per device
+- [ ] [android] The phone plays and buzzes its own bell (alarm usage through Mute), a silent `bell` channel; Take five / Start the next lap / Done for now; I'm in and I'm out
+- [ ] [ui] The bell panel: the three sounds with a preview, Vibrate, Ring even on silent; the web plays the chosen file
+- [ ] [qa] The sound syncs and previews; on the phone on Mute: rings, buzzes, each switch off, each answer
+- [ ] Gate

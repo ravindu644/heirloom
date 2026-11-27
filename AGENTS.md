@@ -140,6 +140,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | `tools/style-check.mjs` | Fails on a colour, font name or duration literal in `client/src/ui/` |
 | `tools/design-audit.mjs` | Every demo state, built, in a browser at 412, 471 and 1440 against DESIGN.md: type, colour, shape, space, left edge, bearing, rhythm, touch, header, scroll |
 | `tools/budget.mjs` | Built JS, CSS, fonts and the server binary against ARCHITECTURE section 7 |
+| `tools/bells.mjs` | Draws the three bells and writes them to `client/public/sounds/` and the phone's `res/raw/` (needs ffmpeg) |
 | `tools/contracts-check.mjs` | Every cell, session and timer state in the fixtures against the schemas |
 
 ## Gotchas

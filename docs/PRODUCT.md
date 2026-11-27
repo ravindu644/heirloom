@@ -39,7 +39,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | A pomodoro can be for a task or for nothing in particular | Starting must not need planning |
 | Time left identical on every device, live; any device can pause or stop it | The user's first requirement |
 | Rings on time on the phone with the screen off; a live countdown in the notification | Focus To-Do users complained of timers dying in the background |
-| A bell at every phase change, and a choice of a few sounds | "The sound of the bell really does ping my brain" |
+| A bell at every phase change, and a choice of three sounds (an electric school bell, a struck bell, a soft chime); on the phone it buzzes too and rings through Mute like an alarm, each a switch; a bell's notification can start the break or the next lap, and a called lap's can say "I'm in" | "The sound of the bell really does ping my brain" |
 | Extend the current pomodoro by a few minutes | Focus To-Do added it in 2024; Cirillo prefers review, so it is a small button, not a habit |
 
 ### 2. Today (the plan)

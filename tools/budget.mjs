@@ -22,6 +22,8 @@ const rows = [
   ['fonts preloaded', (html.match(/<link\b[^>]*>/g) ?? []).filter((l) => /rel=["']?preload/.test(l) && /as=["']?font/.test(l)).length, 2],
   // DESIGN.md: five files, about 110 KB for the whole app.
   ['fonts, all files', sum('.woff2', raw), 115 * KB],
+  // PRODUCT: the bells, all three, small enough to ship in the app and the page.
+  ['bells, all files', sum('.ogg', raw), 200 * KB],
   ...(fs.existsSync(bin) ? [['server binary, arm64', raw(bin), 25 * KB * KB]] : []),
 ];
 

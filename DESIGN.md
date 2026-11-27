@@ -709,6 +709,19 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
+- **The bell** (Settings' bell panel, first): "The bell" over the three sounds as one row of
+  choices, "School bell" (the default), "Struck bell" and "Soft chime"; a tap picks one and plays
+  it once. Phone only, kept on each device, under "Ring on this phone": a switch "Vibrate" ("A
+  buzz with the bell: two long, one short.") and a switch "Ring even on silent" ("The bell plays
+  through Mute, like an alarm. Turn it off for class or the library."), both on. The buzz is 400
+  ms, a 200 ms rest, 400 ms, 200 ms, 150 ms. The phone plays the bell itself, as an alarm when
+  "Ring even on silent" is on, so a phone on Mute still rings; the bell's notification makes no
+  sound of its own.
+- **A bell you can answer:** after a lap, its notification holds "Take five" (the break's own
+  length, as Focus words it) and "Done for now"; after a break, "Start the next lap" and "Done
+  for now". A called lap's holds "I'm in"; once in, it reads "You're in. It starts at 15:00."
+  with "I'm out"; if the server cannot be reached, "Could not reach your server." and the button
+  stays.
 - **On the phone, while heirloom is closed** (the background service, ARCHITECTURE section 6):
   - Settings, in the bell's panel under "Ring on this phone", phone only: a switch "Ring when
     heirloom is closed", on by default, with the note "Keeps a quiet connection to your server,

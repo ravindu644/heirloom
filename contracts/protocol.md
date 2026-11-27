@@ -799,7 +799,9 @@ for a note; what is new is the device's own reckoning (the newest note it has sh
 server's. A device on a lap does not show them. The phone's background service notifies a note
 from someone else ("Lost puppies: sachi" over the line), after fetching its text; one that comes
 during your work lap waits until the lap ends, and nothing is notified while the app is open in
-front. It notifies a new call the moment it appears, from someone else: "lina calls a lap at 15:00".
+front. It notifies a new call the moment it appears, from someone else: "lina calls a lap at 15:00",
+with an "I'm in" button. That button is the service's one write: `POST /api/rooms/in` with the
+kept token and device, as the page would send it; it writes no cell.
 
 **Order.** A screen shows members on a lap first, then on a break, then the rest, each group by
 `week_ms` (most first, joining order on a tie). `ranked` true shows them by `week_ms` alone.

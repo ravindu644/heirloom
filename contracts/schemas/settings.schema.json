@@ -10,7 +10,7 @@
     "long_ms": { "type": "integer", "minimum": 1000, "maximum": 86400000, "default": 900000 },
     "auto_break": { "type": "boolean", "default": false, "description": "Start the break when a lap rings." },
     "auto_work": { "type": "boolean", "default": false, "description": "Start the next lap when a break rings." },
-    "sound": { "type": "string", "description": "Id of the bell. The set is pinned in roadmap section 8." },
+    "sound": { "type": "string", "enum": ["school", "struck", "chime"], "default": "school", "description": "The bell: an electric school bell, a struck bell, or a soft chime (tools/bells.mjs draws them). Any other value reads as school." },
     "celebrate": { "type": "boolean", "default": true },
     "day_target": { "type": "integer", "minimum": 0, "default": 0, "description": "Pomodoros a day. 0 is no target." },
     "share_task": { "type": "boolean", "default": false, "description": "Rooms may see the title of the task in progress." },
