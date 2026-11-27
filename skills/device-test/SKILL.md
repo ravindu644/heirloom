@@ -33,12 +33,14 @@ one into the repository.
 8. Leave the phone as you found it: uninstall test builds the user did not ask to keep, turn the
    screen back on, end any `adb` port forwards you opened.
 
-## The server container
-- Deploy only with `make deploy` (built in roadmap section 9): it cross-compiles for arm64, copies
-  the binary, and restarts the systemd unit. Never edit files on the container by hand.
-- Memory proof: `grep VmRSS /proc/$(pidof heirloomd)/status`, idle and under the simulator.
-- The container is shared with other services; do not install packages or open ports without
-  asking the user.
+## The server
+- Deploy only with `make deploy`: it asks the server for its CPU, builds for it, copies the
+  binary and runs install.sh. Never edit files on the server by hand.
+- Memory proof: `make server-rss`, idle and under the simulator.
+- It is reached from the internet only through the Cloudflare tunnel; do not install packages or
+  open ports without asking the user.
+- The tunnel's token lives in `/etc/cloudflared/token` on the server. Move it machine to machine
+  (`ssh old 'sudo tar -cf - ...' | ssh new 'sudo tar -xf -'`), never through the chat or a file here.
 
 ## Two devices at once
 The user's own phone plus a laptop browser is the real test of live sync. A second browser profile

@@ -114,13 +114,15 @@ bump:
 	@sed -i 's/^  "version": ".*",/  "version": "$(NEW)",/' package.json
 	@echo "[+] Version $$(node -p 'require("./package.json").version') set. Commit it, then tag v$(NEW) to release."
 
-# Puts the binary on the server and runs install.sh there with it, the same script a release
-# installs with. The sudo password goes from .local/ENV.md straight into ssh's stdin:
-# never in a variable, an argument or the log.
+# Builds for the server's own CPU (it is asked), puts the binary there and runs install.sh with
+# it, the same script a release installs with. A sudo password, if the server needs one, goes
+# from .local/ENV.md straight into ssh's stdin: never in a variable, an argument or the log.
 deploy: server
 	$(need-host)
-	scp install.sh server/bin/heirloomd-arm64 $(HOST):
-	@sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) 'cd && sudo -S -p "" env HEIRLOOMD_BINARY=heirloomd-arm64 sh install.sh'
+	@arch=$$(ssh $(HOST) uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+	(cd server && GOOS=linux GOARCH=$$arch $(GOBUILD) -o bin/heirloomd-$$arch ./cmd/heirloomd) && \
+	scp install.sh server/bin/heirloomd-$$arch $(HOST): && \
+	sed -n 's/^- Root via: sudo; password: *//p' .local/ENV.md | ssh $(HOST) "cd && sudo -S -p '' env HEIRLOOMD_BINARY=heirloomd-$$arch sh install.sh"
 
 # Memory of the running service on the real hardware.
 server-rss:
