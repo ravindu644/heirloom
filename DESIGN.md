@@ -242,6 +242,7 @@ motion:
   hold: 350ms
   rise: 8px
   lap-done: 700ms
+  cheer: 600ms
   set-done: 1200ms
   ease: cubic-bezier(0.2, 0, 0, 1)
 ---
@@ -602,11 +603,20 @@ Built once in `client/src/ui/kit/` and reused.
     (24px, a 2px `surface` ring) standing in their lane at the call's start.
     **Cheer** is a 40px round button with 🎉 at the end of the person's top line (`key` fill, a
     `hair` of `key-edge`, named "Cheer lina's lap" to a screen reader), there only while a lap of
-    theirs that rang is not yet cheered by you; once cheered it stays as a `you`-tint circle and
-    the line says who cheered. (The one emoji in the app, the user's choice over a "Cheer" link.)
+    theirs that rang is not yet cheered by you. A tap bursts it: the 🎉 breaks into six lap squares
+    in the heat colours that fly out a short way and fade (`cheer` 600ms), and the button is gone;
+    the line under their lane says "You cheered this lap." (The one emoji in the app, the user's
+    choice over a "Cheer" link. It once stayed as a tinted circle after the tap, doing nothing.)
+    **A cheer arriving:** the first time the one cheered opens People after it (a device's own
+    reckoning, as for notes), six lap squares leave the cheerer's circle and fly to their own
+    circle (`cheer` 600ms, one cheer after another when there are several), and then "sachi cheered
+    your last lap." fades in on their own panel. Once per cheer, never again on that device.
+    Reduced motion: no squares, the words only.
     **A tap on a panel** (anywhere but Cheer) opens that person's report.
-  - **A person's report** takes the room's place, on every size, with Back (secondary) first at
-    the top left; the phone's back gesture does the same. The call strip and the bottom bar stay.
+  - **A person's report** takes the room's place, on every size. Its top line is their circle,
+    name and phase at the left and "Back" at the right end, the same link Settings has beside its
+    heading; the phone's back gesture does the same. (It was a big secondary button above the
+    circle, which the user found heavy.) The call strip and the bottom bar stay.
     Their circle (56px), name, phase and time left. **Today:** minutes and laps in figures, and
     their day on the same hours and lane, from the hour of their first lap to the hour after now,
     at least six hours ("No laps yet today." when there are none), and their task only if they
@@ -618,7 +628,7 @@ Built once in `client/src/ui/kit/` and reused.
     laptop, while a call is open: "15:00 lina calls a lap" over "Starts in 7:42. lina is in.",
     and "I'm in" as the screen's one primary button ("I'm out" in quiet once you are). When it
     starts, People opens with "lina and you started together at 15:00." The bar that says what the last tap did rises above the strip.
-  - **Notes:** the field "A line for the room" first, then "Kept for a week. Notes fold away while
+  - **Notes:** the field "Leave a note for the room" first (it was "A line for the room", which a friend could not place), then "Kept for a week. Notes fold away while
     you are on a lap.", then the notes, newest first: the circle (24px), the name and time in
     `label`, the line in `body`. On a lap the panel says only "2 new notes. They open when this
     lap ends, at 15:25."
@@ -837,6 +847,7 @@ found none of this and called it the one thing that makes the rest feel finished
 | A sheet or menu | `sheet` 200ms | It slides `rise` and more from the bottom on a phone, fades and rises on a laptop; its scrim fades |
 | What the last tap did | `sheet` 200ms | Rises `rise` in, fades out |
 | The timer | none | Digits change; nothing animates |
+| A cheer sent, a cheer arriving | `cheer` 600ms | Six lap squares in the heat colours: from the 🎉 outwards and fading as it goes; or from the cheerer's circle to yours, then the words. Never loops; reduced motion shows the end state |
 | A lap done | `lap-done` 700ms | Your bar runs to meet the ghost's line, the split chip turns over, then the words. Tap anywhere to skip |
 | A task's laps all in | `set-done` 1200ms | The bar stands tall and its segments light in turn over two thirds of it, when the lap just done is the task's last estimated one. Skippable, once per task |
 
