@@ -23,7 +23,14 @@ one into the repository.
 4. Permission state: `adb shell appops get <applicationId> SCHEDULE_EXACT_ALARM` and check
    `USE_EXACT_ALARM` is in the merged manifest (`aapt dump permissions`).
 5. Logs: `adb logcat -d | grep -i <tag>`; WebView console with `chrome://inspect` from the laptop.
-6. Leave the phone as you found it: uninstall test builds the user did not ask to keep, turn the
+6. `dumpsys notification` lists the live notifications under "Notification List:" and, further
+   down, an archive of removed ones in the same format: read only the first section, or a removed
+   countdown looks live (a watcher did this on 2026-11-27). The same holds for `dumpsys alarm`:
+   pending alarms are in the batches, the rest is history.
+7. Forced Doze: `dumpsys battery unplug` then `dumpsys deviceidle force-idle`; undo with
+   `dumpsys deviceidle unforce` and `dumpsys battery reset`. After `adb reboot`, BOOT_COMPLETED
+   arrives only after the first unlock, and USB debugging may need allowing again.
+8. Leave the phone as you found it: uninstall test builds the user did not ask to keep, turn the
    screen back on, end any `adb` port forwards you opened.
 
 ## The server container
