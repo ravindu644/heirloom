@@ -42,3 +42,18 @@ sudo -u heirloomd cp /var/lib/heirloomd/backups/heirloom-YYYY-MM-DD.db /var/lib/
 sudo rm -f /var/lib/heirloomd/heirloom.db-wal /var/lib/heirloomd/heirloom.db-shm
 sudo systemctl start heirloomd
 ```
+
+## Moving to another machine
+
+Install it on the new machine first, then carry the whole data directory across while both are
+stopped, so no edit lands on the old one after the copy:
+
+```
+old$ sudo systemctl disable --now heirloomd
+new$ sudo systemctl stop heirloomd
+old$ sudo tar -C /var/lib/heirloomd -cf - . | ssh new 'sudo tar -C /var/lib/heirloomd -xpf - && sudo chown -R heirloomd:heirloomd /var/lib/heirloomd'
+new$ sudo systemctl start heirloomd
+```
+
+Then point your tunnel or proxy at the new machine. Phones and browsers keep their edits while
+the server is away and send them when it is back at the same address.
