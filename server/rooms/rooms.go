@@ -69,6 +69,7 @@ type Message struct {
 	Streak     RoomStreak `json:"streak"`
 	Call       *Call      `json:"call"`
 	NotesSince *string    `json:"notes_since"`
+	NotesRead  int64      `json:"notes_read"` // the viewer's account's, server ms
 }
 
 // RoomStreak is section 8 over the room's days, and how the last 14 of them went, today last.
@@ -144,9 +145,9 @@ type totals struct {
 	last      *Session // the latest lap that rang today
 	days      [7]int64 // this week's focus by local day, Monday first
 	lastDays  [7]int64
-	lastWeek  []Session       // last week's counted laps, to be cut at this moment of it
-	rang      map[string]bool // the local days with a work lap that rang, since from
-	laps      [][2]int64      // today's, oldest first, the newest maxLaps
+	lastWeek  []Session       // last week's counted parts of laps, to be cut at this moment of it
+	rang      map[string]bool // the local days a work lap rang on, since from
+	laps      [][2]int64      // those touching today, oldest first, the newest maxLaps
 }
 
 // Service's SQLite calls take no context, for the reason sync.Store gives. No method
@@ -512,7 +513,7 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 		t      totals
 		Member
 	}
-	rows, err := s.db.Query(`select a.id, a.public_id, a.username, a.utc_offset_min, a.picture_hash, m.joined
+	rows, err := s.db.Query(`select a.id, a.public_id, a.username, a.utc_offset_min, a.picture_hash, m.joined, m.notes_read
 		from member m join account a on a.id = m.account where m.room = ? order by m.id`, room)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read members: %w", err)
@@ -521,11 +522,15 @@ func (s *Service) Message(room, viewer int64) (*Message, int64, error) {
 	in := false
 	for rows.Next() {
 		var p who
-		if err := rows.Scan(&p.id, &p.ID, &p.Name, &p.offset, &p.Picture, &p.joined); err != nil {
+		var read int64
+		if err := rows.Scan(&p.id, &p.ID, &p.Name, &p.offset, &p.Picture, &p.joined, &read); err != nil {
 			rows.Close()
 			return nil, 0, fmt.Errorf("read members: %w", err)
 		}
 		p.You = p.id == viewer
+		if p.You {
+			m.NotesRead = read
+		}
 		in = in || p.You
 		people = append(people, p)
 	}
@@ -676,8 +681,11 @@ func (s *Service) fill(m *Member, room, account int64, t totals, midnight, now i
 	p := watch(state, now)
 	m.Phase, m.SetIndex, m.EndsAt, m.Paused, m.Laps = p.phase, p.setIndex, p.endsAt, p.paused, t.laps
 	if p.phase == "work" {
-		// Read by the same offset as the totals, so a lap is never in both or in neither.
-		m.Run = &Run{p.ranMs, localDay(p.started, t.offset) == t.day, weekOf(p.started, t.offset) == weekOf(now, t.offset)}
+		// Only its part since the member's midnight: the part before it is yesterday's, and
+		// lands there with the row. A lap in progress ends today, so it is today's and this
+		// week's; and the totals hold only rows, so it is never in both.
+		// ponytail: until the row comes, the part before midnight is in neither.
+		m.Run = &Run{max(0, p.from+p.ranMs-max(p.from, startOfDay(now, t.offset))), true, true}
 	}
 	change = midnight
 	if p.endsAt != nil {
@@ -751,13 +759,15 @@ func (s *Service) count(account int64, offsetMin int, now, from int64) (totals, 
 	if t, ok := s.totals[account]; ok && t.day == day && t.offset == offsetMin && t.from <= from {
 		return t, dayStart + dayMs, nil
 	}
-	rows, err := s.cells.Sessions(account, from, monday+7*dayMs)
+	// Rows are found by started: a day earlier finds a lap that ran over a midnight from it.
+	// ponytail: a lap paused for more than a day before it ran on is missed.
+	rows, err := s.cells.Sessions(account, from-dayMs, monday+7*dayMs)
 	if err != nil {
 		return totals{}, 0, err
 	}
 	s.counts++
 	t := totals{offset: offsetMin, day: day, from: from, rang: map[string]bool{}}
-	var week []Session
+	var recent []Session // what touches last week or this one
 	for id, fields := range rows {
 		// A row that is missing a field, or holds a shape this build does not know, is not counted.
 		object, _ := json.Marshal(fields)
@@ -765,34 +775,38 @@ func (s *Service) count(account int64, offsetMin int, now, from int64) (totals, 
 		if len(fields) != 5 || json.Unmarshal(object, &session) != nil || !session.counts() {
 			continue
 		}
-		switch {
-		case session.Started >= monday:
-			week = append(week, session)
-		case session.Started >= monday-7*dayMs:
-			t.lastWeek = append(t.lastWeek, session)
+		if session.Ended > monday-7*dayMs {
+			recent = append(recent, session)
+		}
+		// Last week's part of a lap, cut to last week, so it can be cut again at this
+		// moment of it: a lap over Monday's midnight gives each week its own minutes.
+		if from, to := max(session.from(), monday-7*dayMs), min(session.Ended, monday); from < to {
+			t.lastWeek = append(t.lastWeek, Session{Kind: session.Kind, Started: from, Ended: to, Outcome: session.Outcome, Device: session.Device})
 		}
 		if session.Outcome == "rang" {
-			t.rang[localDay(session.Started, offsetMin)] = true
+			t.rang[lapDay(session, offsetMin)] = true
 		}
 	}
-	this, _ := Stats(week, offsetMin)
-	last, _ := Stats(t.lastWeek, offsetMin)
+	// One count for both weeks: each day is read by its own date, so a lap over Monday's
+	// midnight puts each part in its own week.
+	counted, _ := Stats(recent, offsetMin)
 	for d := range 7 {
-		t.days[d] = this[midnight.AddDate(0, 0, d-weekday).Format(time.DateOnly)].FocusMs
-		t.lastDays[d] = last[midnight.AddDate(0, 0, d-weekday-7).Format(time.DateOnly)].FocusMs
+		t.days[d] = counted[midnight.AddDate(0, 0, d-weekday).Format(time.DateOnly)].FocusMs
+		t.lastDays[d] = counted[midnight.AddDate(0, 0, d-weekday-7).Format(time.DateOnly)].FocusMs
 		t.weekMs += t.days[d]
 	}
-	t.todayMs, t.todayLaps = this[day].FocusMs, this[day].Laps
+	t.todayMs, t.todayLaps = counted[day].FocusMs, counted[day].Laps
 	t.laps = [][2]int64{}
-	for _, session := range week {
-		if session.Kind == "work" && localDay(session.Started, offsetMin) == day {
+	for _, session := range recent {
+		// Every lap that touches today, one begun before its midnight too.
+		if session.Ended >= dayStart {
 			t.laps = append(t.laps, [2]int64{session.Started, session.Ended})
 		}
 	}
 	slices.SortFunc(t.laps, func(a, b [2]int64) int { return cmp.Or(cmp.Compare(a[0], b[0]), cmp.Compare(a[1], b[1])) })
 	t.laps = t.laps[max(0, len(t.laps)-maxLaps):]
-	for _, session := range week {
-		rang := session.Outcome == "rang" && localDay(session.Started, offsetMin) == day
+	for _, session := range recent {
+		rang := session.Outcome == "rang" && lapDay(session, offsetMin) == day
 		if rang && (t.last == nil || session.Ended > t.last.Ended || session.Ended == t.last.Ended && session.ID > t.last.ID) {
 			t.last = &session
 		}

@@ -273,6 +273,13 @@ func newAPI(db *sql.DB, now func() time.Time, sqliteVersion string, app http.Han
 		notes, err := together.Notes(account, req.Room)
 		return map[string][]rooms.Note{"notes": notes}, 0, err
 	})
+	answer("rooms/read", func(account int64, req roomRequest) (any, int64, error) {
+		if req.At == nil {
+			return nil, 0, auth.ErrBadRequest
+		}
+		id, err := together.Read(account, req.Room, *req.At)
+		return struct{}{}, id, err
+	})
 	answer("rooms/call", func(account int64, req roomRequest) (any, int64, error) {
 		call, id, err := together.Call(account, req.Room, req.At)
 		if call == "" {

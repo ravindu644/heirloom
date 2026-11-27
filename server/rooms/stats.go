@@ -38,27 +38,46 @@ func localDay(ms int64, offsetMin int) string {
 	return time.UnixMilli(ms + int64(offsetMin)*60000).UTC().Format(time.DateOnly)
 }
 
-// Stats counts sessions by the local day each started in, and lists the pairs that ran
-// on two devices at once.
+// startOfDay is the start of the local day ms falls in, for someone offsetMin minutes east
+// of UTC. An offset is fixed, so every day is dayMs long.
+func startOfDay(ms int64, offsetMin int) int64 {
+	off := int64(offsetMin) * 60000
+	return (ms+off)/dayMs*dayMs - off
+}
+
+// lapDay is the local day a lap belongs to: the day its bell rang, or it was stopped.
+func lapDay(s Session, offsetMin int) string { return localDay(s.Ended, offsetMin) }
+
+// Stats counts each session's minutes in the local days they ran in, cut at midnight, and
+// the lap itself on its lapDay. It lists the pairs that ran on two devices at once.
 func Stats(sessions []Session, offsetMin int) (days map[string]Day, overlaps [][2]string) {
 	counted := slices.DeleteFunc(slices.Clone(sessions), func(s Session) bool { return !s.counts() })
 	slices.SortFunc(counted, func(a, b Session) int { return cmp.Compare(a.from(), b.from()) })
 
-	// Walking a day's laps by start, each adds only what reaches past everything before it.
+	// Walking a day's parts by start, each adds only what reaches past everything before
+	// it. A part starts at the later of its lap's start and the day's midnight, so walking
+	// laps by start walks every day's parts by start too.
 	days, reach := map[string]Day{}, map[string]int64{}
 	for _, s := range counted {
-		day := localDay(s.Started, offsetMin)
-		d := days[day]
-		if _, begun := reach[day]; !begun {
-			reach[day] = s.from()
+		// A row can say anything, and the walk is a step a day: an ended years ahead would
+		// hold every room. ponytail: no lap runs a week, so only its last week is walked.
+		for at := max(s.from(), s.Ended-7*dayMs); at < s.Ended; {
+			day, to := localDay(at, offsetMin), min(s.Ended, startOfDay(at, offsetMin)+dayMs)
+			// A part another device's lap already covered adds nothing, and makes no day.
+			if part := to - max(reach[day], at); part > 0 {
+				d := days[day]
+				d.FocusMs += part
+				days[day] = d
+			}
+			reach[day] = max(reach[day], to)
+			at = to
 		}
-		d.FocusMs += max(0, s.Ended-max(reach[day], s.from()))
-		reach[day] = max(reach[day], s.Ended)
 		// Every counted session is a lap: one that was stopped is a lap that ended early.
 		// What is earned by the bell (a cheer, the lap a room shows as the last) is asked
 		// for by outcome where it is decided, not here.
+		d := days[lapDay(s, offsetMin)]
 		d.Laps++
-		days[day] = d
+		days[lapDay(s, offsetMin)] = d
 	}
 
 	overlaps = [][2]string{}
@@ -115,8 +134,8 @@ type presence struct {
 	endsAt   *int64
 	paused   bool
 	task     *string // the id of the task a lap is for, not its title
-	started  int64
-	ranMs    int64 // how far it had run at now, its pauses left out
+	from     int64   // where its counted interval begins: its start, after its pauses
+	ranMs    int64   // how far it had run at now, its pauses left out
 }
 
 // watch reads a timer cell at now. Nothing running, or a run whose bell has gone, is
@@ -126,7 +145,7 @@ func watch(state json.RawMessage, now int64) presence {
 	if !running {
 		return presence{phase: "idle", setIndex: t.SetIndex}
 	}
-	p := presence{phase: t.Phase, setIndex: t.SetIndex, task: t.Task, started: *t.Started}
+	p := presence{phase: t.Phase, setIndex: t.SetIndex, task: t.Task, from: *t.Started + t.PausedMs}
 	end, set := t.Ends()
 	if !set {
 		// Held where the pause began. Never past the plan: a lap paused after its bell rang.
@@ -140,12 +159,6 @@ func watch(state json.RawMessage, now int64) presence {
 	p.endsAt = &end
 	p.ranMs = max(0, now-*t.Started-t.PausedMs)
 	return p
-}
-
-// weekOf is the Monday, 2026-11-23, of the week ms falls in for someone offsetMin minutes east of UTC.
-func weekOf(ms int64, offsetMin int) string {
-	day := time.UnixMilli(ms + int64(offsetMin)*60000).UTC()
-	return day.AddDate(0, 0, -(int(day.Weekday())+6)%7).Format(time.DateOnly)
 }
 
 // A set has four laps. Anything else in the cell is not passed on to a room.

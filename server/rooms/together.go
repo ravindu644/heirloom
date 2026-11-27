@@ -112,6 +112,27 @@ func (s *Service) Notes(account int64, public string) ([]Note, error) {
 	return notes, rows.Err()
 }
 
+// Read marks the room's notes up to at as read on every device of the account. It only
+// moves forward, and never past now: a device with a fast clock cannot read tomorrow's
+// notes today. It returns the room when the mark moved, so its devices are told at once.
+func (s *Service) Read(account int64, public string, at int64) (room int64, err error) {
+	if at < 0 {
+		return 0, auth.ErrBadRequest
+	}
+	if room, err = find(s.db, account, public); err != nil {
+		return 0, err
+	}
+	at = min(at, s.now().UnixMilli())
+	res, err := s.db.Exec("update member set notes_read = ? where room = ? and account = ? and notes_read < ?", at, room, account, at)
+	if err != nil {
+		return 0, fmt.Errorf("mark notes read: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return 0, nil
+	}
+	return room, nil
+}
+
 // openCall is the room's call that still stands, if any.
 func openCall(q interface {
 	QueryRow(string, ...any) *sql.Row

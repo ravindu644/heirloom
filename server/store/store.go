@@ -239,6 +239,9 @@ create table call_in (
 	account integer not null references account (id),
 	unique (call, account)
 ) strict;
+`, `
+-- How far an account has read a room's notes, server ms: read on one device, read on all.
+alter table member add column notes_read integer not null default 0;
 `}
 
 func migrate(db *sql.DB) error {

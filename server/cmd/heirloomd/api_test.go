@@ -197,6 +197,7 @@ type msg struct {
 	Streak     rooms.RoomStreak
 	Call       *rooms.Call
 	NotesSince *string  `json:"notes_since"`
+	NotesRead  int64    `json:"notes_read"`
 	Rooms      []string // in a welcome
 	Role       string   // in a welcome, and the whole of a role message
 	raw        string

@@ -94,6 +94,52 @@ func TestNotesOverHTTP(t *testing.T) {
 	}
 }
 
+// Notes read on one device are read on every device of the account, and only there.
+func TestNotesReadOnEveryDevice(t *testing.T) {
+	w := start(t)
+	ravi, sachi := w.person("ravi", phone, 330), w.person("sachi", laptop, 330)
+	room, _ := together(t, "Notes", ravi, sachi)
+	tab := &person{w: w, session: w.signIn("ravi", tablet), id: tablet, offset: 330} // ravi's second device
+	tab.connect()
+	sachi.ask("note", map[string]any{"room": room, "text": "Chapter 4 done"}).ok(t, "a note")
+	drain(ravi, sachi, tab)
+	at := w.ms.Load()
+	w.pass(time.Minute)
+
+	ravi.ask("read", map[string]any{"room": room, "at": at}).ok(t, "read")
+	for _, d := range []*person{ravi, tab} {
+		if m := d.room(); m.NotesRead != at {
+			t.Errorf("ravi's %s: notes_read %d, want %d", d.id, m.NotesRead, at)
+		}
+	}
+	sachi.still("ravi read the notes, not sachi")
+	if m := look(sachi); m.NotesRead != 0 {
+		t.Errorf("sachi's notes_read = %d, want 0: ravi read them, she did not", m.NotesRead)
+	}
+
+	ravi.ask("read", map[string]any{"room": room, "at": at - 1}).ok(t, "reading an older note")
+	ravi.ask("read", map[string]any{"room": room, "at": at}).ok(t, "reading the same again")
+	tab.still("the mark only moves forward")
+
+	// A fast clock cannot read ahead: the mark stops at now.
+	now := w.ms.Load()
+	tab.ask("read", map[string]any{"room": room, "at": now + 3_600_000}).ok(t, "read ahead")
+	if m := ravi.room(); m.NotesRead != now {
+		t.Errorf("read an hour ahead: notes_read %d, want now, %d", m.NotesRead, now)
+	}
+	drain(ravi, sachi, tab)
+
+	for what, at := range map[string]any{"no at": nil, "a negative at": -1, "not a number": "soon"} {
+		fields := map[string]any{"room": room}
+		if at != nil {
+			fields["at"] = at
+		}
+		ravi.ask("read", fields).refused(t, what, 400, "bad_request")
+	}
+	ravi.still("every one of those was refused")
+	ravi.ask("read", map[string]any{"room": "made-up-room", "at": now}).refused(t, "a room ravi is not in", 404, "room")
+}
+
 func TestThirtyNotesADay(t *testing.T) {
 	w := start(t)
 	ravi, sachi := w.person("ravi", phone, 0), w.person("sachi", laptop, 0)
@@ -313,7 +359,7 @@ func TestRoomsAreNotRevealedToOutsiders(t *testing.T) {
 	ravi, sachi, nimal := w.person("ravi", phone, 0), w.person("sachi", laptop, 0), w.person("nimal", tablet, 0)
 	room, _ := together(t, "Private", ravi, sachi)
 	call := ravi.ask("call", map[string]any{"room": room, "at": w.wholeMinute() + 60000}).ok(t, "call").Call
-	for _, path := range []string{"note", "notes", "call", "in", "remove", "update", "cheer", "leave"} {
+	for _, path := range []string{"note", "notes", "read", "call", "in", "remove", "update", "cheer", "leave"} {
 		fields := func(r string) map[string]any {
 			return map[string]any{"room": r, "text": "hi", "at": w.ms.Load() + 120000, "call": call, "in": true, "member": sachi.Account, "name": "Mine", "to": sachi.Account, "run": "x"}
 		}

@@ -398,16 +398,21 @@ func TestRunIsTheLapInProgress(t *testing.T) {
 	w.now = wednesday.Add(6 * time.Minute)
 	sees("resumed", &Run{Ms: 720000, Today: true, Week: true})
 
-	// Begun at 23:50 on Tuesday in Colombo, read at 00:10 on Wednesday: not today's, this week's.
+	// Begun at 23:50 on Tuesday in Colombo, read at 00:10 on Wednesday: it will end today,
+	// and today has its ten minutes since midnight. The ten before are Tuesday's, with the row.
 	tuesday := time.Date(2026, 11, 24, 18, 20, 0, 0, time.UTC)
 	w.now = tuesday.Add(20 * time.Minute)
 	timer("work", tuesday, nil, 0)
-	sees("over midnight", &Run{Ms: 1200000, Today: false, Week: true})
-	// Begun at 23:50 on Sunday, read at 00:10 on Monday: last week's, and not this one's.
+	sees("over midnight", &Run{Ms: 600000, Today: true, Week: true})
+	// Paused at 23:55 and still paused after midnight: nothing of it ran today yet.
+	pausedAt := tuesday.Add(5 * time.Minute)
+	timer("work", tuesday, &pausedAt, 0)
+	sees("paused over midnight", &Run{Ms: 0, Today: true, Week: true})
+	// Begun at 23:50 on Sunday, read at 00:10 on Monday: Monday's part is this week's.
 	sunday := time.Date(2026, 11, 22, 18, 20, 0, 0, time.UTC)
 	w.now = sunday.Add(20 * time.Minute)
 	timer("work", sunday, nil, 0)
-	sees("over the week's turn", &Run{Ms: 1200000, Today: false, Week: false})
+	sees("over the week's turn", &Run{Ms: 600000, Today: true, Week: true})
 
 	w.now = wednesday
 	timer("work", wednesday.Add(-25*time.Minute), nil, 0)
@@ -421,4 +426,65 @@ func TestRunIsTheLapInProgress(t *testing.T) {
 	timer("work", wednesday.Add(-14*time.Minute), nil, 0)
 	w.push(t, ravi, map[[3]string]any{{"settings", "current", "rooms_hidden"}: true})
 	sees("away", nil)
+}
+
+// A lap's minutes are cut at the member's midnight and the lap is the day's it rang on.
+// In Colombo (+05:30): one from 23:46 on Tuesday to 00:32 on Wednesday, one over this
+// week's turn, and one over last week's, read at 10:00 on Wednesday.
+func TestALapOverMidnight(t *testing.T) {
+	w := newWorld(t)
+	ravi, sachi := w.account(t, "ravi", 330), w.account(t, "sachi", 330)
+	_, room, err := w.Create(ravi, "Sachi and me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := w.Join(sachi, w.message(t, room, ravi).Code); err != nil {
+		t.Fatal(err)
+	}
+	colombo := time.FixedZone("Colombo", 330*60)
+	at := func(day, hour, minute int) time.Time { return time.Date(2026, 11, day, hour, minute, 0, 0, colombo) }
+	laps := map[[3]string]any{}
+	for run, span := range map[string][2]time.Time{
+		"tue-wed":    {at(24, 23, 46), at(25, 0, 32)},
+		"sun-mon":    {at(22, 23, 40), at(23, 0, 10)},
+		"sun-mon-15": {at(15, 23, 40), at(16, 0, 10)}, // begun before last week did
+	} {
+		lap(laps, run, span[0])
+		laps[[3]string{"session", run, "ended"}] = span[1].UnixMilli()
+	}
+	w.push(t, ravi, laps)
+
+	minutes := func(n int64) int64 { return n * 60000 }
+	got := w.message(t, room, sachi).Members[0]
+	if got.TodayMs != minutes(32) || got.TodayLaps != 1 {
+		t.Errorf("today = %d ms, %d laps; want its 32 minutes since midnight and the lap", got.TodayMs, got.TodayLaps)
+	}
+	if want := [][2]int64{{at(24, 23, 46).UnixMilli(), at(25, 0, 32).UnixMilli()}}; !reflect.DeepEqual(got.Laps, want) {
+		t.Errorf("laps = %v, want the one begun before midnight: %v", got.Laps, want)
+	}
+	if got.Last == nil || got.Last.Run != "tue-wed" {
+		t.Errorf("last = %+v, want the lap that rang after midnight", got.Last)
+	}
+	if want := [7]int64{minutes(10), minutes(14), minutes(32)}; got.Days != want {
+		t.Errorf("days = %v, want %v: each part on its own day", got.Days, want)
+	}
+	if got.WeekMs != minutes(56) {
+		t.Errorf("week = %d ms, want 56 minutes: Sunday's 20 are last week's", got.WeekMs)
+	}
+	if want := [7]int64{minutes(10), 0, 0, 0, 0, 0, minutes(20)}; got.LastDays != want {
+		t.Errorf("last days = %v, want %v", got.LastDays, want)
+	}
+	if got.LastAtMs != minutes(10) {
+		t.Errorf("last week at this time = %d ms, want 10 minutes: not the Sunday before it", got.LastAtMs)
+	}
+	// A room's day is kept by a lap that rang on it: Wednesday, not Tuesday.
+	if got := w.message(t, room, sachi).Streak.Marks; got[13] != "open" {
+		t.Errorf("today's mark = %s: sachi has rung nothing", got[13])
+	}
+	sachiLap := map[[3]string]any{}
+	lap(sachiLap, "s1", at(25, 8, 0))
+	w.push(t, sachi, sachiLap)
+	if got := w.message(t, room, sachi).Streak; got.Marks[13] != "kept" || got.Marks[12] == "kept" {
+		t.Errorf("marks = %v, want today kept by ravi's lap that rang after midnight, and Tuesday not", got.Marks)
+	}
 }
