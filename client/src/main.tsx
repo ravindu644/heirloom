@@ -7,7 +7,7 @@ import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
 import { FirstRun } from './ui/welcome.tsx';
 import { planFor } from './plan.ts';
-import { clock, result, ring } from './ui/strings.ts';
+import { clock, result, ring, room } from './ui/strings.ts';
 
 const root = document.getElementById('app')!;
 
@@ -57,8 +57,13 @@ async function start() {
       break: ring.breakOver,
     };
   };
+  // The bell's first answer by the lap's place in its set: the fourth earns the long break.
+  const answerBreaks = () => {
+    const breaks = focus.lengthsFor(focus.state.peek().task);
+    return laps.map((n) => ring.answerBreak(n === 4 ? breaks.long_ms : breaks.short_ms));
+  };
   const notifier = await startPlatform(
-    { ring: ring.bellChannel, countdown: ring.countdownChannel, remind: ring.remindChannel },
+    { countdown: ring.countdownChannel, remind: ring.remindChannel },
     {
       request: (path, body) => engine.request(path, body),
       remembered: () => engine.kept('push'),
@@ -93,23 +98,27 @@ async function start() {
   effect(() => {
     const link = engine.link.value;
     const on = settings.keepInStep.value && settings.ringHere.value;
+    const ringing = { sound: settings.all.value.sound, vibrate: settings.vibrate.value, silent: settings.ringOnSilent.value };
     void breaks.value;
     notifier.keep(
       link && {
         ...link,
         cursor: engine.cursor(),
         on,
+        ringing,
+        auto: { break: settings.all.value.auto_break, work: settings.all.value.auto_work },
         words: {
           bell: bellWords(),
           during: { work: ring.lapElsewhere, short: ring.breakRunning(false), long: ring.breakRunning(true) },
           actions: { pause: ring.pause, resume: ring.resume, stop: ring.stop, done: ring.breakStop },
+          answer: { break: answerBreaks(), next: ring.startNext, rest: ring.breakStop },
           // The service fills in the time left, as the clock reads it.
           left: ring.paused(0).replace(clock(0), '{t}'),
           note: { title: ring.noteTitle, body: ring.noteBody },
-          call: { title: ring.calledTitle, body: ring.calledBody },
+          call: { title: ring.calledTitle, body: ring.calledBody, in: room.imIn, out: room.imOut, youre: ring.youreIn, unreached: ring.unreached },
           starts: { title: ring.callTitle, body: ring.callBody('{room}'), with: ring.callBody('{room}', '{name}') },
           keeping: ring.keeping,
-          channels: { keep: ring.keepChannel, rooms: ring.roomsChannel },
+          channels: { keep: ring.keepChannel, rooms: ring.roomsChannel, bell: ring.bellChannel },
         },
       },
     );
@@ -150,6 +159,14 @@ async function start() {
     // The distance to the server's clock is smoothed at every ping, so the same bell works out
     // a few ms apart from one run of this to the next. An alarm is not set again for that.
     if (plan && !isPaused(plan)) {
+      // The bell's answers (DESIGN.md): the break this lap earned or the next lap, and done for now.
+      // With an automatic start the next phase begins by itself at the bell: only "Done for now",
+      // which stops it (heldTaps matches the run that follows).
+      const lengths = focus.lengthsFor(state.task);
+      const set = settings.all.value;
+      const auto = state.phase === 'work' ? set.auto_break : state.phase === 'short' && set.auto_work;
+      const first = state.phase === 'work' ? { act: 'break' as const, label: ring.answerBreak(view.next.phase === 'long' ? lengths.long_ms : lengths.short_ms) } : { act: 'next' as const, label: ring.startNext };
+      plan.answers = [...(auto ? [] : [first]), { act: 'rest', label: ring.breakStop }];
       const bell = `${state.run} ${view.ends_at}`;
       if (held.bell === bell && Math.abs(plan.at - held.at) < STEADY_MS) plan.at = held.at;
       else held = { bell, at: plan.at };
@@ -171,7 +188,15 @@ async function start() {
   const taps = heldTaps(
     () => focus.state.peek().run,
     () => engine.sync.peek() === 'in-step',
-    (act) => (act === 'pause' ? focus.pause() : act === 'resume' ? focus.resume() : focus.stop()),
+    // The bell's answers do what Focus's buttons at the bell do: the break it earned, the next lap
+    // on Today's next task, or done for now.
+    (act) => {
+      if (act === 'pause') focus.pause();
+      else if (act === 'resume') focus.resume();
+      else if (act === 'break') focus.start();
+      else if (act === 'next') focus.start(app.today.next.peek()?.id ?? null);
+      else focus.stop();
+    },
   );
   notifier.onAction(taps.tap);
   effect(() => {
@@ -191,7 +216,7 @@ async function start() {
 
   // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
   // The phone app's WebView is not trusted to save a file; Settings sends that to the browser.
-  render(<App {...app} focus={asking} onReminderSet={allow} canSave={!APP} server={server} ringBlocked={ringBlocked} mayStop={mayStop} letRun={() => notifier.askUnrestricted()} />, root);
+  render(<App {...app} focus={asking} onReminderSet={allow} canSave={!APP} server={server} ringBlocked={ringBlocked} mayStop={mayStop} letRun={() => notifier.askUnrestricted()} preview={(sound) => notifier.preview(sound)} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

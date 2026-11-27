@@ -2,6 +2,7 @@ package io.github.ravindu644.heirloom;
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
@@ -48,6 +49,10 @@ final class Shade {
     static final int CALLED = 7404;
     static final int KEEP = 7405;
     static final String OPEN = "io.github.ravindu644.heirloom.OPEN";
+    /** Which bell's notification an answer came from, so it leaves the shade. */
+    static final String BELL_ID = "io.github.ravindu644.heirloom.BELL_ID";
+    /** Channels an earlier build made and this one no longer posts on. */
+    static final String[] GONE = { "ring" };
 
     /** The app is on screen: nothing room-related shows, the screen already says it. From MainActivity. */
     static volatile boolean front;
@@ -118,6 +123,11 @@ final class Shade {
      * is ahead of this phone's; `now` is this phone's.
      */
     static JSONObject ringFor(JSONObject s, JSONObject w, long now, long offset) throws JSONException {
+        return ringFor(s, w, now, offset, null);
+    }
+
+    /** `auto`: settings.auto_break and auto_work, { break, work }, from keep(). */
+    static JSONObject ringFor(JSONObject s, JSONObject w, long now, long offset, JSONObject auto) throws JSONException {
         if (s == null || w == null) return null;
         String phase = s.optString("phase", "idle");
         if ("idle".equals(phase)) return null;
@@ -141,7 +151,22 @@ final class Shade {
             .put("title", work ? b.getJSONArray("lap").optString(i) : b.optString("break"))
             .put("body", (work ? b.getJSONArray("take") : b.getJSONArray("next")).optString(i))
             .put("during", during)
-            .put("actions", actions);
+            .put("actions", actions)
+            .put("answers", answers(w.optJSONObject("answer"), work, i, auto != null && (work ? auto.optBoolean("break") : "short".equals(phase) && auto.optBoolean("work"))));
+    }
+
+    /**
+     * The bell's answers (DESIGN.md, "A bell you can answer"), from the templates: after a lap, the
+     * break by its own length and "Done for now"; after a break, the next lap and "Done for now".
+     */
+    static JSONArray answers(JSONObject a, boolean work, int set, boolean auto) throws JSONException {
+        JSONArray out = new JSONArray();
+        if (a == null) return out;
+        // The next phase starts by itself at this bell: only "Done for now", which stops it.
+        if (auto) return out.put(new JSONObject().put("act", "rest").put("label", a.optString("rest")));
+        if (work) out.put(new JSONObject().put("act", "break").put("label", a.getJSONArray("break").optString(set)));
+        else out.put(new JSONObject().put("act", "next").put("label", a.optString("next")));
+        return out.put(new JSONObject().put("act", "rest").put("label", a.optString("rest")));
     }
 
     /**
@@ -162,11 +187,23 @@ final class Shade {
         int id = given.optInt("id", BELL);
         if (off) return new int[] { id, 0 };
         boolean coming = given.optLong("at") - now >= MOMENT_MS;
-        if (ring != null && coming && given.optLong("at") == ring.optLong("at") && given.optString("title").equals(ring.optString("title")) && given.optString("body").equals(ring.optString("body"))) {
+        if (ring != null && coming && sameBell(given, ring)) {
             return new int[] { 0, 0 };
         }
         if (coming) return new int[] { id, ring == null ? 0 : id };
         return new int[] { 0, ring == null ? 0 : other(id) };
+    }
+
+    // The same bell: its time, its words, its answers and the run they answer. An alarm armed by an
+    // earlier build, with no answers, is armed again with them.
+    private static boolean sameBell(JSONObject given, JSONObject ring) {
+        JSONObject actions = ring.optJSONObject("actions");
+        Object run = actions == null ? null : actions.opt("run");
+        return given.optLong("at") == ring.optLong("at")
+            && given.optString("title").equals(ring.optString("title"))
+            && given.optString("body").equals(ring.optString("body"))
+            && String.valueOf(ring.optJSONArray("answers")).equals(String.valueOf(given.optJSONArray("answers")))
+            && String.valueOf(run == JSONObject.NULL ? null : run).equals(String.valueOf(given.isNull("run") ? null : given.opt("run")));
     }
 
     static int other(int id) {
@@ -272,7 +309,7 @@ final class Shade {
     static synchronized void heard(Context c, String stamp, JSONObject state) {
         JSONObject h = held(c);
         try {
-            offer(c, stamp, state, ringFor(state, h.optJSONObject("words"), System.currentTimeMillis(), h.optLong("offset")), false);
+            offer(c, stamp, state, ringFor(state, h.optJSONObject("words"), System.currentTimeMillis(), h.optLong("offset"), h.optJSONObject("auto")), false);
         } catch (JSONException ignored) {
             // Templates missing a part: nothing is drawn from them.
         }
@@ -291,7 +328,9 @@ final class Shade {
             h.put("bell", JSONObject.NULL);
         }
         if (d[1] != 0) {
-            JSONObject b = new JSONObject().put("id", d[1]).put("at", rings.optLong("at")).put("title", rings.optString("title")).put("body", rings.optString("body"));
+            JSONObject actions = rings.optJSONObject("actions");
+            JSONObject b = new JSONObject().put("id", d[1]).put("at", rings.optLong("at")).put("title", rings.optString("title")).put("body", rings.optString("body"))
+                .put("answers", orNull(rings.optJSONArray("answers"))).put("run", actions == null ? JSONObject.NULL : actions.opt("run"));
             set = exact(c, alarm(c, Receiver.BELL, d[1], b), b.optLong("at"));
             if (set) h.put("bell", b);
         }
@@ -343,7 +382,7 @@ final class Shade {
         }
         if (k != null) {
             try {
-                for (String key : new String[] { "server", "account", "token", "device", "on", "words" }) h.put(key, k.opt(key));
+                for (String key : new String[] { "server", "account", "token", "device", "on", "words", "ringing", "auto" }) h.put(key, k.opt(key));
                 // The page's cursor only starts a fresh one: after that the service reads on from its own.
                 if (h.optLong("cursor") == 0) h.put("cursor", k.optLong("cursor"));
                 // With the service off, nothing but the page will ever take a call back.
@@ -367,7 +406,18 @@ final class Shade {
         for (int id : new int[] { BELL, other(BELL), COUNTDOWN, PAUSED, CALL }) nm.cancel(id);
         JSONObject rooms = h.optJSONObject("rooms");
         if (rooms != null) for (Iterator<String> it = rooms.keys(); it.hasNext(); ) quiet(c, it.next());
-        held = new JSONObject();
+        held = wiped(h);
+    }
+
+    /** What survives a wipe: how this phone rings is the phone's, not the account's. */
+    static JSONObject wiped(JSONObject h) {
+        JSONObject out = new JSONObject();
+        try {
+            if (h.optJSONObject("ringing") != null) out.put("ringing", h.optJSONObject("ringing"));
+        } catch (JSONException ignored) {
+            // put never throws for an object.
+        }
+        return out;
     }
 
     /** The server said `bye token`: the service stops for good, the alarms stay. A sign-in sends a new token. */
@@ -490,11 +540,13 @@ final class Shade {
                 JSONObject w = h.optJSONObject("words");
                 JSONObject cw = w == null ? null : w.optJSONObject("call");
                 if (cw != null && !front) {
-                    String title = fill(cw.optString("title"), "name", names.optString(call.optString("by")), "time", wall(call.optLong("at") - h.optLong("offset")));
-                    notify(c, id, CALLED, title, fill(cw.optString("body"), "room", name));
+                    String time = wall(call.optLong("at") - h.optLong("offset"));
+                    String title = fill(cw.optString("title"), "name", names.optString(call.optString("by")), "time", time);
+                    announce(c, cw, id, callId, title, name, time, false, false);
                 }
             }
             r.put("call", callId == null ? JSONObject.NULL : callId);
+            if (call != null) r.put("at", call.optLong("at")).put("by", call.optString("by"));
             boolean in = call != null && call.optJSONArray("in") != null && call.optJSONArray("in").toString().contains(JSONObject.quote(me));
             r.put("in", in ? new JSONObject().put("id", callId).put("at", call.optLong("at")).put("by", call.optString("by")) : JSONObject.NULL);
             String since = m.isNull("notes_since") ? null : m.optString("notes_since");
@@ -556,11 +608,41 @@ final class Shade {
     }
 
     /** The bell's alarm: show it, and the notes that waited for the lap's end. */
-    static synchronized void rang(Context c, Intent i) {
-        post(c, null, i.getIntExtra("id", BELL), "ring", i.getStringExtra("title"), i.getStringExtra("body"), null);
+    static synchronized void rang(Context c, Intent i, BroadcastReceiver.PendingResult hold) {
         JSONObject h = held(c);
+        channels(c, h.optJSONObject("words"));
+        int id = i.getIntExtra("id", BELL);
+        NotificationCompat.Builder n = builder(c, "bell", i.getStringExtra("title"), i.getStringExtra("body"), null, id);
+        // Swiped away: the bell stops with it.
+        n.setDeleteIntent(PendingIntent.getBroadcast(c, Receiver.HUSH.hashCode(), new Intent(c, Receiver.class).setAction(Receiver.HUSH), PendingIntent.FLAG_IMMUTABLE));
+        n.setPriority(NotificationCompat.PRIORITY_HIGH);
+        String run = i.getStringExtra("run");
+        try {
+            JSONArray answers = new JSONArray(i.getStringExtra("answers") == null ? "[]" : i.getStringExtra("answers"));
+            for (int k = 0; k < answers.length(); k++) {
+                JSONObject a = answers.getJSONObject(k);
+                n.addAction(button(c, a.optString("act"), a.optString("label"), run, id));
+            }
+        } catch (JSONException ignored) {
+            // No answers: the bell still rings.
+        }
+        show(c, null, id, n);
+        Bell.ring(c, h.optJSONObject("ringing"), hold);
         flush(c, h);
         save(c);
+    }
+
+    // A button that carries an act to the page through ActionActivity, as the countdown's do.
+    static NotificationCompat.Action button(Context c, String act, String label, String run, int bell) {
+        Intent intent = new Intent(c, ActionActivity.class).putExtra(CountdownPlugin.ACT, act).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (run != null) intent.putExtra(CountdownPlugin.RUN, run);
+        if (bell != 0) intent.putExtra(BELL_ID, bell);
+        // One request code per act and notification, with FLAG_UPDATE_CURRENT: an older countdown's
+        // button carries the newest run, which is right with one countdown; the page drops a run not
+        // its own. The bell's two ids each have their own, so an answer clears its own bell.
+        int code = COUNTDOWN + 10 + 10 * bell + java.util.Arrays.asList("pause", "resume", "stop", "break", "next", "rest").indexOf(act);
+        PendingIntent pending = PendingIntent.getActivity(c, code, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        return new NotificationCompat.Action.Builder(0, label, pending).build();
     }
 
     private static void flush(Context c, JSONObject h) {
@@ -599,22 +681,94 @@ final class Shade {
     }
 
     private static void post(Context c, String tag, int id, String channel, String title, String body, Intent open) {
+        show(c, tag, id, builder(c, channel, title, body, open, id));
+    }
+
+    private static NotificationCompat.Builder builder(Context c, String channel, String title, String body, Intent open, int code) {
         if (open == null) open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
-        PendingIntent tap = PendingIntent.getActivity(c, id, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        NotificationCompat.Builder n = new NotificationCompat.Builder(c, channel)
+        PendingIntent tap = PendingIntent.getActivity(c, code, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        return new NotificationCompat.Builder(c, channel)
             .setSmallIcon(R.drawable.ic_stat_heirloom)
             .setColor(ContextCompat.getColor(c, R.color.you))
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
-            .setPriority("ring".equals(channel) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(tap);
+    }
+
+    private static void show(Context c, String tag, int id, NotificationCompat.Builder n) {
         try {
             NotificationManagerCompat.from(c).notify(tag, id, n.build());
         } catch (SecurityException e) {
             // Notifications refused since: nothing to show it with.
         }
+    }
+
+    /**
+     * A new call's text and button (DESIGN.md, "A bell you can answer"): the room's name with
+     * "I'm in"; once in, "You're in. It starts at 15:00." with "I'm out"; after a try that did not
+     * reach the server, "Could not reach your server." with the button it had. {text, label}.
+     */
+    static String[] form(JSONObject cw, String room, String time, boolean in, boolean failed) {
+        String text = failed ? cw.optString("unreached") : in ? fill(cw.optString("youre"), "time", time) : fill(cw.optString("body"), "room", room);
+        return new String[] { text, in ? cw.optString("out") : cw.optString("in") };
+    }
+
+    // The new call's notification in one of its forms. Its button is the service's one write.
+    private static void announce(Context c, JSONObject cw, String room, String call, String title, String name, String time, boolean in, boolean failed) {
+        String[] f = form(cw, name, time, in, failed);
+        Intent open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
+        if (open != null) open.putExtra(OPEN, "room");
+        NotificationCompat.Builder n = builder(c, "rooms", title, f[0], open, CALLED);
+        Intent answer = new Intent(c, Receiver.class).setAction(Receiver.IN)
+            .putExtra("room", room).putExtra("call", call).putExtra("in", !in)
+            .putExtra("title", title).putExtra("name", name).putExtra("time", time);
+        n.addAction(new NotificationCompat.Action.Builder(0, f[1], PendingIntent.getBroadcast(c, room.hashCode(), answer, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT)).build());
+        // Redrawn in place with new words: it buzzed once already.
+        n.setOnlyAlertOnce(true);
+        show(c, room, CALLED, n);
+    }
+
+    static final int JOINED = 0;
+    static final int UNREACHED = 1;
+    static final int OVER = 2;
+
+    /** What came of "I'm in": JOINED on a 2xx; UNREACHED with no answer (null); OVER on any refusal, a 404 `call` most of all: the call has started or was taken back. */
+    static int outcome(Integer status) {
+        if (status == null) return UNREACHED;
+        return status >= 200 && status < 300 ? JOINED : OVER;
+    }
+
+    /** "I'm in" or "I'm out" was tapped, and the server answered `status`, or nothing (null). */
+    static synchronized void answered(Context c, Intent i, Integer status) {
+        int outcome = outcome(status);
+        String tag = i.getStringExtra("room");
+        // The call is over or will not have you: its notification has nothing left to offer.
+        if (outcome == OVER) {
+            if (tag != null) NotificationManagerCompat.from(c).cancel(tag, CALLED);
+            return;
+        }
+        boolean ok = outcome == JOINED;
+        JSONObject h = held(c);
+        JSONObject w = h.optJSONObject("words");
+        JSONObject cw = w == null ? null : w.optJSONObject("call");
+        String room = i.getStringExtra("room");
+        String call = i.getStringExtra("call");
+        boolean wanted = i.getBooleanExtra("in", true);
+        if (cw == null || room == null || call == null) return;
+        announce(c, cw, room, call, i.getStringExtra("title"), i.getStringExtra("name"), i.getStringExtra("time"), ok == wanted, !ok);
+        JSONObject rooms = h.optJSONObject("rooms");
+        JSONObject r = rooms == null ? null : rooms.optJSONObject(room);
+        if (!ok || r == null || !call.equals(r.optString("call"))) return;
+        try {
+            // The server will say the same in the room's next message; the alarm need not wait for it.
+            r.put("in", wanted ? new JSONObject().put("id", call).put("at", r.optLong("at")).put("by", r.optString("by")) : JSONObject.NULL);
+            calls(c, h);
+        } catch (JSONException ignored) {
+            // put never throws for these values.
+        }
+        save(c);
     }
 
     private static void quiet(Context c, String room) {
@@ -635,6 +789,11 @@ final class Shade {
         NotificationManagerCompat nm = NotificationManagerCompat.from(c);
         nm.createNotificationChannel(new NotificationChannelCompat.Builder("keep", NotificationManagerCompat.IMPORTANCE_MIN).setName(names == null ? app : names.optString("keep", app)).setShowBadge(false).build());
         nm.createNotificationChannel(new NotificationChannelCompat.Builder("rooms", NotificationManagerCompat.IMPORTANCE_DEFAULT).setName(names == null ? app : names.optString("rooms", app)).build());
+        // High, to show over the lock screen and as a heads-up, and silent: Bell plays the sound and
+        // the buzz itself, so "Ring even on silent" can come through Mute.
+        nm.createNotificationChannel(new NotificationChannelCompat.Builder("bell", NotificationManagerCompat.IMPORTANCE_HIGH).setName(names == null ? app : names.optString("bell", app))
+            .setSound(null, null).setVibrationEnabled(false).build());
+        for (String gone : GONE) nm.deleteNotificationChannel(gone);
     }
 
     // The countdown: running, a live countdown Android draws itself to `at` and takes away at the
@@ -662,17 +821,7 @@ final class Shade {
         JSONObject actions = ring.optJSONObject("actions");
         if (actions != null) {
             String run = actions.isNull("run") ? null : actions.optString("run");
-            for (String act : running ? new String[] { "pause", "stop" } : new String[] { "resume", "stop" }) {
-                // An activity, not a broadcast: from Android 12 a receiver started by a notification may
-                // not open the app, and when the app is gone, opening it is the only way the tap is done.
-                Intent intent = new Intent(c, ActionActivity.class).putExtra(CountdownPlugin.ACT, act).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                if (run != null) intent.putExtra(CountdownPlugin.RUN, run);
-                // One request code per act, with FLAG_UPDATE_CURRENT: an older notification's button carries
-                // the newest run, which is right with one countdown; the page drops a run not its own.
-                int code = COUNTDOWN + 10 + ("pause".equals(act) ? 0 : "resume".equals(act) ? 1 : 2);
-                PendingIntent pending = PendingIntent.getActivity(c, code, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                builder.addAction(new NotificationCompat.Action.Builder(0, actions.optString(act), pending).build());
-            }
+            for (String act : running ? new String[] { "pause", "stop" } : new String[] { "resume", "stop" }) builder.addAction(button(c, act, actions.optString(act), run, 0));
         }
         NotificationManagerCompat nm = NotificationManagerCompat.from(c);
         try {
@@ -700,6 +849,8 @@ final class Shade {
     private static PendingIntent alarm(Context c, String action, int id, JSONObject words) {
         Intent i = new Intent(c, Receiver.class).setAction(action).putExtra("id", id);
         if (words != null) i.putExtra("title", words.optString("title")).putExtra("body", words.optString("body"));
+        if (words != null && words.optJSONArray("answers") != null) i.putExtra("answers", words.optJSONArray("answers").toString());
+        if (words != null && !words.isNull("run")) i.putExtra("run", words.optString("run"));
         return PendingIntent.getBroadcast(c, id, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 

@@ -43,6 +43,9 @@ public class ShadeTest {
         + "\"break\":\"Break over.\"},"
         + "\"during\":{\"work\":\"A lap\",\"short\":\"Short break\",\"long\":\"Long break\"},"
         + "\"actions\":{\"pause\":\"Pause\",\"resume\":\"Resume\",\"stop\":\"Stop\",\"done\":\"Done for now\"},"
+        + "\"answer\":{\"break\":[\"Take five\",\"Take five\",\"Take five\",\"Take 15 minutes\"],\"next\":\"Start the next lap\",\"rest\":\"Done for now\"},"
+        + "\"call\":{\"title\":\"{name} calls a lap at {time}\",\"body\":\"{room}\",\"in\":\"I'm in\",\"out\":\"I'm out\","
+        + "\"youre\":\"You're in. It starts at {time}.\",\"unreached\":\"Could not reach your server.\"},"
         + "\"left\":\"Paused, {t} left\"}");
 
     private static JSONObject lap(long started, int set) throws Exception {
@@ -264,5 +267,88 @@ public class ShadeTest {
         assertEquals(400, Shade.smooth(null, 400));
         assertEquals(500, Shade.smooth(400L, 800));
         assertEquals(9000, Shade.smooth(400L, 9000));
+    }
+
+    @Test
+    public void aLapsBellOffersItsBreakAndABreaksBellTheNextLapBothWithDoneForNow() throws Exception {
+        JSONArray lap = Shade.ringFor(lap(T0, 3), WORDS, T0, 0).getJSONArray("answers");
+        assertEquals("break", lap.getJSONObject(0).getString("act"));
+        assertEquals("the fourth lap earns the long break", "Take 15 minutes", lap.getJSONObject(0).getString("label"));
+        assertEquals("rest", lap.getJSONObject(1).getString("act"));
+        assertEquals("Done for now", lap.getJSONObject(1).getString("label"));
+        JSONObject brk = lap(T0, 1).put("phase", "short").put("planned_ms", 5 * MIN);
+        JSONArray after = Shade.ringFor(brk, WORDS, T0, 0).getJSONArray("answers");
+        assertEquals("next", after.getJSONObject(0).getString("act"));
+        assertEquals("Start the next lap", after.getJSONObject(0).getString("label"));
+        assertEquals("rest", after.getJSONObject(1).getString("act"));
+        assertEquals("no templates: no answers, the bell still rings", 0, Shade.answers(null, true, 0, false).length());
+    }
+
+    @Test
+    public void theBellRingsAsAnAlarmOnSilentAndFollowsThePhonesModeOtherwise() throws Exception {
+        assertEquals(android.media.AudioAttributes.USAGE_ALARM, Bell.usage(Bell.silent(null)));
+        assertEquals(android.media.AudioAttributes.USAGE_ALARM, Bell.usage(Bell.silent(json("{\"silent\":true}"))));
+        assertEquals(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT, Bell.usage(Bell.silent(json("{\"silent\":false}"))));
+        assertTrue("on unless switched off", Bell.buzzes(null));
+        assertTrue(Bell.buzzes(json("{\"sound\":\"chime\"}")));
+        assertFalse(Bell.buzzes(json("{\"vibrate\":false}")));
+        assertArrayEquals("two long, one short", new long[] { 0, 400, 200, 400, 200, 150 }, Bell.BUZZ);
+    }
+
+    @Test
+    public void aCalledLapsNotificationAfterImInAndAfterAFailedTry() throws Exception {
+        JSONObject cw = WORDS.getJSONObject("call");
+        assertArrayEquals(new String[] { "Sachi and me", "I'm in" }, Shade.form(cw, "Sachi and me", "15:00", false, false));
+        assertArrayEquals("in: the time, and the way out", new String[] { "You're in. It starts at 15:00.", "I'm out" }, Shade.form(cw, "Sachi and me", "15:00", true, false));
+        assertArrayEquals("not reached: the button stays", new String[] { "Could not reach your server.", "I'm in" }, Shade.form(cw, "Sachi and me", "15:00", false, true));
+        assertArrayEquals(new String[] { "Could not reach your server.", "I'm out" }, Shade.form(cw, "Sachi and me", "15:00", true, true));
+    }
+
+    @Test
+    public void theOldRingChannelIsDeleted() {
+        assertTrue(java.util.Arrays.asList(Shade.GONE).contains("ring"));
+    }
+
+    @Test
+    public void aBellWhoseNextPhaseStartsByItselfOffersOnlyDoneForNow() throws Exception {
+        JSONObject both = json("{\"break\":true,\"work\":true}");
+        JSONArray lap = Shade.ringFor(lap(T0, 0), WORDS, T0, 0, both).getJSONArray("answers");
+        assertEquals(1, lap.length());
+        assertEquals("rest", lap.getJSONObject(0).getString("act"));
+        JSONObject shortBreak = lap(T0, 1).put("phase", "short").put("planned_ms", 5 * MIN);
+        assertEquals(1, Shade.ringFor(shortBreak, WORDS, T0, 0, both).getJSONArray("answers").length());
+        JSONObject longBreak = lap(T0, 3).put("phase", "long").put("planned_ms", 15 * MIN);
+        assertEquals("a long break never chains into the next set", 2, Shade.ringFor(longBreak, WORDS, T0, 0, both).getJSONArray("answers").length());
+        assertEquals("auto_break alone leaves a break's bell as it was", 2, Shade.ringFor(shortBreak, WORDS, T0, 0, json("{\"break\":true,\"work\":false}")).getJSONArray("answers").length());
+    }
+
+    @Test
+    public void iAmInSaysUnreachedOnlyWhenNothingAnsweredAndDropsACallThatIsOver() {
+        assertEquals(Shade.JOINED, Shade.outcome(200));
+        assertEquals(Shade.UNREACHED, Shade.outcome(null));
+        assertEquals("404 call: it has started or was taken back", Shade.OVER, Shade.outcome(404));
+        assertEquals(Shade.OVER, Shade.outcome(500));
+    }
+
+    @Test
+    public void howThePhoneRingsOutlivesAWipe() throws Exception {
+        JSONObject h = json("{\"token\":\"t\",\"stamp\":\"s\",\"ringing\":{\"sound\":\"chime\",\"vibrate\":false,\"silent\":false}}");
+        JSONObject after = Shade.wiped(h);
+        assertEquals("chime", after.getJSONObject("ringing").getString("sound"));
+        assertFalse(after.has("token"));
+        assertFalse(after.has("stamp"));
+        assertEquals(0, Shade.wiped(new JSONObject()).length());
+    }
+
+    @Test
+    public void aBellArmedWithoutItsAnswersIsArmedAgainWithThem() throws Exception {
+        long at = T0 + 25 * MIN;
+        JSONArray answers = new JSONArray("[{\"act\":\"break\",\"label\":\"Take five\"},{\"act\":\"rest\",\"label\":\"Done for now\"}]");
+        JSONObject r = ring(at, "Lap done.").put("answers", answers).put("actions", new JSONObject().put("run", "run-1"));
+        JSONObject old = given(1, at, "Lap done.");
+        assertArrayEquals("armed by an earlier build", new int[] { 1, 1 }, Shade.bell(old, r, T0, false));
+        JSONObject armed = given(1, at, "Lap done.").put("answers", answers).put("run", "run-1");
+        assertArrayEquals(new int[] { 0, 0 }, Shade.bell(armed, r, T0, false));
+        assertArrayEquals("another run's bell at the same moment", new int[] { 1, 1 }, Shade.bell(armed, ring(at, "Lap done.").put("answers", answers).put("actions", new JSONObject().put("run", "run-2")), T0, false));
     }
 }

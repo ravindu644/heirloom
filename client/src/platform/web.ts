@@ -19,6 +19,7 @@
 //   page rings by itself if it looks first and the bell is under LATE_MS old.
 
 import { MOMENT_MS, isPaused } from './notifier.ts';
+import type { Sound } from '../sync/settings.ts';
 import type { Call, Notifier, Ring } from './notifier.ts';
 import { createPush } from './push.ts';
 import { upcoming } from './reminders.ts';
@@ -45,6 +46,10 @@ export interface WebEnv {
   /** Runs `look` each time the page comes back into view. */
   onShow(look: () => void): void;
   bell(): void;
+  /** The bell `bell()` rings from now on: settings.sound, from keep(). */
+  choose?(sound: Sound): void;
+  /** Plays one of the bells once, from Settings. */
+  preview?(sound: Sound): void;
   /** Missing where the browser has no notifications. */
   Notification?: NotificationApi;
   /** Web Push, where the page has a service worker and a server to ask. */
@@ -238,9 +243,13 @@ export function createWebNotifier(env: WebEnv): Notifier {
     // No Notification API at all still rings: the bell sounds while the page is open.
     canRing: async () => env.Notification?.permission !== 'denied',
     // A closed tab is reached by Web Push, not by a connection of its own, and no browser stops it to save battery.
-    keep() {},
+    // A browser keeps no connection of its own while closed; it only takes the bell chosen.
+    keep(link) {
+      if (link) env.choose?.(link.ringing.sound);
+    },
     background: async () => ({ unrestricted: true }),
     askUnrestricted() {},
+    preview: (sound) => env.preview?.(sound),
   };
 }
 
@@ -252,7 +261,14 @@ export function timer(run: () => void, ms: number): () => void {
 
 /** The bell in this page. The first tap or key anywhere unlocks it. */
 function pageBell(): Bell {
-  const bell = createBell(() => new AudioContext());
+  const bell = createBell(
+    () => new AudioContext(),
+    async (sound) => {
+      const res = await fetch(`/sounds/${sound}.ogg`);
+      if (!res.ok) throw new Error(`no bell ${sound}`);
+      return res.arrayBuffer();
+    },
+  );
   // Every gesture, not just the first: unlock is cheap once running, and it revives a context the
   // system suspended. pointerup, not pointerdown: a touch's pointerdown does not count as a gesture.
   for (const type of ['pointerup', 'keydown']) addEventListener(type, bell.unlock, { capture: true, passive: true });
@@ -281,12 +297,16 @@ async function manager() {
 
 /** The app's notifier in the browser. Without `from` it rings only while the page is open. */
 export function webNotifier(from?: PushFrom): Notifier {
+  const bell = pageBell();
   return createWebNotifier({
     now: () => Date.now(),
     schedule: timer,
     hidden: () => document.hidden,
     onShow: whenVisible(document),
-    bell: pageBell().play,
+    bell: bell.play,
+    choose: bell.choose,
+    // The file the server carries (client/public/sounds). A tap played it, so the browser allows it.
+    preview: (sound) => void new Audio(`/sounds/${sound}.ogg`).play().catch(() => {}),
     Notification: typeof Notification === 'undefined' ? undefined : Notification,
     push: from && {
       ...from,

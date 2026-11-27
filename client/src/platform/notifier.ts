@@ -2,6 +2,8 @@
 // past it to a plugin, so "ring here" and the phone's exact alarm stay in one place.
 
 import type { TimerState } from '../core/timer.ts';
+import { AUTO_SUFFIX } from '../sync/focus.ts';
+import type { Sound } from '../sync/settings.ts';
 import type { Reminder } from './reminders.ts';
 
 /** What to ring and when. `at` is this device's own clock, in ms. The words come from the caller. */
@@ -17,10 +19,15 @@ export interface Ring {
   push?: { run: string; at: number };
   /** The countdown's buttons, worded by the caller. While it runs the phone shows Pause and Stop. */
   actions?: Actions;
+  /** The bell's own buttons, in order (DESIGN.md, "A bell you can answer"). The phone shows them. */
+  answers?: { act: Answer; label: string }[];
 }
 
+/** What the bell's buttons answer: start the break, start the next lap, or be done for now. */
+export type Answer = 'break' | 'next' | 'rest';
+
 /** A tap on one of the countdown's buttons. */
-export type Act = 'pause' | 'resume' | 'stop';
+export type Act = 'pause' | 'resume' | 'stop' | Answer;
 
 /** The words on the countdown's buttons, and the timer's run they are drawn for. */
 export interface Actions {
@@ -72,16 +79,18 @@ export interface Words {
   during: { work: string; short: string; long: string };
   /** The countdown's buttons; `done` ends a break. */
   actions: { pause: string; resume: string; stop: string; done: string };
+  /** The bell's answers: the break by the lap's place in its set (0 to 3), the next lap, done for now. */
+  answer: { break: string[]; next: string; rest: string };
   /** A paused phase: "Paused, {t} left". */
   left: string;
   note: { title: string; body: string };
-  /** A new call from someone else. */
-  call: { title: string; body: string };
+  /** A new call from someone else, its button, and its text once in or when the server could not be reached. */
+  call: { title: string; body: string; in: string; out: string; youre: string; unreached: string };
   /** The alarm of a call you are in: `body` for your own call, `with` for someone else's. */
   starts: { title: string; body: string; with: string };
   /** The service's own notification. */
   keeping: string;
-  channels: { keep: string; rooms: string };
+  channels: { keep: string; rooms: string; bell: string };
 }
 
 /** What the phone's background service needs to keep step. `on`: its switch and Ring here, together. */
@@ -93,6 +102,10 @@ export interface Keep {
   cursor: number;
   on: boolean;
   words: Words;
+  /** How the phone rings: the sound, the buzz, and whether it comes through Mute as an alarm. */
+  ringing: { sound: Sound; vibrate: boolean; silent: boolean };
+  /** settings.auto_break and auto_work: a bell that starts the next phase by itself offers only "Done for now". */
+  auto: { break: boolean; work: boolean };
 }
 
 /** A plan closer than this to now is a phase already ending, such as a tap on finish: no bell. */
@@ -138,6 +151,8 @@ export interface Notifier {
   background(): Promise<{ unrestricted: boolean }>;
   /** Opens the platform's own request to let heirloom run unrestricted. Call it from a tap. */
   askUnrestricted(): void;
+  /** Plays one bell once, from a tap in Settings: as a notification sounds, following the device's mode. */
+  preview(sound: Sound): void;
 }
 
 /**
@@ -145,14 +160,19 @@ export interface Notifier {
  * not hold may be for a lap the phone's service drew while the app was closed, which the page has
  * not caught up to yet: it waits until the page has caught up, and is done then if the run is the
  * timer's, else dropped (a notification left over from an earlier run). Call `look` whenever the
- * timer or the catching up changes.
+ * timer or the catching up changes. "Done for now" on a bell whose next phase started by itself
+ * stops that phase: its run is the bell's with FOLLOWS after it.
  */
+/** What an automatic start adds to the run that rang. */
+export const FOLLOWS = AUTO_SUFFIX;
+
 export function heldTaps(run: () => string | null, caughtUp: () => boolean, act: (act: Act) => void) {
   let waiting: [Act, string | null] | null = null;
   const look = () => {
     if (!waiting) return;
     const [a, r] = waiting;
-    if (r === run()) {
+    const now = run();
+    if (r === now || (a === 'rest' && r !== null && now === r + FOLLOWS)) {
       waiting = null;
       act(a);
     } else if (caughtUp()) waiting = null;

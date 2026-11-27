@@ -15,6 +15,10 @@ public class ActionActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // An answer on the bell stops it and takes it out of the shade.
+        Bell.hush(this);
+        int bell = getIntent().getIntExtra(Shade.BELL_ID, 0);
+        if (bell != 0) androidx.core.app.NotificationManagerCompat.from(this).cancel(bell);
         String act = getIntent().getStringExtra(CountdownPlugin.ACT);
         String run = getIntent().getStringExtra(CountdownPlugin.RUN);
         if (act != null && !CountdownPlugin.deliver(act, run)) {

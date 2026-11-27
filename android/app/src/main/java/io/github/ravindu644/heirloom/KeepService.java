@@ -46,7 +46,8 @@ public class KeepService extends Service {
 
     private static final MediaType JSON = MediaType.get("application/json");
     // One for the process: a client per service would leave its threads and pool behind each time.
-    private static final OkHttpClient http = new OkHttpClient();
+    // Short limits: "I'm in" holds a receiver, which Android ends after ten seconds.
+    private static final OkHttpClient http = new OkHttpClient.Builder().callTimeout(8, TimeUnit.SECONDS).build();
     // Every socket event and timer runs here, one at a time, so none of the fields below is shared.
     private final ScheduledExecutorService loop = Executors.newSingleThreadScheduledExecutor();
     private WebSocket ws;
@@ -293,6 +294,34 @@ public class KeepService extends Service {
 
     private static void cancel(ScheduledFuture<?> f) {
         if (f != null) f.cancel(false);
+    }
+
+    /**
+     * "I'm in" or "I'm out" on a called lap (protocol section 15, `/api/rooms/in`): the service's one
+     * write, with the kept token and device, as the page would send it. It writes no cell.
+     */
+    static void in(Context c, String room, String call, boolean in, java.util.function.Consumer<Integer> done) {
+        JSONObject l = Shade.link(c);
+        Request req;
+        try {
+            String body = new JSONObject().put("token", l.optString("token")).put("device", l.optString("device")).put("room", room).put("call", call).put("in", in).toString();
+            req = new Request.Builder().url(l.optString("server") + "/api/rooms/in").post(RequestBody.create(body, JSON)).build();
+        } catch (JSONException | IllegalArgumentException e) {
+            done.accept(null);
+            return;
+        }
+        http.newCall(req).enqueue(new Callback() {
+            @Override
+            public void onResponse(Call call, Response res) {
+                res.close();
+                done.accept(res.code());
+            }
+
+            @Override
+            public void onFailure(Call call, IOException e) {
+                done.accept(null);
+            }
+        });
     }
 
     // A room's notes (protocol section 15): fetched only to word a notification, never written.

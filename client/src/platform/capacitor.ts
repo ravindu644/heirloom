@@ -20,7 +20,6 @@ export const OLD_IDS = [1, 2, 7402];
 
 /** The names of the channels in the phone's notification settings. The words come from the caller. */
 export interface Channels {
-  ring: string;
   countdown: string;
   /** Reminders, a habit's and a task's. Until it is named, the phone schedules none. */
   remind?: string;
@@ -35,11 +34,13 @@ export interface Countdown {
   keep(options: Keep | null): Promise<void>;
   background(): Promise<{ unrestricted: boolean }>;
   askUnrestricted(): Promise<void>;
+  /** One bell from Settings, played by the phone as a notification sounds. */
+  preview(options: { sound: string }): Promise<void>;
   /** A tap on a button, from ActionActivity. One made while the app was away arrives when this is called. */
   addListener(event: 'action', heard: (data: { act: string; run?: string | null }) => void): Promise<unknown>;
 }
 
-const ACTS: readonly string[] = ['pause', 'resume', 'stop'] satisfies Act[];
+const ACTS: readonly string[] = ['pause', 'resume', 'stop', 'break', 'next', 'rest'] satisfies Act[];
 
 export type Alarms = Pick<
   LocalNotificationsPlugin,
@@ -80,9 +81,8 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
   // order, so the last plan is the one left standing.
   let queue: Promise<unknown> = Promise.all([
     // Settings fixed at creation: Android keeps a channel's sound and importance once it exists, so
-    // changing these means a new id. The bell is high importance so it shows on the lock screen and
-    // makes its sound; the countdown is low so it never makes one. The native side posts on them.
-    alarms.createChannel({ id: 'ring', name: channels.ring, importance: 4, visibility: 1, vibration: true }),
+    // changing these means a new id. The countdown is low so it never makes a sound; the native side
+    // posts on it. The bell's channel is the native side's own (Shade.channels): it plays the bell itself.
     alarms.createChannel({ id: 'countdown', name: channels.countdown, importance: 2, visibility: 1, vibration: false }),
     // Between the two: the default sound, no heads-up over whatever the person is doing. Creating a
     // channel that exists already updates its name (Android's createNotificationChannel), so a
@@ -233,6 +233,9 @@ export function createCapacitorNotifier({ alarms, countdown, now, channels, warn
     },
     askUnrestricted() {
       run(() => countdown.askUnrestricted());
+    },
+    preview(sound) {
+      void countdown.preview({ sound }).catch(warn);
     },
     reminders(set) {
       habits = set;

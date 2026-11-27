@@ -22,6 +22,8 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         Shade.front = true;
+        // Opened from the bell, or while it sounds: the person has heard it.
+        Bell.hush(this);
     }
 
     @Override

@@ -115,6 +115,13 @@ public class CountdownPlugin extends Plugin {
         call.resolve();
     }
 
+    /** One bell from Settings: { sound }. */
+    @PluginMethod
+    public void preview(PluginCall call) {
+        Bell.preview(getContext(), call.getString("sound"));
+        call.resolve();
+    }
+
     /** Whether Android lets heirloom run in the background unrestricted: out of battery optimisation. */
     @PluginMethod
     public void background(PluginCall call) {

@@ -1,5 +1,6 @@
-// The bell, drawn with Web Audio so there is no file to fetch or cache. Section 8 brings the
-// licensed set; until then this is the one sound.
+// The bell in a page: the chosen one of the three files (client/public/sounds), and, where it
+// cannot be fetched or decoded (offline before it was ever heard, a browser without Ogg), a bell
+// drawn with Web Audio, which needs no file at all.
 
 // A small struck bell: a few inharmonic partials, the high ones dying first so the strike is bright
 // and the tail is round. The second partial sits 4 Hz off the first, which gives the slow shimmer
@@ -37,6 +38,8 @@ export interface Bell {
   play(): void;
   /** Call from inside a tap or key handler: browsers start audio only from a gesture. */
   unlock(): void;
+  /** The bell to ring from now on (settings.sound). Until it is decoded, the drawn one rings. */
+  choose(sound: string): void;
 }
 
 /** How long the audio stays open after a strike: the bell's 1.25 s and a little over. */
@@ -67,21 +70,55 @@ export function bellOnDemand(make: () => AudioContext, schedule: (run: () => voi
   };
 }
 
-/** `make` builds the audio context; it may be missing or throw, as in Node or an old browser. */
-export function createBell(make: () => AudioContext): Bell {
+/**
+ * `make` builds the audio context; it may be missing or throw, as in Node or an old browser.
+ * `load` fetches a bell's file; without it, or when it fails, the drawn bell rings.
+ */
+export function createBell(make: () => AudioContext, load?: (sound: string) => Promise<ArrayBuffer>): Bell {
   let ctx: AudioContext | undefined;
+  let chosen = '';
+  let bytes: Promise<ArrayBuffer> | null = null;
+  let clip: AudioBuffer | null = null;
+  // Decoding needs the context, which only a gesture makes: done at whichever comes second.
+  const decode = () => {
+    if (!ctx || !bytes) return;
+    const c = ctx;
+    const mine = chosen;
+    const fetched = bytes;
+    bytes = null;
+    fetched
+      .then((data) => c.decodeAudioData(data))
+      .then((buffer) => {
+        if (chosen === mine) clip = buffer;
+      })
+      .catch(() => {});
+  };
   return {
     play() {
-      if (ctx?.state === 'running') strike(ctx);
+      if (ctx?.state !== 'running') return;
+      if (!clip) return strike(ctx);
+      const source = ctx.createBufferSource();
+      source.buffer = clip;
+      source.connect(ctx.destination);
+      source.start();
     },
     unlock() {
       try {
         ctx ??= make();
         // Also wakes a context the system suspended later, as iOS does after a call.
         ctx.resume().catch(() => {});
+        decode();
       } catch {
         // No audio here; the bell stays silent and the notification still says it.
       }
+    },
+    choose(sound) {
+      if (sound === chosen || !load) return;
+      chosen = sound;
+      clip = null;
+      bytes = load(sound);
+      bytes.catch(() => {});
+      decode();
     },
   };
 }

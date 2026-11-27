@@ -245,6 +245,70 @@ describe('the bell', () => {
   });
 });
 
+describe('the chosen bell, in a page', () => {
+  // A running context that decodes what it is given, or refuses to (a browser without Ogg).
+  const audio = (decodes: boolean) => {
+    const log = { oscillators: 0, clips: [] as unknown[] };
+    const param = { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} };
+    const node = { frequency: param, gain: param, connect: (next: unknown) => next, start() {}, stop() {} };
+    const ctx = {
+      state: 'running',
+      currentTime: 0,
+      destination: {},
+      resume: async () => {},
+      createOscillator: () => (log.oscillators++, node),
+      createGain: () => node,
+      decodeAudioData: async (data: ArrayBuffer) => (decodes ? { from: data } : Promise.reject(new Error('cannot decode'))),
+      createBufferSource: () => ({ connect: () => {}, start() {}, set buffer(clip: unknown) { log.clips.push(clip); } }),
+    } as unknown as AudioContext;
+    return { log, ctx };
+  };
+
+  it('rings the chosen file once it is decoded, and the drawn bell before that', async () => {
+    const { log, ctx } = audio(true);
+    const asked: string[] = [];
+    const files = new Map([['chime', new ArrayBuffer(1)]]);
+    const bell = createBell(() => ctx, async (sound) => (asked.push(sound), files.get(sound)!));
+    bell.choose('chime');
+    bell.play();
+    assert.equal(log.oscillators, 0, 'nothing before a gesture');
+    bell.unlock();
+    bell.play();
+    assert.ok(log.oscillators > 0, 'the drawn bell while the file is on its way');
+    await settle();
+    await settle();
+    bell.play();
+    assert.deepEqual(log.clips, [{ from: files.get('chime') }]);
+    bell.choose('chime');
+    assert.deepEqual(asked, ['chime'], 'the same bell again is not fetched again');
+  });
+
+  it('a file that cannot be fetched or decoded leaves the drawn bell', async () => {
+    for (const [decodes, load] of [
+      [false, async () => new ArrayBuffer(1)],
+      [true, async () => Promise.reject(new Error('offline'))],
+    ] as const) {
+      const { log, ctx } = audio(decodes);
+      const bell = createBell(() => ctx, load);
+      bell.unlock();
+      bell.choose('school');
+      await settle();
+      await settle();
+      bell.play();
+      assert.deepEqual(log.clips, []);
+      assert.ok(log.oscillators > 0);
+    }
+  });
+
+  it('the browser takes the bell from what keep() carries', () => {
+    const chosen: string[] = [];
+    const { notifier } = rig({}, { choose: (sound) => chosen.push(sound) });
+    notifier.keep(null);
+    notifier.keep({ ringing: { sound: 'struck', vibrate: true, silent: true } } as Parameters<typeof notifier.keep>[0]);
+    assert.deepEqual(chosen, ['struck']);
+  });
+});
+
 // Enough of an AudioContext for a strike, counting what the bell asks of it.
 function fakeAudio() {
   const log = { made: 0, resumed: 0, suspended: 0, oscillators: 0 };
@@ -424,5 +488,14 @@ describe('a called lap, in an open tab', () => {
     off.notifier.call(call(10 * MIN));
     off.time.advance(20 * MIN);
     assert.deepEqual(off.shown, []);
+  });
+});
+
+describe('a bell from Settings, in a browser', () => {
+  it('plays the chosen one once, and the page with nothing to play it with plays nothing', () => {
+    const played: string[] = [];
+    rig({}, { preview: (sound) => played.push(sound) }).notifier.preview('chime');
+    assert.deepEqual(played, ['chime']);
+    rig().notifier.preview('school');
   });
 });

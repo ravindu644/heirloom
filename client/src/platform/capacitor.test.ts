@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import { T0, fakeTime, settle } from '../sync/fakes.ts';
 import { OLD_IDS, createCapacitorNotifier, whenResumed } from './capacitor.ts';
 import type { Alarms, Countdown } from './capacitor.ts';
-import { heldTaps } from './notifier.ts';
+import { FOLLOWS, heldTaps } from './notifier.ts';
 import { createWebNotifier } from './web.ts';
 
 const MIN = 60_000;
@@ -85,6 +85,9 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     async askUnrestricted() {
       sent.push(['ask', null]);
     },
+    async preview(options) {
+      sent.push(['preview', options]);
+    },
     async addListener(_event, heard) {
       tap = heard;
     },
@@ -95,7 +98,7 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     alarms,
     countdown,
     now: time.now,
-    channels: { ring: 'Bell', countdown: 'Time left', remind },
+    channels: { countdown: 'Time left', remind },
     warn: (error) => warned.push(error),
     page,
     onResume: (run) => app.resume.push(run),
@@ -116,16 +119,17 @@ const STAMP = '2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718';
 const cell = { stamp: STAMP, state: STATE };
 
 describe('the phone notifier', () => {
-  it('makes its channels first, which the native side posts on', async () => {
+  it('makes its channels first, which the native side posts on; the old ring channel is no longer made', async () => {
     const { calls, done } = rig({ remind: 'Reminders' });
     await done();
-    assert.deepEqual(calls, ['channel ring 4', 'channel countdown 2', 'channel remind 3']);
+    // The bell's own silent channel is the native side's (Shade.channels), which deletes "ring".
+    assert.deepEqual(calls, ['channel countdown 2', 'channel remind 3']);
   });
 
   it('the first start of this build cancels the bell and the call the notifications plugin held, once', async () => {
     const first = rig({ moved: true });
     await first.done();
-    assert.deepEqual(first.calls, ['channel ring 4', 'channel countdown 2', 'cancel']);
+    assert.deepEqual(first.calls, ['channel countdown 2', 'cancel']);
     assert.deepEqual(OLD_IDS, [1, 2, 7402]);
     const later = rig();
     await later.done();
@@ -254,6 +258,25 @@ describe('the countdown\'s buttons', () => {
       ['resume', null],
     ]);
   });
+
+  it("the bell's answers reach the app as the countdown's buttons do", () => {
+    const { notifier, tapped } = rig();
+    const heard: [string, string | null][] = [];
+    notifier.onAction((act, run) => heard.push([act, run]));
+    for (const act of ['break', 'next', 'rest']) tapped(act, 'run-7');
+    assert.deepEqual(heard, [
+      ['break', 'run-7'],
+      ['next', 'run-7'],
+      ['rest', 'run-7'],
+    ]);
+  });
+
+  it('a bell from Settings is played by the phone', async () => {
+    const { notifier, sent, done } = rig();
+    notifier.preview('struck');
+    await done();
+    assert.deepEqual(sent, [['preview', { sound: 'struck' }]]);
+  });
 });
 
 describe('a tap for a run the page has not heard of yet', () => {
@@ -297,19 +320,52 @@ describe('a tap for a run the page has not heard of yet', () => {
   });
 });
 
+describe('"Done for now" on a bell whose next phase started by itself', () => {
+  it('stops the phase that followed: its run is the bell\'s with the suffix', () => {
+    const state = { run: 'run-7' + FOLLOWS, caughtUp: true };
+    const done: string[] = [];
+    const taps = heldTaps(() => state.run, () => state.caughtUp, (act) => done.push(act));
+    taps.tap('rest', 'run-7');
+    assert.deepEqual(done, ['rest']);
+  });
+
+  it('only "Done for now" matches the run that followed; the break or the next lap were already started', () => {
+    const state = { run: 'run-7' + FOLLOWS, caughtUp: true };
+    const done: string[] = [];
+    const taps = heldTaps(() => state.run, () => state.caughtUp, (act) => done.push(act));
+    taps.tap('break', 'run-7');
+    taps.tap('next', 'run-7');
+    taps.tap('rest', 'run-6');
+    assert.deepEqual(done, []);
+  });
+
+  it('held while the page catches up to the phase that followed', () => {
+    const state = { run: 'run-7', caughtUp: false };
+    const done: string[] = [];
+    const taps = heldTaps(() => state.run, () => state.caughtUp, (act) => done.push(act));
+    state.run = 'run-6';
+    taps.tap('rest', 'run-7');
+    state.run = 'run-7' + FOLLOWS;
+    state.caughtUp = true;
+    taps.look();
+    assert.deepEqual(done, ['rest']);
+  });
+});
+
 describe('keeping step while closed', () => {
   const words = {
     bell: { lap: [], take: [], next: [], break: '' },
     during: { work: 'A lap', short: 'Short break', long: 'Long break' },
     actions: { pause: 'Pause', resume: 'Resume', stop: 'Stop', done: 'Done for now' },
+    answer: { break: ['Take five', 'Take five', 'Take five', 'Take 15 minutes'], next: 'Start the next lap', rest: 'Done for now' },
     left: 'Paused, {t} left',
     note: { title: '{room}', body: '{name}: {text}' },
-    call: { title: '{name} calls a lap at {time}', body: '{room}' },
+    call: { title: '{name} calls a lap at {time}', body: '{room}', in: "I'm in", out: "I'm out", youre: "You're in. It starts at {time}.", unreached: 'Could not reach your server.' },
     starts: { title: 'The lap together starts', body: '{room}', with: '{room}, with {name}' },
     keeping: 'heirloom is keeping in step',
-    channels: { keep: 'Keeping in step', rooms: 'Rooms' },
+    channels: { keep: 'Keeping in step', rooms: 'Rooms', bell: 'Bell' },
   };
-  const link = { server: 'https://h.example', account: 'a_1', token: 't', device: 'd', cursor: 1042, on: true, words };
+  const link = { server: 'https://h.example', account: 'a_1', token: 't', device: 'd', cursor: 1042, on: true, words, ringing: { sound: 'school' as const, vibrate: true, silent: true }, auto: { break: false, work: false } };
 
   it('sends the link once per change, the cursor alone being none, and the plan again after it', async () => {
     const { notifier, sent, ring, done } = rig();
