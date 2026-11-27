@@ -61,10 +61,14 @@ interface Props {
   canSave?: boolean;
   /** True while the device will not let heirloom notify: the bell's switch then says why nothing would ring. */
   ringBlocked?: ReadonlySignal<boolean>;
+  /** The phone app: true while Android may stop heirloom in the background to save battery. */
+  mayStop?: ReadonlySignal<boolean>;
+  /** Opens Android's own screen to let heirloom run unrestricted. */
+  letRun?: () => void;
   onSignIn: () => void;
 }
 
-export function Settings({ engine, settings, invites, admins, resets, rooms, server: choice, canSave = true, ringBlocked, onSignIn }: Props) {
+export function Settings({ engine, settings, invites, admins, resets, rooms, server: choice, canSave = true, ringBlocked, mayStop, letRun, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -226,6 +230,18 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
 
       <Panel title={s.settings.bell}>
         <Switch label={s.settings.ringHere(s.device())} note={ringBlocked?.value ? s.settings.ringBlocked : s.settings.ringHereNote} on={settings.ringHere.value} onChange={(ring) => settings.setRingHere(ring)} />
+        {/* The phone app only: with Ring here off it has nothing to ring, so it takes no press. */}
+        {!canSave && <Switch label={s.settings.keepInStep} note={s.settings.keepInStepNote} on={settings.keepInStep.value} off={!settings.ringHere.value} onChange={(on) => settings.setKeepInStep(on)} />}
+        {/* Asked from this tap only, never at start; gone once Android says it is set (looked at again
+            when the app comes back), and while nothing runs in the background for it to keep alive. */}
+        {!canSave && mayStop?.value && settings.ringHere.value && settings.keepInStep.value && (
+          <div class={css.with}>
+            <Button kind="link" class={links.own} onClick={letRun}>
+              {s.settings.letRun}
+            </Button>
+            <Note>{s.settings.letRunNote}</Note>
+          </div>
+        )}
       </Panel>
 
       <Panel title={s.settings.finish}>

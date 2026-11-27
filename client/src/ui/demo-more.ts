@@ -417,6 +417,7 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     ...seed,
   });
   const ringHere = signal(true);
+  const keepInStep = signal(true);
   const shown = signal(marks);
   return {
     all,
@@ -426,6 +427,8 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     },
     ringHere,
     setRingHere: (ring) => void (ringHere.value = ring),
+    keepInStep,
+    setKeepInStep: (on) => void (keepInStep.value = on),
     marks: computed(() => (all.value.celebrate ? shown.value : [])),
     seen: () => void (shown.value = []),
     exportAll: () => JSON.stringify({ heirloom: 1, exported: Date.now(), account: 'ravi', cells: [] }),

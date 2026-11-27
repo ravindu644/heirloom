@@ -127,9 +127,12 @@ interface Props {
   server?: ServerChoice;
   /** True while the device will not let heirloom notify: Settings says so under the bell. */
   ringBlocked?: ReadonlySignal<boolean>;
+  /** The phone app: true while Android may stop heirloom in the background; Settings offers the way out. */
+  mayStop?: ReadonlySignal<boolean>;
+  letRun?: () => void;
 }
 
-export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, onReminderSet, canSave, ringBlocked }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, onReminderSet, canSave, ringBlocked, mayStop, letRun }: Props) {
   const screen = useScreen();
   const invite = useInvite();
   const link = useReset();
@@ -196,7 +199,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
         <RoomScreen engine={engine} rooms={rooms} lapMs={settings.all.value.work_ms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
-        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} mayStop={mayStop} letRun={letRun} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

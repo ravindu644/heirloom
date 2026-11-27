@@ -78,6 +78,8 @@ interface Scene {
   phoneApp?: boolean;
   /** The device will not let heirloom notify. */
   ringBlocked?: boolean;
+  /** The phone app, where Android may still stop heirloom in the background to save battery. */
+  mayStop?: boolean;
   /** The phone app's server step, alone, as it is before there is any engine. */
   serverStep?: DemoServer;
   /** The phone app with no server yet: the welcome, then the server step. */
@@ -395,6 +397,8 @@ const MORE: Record<string, Scene> = {
   'settings-top': { ...idleAt2, about: 'Settings with every number at its top: each plus is off', settings: true, day: day(), prefs: { work_ms: 360 * MIN, short_ms: 60 * MIN, long_ms: 60 * MIN, day_target: 24 } },
   'settings-changed': { ...idleAt2, about: 'Settings with most things changed', settings: true, day: day(), prefs: { work_ms: 50 * MIN, short_ms: 10 * MIN, long_ms: 30 * MIN, auto_break: true, auto_work: true, celebrate: false, day_target: 0, share_task: true } },
   'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
+  'settings-phone-asleep': { ...idleAt2, about: 'Settings in the phone app while Android may stop heirloom in the background: the way to let it run, under the bell', settings: true, day: day(), phoneApp: true, mayStop: true },
+  'settings-phone-ring-off': { ...idleAt2, about: 'The phone app with Ring here off: ring when closed has nothing to ring and takes no press, and the battery link goes with it', settings: true, day: day(), phoneApp: true, mayStop: true, tap: 'Ring on this' },
   'settings-rest-one': { ...idleAt2, about: 'Settings with Sunday pinned as a rest day: the other six can still be chosen', settings: true, day: day(), prefs: { rest_days: 64 } },
   'settings-rest-two': { ...idleAt2, about: 'Settings with Saturday and Sunday pinned: the other five take no press', settings: true, day: day(), prefs: { rest_days: 96 } },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
@@ -615,6 +619,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
 
   const focus: Focus = {
     state,
+    stamp: signal(null),
     lengths: signal(LENGTHS),
     lengthsFor,
     view() {
@@ -682,6 +687,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     rows: (dataset) => (dataset !== 'task' ? none : scene.day ? today.rows : long),
     write() {},
     stamp: () => undefined,
+    // The demo keeps step with no server: no background service has anything to hold.
+    link: signal(null),
+    cursor: () => 0,
     act() {},
     // An invite called `refused` is one the server will not take.
     register: async (invite, username, password) => {
@@ -740,7 +748,7 @@ render(
   ) : scene?.serverStep ? (
     <ServerStep choice={demoServer(scene.serverStep)} />
   ) : scene ? (
-    <App {...staged!} ringBlocked={signal(!!scene.ringBlocked)} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
+    <App {...staged!} ringBlocked={signal(!!scene.ringBlocked)} mayStop={signal(!!scene.mayStop)} letRun={() => console.info('demo: Android\'s battery screen would open')} canSave={!scene.phoneApp && !scene.serverAt} onReminderSet={() => console.info('demo: a reminder was set')} />
   ) : (
     <main style="padding: var(--layout-gutter); display: grid; gap: var(--space-sm)">
       <h1>heirloom, every state</h1>

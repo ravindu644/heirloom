@@ -233,6 +233,17 @@ export const ring = {
   remindBody: 'Planned for today.',
   // A task's reminder, at its minute: its title, and when it was planned for.
   taskBody: (time: string) => `Planned for ${time}.`,
+  // The phone while heirloom is closed (DESIGN.md). Its background service fills the braces itself
+  // from what the server says. A lap started elsewhere before the app has its task: never a guess.
+  lapElsewhere: 'A lap',
+  keeping: 'heirloom is keeping in step',
+  keepChannel: 'Keeping in step',
+  roomsChannel: 'Rooms',
+  // A note: the room's name over "sachi: the line itself". A call: "lina calls a lap at 15:00" over the room's name.
+  noteTitle: '{room}',
+  noteBody: '{name}: {text}',
+  calledTitle: '{name} calls a lap at {time}',
+  calledBody: '{room}',
 };
 
 // A second tab of the same browser: it shares the first one's laps and must not run beside it.
@@ -296,6 +307,12 @@ export const settings = {
   ringHereNote: 'A sound and a notification when a lap or a break ends.',
   // The device will not let heirloom notify: the switch is on and nothing would ring, so it says why.
   ringBlocked: 'Notifications for heirloom are switched off on this device, so the bell cannot ring. Allow them in the device\u2019s settings.',
+  // The phone app only: the quiet connection that keeps the phone in step while heirloom is closed.
+  keepInStep: 'Ring when heirloom is closed',
+  keepInStepNote: 'Keeps a quiet connection to your server, so a lap started or paused elsewhere reaches this phone, and room notes and calls show up.',
+  // While Android may still put heirloom to sleep. The tap opens Android's own screen for it.
+  letRun: 'Let it run in the background',
+  letRunNote: 'Android may stop heirloom to save battery. Set it to Unrestricted so it keeps step.',
   // Under the three lengths.
   lengthsNote: 'A lap or a break already running keeps its length.',
   // Under the day target: the same number Today edits.

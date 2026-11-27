@@ -5,6 +5,8 @@
 .settings p { text-wrap: pretty; }
 .settings p:empty { display: none; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* A link and the note under it, as close as a switch's words and its note. */
+.with { display: grid; gap: var(--space-xs); }
 /* Your picture: a part of the account, a line apart. */
 .picture { display: grid; gap: var(--space-sm); padding-top: var(--space-md); border-top: var(--layout-hair) solid var(--line); }
 /* About's heading is the mark and the name, as the header draws them. */

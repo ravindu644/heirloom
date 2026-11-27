@@ -10,3 +10,8 @@
    heading is what wraps. */
 button.end { position: relative; z-index: 1; flex: none; min-width: 0; min-height: 0; border: 0; }
 button.end::after { content: ""; position: absolute; top: calc(var(--space-sm) * -1); right: 0; width: max(100%, var(--layout-touch)); height: var(--layout-touch); }
+
+/* A link on a line of its own ("Let it run in the background"): only as wide as its words, its
+   48px target laid over the line by as much above as below, and over the note under it, so the
+   line keeps its height. */
+.own { position: relative; z-index: 1; justify-self: start; border: 0; display: flex; align-items: center; margin: calc((1lh - var(--layout-touch)) / 2) 0; }

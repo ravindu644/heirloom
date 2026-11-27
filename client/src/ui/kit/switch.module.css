@@ -8,3 +8,5 @@
 .switch b { font: var(--type-body); }
 .switch small { font: var(--type-label); color: var(--muted); text-wrap: pretty; }
 .switch > button { margin: calc((var(--space-md) + var(--space-xs) - var(--layout-touch)) / 2); }
+.switch[data-off] { cursor: default; }
+.switch[data-off] b { color: var(--muted); }
