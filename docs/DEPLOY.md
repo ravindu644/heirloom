@@ -43,6 +43,15 @@ sudo rm -f /var/lib/heirloomd/heirloom.db-wal /var/lib/heirloomd/heirloom.db-shm
 sudo systemctl start heirloomd
 ```
 
+To keep copies on another machine too, give it a key that can do nothing but stream that folder.
+In the server's `~/.ssh/authorized_keys`, for a user with sudo:
+
+```
+restrict,command="sudo -n tar -C /var/lib/heirloomd/backups -cf - ." ssh-ed25519 AAAA... backup
+```
+
+and on the other machine, from a timer: `ssh -i ~/.ssh/that-key user@server | tar -C ~/heirloom-backups -xf -`.
+
 ## Moving to another machine
 
 Install it on the new machine first, then carry the whole data directory across while both are
