@@ -362,8 +362,8 @@ On the third build the user found no glitches; four things about how it reads an
 ## 27. A bell you hear and feel, and notifications you can answer
 
 - [x] [lead] Three bells drawn by `tools/bells.mjs` (school, struck, chime; 55 KB); the `sound` enum; DESIGN's bell panel and answers; the phone's "I'm in" in protocol section 15
-- [ ] [core] `sound` read with its default; `vibrate` and `ringOnSilent` per device
+- [x] [core] `sound` read with its default; `vibrate` and `ringOnSilent` per device
 - [ ] [android] The phone plays and buzzes its own bell (alarm usage through Mute), a silent `bell` channel; Take five / Start the next lap / Done for now; I'm in and I'm out
-- [ ] [ui] The bell panel: the three sounds with a preview, Vibrate, Ring even on silent; the web plays the chosen file
+- [x] [ui] The bell panel: the three sounds with a preview, Vibrate, Ring even on silent; the web plays the chosen file
 - [ ] [qa] The sound syncs and previews; on the phone on Mute: rings, buzzes, each switch off, each answer
 - [ ] Gate
