@@ -16,4 +16,17 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CountdownPlugin.class);
         super.onCreate(savedInstanceState);
     }
+
+    // On screen, the page already says what a room notification would.
+    @Override
+    public void onResume() {
+        super.onResume();
+        Shade.front = true;
+    }
+
+    @Override
+    public void onPause() {
+        Shade.front = false;
+        super.onPause();
+    }
 }

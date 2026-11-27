@@ -87,7 +87,12 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // The background service's own socket (ARCHITECTURE log, 2026-11-27): the one dependency it adds.
+    // 5.4, not 5.5: 5.5's Android build needs compileSdk 37, and TOOLCHAINS pins 36.
+    implementation "com.squareup.okhttp3:okhttp:5.4.0"
     testImplementation "junit:junit:$junitVersion"
+    // android.jar's org.json is a stub that throws in JVM tests; Shade's decisions read JSON.
+    testImplementation "org.json:json:20260814"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

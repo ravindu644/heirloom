@@ -1,6 +1,7 @@
 // The one way the app rings. The browser and the phone each implement it; screens never reach
 // past it to a plugin, so "ring here" and the phone's exact alarm stay in one place.
 
+import type { TimerState } from '../core/timer.ts';
 import type { Reminder } from './reminders.ts';
 
 /** What to ring and when. `at` is this device's own clock, in ms. The words come from the caller. */
@@ -46,9 +47,52 @@ export const isPaused = (plan: Ring | Paused | null): plan is Paused => plan !==
 /** A called lap this account is in (protocol.md section 15, Start together): a notification at
  * `at`, this device's own clock, in ms, that it starts. The words come from the caller. */
 export interface Call {
+  /** The call's id: the page and the phone's background service may each say the same call. */
+  id: string;
   at: number;
   title: string;
   body: string;
+}
+
+/** The timer cell a plan was made from: its stamp (null with no cell yet) and its value. The phone
+ * keeps the newer of this and what its background service hears; the browser ignores it. */
+export interface Timer {
+  stamp: string | null;
+  state: TimerState;
+}
+
+/**
+ * The words the phone's background service says things with when the page is not there to
+ * (ARCHITECTURE section 6). Templates fill `{t}`, `{room}`, `{name}`, `{text}` and `{time}`.
+ */
+export interface Words {
+  /** The bell, by the lap's place in its set (0 to 3): as the push words of a closed tab. */
+  bell: { lap: string[]; take: string[]; next: string[]; break: string };
+  /** Over the countdown of a lap started elsewhere, before the app has its task. */
+  during: { work: string; short: string; long: string };
+  /** The countdown's buttons; `done` ends a break. */
+  actions: { pause: string; resume: string; stop: string; done: string };
+  /** A paused phase: "Paused, {t} left". */
+  left: string;
+  note: { title: string; body: string };
+  /** A new call from someone else. */
+  call: { title: string; body: string };
+  /** The alarm of a call you are in: `body` for your own call, `with` for someone else's. */
+  starts: { title: string; body: string; with: string };
+  /** The service's own notification. */
+  keeping: string;
+  channels: { keep: string; rooms: string };
+}
+
+/** What the phone's background service needs to keep step. `on`: its switch and Ring here, together. */
+export interface Keep {
+  server: string;
+  account: string;
+  token: string;
+  device: string;
+  cursor: number;
+  on: boolean;
+  words: Words;
 }
 
 /** A plan closer than this to now is a phase already ending, such as a tap on finish: no bell. */
@@ -58,9 +102,10 @@ export interface Notifier {
   /**
    * Ring at `ring.at`, replacing whatever was planned. `Paused` cancels the bell and keeps a still
    * notification to resume from; `null` cancels everything: stopped, or nothing running. A plan with
-   * the same `at` and other words changes the words only: the alarm stays as it is.
+   * the same `at` and other words changes the words only: the alarm stays as it is. `timer` is the
+   * cell it was made from, for the phone.
    */
-  plan(ring: Ring | Paused | null): void;
+  plan(ring: Ring | Paused | null, timer?: Timer): void;
   /**
    * Hears the countdown's buttons. The phone delivers a tap made while the app was away, or that
    * opened it, as soon as this is called. The browser has no such buttons and never calls it.
@@ -87,4 +132,36 @@ export interface Notifier {
    * given again after its time leaves its notification where it is.
    */
   call(next: Call | null): void;
+  /** Who the phone's background service keeps step as, and with what words; null signed out. The browser has none. */
+  keep(link: Keep | null): void;
+  /** Whether the platform may stop heirloom in the background to save battery. The browser: never asks, always true. */
+  background(): Promise<{ unrestricted: boolean }>;
+  /** Opens the platform's own request to let heirloom run unrestricted. Call it from a tap. */
+  askUnrestricted(): void;
+}
+
+/**
+ * The countdown's taps, done for the run their button was drawn for. A tap for a run the page does
+ * not hold may be for a lap the phone's service drew while the app was closed, which the page has
+ * not caught up to yet: it waits until the page has caught up, and is done then if the run is the
+ * timer's, else dropped (a notification left over from an earlier run). Call `look` whenever the
+ * timer or the catching up changes.
+ */
+export function heldTaps(run: () => string | null, caughtUp: () => boolean, act: (act: Act) => void) {
+  let waiting: [Act, string | null] | null = null;
+  const look = () => {
+    if (!waiting) return;
+    const [a, r] = waiting;
+    if (r === run()) {
+      waiting = null;
+      act(a);
+    } else if (caughtUp()) waiting = null;
+  };
+  return {
+    tap(a: Act, r: string | null) {
+      waiting = [a, r];
+      look();
+    },
+    look,
+  };
 }

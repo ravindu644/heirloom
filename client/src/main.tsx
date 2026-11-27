@@ -1,13 +1,13 @@
-import { computed, effect, signal } from '@preact/signals-core';
+import { computed, effect, signal, untracked } from '@preact/signals-core';
 import { render } from 'preact';
 import { onFront, startPlatform } from './platform/index.ts';
-import { isPaused } from './platform/notifier.ts';
+import { heldTaps, isPaused } from './platform/notifier.ts';
 import { serverChoice, startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
 import { App, Elsewhere } from './ui/app.tsx';
 import { FirstRun } from './ui/welcome.tsx';
 import { planFor } from './plan.ts';
-import { result, ring } from './ui/strings.ts';
+import { clock, result, ring } from './ui/strings.ts';
 
 const root = document.getElementById('app')!;
 
@@ -32,15 +32,31 @@ async function start() {
   // the front: the way to change it is in the device's own settings, outside the app.
   const ringBlocked = signal(false);
   let lookAtBell = () => {};
+  // The phone app: whether Android may stop heirloom in the background. Settings offers the way out,
+  // and the answer changes only in Android's own screen, so it is looked at on the way back.
+  const mayStop = signal(false);
+  let lookAtBackground = () => {};
   onFront(() => {
     engine.wake();
     for (const part of [app.today, app.progress, app.habits]) part.wake();
     lookAtBell();
+    lookAtBackground();
   });
   // The browser's notifier, or the phone's exact alarm and countdown when this is the phone app.
   // In a browser it also asks the server to push at a bell, for a tab that is closed or out of
   // sight, with the words to say: the server holds no copy of its own (protocol.md section 17).
   const laps = [1, 2, 3, 4];
+  // The bell's words by the lap's place in its set, for a bell rung where this page is not: a
+  // closed tab's push, or the phone's background service.
+  const bellWords = () => {
+    const breaks = focus.lengthsFor(focus.state.peek().task);
+    return {
+      lap: laps.map(() => ring.lapDone),
+      take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
+      next: laps.map(() => ring.lapNext),
+      break: ring.breakOver,
+    };
+  };
   const notifier = await startPlatform(
     { ring: ring.bellChannel, countdown: ring.countdownChannel, remind: ring.remindChannel },
     {
@@ -48,19 +64,13 @@ async function start() {
       remembered: () => engine.kept('push'),
       remember: (sent) => engine.keep('push', sent),
       // Asked for at each subscribe: the break lengths in them change in Settings, and with the task.
-      words: () => {
-        const breaks = focus.lengthsFor(focus.state.peek().task);
-        return {
-          lap: laps.map(() => ring.lapDone),
-          take: laps.map((n) => result.take(n === 4 ? breaks.long_ms : breaks.short_ms)),
-          next: laps.map(() => ring.lapNext),
-          break: ring.breakOver,
-        };
-      },
+      words: bellWords,
     },
   );
   lookAtBell = () => void notifier.canRing().then((can) => (ringBlocked.value = !can));
   lookAtBell();
+  lookAtBackground = () => void notifier.background().then((b) => (mayStop.value = !b.unrestricted));
+  lookAtBackground();
   // Asking is the moment it can turn to refused, so the answer is looked at straight after.
   const allow = () => void notifier.allow().then(lookAtBell);
   // "Ring here" is this device's own switch; and the notifier is told who is signed in, so a
@@ -76,6 +86,33 @@ async function start() {
   effect(() => {
     void breaks.value;
     notifier.reword();
+  });
+  // The phone's background service keeps step as this device, with the words it says things in
+  // while the page is not there (ARCHITECTURE section 6). Sent again when any of it changes; a
+  // sign-out sends null, which stops it and wipes what it held.
+  effect(() => {
+    const link = engine.link.value;
+    const on = settings.keepInStep.value && settings.ringHere.value;
+    void breaks.value;
+    notifier.keep(
+      link && {
+        ...link,
+        cursor: engine.cursor(),
+        on,
+        words: {
+          bell: bellWords(),
+          during: { work: ring.lapElsewhere, short: ring.breakRunning(false), long: ring.breakRunning(true) },
+          actions: { pause: ring.pause, resume: ring.resume, stop: ring.stop, done: ring.breakStop },
+          // The service fills in the time left, as the clock reads it.
+          left: ring.paused(0).replace(clock(0), '{t}'),
+          note: { title: ring.noteTitle, body: ring.noteBody },
+          call: { title: ring.calledTitle, body: ring.calledBody },
+          starts: { title: ring.callTitle, body: ring.callBody('{room}'), with: ring.callBody('{room}', '{name}') },
+          keeping: ring.keeping,
+          channels: { keep: ring.keepChannel, rooms: ring.roomsChannel },
+        },
+      },
+    );
   });
   // A habit is reminded on this device at each of its times on the days it is planned: the first
   // time until the first check-in of the day, the second until the second, and so on. A task
@@ -99,6 +136,8 @@ async function start() {
   // planned is worked out in plan.ts.
   effect(() => {
     const state = focus.state.value;
+    // The cell's stamp goes with it: the phone keeps the newer of this and what its service hears.
+    const stamp = focus.stamp.value;
     // Also when the connection comes or goes: a welcome is when the device learns how far its
     // own clock is from the server's, and an alarm planned before that would ring that far off.
     void engine.sync.value;
@@ -115,24 +154,31 @@ async function start() {
       if (held.bell === bell && Math.abs(plan.at - held.at) < STEADY_MS) plan.at = held.at;
       else held = { bell, at: plan.at };
     }
-    notifier.plan(plan);
+    notifier.plan(plan, { stamp, state });
   });
   // A called lap you are in rings at its minute, on the phone too (protocol section 15, Start
   // together): the soonest one, in this device's time. The lap itself is started by sync.
   effect(() => {
     const next = app.rooms.calledIn.value[0];
     const me = engine.account.value?.username;
-    notifier.call(next ? { at: next.at - (engine.now() - Date.now()), title: ring.callTitle, body: ring.callBody(next.name, next.by === me ? undefined : next.by) } : null);
+    notifier.call(next ? { id: next.call, at: next.at - (engine.now() - Date.now()), title: ring.callTitle, body: ring.callBody(next.name, next.by === me ? undefined : next.by) } : null);
   });
 
   // The countdown's buttons do what the same buttons on Focus do: this page stays the one
   // writer of the timer, and a tap made while the app was away is done when it is back.
-  // A button of a notification left over from an earlier run does nothing.
-  notifier.onAction((act, run) => {
-    if (run !== focus.state.peek().run) return;
-    if (act === 'pause') focus.pause();
-    else if (act === 'resume') focus.resume();
-    else focus.stop();
+  // A tap on a countdown the phone's service drew while the app was closed may be for a run this
+  // page has not heard of yet: it waits until the page has caught up (platform/notifier.ts).
+  const taps = heldTaps(
+    () => focus.state.peek().run,
+    () => engine.sync.peek() === 'in-step',
+    (act) => (act === 'pause' ? focus.pause() : act === 'resume' ? focus.resume() : focus.stop()),
+  );
+  notifier.onAction(taps.tap);
+  effect(() => {
+    void focus.state.value;
+    void engine.sync.value;
+    // The act writes the timer, which this effect reads: done outside it.
+    untracked(taps.look);
   });
 
   // Permission to notify is asked for at the first start, from the tap, when it is plain what
@@ -145,7 +191,7 @@ async function start() {
 
   // Someone who only keeps habits never starts a lap, so the tap that sets a reminder asks too.
   // The phone app's WebView is not trusted to save a file; Settings sends that to the browser.
-  render(<App {...app} focus={asking} onReminderSet={allow} canSave={!APP} server={server} ringBlocked={ringBlocked} />, root);
+  render(<App {...app} focus={asking} onReminderSet={allow} canSave={!APP} server={server} ringBlocked={ringBlocked} mayStop={mayStop} letRun={() => notifier.askUnrestricted()} />, root);
 }
 
 // The built app in a browser keeps itself for a time with no connection (vite.config.ts writes

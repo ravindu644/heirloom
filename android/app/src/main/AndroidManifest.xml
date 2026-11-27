@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- No backups: the token the background service keeps would ride along to another phone. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
@@ -37,6 +38,24 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:exported="false" />
+
+        <!-- Holds the read-only socket while heirloom is closed (ARCHITECTURE section 6). -->
+        <service
+            android:name=".KeepService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a connection to the user's own self-hosted server, so a timer started, paused or stopped on another device rings or goes quiet on this phone on time, and notes and calls from the user's study rooms arrive. No push service is used." />
+        </service>
+
+        <!-- The bell's and a called lap's alarms, and boot and update, which clear alarms and the service. -->
+        <receiver android:name=".Receiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -51,6 +70,13 @@
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32"
         tools:node="replace" />
-    <!-- RECEIVE_BOOT_COMPLETED arrives from the notifications plugin: alarms do not survive a
-         reboot, and its receiver sets the planned bell again. -->
+    <!-- Alarms do not survive a reboot: Receiver sets the bell and the call again, and starts the service. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- A sleeping CPU delays the socket's timers: held only while connected. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Settings' "Let it run in the background" opens Android's own request, from that tap only. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 </manifest>

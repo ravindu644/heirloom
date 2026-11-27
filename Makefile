@@ -10,7 +10,7 @@ HOST_ADDR := $(shell sed -n 's/^- Address: *\([A-Za-z0-9.:-]*\).*/\1/p' .local/E
 HOST := $(HOST_USER)@$(HOST_ADDR)
 need-host = @test -n "$(HOST_USER)" -a -n "$(HOST_ADDR)" || { echo "No server address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
-CHECKS := lint-design contracts test-tools style audit types pure test-core test-server test-sync sim budget e2e
+CHECKS := lint-design contracts test-tools style audit types pure test-core test-android test-server test-sync sim budget e2e
 .PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy server-rss
 
 # -k: one failing check does not hide the others.
@@ -48,6 +48,11 @@ pure:
 
 test-core:
 	node --test "client/src/**/*.test.ts"
+
+# The phone's native drawer and its background service, on the JVM: their decisions against the
+# fixtures and the rules capacitor.ts used to hold. No phone needed.
+test-android:
+	cd android && JAVA_HOME=$(JDK21) ./gradlew testDebugUnitTest -q
 
 # Real devices' code against the real server, in Node: the scenarios of ARCHITECTURE section 4,
 # then many devices editing at random with the network coming and going.

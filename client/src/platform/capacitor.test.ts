@@ -1,17 +1,18 @@
-// The phone's notifier against a fake notifications plugin and a fake countdown, recording every
-// bridge call in order, so what Android is asked to do can be read straight off the log.
+// The phone's notifier against a fake notifications plugin and a fake Countdown plugin, recording
+// every bridge call in order. What the native drawer does with a plan is ShadeTest's (android/app/src/test).
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { T0, fakeTime, settle } from '../sync/fakes.ts';
-import { CALL_ID, RING_ID, createCapacitorNotifier, whenResumed } from './capacitor.ts';
+import { OLD_IDS, createCapacitorNotifier, whenResumed } from './capacitor.ts';
 import type { Alarms, Countdown } from './capacitor.ts';
+import { heldTaps } from './notifier.ts';
 import { createWebNotifier } from './web.ts';
 
 const MIN = 60_000;
 type Grant = 'granted' | 'denied' | 'prompt';
 
-function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0, hidden = false, remind = undefined as string | undefined } = {}) {
+function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer = 'granted' as Grant, failures = 0, hidden = false, remind = undefined as string | undefined, rings = true, moved = false } = {}) {
   const time = fakeTime();
   // The page: the browser's own notifier on the same fake clock, its bell heard only in view.
   const app = { hidden, resume: [] as (() => void)[] };
@@ -25,9 +26,10 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
   });
   const calls: string[] = [];
   const scheduled: any[] = [];
-  const shown: any[] = [];
   const warned: unknown[] = [];
-  const state = { display, exact };
+  const state = { display, exact, rings };
+  // What the Countdown plugin was sent, method and options, in order.
+  const sent: [string, any][] = [];
   // What the plugin holds, by id, as getPending gives it back.
   const held = new Map<number, any>();
   const alarms = {
@@ -65,12 +67,23 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     },
   } as unknown as Alarms;
   const countdown: Countdown = {
-    async show(options) {
-      calls.push('countdown');
-      shown.push(options);
+    async plan(options) {
+      calls.push('plan');
+      if (failures-- > 0) throw new Error('bridge gone');
+      sent.push(['plan', options]);
+      return { rings: state.rings };
     },
-    async clear() {
-      calls.push('clear');
+    async call(options) {
+      sent.push(['call', options]);
+    },
+    async keep(options) {
+      sent.push(['keep', options]);
+    },
+    async background() {
+      return { unrestricted: false };
+    },
+    async askUnrestricted() {
+      sent.push(['ask', null]);
     },
     async addListener(_event, heard) {
       tap = heard;
@@ -86,208 +99,139 @@ function rig({ display = 'granted' as Grant, exact = 'granted' as Grant, answer 
     warn: (error) => warned.push(error),
     page,
     onResume: (run) => app.resume.push(run),
+    moved,
   });
   const resume = () => app.resume.forEach((run) => run());
   const ring = (inMs: number, during?: string) => ({ at: T0 + inMs, title: 'Time for a break', body: '5 minutes', during });
   const done = async () => {
     for (let i = 0; i < 20; i++) await settle();
   };
-  return { time, calls, scheduled, shown, warned, state, notifier, ring, done, app, pageRings, resume, held, tapped: (act: string, run: string | null = null) => tap({ act, run }) };
+  const plans = () => sent.filter(([what]) => what === 'plan').map(([, options]) => options);
+  return { time, calls, scheduled, warned, state, notifier, ring, done, app, pageRings, resume, held, sent, plans, tapped: (act: string, run: string | null = null) => tap({ act, run }) };
 }
 
+
+const STATE = { phase: 'work', run: 'run-7', task: null, started: T0, paused_at: null, paused_ms: 0, planned_ms: 25 * MIN, set_index: 1 } as const;
+const STAMP = '2026-11-24T04:30:00.000Z-0000-a1b2c3d4e5f60718';
+const cell = { stamp: STAMP, state: STATE };
+
 describe('the phone notifier', () => {
-  it('makes its two channels first: a loud one for the bell, a quiet one for the countdown', async () => {
-    const { calls, done } = rig();
+  it('makes its channels first, which the native side posts on', async () => {
+    const { calls, done } = rig({ remind: 'Reminders' });
     await done();
-    assert.deepEqual(calls, ['channel ring 4', 'channel countdown 2']);
+    assert.deepEqual(calls, ['channel ring 4', 'channel countdown 2', 'channel remind 3']);
   });
 
-  it('schedules one exact alarm that fires in Doze, with the words and the countdown', async () => {
-    const { calls, scheduled, shown, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN, 'Lap 2 of 4'));
-    await done();
-    assert.deepEqual(calls.slice(2), ['cancel', 'schedule', 'countdown']);
-    assert.equal(scheduled.length, 1);
-    const [n] = scheduled;
-    assert.equal(n.id, RING_ID);
-    assert.equal(n.channelId, 'ring');
-    assert.equal(n.title, 'Time for a break');
-    assert.equal(n.body, '5 minutes');
-    assert.equal(n.schedule.allowWhileIdle, true);
-    assert.equal(n.schedule.at.getTime(), T0 + 25 * MIN);
-    assert.notEqual(n.isExactNotification, false);
-    assert.deepEqual(shown, [{ title: 'Lap 2 of 4', end: T0 + 25 * MIN, channel: 'countdown' }]);
+  it('the first start of this build cancels the bell and the call the notifications plugin held, once', async () => {
+    const first = rig({ moved: true });
+    await first.done();
+    assert.deepEqual(first.calls, ['channel ring 4', 'channel countdown 2', 'cancel']);
+    assert.deepEqual(OLD_IDS, [1, 2, 7402]);
+    const later = rig();
+    await later.done();
+    assert.ok(!later.calls.includes('cancel'));
   });
 
-  it('a new plan cancels the old alarm and schedules the new one, on the same id', async () => {
-    const { calls, scheduled, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN));
-    notifier.plan(ring(30 * MIN));
+  it('hands the native side the timer cell with the plan, in whole ms', async () => {
+    const { notifier, plans, ring, done } = rig();
+    notifier.plan({ ...ring(25 * MIN, 'Lap 2 today'), at: T0 + 25 * MIN + 0.4 }, cell);
     await done();
-    assert.deepEqual(calls.slice(2), ['cancel', 'schedule', 'clear', 'cancel', 'schedule', 'clear']);
-    assert.deepEqual(
-      scheduled.map((n) => [n.id, n.schedule.at.getTime()]),
-      [
-        [RING_ID, T0 + 25 * MIN],
-        [RING_ID, T0 + 30 * MIN],
-      ],
-    );
+    assert.deepEqual(plans(), [{ stamp: STAMP, state: STATE, ring: { ...ring(25 * MIN, 'Lap 2 today'), at: T0 + 25 * MIN }, off: false }]);
   });
 
-  it('null cancels the alarm and takes the countdown away', async () => {
-    const { calls, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
+  it('the first plan always goes, even null, and the same plan twice goes once', async () => {
+    const { notifier, plans, ring, done } = rig();
     notifier.plan(null);
+    notifier.plan(ring(25 * MIN), cell);
+    notifier.plan(ring(25 * MIN), cell);
     await done();
-    assert.deepEqual(calls.slice(-2), ['cancel', 'clear']);
+    assert.deepEqual(plans().map((p) => p.ring?.at ?? null), [null, T0 + 25 * MIN]);
+    assert.equal(plans()[0].stamp, null);
   });
 
-  it('the first plan always runs, even null: an alarm from the app’s last life must not ring for a stopped timer', async () => {
-    const { calls, notifier, done } = rig();
-    notifier.plan(null);
+  it('a new stamp for the same plan goes again: the native side keeps the newer feed', async () => {
+    const { notifier, plans, ring, done } = rig();
+    notifier.plan(ring(25 * MIN), cell);
+    notifier.plan(ring(25 * MIN), { ...cell, stamp: STAMP.replace('30:00', '30:01') });
     await done();
-    assert.deepEqual(calls.slice(2), ['cancel', 'clear']);
+    assert.equal(plans().length, 2);
   });
 
-  it('the same plan twice is one alarm', async () => {
-    const { scheduled, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
+  it('when Android will not ring it, the page rings once if it is on screen at the time', async () => {
+    const { time, pageRings, notifier, ring, done } = rig({ rings: false });
+    notifier.plan(ring(25 * MIN), cell);
     await done();
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-    await done();
-    assert.equal(scheduled.length, 1);
-  });
-
-  it('a plan in the past, or within a moment of now, schedules nothing and cancels what was there', async () => {
-    const { calls, scheduled, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN));
-    await done();
-    notifier.plan(ring(-60 * MIN));
-    notifier.plan(ring(200));
-    await done();
-    assert.equal(scheduled.length, 1);
-    assert.deepEqual(calls.slice(-2), ['cancel', 'clear']);
-  });
-
-  it('without permission to notify, or without exact alarms, it schedules nothing and never asks', async () => {
-    for (const lacking of [{ display: 'prompt' as Grant }, { display: 'denied' as Grant }, { exact: 'denied' as Grant }]) {
-      const { calls, scheduled, notifier, ring, done } = rig(lacking);
-      notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-      await done();
-      assert.equal(scheduled.length, 0);
-      assert.ok(!calls.includes('ask'));
-      assert.deepEqual(calls.slice(-2), ['cancel', 'clear']);
-    }
-  });
-
-  it('the start that asks for permission still gets its bell once it is given', async () => {
-    const { scheduled, notifier, ring, done } = rig({ display: 'prompt' });
-    // main.tsx: `void notifier.allow(), focus.start(task)`; the plan lands while the prompt is up.
-    const allowed = notifier.allow();
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-    assert.equal(await allowed, true);
-    await done();
-    assert.equal(scheduled.length, 1);
-    assert.equal(scheduled[0].schedule.at.getTime(), T0 + 25 * MIN);
-  });
-
-  it('allow is false when exact alarms are off, and false when the person says no', async () => {
-    assert.equal(await rig({ exact: 'denied' }).notifier.allow(), false);
-    assert.equal(await rig({ display: 'prompt', answer: 'denied' }).notifier.allow(), false);
-    assert.equal(await rig().notifier.allow(), true);
-  });
-
-  it('a bridge call that fails is reported, and the next plan still runs', async () => {
-    const { scheduled, warned, notifier, ring, done } = rig({ failures: 1 });
-    notifier.plan(ring(25 * MIN));
-    notifier.plan(ring(30 * MIN));
-    await done();
-    assert.equal(warned.length, 1);
-    assert.deepEqual(
-      scheduled.map((n) => n.schedule.at.getTime()),
-      [T0 + 30 * MIN],
-    );
-  });
-
-  it('whole milliseconds reach the native side, which reads the end as a long', async () => {
-    const { scheduled, shown, notifier, done } = rig();
-    notifier.plan({ at: T0 + 25 * MIN + 0.6, title: 't', body: 'b', during: 'Lap 1 of 4' });
-    await done();
-    assert.equal(scheduled[0].schedule.at.getTime(), T0 + 25 * MIN + 1);
-    assert.equal(shown[0].end, T0 + 25 * MIN + 1);
-  });
-
-  it('without permission, the page rings the bell once if it is on screen at the time', async () => {
-    const { time, pageRings, notifier, ring, done } = rig({ display: 'denied' });
-    notifier.plan(ring(25 * MIN));
-    await done();
-    time.advance(60 * MIN);
+    time.advance(25 * MIN);
     assert.deepEqual(pageRings, [T0 + 25 * MIN]);
   });
 
-  it('without permission and out of sight, nothing rings, then or on coming back', async () => {
-    const { time, app, pageRings, scheduled, notifier, ring, done, resume } = rig({ display: 'denied', hidden: true });
-    notifier.plan(ring(25 * MIN));
+  it('when Android rings it, the page does not ring a second one', async () => {
+    const { time, pageRings, notifier, ring, done } = rig();
+    notifier.plan(ring(25 * MIN), cell);
     await done();
-    time.advance(25 * MIN + 30_000);
-    app.hidden = false;
-    resume();
-    await done();
-    time.advance(60 * MIN);
-    assert.deepEqual(pageRings, []);
-    assert.equal(scheduled.length, 0);
-  });
-
-  it('permission given in settings while away: coming back schedules the pending bell, once', async () => {
-    const { time, state, scheduled, pageRings, notifier, ring, done, resume } = rig({ display: 'denied' });
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-    await done();
-    assert.equal(scheduled.length, 0);
-    time.advance(5 * MIN);
-    state.display = 'granted';
-    resume();
-    resume();
-    await done();
-    assert.equal(scheduled.length, 1);
-    assert.equal(scheduled[0].schedule.at.getTime(), T0 + 25 * MIN);
-    // Android has it now: the page keeps quiet at the bell.
-    time.advance(60 * MIN);
+    time.advance(30 * MIN);
     assert.deepEqual(pageRings, []);
   });
 
-  it('with permission, the notification is the bell and the page does not ring a second one', async () => {
-    const { time, scheduled, pageRings, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN));
+  it('a bridge call that fails is reported, and the next plan still goes', async () => {
+    const { notifier, plans, warned, ring, done } = rig({ failures: 1 });
+    notifier.plan(ring(25 * MIN), cell);
+    notifier.plan(ring(30 * MIN), cell);
     await done();
-    time.advance(60 * MIN);
-    assert.equal(scheduled.length, 1);
-    assert.deepEqual(pageRings, []);
+    assert.equal(warned.length, 1);
+    assert.deepEqual(plans().map((p) => p.ring.at), [T0 + 30 * MIN]);
+  });
+
+  it('a bridge that fails to take the plan leaves the bell to the page, if it is on screen', async () => {
+    const { time, pageRings, notifier, warned, ring, done } = rig({ failures: 1 });
+    notifier.plan(ring(25 * MIN), cell);
+    await done();
+    time.advance(25 * MIN);
+    assert.equal(warned.length, 1);
+    assert.deepEqual(pageRings, [T0 + 25 * MIN]);
+  });
+
+  it('the start that asks for permission plans again once it is given', async () => {
+    const { notifier, plans, ring, done } = rig({ display: 'prompt' });
+    notifier.plan(ring(25 * MIN), cell);
+    assert.equal(await notifier.allow(), true);
+    await done();
+    assert.equal(plans().length, 2);
+  });
+
+  it('allow is false when exact alarms are off, and false when the person says no', async () => {
+    assert.equal(await rig({ display: 'prompt', exact: 'denied' }).notifier.allow(), false);
+    assert.equal(await rig({ display: 'prompt', answer: 'denied' }).notifier.allow(), false);
+  });
+
+  it('coming back to the app plans again: permission may have been given in settings', async () => {
+    const { notifier, plans, ring, done, resume } = rig();
+    notifier.plan(ring(25 * MIN), cell);
+    await done();
+    resume();
+    await done();
+    assert.equal(plans().length, 2);
   });
 });
 
 describe('ring here, on the phone', () => {
-  it('off cancels the alarm and clears the countdown, plans nothing while off, and on again schedules the bell', async () => {
-    const { calls, scheduled, notifier, ring, done } = rig();
-    notifier.plan(ring(25 * MIN, 'Lap 1 of 4'));
-    await done();
+  it('off sends the timer with no plan, so nothing is drawn; on again sends the bell', async () => {
+    const { notifier, plans, ring, done } = rig();
+    notifier.plan(ring(25 * MIN), cell);
     notifier.ringHere(false);
-    await done();
-    assert.deepEqual(calls.slice(-2), ['cancel', 'clear']);
-    notifier.plan(ring(30 * MIN, 'Lap 1 of 4'));
-    await done();
-    assert.equal(scheduled.length, 1);
     notifier.ringHere(true);
     await done();
-    assert.deepEqual(
-      scheduled.map((n) => n.schedule.at.getTime()),
-      [T0 + 25 * MIN, T0 + 30 * MIN],
-    );
+    // Off says why the plan is empty: the native side takes back even a bell already due.
+    assert.deepEqual(plans().map((p) => [p.stamp, p.ring?.at ?? null, p.off]), [
+      [STAMP, T0 + 25 * MIN, false],
+      [STAMP, null, true],
+      [STAMP, T0 + 25 * MIN, false],
+    ]);
   });
 
-  it('off, the page keeps quiet too, even without permission', async () => {
-    const { time, pageRings, notifier, ring, done } = rig({ display: 'denied' });
-    notifier.plan(ring(25 * MIN));
+  it('off, the page keeps quiet too, even when Android cannot ring', async () => {
+    const { time, pageRings, notifier, ring, done } = rig({ rings: false });
+    notifier.plan(ring(25 * MIN), cell);
     notifier.ringHere(false);
     await done();
     time.advance(60 * MIN);
@@ -295,84 +239,7 @@ describe('ring here, on the phone', () => {
   });
 });
 
-describe('the countdown and its buttons', () => {
-  const ACTIONS = { pause: 'Pause', resume: 'Resume', stop: 'Stop', run: 'run-7' };
-  const lap = (inMs: number, during = 'Lap 1 of 4') => ({ at: T0 + inMs, title: 'Lap 1 of 4, done.', body: 'Take five.', during, actions: ACTIONS });
-  const still = { paused: true as const, during: 'Lap 1 of 4, paused', left: '12:34 left', actions: ACTIONS };
-
-  it('while a lap runs, the countdown carries Pause and Stop, worded by the caller', async () => {
-    const { notifier, done, shown } = rig();
-    notifier.plan(lap(25 * MIN));
-    await done();
-    assert.deepEqual(shown.at(-1), {
-      title: 'Lap 1 of 4',
-      end: T0 + 25 * MIN,
-      channel: 'countdown',
-      actions: [
-        { act: 'pause', label: 'Pause', run: 'run-7' },
-        { act: 'stop', label: 'Stop', run: 'run-7' },
-      ],
-    });
-  });
-
-  it('paused: the bell is taken back and a still notification offers Resume and Stop; resuming arms it again', async () => {
-    const { notifier, done, shown, held, calls, scheduled } = rig();
-    notifier.plan(lap(25 * MIN));
-    await done();
-    notifier.plan(still);
-    await done();
-    assert.ok(!held.has(RING_ID));
-    assert.deepEqual(shown.at(-1), {
-      title: 'Lap 1 of 4, paused',
-      text: '12:34 left',
-      channel: 'countdown',
-      actions: [
-        { act: 'resume', label: 'Resume', run: 'run-7' },
-        { act: 'stop', label: 'Stop', run: 'run-7' },
-      ],
-    });
-    assert.equal(calls.at(-1), 'countdown');
-    notifier.plan(lap(30 * MIN));
-    await done();
-    assert.equal(scheduled.at(-1).schedule.at.getTime(), T0 + 30 * MIN);
-    assert.equal(shown.at(-1).end, T0 + 30 * MIN);
-  });
-
-  it('a stop clears the still one too', async () => {
-    const { notifier, done, calls } = rig();
-    notifier.plan(still);
-    await done();
-    notifier.plan(null);
-    await done();
-    assert.equal(calls.at(-1), 'clear');
-  });
-
-  it('the same bell with another line redraws the countdown only: the alarm is not touched', async () => {
-    const { notifier, done, shown, calls } = rig();
-    notifier.plan(lap(25 * MIN, 'Lap 1 of 4'));
-    await done();
-    const before = calls.length;
-    notifier.plan(lap(25 * MIN, 'Lap 1 of 4, on the intro'));
-    await done();
-    assert.deepEqual(calls.slice(before), ['countdown']);
-    assert.equal(shown.at(-1).title, 'Lap 1 of 4, on the intro');
-  });
-
-  it('other words for the bell itself set the same alarm again, at the same moment, on the same id', async () => {
-    const { notifier, done, scheduled } = rig();
-    notifier.plan(lap(25 * MIN));
-    await done();
-    notifier.plan({ ...lap(25 * MIN), body: 'Take ten.' });
-    await done();
-    assert.deepEqual(
-      scheduled.map((n) => [n.id, n.schedule.at.getTime(), n.body]),
-      [
-        [RING_ID, T0 + 25 * MIN, 'Take five.'],
-        [RING_ID, T0 + 25 * MIN, 'Take ten.'],
-      ],
-    );
-  });
-
+describe('the countdown\'s buttons', () => {
   it('a tap reaches the app with the run its button was drawn for; one made before it listens (it opened the app) keeps its run', async () => {
     const { notifier, tapped } = rig();
     tapped('pause', 'run-6');
@@ -387,84 +254,105 @@ describe('the countdown and its buttons', () => {
       ['resume', null],
     ]);
   });
+});
 
-  it('ring here off: no still notification either', async () => {
-    const { notifier, done, calls } = rig();
-    notifier.ringHere(false);
-    notifier.plan(still);
-    await done();
-    assert.ok(!calls.includes('countdown'));
+describe('a tap for a run the page has not heard of yet', () => {
+  const rigTaps = (run: string | null) => {
+    const state = { run, caughtUp: false };
+    const done: string[] = [];
+    const taps = heldTaps(() => state.run, () => state.caughtUp, (act) => done.push(act));
+    return { state, done, taps };
+  };
+
+  it('waits for the page to catch up and is done once the run arrives: a lap the service drew while the app was closed', () => {
+    const { state, done, taps } = rigTaps('run-1');
+    taps.tap('pause', 'run-2');
+    taps.look();
+    assert.deepEqual(done, []);
+    state.run = 'run-2';
+    taps.look();
+    state.caughtUp = true;
+    taps.look();
+    assert.deepEqual(done, ['pause']);
+  });
+
+  it('is dropped once the page has caught up and the run is still not the timer\'s', () => {
+    const { state, done, taps } = rigTaps('run-1');
+    taps.tap('stop', 'run-0');
+    state.caughtUp = true;
+    taps.look();
+    state.run = 'run-0';
+    taps.look();
+    assert.deepEqual(done, []);
+  });
+
+  it('the timer\'s own run is done at once, and a stale one is dropped at once when the page is in step', () => {
+    const { state, done, taps } = rigTaps('run-1');
+    taps.tap('pause', 'run-1');
+    state.caughtUp = true;
+    taps.tap('stop', 'run-0');
+    state.run = 'run-0';
+    taps.look();
+    assert.deepEqual(done, ['pause']);
   });
 });
 
-describe('a bell whose time has come', () => {
-  const lap = (inMs: number) => ({ at: T0 + inMs, title: 'Lap 1 of 4, done.', body: 'Take five.', during: 'Lap 1 of 4' });
-  const rest = (inMs: number) => ({ at: T0 + inMs, title: 'Break over.', body: 'Lap 2 is next.', during: 'Short break' });
+describe('keeping step while closed', () => {
+  const words = {
+    bell: { lap: [], take: [], next: [], break: '' },
+    during: { work: 'A lap', short: 'Short break', long: 'Long break' },
+    actions: { pause: 'Pause', resume: 'Resume', stop: 'Stop', done: 'Done for now' },
+    left: 'Paused, {t} left',
+    note: { title: '{room}', body: '{name}: {text}' },
+    call: { title: '{name} calls a lap at {time}', body: '{room}' },
+    starts: { title: 'The lap together starts', body: '{room}', with: '{room}, with {name}' },
+    keeping: 'heirloom is keeping in step',
+    channels: { keep: 'Keeping in step', rooms: 'Rooms' },
+  };
+  const link = { server: 'https://h.example', account: 'a_1', token: 't', device: 'd', cursor: 1042, on: true, words };
 
-  it('is left to Android when the timer stops running at the bell, even if Android is late', async () => {
-    const { time, notifier, done, held, calls } = rig();
-    notifier.plan(lap(MIN));
+  it('sends the link once per change, the cursor alone being none, and the plan again after it', async () => {
+    const { notifier, sent, ring, done } = rig();
+    notifier.plan(ring(25 * MIN), cell);
+    notifier.keep(link);
+    notifier.keep({ ...link, cursor: 1100 });
+    notifier.keep({ ...link, on: false });
+    notifier.keep(null);
     await done();
-    // The page's own timer reaches the bell first: the lap stops running and plans nothing.
-    time.jump(MIN + 800);
-    notifier.plan(null);
-    await done();
-    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
-    assert.equal(calls.at(-1), 'clear');
+    assert.deepEqual(sent.map(([what, o]) => (what === 'keep' ? (o && o.on) : what)), ['plan', true, 'plan', false, 'plan', null, 'plan']);
   });
 
-  it('with the break started by itself, the break goes on the other id and the lap still rings', async () => {
-    const { time, notifier, done, held } = rig();
-    notifier.plan(lap(MIN));
+  it('asks Android whether heirloom may be stopped, and opens its request from a tap', async () => {
+    const { notifier, sent, done } = rig();
+    assert.deepEqual(await notifier.background(), { unrestricted: false });
+    notifier.askUnrestricted();
     await done();
-    time.jump(MIN + 800);
-    notifier.plan(rest(MIN + 5 * MIN));
+    assert.deepEqual(sent, [['ask', null]]);
+  });
+});
+
+describe('a called lap, on the phone', () => {
+  const call = (inMs: number, body = 'Study club, with lina') => ({ id: 'c1', at: T0 + inMs + 0.3, title: 'The lap together starts', body });
+  const calls = (sent: [string, any][]) => sent.filter(([what]) => what === 'call').map(([, o]) => o);
+
+  it('goes to the native side in whole ms, once per change; nothing until main says', async () => {
+    const { notifier, sent, done } = rig();
+    notifier.ringHere(true);
+    notifier.call(call(10 * MIN));
+    notifier.call(call(10 * MIN));
+    notifier.call(null);
     await done();
-    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
-    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
+    assert.deepEqual(calls(sent), [{ ...call(10 * MIN), at: T0 + 10 * MIN }, null]);
   });
 
-  it('the break planned a moment after the lap planned nothing still goes on the other id', async () => {
-    const { time, notifier, done, held } = rig();
-    notifier.plan(lap(MIN));
-    await done();
-    time.jump(MIN + 300);
-    notifier.plan(null);
-    await done();
-    time.jump(500);
-    notifier.plan(rest(MIN + 5 * MIN));
-    await done();
-    assert.equal(held.get(RING_ID)?.title, 'Lap 1 of 4, done.');
-    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
-  });
-
-  it('a real stop before the bell still cancels, and the ids take turns so no more than two bells are ever held', async () => {
-    const { time, notifier, done, held, scheduled } = rig();
-    notifier.plan(lap(MIN));
-    await done();
-    time.jump(MIN + 800);
-    notifier.plan(rest(6 * MIN));
-    await done();
-    time.jump(5 * MIN);
-    // The break rang too; the next lap goes back on the first id, which clears the old bell from the shade.
-    notifier.plan(lap(6 * MIN + 1000 + 25 * MIN));
-    await done();
-    assert.deepEqual(scheduled.map((n) => n.id), [RING_ID, RING_ID + 1, RING_ID]);
-    // Stopped halfway through: that bell is taken back, the rung break is not touched.
-    notifier.plan(null);
-    await done();
-    assert.ok(!held.has(RING_ID));
-    assert.equal(held.get(RING_ID + 1)?.title, 'Break over.');
-  });
-
-  it('switching ring here off takes back even a bell whose time has come', async () => {
-    const { time, notifier, done, held } = rig();
-    notifier.plan(lap(MIN));
-    await done();
-    time.jump(MIN + 300);
+  it('ring here off takes it off, on again sets it; coming back sends it again', async () => {
+    const { notifier, sent, done, resume } = rig();
+    notifier.call(call(10 * MIN));
     notifier.ringHere(false);
+    notifier.ringHere(true);
+    resume();
     await done();
-    assert.ok(!held.has(RING_ID));
+    assert.deepEqual(calls(sent).map((o) => o && o.id), ['c1', null, 'c1', 'c1']);
   });
 });
 
@@ -671,97 +559,5 @@ describe('in front again, on the phone', () => {
     assert.deepEqual(seen.map(([event]) => event), ['resume']);
     seen[0]![1]();
     assert.equal(runs, 1);
-  });
-});
-
-
-describe('a called lap, on the phone', () => {
-  const call = (inMs: number, body = 'Study club, with lina') => ({ at: T0 + inMs, title: 'The lap together starts', body });
-
-  it('an exact alarm at its minute, on the reminders’ channel, with its own id', async () => {
-    const { notifier, done, held } = rig({ remind: 'Reminders' });
-    notifier.call(call(10 * MIN));
-    await done();
-    const n = held.get(CALL_ID);
-    assert.equal(n.title, 'The lap together starts');
-    assert.equal(n.body, 'Study club, with lina');
-    assert.equal(n.channelId, 'remind');
-    assert.equal(n.schedule.at.getTime(), T0 + 10 * MIN);
-    assert.equal(n.schedule.allowWhileIdle, true);
-    assert.notEqual(n.isExactNotification, false);
-  });
-
-  it('a new call replaces the last on the same id; null cancels it and takes it out of the shade', async () => {
-    const { notifier, done, held, calls } = rig({ remind: 'Reminders' });
-    notifier.call(call(10 * MIN));
-    notifier.call(call(15 * MIN, 'Night owls, with ravi'));
-    await done();
-    assert.deepEqual([...held.keys()], [CALL_ID]);
-    assert.equal(held.get(CALL_ID).body, 'Night owls, with ravi');
-    const before = calls.length;
-    notifier.call(call(15 * MIN, 'Night owls, with ravi'));
-    await done();
-    assert.equal(calls.length, before);
-    notifier.call(null);
-    await done();
-    assert.equal(held.size, 0);
-    assert.deepEqual(calls.slice(before), ['cancel', `remove ${CALL_ID}`]);
-  });
-
-  it('one already past sets nothing; the same call again after its minute leaves its notification in the shade', async () => {
-    const past = rig({ remind: 'Reminders' });
-    past.notifier.call(call(-MIN));
-    await past.done();
-    assert.equal(past.held.size, 0);
-    assert.ok(!past.calls.includes('schedule'));
-
-    const { notifier, done, time, calls } = rig({ remind: 'Reminders' });
-    notifier.call(call(10 * MIN));
-    await done();
-    time.jump(10 * MIN + 20_000);
-    const before = calls.length;
-    notifier.call(call(10 * MIN));
-    await done();
-    assert.deepEqual(calls.slice(before), []);
-    // The call ends a minute after its start and main says null: the notification stays where it is.
-    time.jump(MIN);
-    notifier.call(null);
-    await done();
-    assert.deepEqual(calls.slice(before), []);
-    // A new call later is set as any other.
-    notifier.call(call(30 * MIN));
-    await done();
-    assert.equal(calls.at(-1), 'schedule');
-  });
-
-  it('nothing is touched until main says; its first null clears one left from the app’s last life', async () => {
-    const { notifier, done, held, calls } = rig({ remind: 'Reminders' });
-    held.set(CALL_ID, { id: CALL_ID });
-    notifier.ringHere(true);
-    await done();
-    assert.ok(held.has(CALL_ID));
-    notifier.call(null);
-    await done();
-    assert.ok(!held.has(CALL_ID));
-    assert.ok(calls.includes(`remove ${CALL_ID}`));
-  });
-
-  it('nothing without permission or with ring here off; reminders being rebuilt leave it alone', async () => {
-    const denied = rig({ remind: 'Reminders', display: 'denied' });
-    denied.notifier.call(call(10 * MIN));
-    await denied.done();
-    assert.equal(denied.held.size, 0);
-
-    const { notifier, done, held } = rig({ remind: 'Reminders' });
-    notifier.call(call(10 * MIN));
-    notifier.reminders([]);
-    await done();
-    assert.ok(held.has(CALL_ID));
-    notifier.ringHere(false);
-    await done();
-    assert.ok(!held.has(CALL_ID));
-    notifier.ringHere(true);
-    await done();
-    assert.ok(held.has(CALL_ID));
   });
 });

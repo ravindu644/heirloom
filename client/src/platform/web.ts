@@ -237,6 +237,10 @@ export function createWebNotifier(env: WebEnv): Notifier {
     reword: subscribe,
     // No Notification API at all still rings: the bell sounds while the page is open.
     canRing: async () => env.Notification?.permission !== 'denied',
+    // A closed tab is reached by Web Push, not by a connection of its own, and no browser stops it to save battery.
+    keep() {},
+    background: async () => ({ unrestricted: true }),
+    askUnrestricted() {},
   };
 }
 
