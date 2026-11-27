@@ -179,9 +179,10 @@ else does). Stamps are the timer cell's stamp, compared as plain strings (protoc
   native side holds (stamp, cursor, alarms). `on` is the switch and Ring here together. Null is a
   sign-out: stop, wipe. `words` are the templates, all from `strings.ts`:
   `{ bell: { lap[4], take[4], next[4], break }, during: { work, short, long }, actions: { pause,
-  resume, stop }, left: "{t} left", note: { title: "{room}", body: "{name}: {text}" },
-  call: { title: "{name} calls a lap at {time}", body: "{room}" }, keeping, channels: { keep,
-  rooms } }`.
+  resume, stop, done }, left: "Paused, {t} left", note: { title: "{room}", body: "{name}: {text}" },
+  call: { title: "{name} calls a lap at {time}", body: "{room}" }, starts: { title, body: "{room}",
+  with: "{room}, with {name}" }, keeping, channels: { keep, rooms } }`. OkHttp is pinned at 5.4
+  while compileSdk is 36 (5.5 wants 37).
 
 The service merges its own feed with the page's by stamp, newer wins, the page on a tie. It
 starts when `keep` says `on` and notifications are allowed, and at boot and update from what it

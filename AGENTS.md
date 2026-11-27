@@ -64,6 +64,7 @@ A lane that needs a change outside its folder asks the lead in its report; it ne
 - `contracts/` is the only definition of the wire format, the datasets and their fields. Fixtures
   in `contracts/fixtures/` run in both Go and TS tests.
 - `client/src/core/merge.ts` and `server/sync/` are the only places a cell is compared or applied.
+  One logged exception: the phone's `Shade.java` keeps the newer of two timer feeds by stamp (ARCHITECTURE section 6).
 - `DESIGN.md` is the only file with colour, font, size, radius and duration values. UI code uses
   the generated `tokens.css`; `tools/style-check.mjs` fails on a literal.
 - `client/src/ui/kit/` holds the shared components. A screen that needs a button, a sheet or a list

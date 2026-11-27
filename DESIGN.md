@@ -711,7 +711,7 @@ Built once in `client/src/ui/kit/` and reused.
     silent channel named "Keeping in step" that the person can hide.
   - A note: the room's name over "sachi: the line itself", on a channel named "Rooms". A call:
     "lina calls a lap at 15:00" over the room's name. Both open the room. A lap started
-    elsewhere and drawn from the service alone says "A lap" or "A short break" until the app
+    elsewhere and drawn from the service alone says "A lap", "Short break" or "Long break" until the app
     has the task: never a blank, never a guessed title.
 - **Rest days** are a panel in Settings, after the day's target: the seven weekdays as one row of
   choices (as a habit's days), any two of which may be on; with two on, the other five take no
