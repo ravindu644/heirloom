@@ -29,7 +29,8 @@ prints the last part of the link that sets a new one, `<server>/#/reset/<this>`.
 
 Port 8787 is plain http, fine for a home network you trust. For friends elsewhere, put https in
 front of it with a Cloudflare tunnel or a reverse proxy pointed at `http://127.0.0.1:8787`. Over
-https a closed browser tab still rings, and the app keeps working offline.
+https a closed browser tab still rings, and the app keeps working offline. No machine that stays
+on? [A free server that stays up](FREE-SERVER.md) is how heirloom's own runs for $0.
 
 ## Backups
 

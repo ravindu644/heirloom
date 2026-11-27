@@ -50,6 +50,7 @@ No friend with a server? [Run your own](docs/DEPLOY.md): one file for Linux on x
 | Page | What it covers |
 |------|----------------|
 | [Running a server](docs/DEPLOY.md) | Getting heirloomd, the systemd service, the first setup, https, backups. |
+| [A free server that stays up](docs/FREE-SERVER.md) | heirloom's own setup, step by step: an Oracle Always Free VM, a Cloudflare tunnel, SSH only over Tailscale, a $1 alarm, backups on a second machine. |
 | [Product](docs/PRODUCT.md) | What version 1 does, and why. |
 | [Architecture](docs/ARCHITECTURE.md) | How it is built, and what happens when two offline devices disagree. |
 | [How it is built](AGENTS.md) | Building from source, and the team of agents that builds it. |
