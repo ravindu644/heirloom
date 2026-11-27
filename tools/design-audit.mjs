@@ -541,6 +541,42 @@ export function rowLinks() {
   });
 }
 
+// In the page. 14. What sticks to the top of a scroller (a room's tabs) sits flush with that top
+// once it has stuck: its scroller is scrolled to the end, and every point of the strip between
+// the scroller's top and the stuck thing must be the stuck thing or lie outside the scroller (the
+// header). A sticky `top: 0` stops at the scroller's padding, and what scrolled showed through
+// that strip on the phone. The scroll is put back.
+export function stuck() {
+  const name = (e) => e.tagName.toLowerCase() + (e.classList[0] ? '.' + e.classList[0].replace(/__[0-9a-f]{5}$/, '') : '');
+  const found = [];
+  for (const el of document.querySelectorAll('*')) {
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'sticky' || cs.top === 'auto' || !el.checkVisibility()) continue;
+    let box = el.parentElement;
+    while (box && !/auto|scroll/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+    if (!box || box.scrollHeight <= box.clientHeight + 1) continue;
+    const was = box.scrollTop;
+    const before = el.getBoundingClientRect().top;
+    box.scrollTop = box.scrollHeight;
+    const r = el.getBoundingClientRect();
+    // Not stuck: it scrolled as far as the page did, and what stands over it is the page's own.
+    if (r.top <= before - (box.scrollTop - was) + 0.5) {
+      box.scrollTop = was;
+      continue;
+    }
+    const top = box.getBoundingClientRect().top + box.clientTop;
+    const x = Math.round(r.left + r.width / 2);
+    let open = 0;
+    for (let y = Math.ceil(top); y < Math.floor(r.top); y++) {
+      const hit = document.elementFromPoint(x, y);
+      if (hit && box.contains(hit) && !el.contains(hit)) open++;
+    }
+    box.scrollTop = was;
+    if (open) found.push({ rule: 'stuck', path: [el.parentElement, el].map(name).join(' > '), text: (el.textContent || '').trim().slice(0, 30), what: `stuck ${Math.round(r.top - top)}px under its scroller's top, ${open}px of what scrolled showing above it`, allowed: 'what sticks to the top sits flush under the header, and nothing scrolled shows between them' });
+  }
+  return found;
+}
+
 // In the page: resolves once nothing has changed for 150ms, or after a second whatever happens
 // (the clock ticks each second, which is not a tap landing).
 function settled() {
@@ -619,6 +655,7 @@ async function main() {
           const { els, head, doc } = await read(false);
           for (const x of await page.evaluate(wobble)) found.push({ ...x, state, size });
           for (const x of await page.evaluate(rowLinks)) found.push({ ...x, state, size });
+          for (const x of await page.evaluate(stuck)) found.push({ ...x, state, size });
           await page.emulateMedia({ colorScheme: 'dark' });
           const dark = (await read(true)).els;
           heads[size][state] = head;

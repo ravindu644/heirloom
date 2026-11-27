@@ -1,7 +1,7 @@
 # heirloom. `make check` runs every check and reports each one; the rest build and run things.
 SHELL := /bin/bash
 TOKENS := client/src/ui/tokens.css
-VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
 # The server's address and login live in .local/ENV.md and nowhere else.
