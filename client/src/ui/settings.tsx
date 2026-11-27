@@ -8,7 +8,7 @@ import type { Rooms } from '../sync/rooms.ts';
 import { holderOf, makePicture, ownPicture, usePicture } from './picture.ts';
 import { isPlain } from '../sync/server.ts';
 import type { ServerChoice } from '../sync/server.ts';
-import type { Settings as SettingsData, SettingsView } from '../sync/settings.ts';
+import { SOUNDS, type Settings as SettingsData, type SettingsView, type Sound } from '../sync/settings.ts';
 import { Button } from './kit/button.tsx';
 import { cx } from './kit/cx.ts';
 import { Fold } from './kit/fold.tsx';
@@ -65,10 +65,12 @@ interface Props {
   mayStop?: ReadonlySignal<boolean>;
   /** Opens Android's own screen to let heirloom run unrestricted. */
   letRun?: () => void;
+  /** Plays a bell once, as it will ring: the tap that picks it. */
+  preview?: (sound: Sound) => void;
   onSignIn: () => void;
 }
 
-export function Settings({ engine, settings, invites, admins, resets, rooms, server: choice, canSave = true, ringBlocked, mayStop, letRun, onSignIn }: Props) {
+export function Settings({ engine, settings, invites, admins, resets, rooms, server: choice, canSave = true, ringBlocked, mayStop, letRun, preview, onSignIn }: Props) {
   const account = engine.account.value;
   const sync = engine.sync.value;
   const unsent = engine.unsent.value;
@@ -229,7 +231,18 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
       </Panel>
 
       <Panel title={s.settings.bell}>
+        {/* The panel's own title names the three: a second "The bell" over them would say it twice. */}
+        <div class={cx(form.choices, form.share)} role="group" aria-label={s.settings.bell}>
+          {SOUNDS.map((sound) => (
+            <button key={sound} type="button" class={form.choice} aria-pressed={all.sound === sound} onClick={() => (settings.set({ sound }), preview?.(sound))}>
+              {s.settings.sounds[sound]}
+            </button>
+          ))}
+        </div>
         <Switch label={s.settings.ringHere(s.device())} note={ringBlocked?.value ? s.settings.ringBlocked : s.settings.ringHereNote} on={settings.ringHere.value} onChange={(ring) => settings.setRingHere(ring)} />
+        {/* The phone app only, each phone its own; with Ring here off there is no bell for them to change. */}
+        {!canSave && <Switch label={s.settings.vibrate} note={s.settings.vibrateNote} on={settings.vibrate.value} off={!settings.ringHere.value} onChange={(on) => settings.setVibrate(on)} />}
+        {!canSave && <Switch label={s.settings.ringOnSilent} note={s.settings.ringOnSilentNote} on={settings.ringOnSilent.value} off={!settings.ringHere.value} onChange={(on) => settings.setRingOnSilent(on)} />}
         {/* The phone app only: with Ring here off it has nothing to ring, so it takes no press. */}
         {!canSave && <Switch label={s.settings.keepInStep} note={s.settings.keepInStepNote} on={settings.keepInStep.value} off={!settings.ringHere.value} onChange={(on) => settings.setKeepInStep(on)} />}
         {/* Asked from this tap only, never at start; gone once Android says it is set (looked at again

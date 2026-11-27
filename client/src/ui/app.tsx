@@ -14,7 +14,7 @@ import type { Focus } from '../sync/focus.ts';
 import type { Habits } from '../sync/habits.ts';
 import type { Progress } from '../sync/progress.ts';
 import type { Rooms } from '../sync/rooms.ts';
-import type { Settings as SettingsData } from '../sync/settings.ts';
+import type { Settings as SettingsData, Sound } from '../sync/settings.ts';
 import type { Today } from '../sync/today.ts';
 import css from './app.module.css';
 import { Settings } from './settings.tsx';
@@ -130,9 +130,11 @@ interface Props {
   /** The phone app: true while Android may stop heirloom in the background; Settings offers the way out. */
   mayStop?: ReadonlySignal<boolean>;
   letRun?: () => void;
+  /** Plays a bell once: the tap in Settings that picks it. */
+  preview?: (sound: Sound) => void;
 }
 
-export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, onReminderSet, canSave, ringBlocked, mayStop, letRun }: Props) {
+export function App({ engine, focus, today, progress, habits, rooms, settings, invites, admins, resets, server, onReminderSet, canSave, ringBlocked, mayStop, letRun, preview }: Props) {
   const screen = useScreen();
   const invite = useInvite();
   const link = useReset();
@@ -199,7 +201,7 @@ export function App({ engine, focus, today, progress, habits, rooms, settings, i
         <RoomScreen engine={engine} rooms={rooms} lapMs={settings.all.value.work_ms} />
       ) : (
         // Settings is not one of the five: its name makes it a screen of its own for the frame.
-        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} mayStop={mayStop} letRun={letRun} onSignIn={() => setAgain(true)} />
+        <Settings engine={engine} settings={settings} invites={invites} admins={admins} resets={resets} rooms={rooms} server={server} canSave={canSave} ringBlocked={ringBlocked} mayStop={mayStop} letRun={letRun} preview={preview} onSignIn={() => setAgain(true)} />
       )}
     </Shell>
   );

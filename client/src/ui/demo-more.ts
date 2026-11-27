@@ -410,7 +410,7 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     long_ms: 15 * MIN,
     auto_break: false,
     auto_work: false,
-    sound: 'bell',
+    sound: 'school',
     celebrate: true,
     day_target: 8,
     share_task: false,
@@ -420,6 +420,8 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
   });
   const ringHere = signal(true);
   const keepInStep = signal(true);
+  const vibrate = signal(true);
+  const ringOnSilent = signal(true);
   const shown = signal(marks);
   return {
     all,
@@ -431,6 +433,10 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     setRingHere: (ring) => void (ringHere.value = ring),
     keepInStep,
     setKeepInStep: (on) => void (keepInStep.value = on),
+    vibrate,
+    setVibrate: (on) => void (vibrate.value = on),
+    ringOnSilent,
+    setRingOnSilent: (on) => void (ringOnSilent.value = on),
     marks: computed(() => (all.value.celebrate ? shown.value : [])),
     seen: () => void (shown.value = []),
     exportAll: () => JSON.stringify({ heirloom: 1, exported: Date.now(), account: 'ravi', cells: [] }),

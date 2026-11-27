@@ -1,6 +1,7 @@
 /* Equal shares on a phone; each its own width, at least 128px, from the left edge with a sidebar.
-   The row stays under the header while its panel scrolls. */
-.tabs { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--ground); box-shadow: inset 0 calc(var(--layout-hair) * -1) 0 var(--line); }
+   The row stays under the header while its panel scrolls, flush with it: a sticky `top: 0` stops
+   at the scroller's padding, and what scrolled showed through that strip, so it reaches back over it. */
+.tabs { position: sticky; top: calc(var(--main-top, 0px) * -1); z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--ground); box-shadow: inset 0 calc(var(--layout-hair) * -1) 0 var(--line); }
 .tabs button { min-height: var(--layout-touch); padding: 0 var(--space-sm); border: 0; background: none; font: var(--type-body-strong); color: var(--muted); cursor: pointer; }
 .tabs [aria-selected="true"] { color: var(--ink); box-shadow: inset 0 calc(var(--layout-stroke) * -1) 0 var(--ink); }
 .label { position: relative; }

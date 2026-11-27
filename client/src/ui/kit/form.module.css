@@ -35,6 +35,13 @@
   .weekday::after { content: ''; position: absolute; inset: 0 calc(var(--space-xs) / -2); }
 }
 
+/* A few choices that make one row ("School bell", "Struck bell", "Soft chime"): where the line is
+   too short for them at their own width, they share it equally rather than leave one alone below. */
+.share { container-type: inline-size; }
+@container (max-width: 400px) {
+  .share > .choice { flex: 1; min-width: 0; padding: 0 var(--space-sm); justify-content: center; }
+}
+
 .line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); font: var(--type-label); color: var(--muted); }
 
 .ends { display: flex; gap: var(--space-sm); }

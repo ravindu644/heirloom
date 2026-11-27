@@ -244,6 +244,13 @@ export const ring = {
   noteBody: '{name}: {text}',
   calledTitle: '{name} calls a lap at {time}',
   calledBody: '{room}',
+  // The bell's answers (DESIGN.md, "A bell you can answer"): the break by its own length, as Focus
+  // says it, or the next lap; "Done for now" is breakStop.
+  answerBreak: (ms: number) => (mins(ms) === 5 ? 'Take five' : `Take ${length(ms)}`),
+  startNext: 'Start the next lap',
+  // A called lap's notification once you are in, and when the server could not be reached.
+  youreIn: "You're in. It starts at {time}.",
+  unreached: 'Could not reach your server.',
 };
 
 // A second tab of the same browser: it shares the first one's laps and must not run beside it.
@@ -303,10 +310,17 @@ export const settings = {
   targetMore: 'One lap more',
 
   bell: 'The bell',
+  // The three bells, as tools/bells.mjs draws them; a tap picks one and plays it once.
+  sounds: { school: 'School bell', struck: 'Struck bell', chime: 'Soft chime' },
   ringHere: (device: string) => `Ring on this ${device}`,
   ringHereNote: 'A sound and a notification when a lap or a break ends.',
   // The device will not let heirloom notify: the switch is on and nothing would ring, so it says why.
   ringBlocked: 'Notifications for heirloom are switched off on this device, so the bell cannot ring. Allow them in the device\u2019s settings.',
+  // The phone app only, each phone its own: how the bell reaches a person who is not looking.
+  vibrate: 'Vibrate',
+  vibrateNote: 'A buzz with the bell: two long, one short.',
+  ringOnSilent: 'Ring even on silent',
+  ringOnSilentNote: 'The bell plays through Mute, like an alarm. Turn it off for class or the library.',
   // The phone app only: the quiet connection that keeps the phone in step while heirloom is closed.
   keepInStep: 'Ring when heirloom is closed',
   keepInStepNote: 'Keeps a quiet connection to your server, so a lap started or paused elsewhere reaches this phone, and room notes and calls show up.',
@@ -687,6 +701,8 @@ const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
 /** "Sachi", "Sachi and Dilan", "Sachi, Dilan and Amaya". */
 // A small count in words: "all four have run a lap".
 const word = (n: number) => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'][n] ?? String(n);
+// Everyone in a room, as the streak says it: "you" alone, "both" of two, "all four" past that.
+const everyone = (n: number) => (n === 1 ? 'you' : n === 2 ? 'both' : `all ${word(n)}`);
 const names = (list: string[]) => (list.length < 3 ? list.join(' and ') : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
 
 export const habits = {
@@ -829,7 +845,7 @@ export const room = {
   streakDays: (run: number) => (run === 1 ? 'day in a row, everyone in' : 'days in a row, everyone in'),
   streakSaid: (run: number) => `${plural(run, 'day', 'days')} in a row on which everyone ran a lap`,
   restWas: (ms: number) => `${new Date(ms).toLocaleDateString('en-GB', { weekday: 'long' })} the ${ordinal(new Date(ms).getDate())} was a rest day. Two a week keep it going.`,
-  todayNeeds: (ran: number, of: number) => (ran >= of ? `Today is kept: all ${word(of)} have run a lap.` : `Today counts once all ${word(of)} have run a lap: ${ran} of ${of} so far.`),
+  todayNeeds: (ran: number, of: number) => (ran >= of ? `Today is kept: ${everyone(of)} have run a lap.` : `Today counts once ${everyone(of)} have run a lap: ${ran} of ${of} so far.`),
   yourPart: 'Your part',
   partOf: (room: number) => `of the room’s ${total(room)} this week`,
   partToday: (ran: boolean) => (ran ? 'You have run a lap today, so you count for the streak.' : 'A lap that rings today, and you count for the streak.'),
