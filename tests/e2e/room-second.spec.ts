@@ -223,6 +223,30 @@ test('notes: B writes one, A sees "1" on Notes and not on the bottom bar; on a l
   expect(await ask(pb.node, '/api/rooms/note', { room: roomId, text: 'two\nlines' })).toEqual({ ok: false, error: 'bad_request' });
 });
 
+test('notes read on one device are read on all: B writes two, both of A\'s devices count 2; A opens Notes on one and the other\'s count goes without a reload; B, who wrote them, has none', async ({ deviceA: a, deviceB: b, phone }) => {
+  test.setTimeout(60000);
+  const [pa, pb] = [await person(a, 'rd_a'), await person(b, 'rd_b')];
+  // A's second device.
+  await phone.page.setViewportSize(PHONE);
+  await signIn(phone.page, pa.name);
+  await ready(phone.page);
+  const { id: roomId } = await room({ d: a, p: pa }, { d: b, p: pb });
+  for (const d of [a, phone, b]) {
+    await go(d.page, 'Room');
+    await tab(d.page, 'People').click();
+  }
+  for (const text of ['back at four', 'library is full']) expect((await ask(pb.node, '/api/rooms/note', { room: roomId, text })).ok).toBe(true);
+
+  for (const d of [a, phone]) await expect(tab(d.page, 'Notes')).toHaveAccessibleName('Notes, 2 new', { timeout: 5000 });
+  await expect(tab(b.page, 'Notes'), 'B is counted their own notes').toHaveAccessibleName('Notes');
+
+  await tab(a.page, 'Notes').click();
+  await expect(a.page.getByRole('tabpanel')).toContainText('library is full');
+  // The phone is not touched: no reload, no tab change. Only the server's word can clear it.
+  await expect(tab(phone.page, 'Notes'), 'read on A\'s laptop, still new on A\'s phone').toHaveAccessibleName('Notes', { timeout: 5000 });
+  await expect(tab(b.page, 'Notes')).toHaveAccessibleName('Notes');
+});
+
 // 4. Removing a member.
 
 test('the keeper removes C: C sees the room gone, the old code no longer joins, the new one does; a member who is not the keeper cannot remove', async ({ deviceA: a, deviceB: b, deviceC: c }) => {
@@ -313,7 +337,7 @@ test('the Week tab: the room\'s total for the week, ahead of last week at this t
   await expect(panel).toContainText(/The room is .+ ahead of last week at this time\./, { timeout: 3000 });
   await expect(panel).toContainText(/together this week/);
   await expect(panel).toContainText(/days? in a row, everyone in/);
-  await expect(panel).toContainText(/Today (is kept|counts once all)/);
+  await expect(panel).toContainText(/Today (is kept|counts once (all|both))/);
   // Your part: A's own week, of the room's.
   const part = (await panel.innerText()).replace(/\s+/g, ' ').match(/((?:\d+h )?\d+m) of the room\u2019s ((?:\d+h )?\d+m) this week/);
   expect(part, 'no "Your part" line').not.toBeNull();

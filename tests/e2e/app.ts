@@ -34,17 +34,17 @@ export const startNow = (page: Page) => page.getByRole('button', { name: 'Start 
 
 /**
  * Focus's first row, where Today's heading stands: in a break its name ("Short break", ", over"
- * when over), for a lap begun before midnight "A lap from yesterday", otherwise the task's
+ * when over), otherwise the task's
  * project or "This lap is for", with "Change task" before a start. Not drawn with nothing on the
  * list and no break.
  */
 export const firstRow = (page: Page) => page.locator('main [class*="_about_"]').filter({ visible: true }).first();
 
-/** What the first row says of the lap itself: the break, or a lap from yesterday; '' when it names the task, or is not drawn. */
+/** What the first row says of the lap itself: the break; '' when it names the task, or is not drawn. */
 export async function lapSaid(page: Page) {
   const row = firstRow(page);
   const text = (await row.count()) ? ((await row.textContent())?.trim() ?? '') : '';
-  return /^(Short break|Long break|A lap from yesterday)/.test(text) ? text : '';
+  return /^(Short break|Long break)/.test(text) ? text : '';
 }
 
 /** What a ready Focus screen shows: its start, and a first row that names no break (DESIGN.md: no "Lap 2 today, next"). */
