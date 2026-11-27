@@ -516,6 +516,12 @@ Built once in `client/src/ui/kit/` and reused.
   beside it, so 25 to 50 is typed once, and minus and plus are for nudging.
 - **Links at the end of a list** ("Archived, 1", "Recently deleted, 1") sit on
   one line, `md` apart, wrapping when they must.
+- **A row's own links** (Restore and Delete for good, Remove, Lower) stand in the same place in
+  every row of a list. Where they go is decided by the list's own width, never by one row's
+  words: from one width up they sit at each row's right end and a long title wraps beside
+  them; under it they sit on their own line under every row. One short link beside a name cut
+  to fit (a room's Remove) stays at the right end at every width, the same in every row. (The bin
+  once put them at the right of a short title and under a longer one, in the same sheet.)
 - **A mark:** one line in `label` under the result, in the top group, quieter than the result.
   No badge, no icon, no wall of them.
 - **Nothing is drawn disabled to say that something happened.** What happened is a sentence
