@@ -156,10 +156,36 @@ both ways         ping / pong every 25 s                  (heartbeat for the tun
 | Where | How | Why |
 |---|---|---|
 | Android | Whenever the timer cell changes, from any device, cancel and reschedule an exact alarm at the phase end. Ring and vibrate | The only thing that rings on time with the screen off ([stack.md](research/stack.md) §1) |
-| Android, during a phase | A notification with a live countdown (`setChronometerCountDown`) through a small custom plugin | Time left at a glance without opening the app; no running process |
+| Android, during a phase | A notification with a live countdown (`setChronometerCountDown`) | Time left at a glance without opening the app |
+| Android, app closed | A `specialUse` foreground service holds a read-only socket to `/api/ws` (OkHttp, JSON ping every 25 s, a partial wakelock while connected, reconnect with backoff and at once on a network change). It starts from the app, on boot and after an update; not with its switch off, Ring here off, or notifications denied | A closed app hears nothing from the server otherwise, and the user ruled out FCM and UnifiedPush |
+| Android, who draws | The native side draws every notification on the phone (countdown, bell, a called lap's alarm, room alerts). Two feeders: the page sends `(timer stamp, state, words)` at each plan; the service sends `(stamp, state)` from the server and words it from templates the page handed over. The newer stamp wins; on a tie the page's words win | One drawer means no two writers on one notification; the stamp keeps a stale feed from undoing a newer one |
 | Laptop, tab open | In-page timer plus the Notification API and the bell | Instant |
 | Laptop, tab closed or in background | Web Push from the server at the phase end (VAPID keys made by the server, no paid service) | Background tabs throttle timers |
 | Every device | A per-device "ring here" switch | Phone and laptop on the same desk should not both ring if the user says so |
+
+### The phone's native drawer: what the page sends it
+
+The `Countdown` plugin is the one way in (`client/src/platform/capacitor.ts` calls it; nothing
+else does). Stamps are the timer cell's stamp, compared as plain strings (protocol section 2).
+
+- `plan({ stamp, state, ring })`: the timer as the page knows it. `state` is the timer cell's
+  value, `ring` is what `planFor` made (a `Ring`, a `Paused`, or null). Answers `{ rings }`:
+  whether Android will ring it (false with notifications or exact alarms refused, so the page
+  rings in-page instead).
+- `call({ id, at, title, body } | null)`: the soonest called lap you are in, `at` in this
+  device's time. Null takes it off.
+- `keep({ server, account, token, device, cursor, on, words } | null)`: what the service needs.
+  `account` is the account id: any change of `server`, `account` or `token` wipes everything the
+  native side holds (stamp, cursor, alarms). `on` is the switch and Ring here together. Null is a
+  sign-out: stop, wipe. `words` are the templates, all from `strings.ts`:
+  `{ bell: { lap[4], take[4], next[4], break }, during: { work, short, long }, actions: { pause,
+  resume, stop }, left: "{t} left", note: { title: "{room}", body: "{name}: {text}" },
+  call: { title: "{name} calls a lap at {time}", body: "{room}" }, keeping, channels: { keep,
+  rooms } }`.
+
+The service merges its own feed with the page's by stamp, newer wins, the page on a tie. It
+starts when `keep` says `on` and notifications are allowed, and at boot and update from what it
+kept.
 
 ## 7. Budgets (checked by tools, not by eye)
 
@@ -239,3 +265,5 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-25 | The phone app's server is typed in the app, and may be plain `http` | The app is self-hostable; a home network has no certificate. Android needs cleartext and mixed content allowed for it |
 | 2026-11-25 | `task.time` added, a local time of day on the due day; a project's `color` is one of twelve names or `#rrggbb` | The user asked for both by name. A new field and a wider set of values: an older build keeps what it does not know and shows such a project in ink |
 | 2026-11-25 | Motion is CSS in the kit and the browser's own pickers are used for a time and a colour: no animation library, no picker component | The platform does all three; the JS budget stays where it is |
+| 2026-11-27 | The phone keeps its own connection while closed: a `specialUse` foreground service with a read-only second socket per device, OkHttp its one new dependency, the token kept in a file in the app's no-backup folder, `allowBackup` off. Supersedes the 2026-11-25 line that the phone rings only for a timer it has seen | The user's chosen way, the one self-hosted apps use. OkHttp is what Home Assistant, Gotify and ntfy ship; Java-WebSocket ignores Android's network security config. Backups could carry the token to another phone |
+| 2026-11-27 | A third place compares a timer stamp: the phone's native drawer keeps the newer of its two feeds (the page's and the service's), the page winning a tie | It only decides which feed to draw, never what a cell holds; `merge.ts` and `server/sync` stay the only places a cell is applied |

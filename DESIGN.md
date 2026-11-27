@@ -699,6 +699,20 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
+- **On the phone, while heirloom is closed** (the background service, ARCHITECTURE section 6):
+  - Settings, in the bell's panel under "Ring on this phone", phone only: a switch "Ring when
+    heirloom is closed", on by default, with the note "Keeps a quiet connection to your server,
+    so a lap started or paused elsewhere reaches this phone, and room notes and calls show up."
+    Under it, while Android may still put heirloom to sleep, a link "Let it run in the
+    background" with "Android may stop heirloom to save battery. Set it to Unrestricted so it
+    keeps step." It opens Android's own screen, from that tap only, never at start. Gone once
+    it is set.
+  - The service's own notification: "heirloom is keeping in step", nothing under it, on a
+    silent channel named "Keeping in step" that the person can hide.
+  - A note: the room's name over "sachi: the line itself", on a channel named "Rooms". A call:
+    "lina calls a lap at 15:00" over the room's name. Both open the room. A lap started
+    elsewhere and drawn from the service alone says "A lap" or "A short break" until the app
+    has the task: never a blank, never a guessed title.
 - **Rest days** are a panel in Settings, after the day's target: the seven weekdays as one row of
   choices (as a habit's days), any two of which may be on; with two on, the other five take no
   press. Under it, a note: "Two days a week may stay empty without breaking your streak. Pin one

@@ -138,8 +138,7 @@ that apply everywhere:
 ## Later, maybe
 
 Ideas that may come back after v1, each needing its own decision: a desktop app (Tauri), iOS, white
-noise, app blocking during focus, a companion character, widgets, a public read-only progress page,
-a push to the phone so a timer started on the laptop rings on a phone whose app is closed.
+noise, app blocking during focus, a companion character, widgets, a public read-only progress page.
 
 ## Decision log
 
@@ -164,3 +163,4 @@ a push to the phone so a timer started on the laptop rings on a phone whose app 
 | 2026-11-26 | A lap stopped within its first minute is a start taken back: no row, no lap of the day, no place in the four. (For one build every stopped lap counted, and the day's bar on Focus filled with slips of the thumb.) A lap stopped after a minute is still a lap that ended early |
 | 2026-11-27 | A room holds 16 people, up from 8: the user wants to invite more friends. The server sends the whole room to everyone at each change, about 400 bytes a person, so 16 is light for the server; past about 25 the People tab would want the people not on a lap folded away |
 | 2026-11-27 | Rest days can be pinned: the user wants a whole Sunday to be a rest day by plan. Still two a week; a pinned day holds its place, the rest stay automatic so a bad day is still covered, and a pinned day kept gives its place back. Only the focus streak: habits rest on the days they are not planned, and a room keeps its own automatic two |
+| 2026-11-27 | The phone stays in step while heirloom is closed: a foreground service holds its own connection to the server, so a lap started or paused on the web updates the phone's countdown and bell within a second, and room notes and called laps notify. The user chose it over UnifiedPush (an extra app for every friend) and Firebase (a Google project tied to every self-hosted server), as self-hosted apps like Home Assistant and Gotify do. A silent notification says it is running; a Settings switch turns it off |

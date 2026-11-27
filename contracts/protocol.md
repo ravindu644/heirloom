@@ -73,7 +73,11 @@ edit made after seeing a value is always stamped later than it (section 2).
 
 ## 4. Messages
 
-One WebSocket per device at `GET /api/ws`. Every frame is one JSON object with a `type`.
+One WebSocket per device at `GET /api/ws`, and on the phone a second one: the app's background
+service holds its own socket with the same token and device, and only reads (it sends `hello` and
+`ping`, never `push`). The server treats each socket on its own: a push reaches every socket of the
+account but the one that sent it, and a sign-out sends `bye` to both. Every frame is one JSON
+object with a `type`.
 Times are ms since the epoch.
 
 | Dir | Message | Meaning |
@@ -792,7 +796,10 @@ change: it is not counted and sends no room again.
 seven days. Notes older than seven days are deleted. A note belongs to the room: when its writer
 leaves it stays, written by `"from": null` ("Someone who left"). The server sends no notification
 for a note; what is new is the device's own reckoning (the newest note it has shown), not the
-server's. A device on a lap does not show them.
+server's. A device on a lap does not show them. The phone's background service notifies a note
+from someone else ("Lost puppies: sachi" over the line), after fetching its text; one that comes
+during your work lap waits until the lap ends, and nothing is notified while the app is open in
+front. It notifies a new call the moment it appears, from someone else: "lina calls a lap at 15:00".
 
 **Order.** A screen shows members on a lap first, then on a break, then the rest, each group by
 `week_ms` (most first, joining order on a tie). `ranked` true shows them by `week_ms` alone.
