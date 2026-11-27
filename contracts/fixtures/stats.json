@@ -466,7 +466,7 @@
    }
   },
   {
-   "name": "the day is the local day the lap started in",
+   "name": "a lap across midnight: its minutes cut at midnight, the lap on the day it ended",
    "utc_offset_min": 330,
    "sessions": [
     {
@@ -495,15 +495,91 @@
    "expect": {
     "days": {
      "2026-11-24": {
-      "focus_ms": 1500000,
-      "laps": 1
+      "focus_ms": 600000,
+      "laps": 0
      },
      "2026-11-25": {
-      "focus_ms": 1500000,
+      "focus_ms": 2400000,
+      "laps": 2
+     }
+    },
+    "overlaps": []
+   }
+  },
+  {
+   "name": "a paused lap across midnight: the pause comes off its start, then the cut",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795543800000,
+     "ended": 1795545900000,
+     "planned_ms": 1500000,
+     "paused_ms": 600000,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 600000,
+      "laps": 0
+     },
+     "2026-11-25": {
+      "focus_ms": 900000,
       "laps": 1
      }
     },
     "overlaps": []
+   }
+  },
+  {
+   "name": "two devices overlapping across midnight: the minutes once on each side, the pair marked",
+   "utc_offset_min": 330,
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795544100000,
+     "ended": 1795545600000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    },
+    {
+     "id": "run-2",
+     "kind": "work",
+     "task": null,
+     "started": 1795544700000,
+     "ended": 1795546200000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "0f1e2d3c4b5a6978"
+    }
+   ],
+   "expect": {
+    "days": {
+     "2026-11-24": {
+      "focus_ms": 900000,
+      "laps": 0
+     },
+     "2026-11-25": {
+      "focus_ms": 1200000,
+      "laps": 2
+     }
+    },
+    "overlaps": [
+     [
+      "run-1",
+      "run-2"
+     ]
+    ]
    }
   }
  ],
@@ -894,6 +970,80 @@
      "total_ms": 1500000
     },
     "split_ms": 1500000
+   }
+  },
+  {
+   "name": "a lap begun before midnight counts toward today from midnight on",
+   "utc_offset_min": 330,
+   "now": 1795546200000,
+   "state": {
+    "phase": "work",
+    "run": "run-2",
+    "task": null,
+    "started": 1795544400000,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 2700000,
+    "set_index": 2
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795541400000,
+     "ended": 1795542900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 1200000,
+    "ghost": {
+     "day": "2026-11-24",
+     "ms": 0,
+     "total_ms": 1500000
+    },
+    "split_ms": 1200000
+   }
+  },
+  {
+   "name": "a lap that rang after midnight: today has its tail, the day before its start",
+   "utc_offset_min": 330,
+   "now": 1795548600000,
+   "state": {
+    "phase": "idle",
+    "run": null,
+    "task": null,
+    "started": null,
+    "paused_at": null,
+    "paused_ms": 0,
+    "planned_ms": 0,
+    "set_index": 1
+   },
+   "sessions": [
+    {
+     "id": "run-1",
+     "kind": "work",
+     "task": null,
+     "started": 1795544400000,
+     "ended": 1795545900000,
+     "planned_ms": 1500000,
+     "paused_ms": 0,
+     "outcome": "rang",
+     "device": "a1b2c3d4e5f60718"
+    }
+   ],
+   "expect": {
+    "you_ms": 900000,
+    "ghost": {
+     "day": "2026-11-24",
+     "ms": 0,
+     "total_ms": 600000
+    },
+    "split_ms": 900000
    }
   }
  ],

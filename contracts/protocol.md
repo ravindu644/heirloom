@@ -180,10 +180,14 @@ From `session` rows and the viewer's offset from UTC in minutes.
 
 - A session counts when `kind` is `work` and `outcome` is `rang` or `stopped`. `void` and breaks
   count nowhere.
-- Its counted interval is `[started + paused_ms, ended]`. Its day is the local day of `started`.
-- A day's `focus_ms` is the length of the union of its counted intervals, so minutes that ran on
-  two devices at once count once. Its `laps` is the number of counted sessions: a lap that was
-  stopped is a lap, a short one.
+- Its counted interval is `[started + paused_ms, ended]`. A lap's day is the local day of
+  `ended`: the day its bell rang, or it was stopped. Its minutes are cut at local midnight, so a
+  lap from 23:46 to 00:32 gives 14 minutes to the day before and 32 to the day after, and counts
+  as a lap on the day after.
+- A day's `focus_ms` is the length of the union of the parts of counted intervals inside that day,
+  so minutes that ran on two devices at once count once. Its `laps` is the number of counted
+  sessions whose day it is: a lap that was stopped is a lap, a short one. A day can have focus and
+  0 laps: the start of a lap that ended after midnight.
 - A lap's `fill` is how much of it ran: 1 for `rang`, else `(ended - started - paused_ms) /
   planned_ms`, never over 1. Wherever laps are drawn (the set of four, a task's squares, the day's
   target), each is drawn that full, so a count of laps never says more than the picture does.
@@ -192,19 +196,19 @@ From `session` rows and the viewer's offset from UTC in minutes.
 - `overlaps` lists each pair of counted sessions from different devices whose intervals share more
   than an instant: the "ran on two devices" mark. Each pair is sorted by id, and so is the list.
 - A day with nothing counted is not in `days`.
-- An interval that would end before it begins counts as 0. Two overlapping laps that started on
-  different local days each count in their own day; the mark still shows the pair.
+- An interval that would end before it begins counts as 0. Two overlapping laps that cross
+  midnight count once on each side of it; the mark still shows the pair.
 
 **The race.** Every screen answers "how am I doing against my usual day", so there is one more
 function: from the sessions, the timer state, `now` and the offset.
 
 - `you_ms`: today's focus up to `now`, plus the lap in progress: a work run with no session row
   yet counts its running time so far (to the pause if paused, to the planned end if the bell has
-  gone). A break in progress adds nothing.
+  gone), from midnight on if it began yesterday. A break in progress adds nothing.
 - The ghost is a past day: the same weekday last week if it has any counted focus, else the latest
   day before today that has, else there is none (`ghost` and `split_ms` are `null`).
 - `ghost.ms` is that day's focus up to the same time of day as `now`; `ghost.total_ms` is its
-  whole day. `split_ms` is `you_ms - ghost.ms`: under 0 is behind.
+  whole day. Both are cut at that day's midnights, as `days` is. `split_ms` is `you_ms - ghost.ms`: under 0 is behind.
 
 Fixture: `stats.json`, `cases` for the totals and `race` for the race. Roadmap section 5 adds
 weeks, projects, estimates and bests to it.
@@ -547,7 +551,8 @@ cell, and is not counted, shown or walked from. Nothing a screen reads may throw
 
 The rules behind the Progress screen. All of it is worked out on the device from `session`, `task`,
 `project` and `day` rows, with the same counting as section 7: a session counts when it is work
-and not `void`, on the local day it started, and minutes two devices ran at once count once.
+and not `void`, its minutes cut at local midnight and the lap on the day it ended, and minutes
+two devices ran at once count once.
 
 **This week against last week.** Weeks run Monday to Sunday. For each day of this week up to
 today, the running total of focus; today's includes the lap in progress, as the race does. For
@@ -585,8 +590,8 @@ And over time: the same ratio for each of the last eight Monday to Sunday weeks,
 this week last, over the tasks whose `done` time falls in the week by local day. A week with no
 such task has no ratio.
 
-**A day's timeline.** Every session that started on the day, breaks and set-aside laps included,
-oldest first, each with its kind, times, outcome, task, and whether it is one of a pair that ran
+**A day's timeline.** Every session whose time touches the day, breaks and set-aside laps
+included, oldest first, drawn only inside the day (00:00 to 24:00), each with its kind, times, outcome, task, and whether it is one of a pair that ran
 on two devices at once (the `overlaps` of section 7).
 
 **Setting a lap aside from the timeline** writes `outcome: void` on its row. Counting it again
@@ -661,6 +666,7 @@ errors as section 10, and these of their own:
 | `/api/rooms/call` | `room`, `at` (server ms, a whole minute 1 to 30 minutes ahead), or `at: null` to take your own call back | `{"call":"<id>"}` or `{}`. See **Start together** |
 | `/api/rooms/notes` | `room` | `{"notes": [...]}`: the last seven days, newest first. See **Notes** |
 | `/api/rooms/in` | `room`, `call`, `in` (true or false) | `{}`. Until the call starts; a second is the same answer |
+| `/api/rooms/read` | `room`, `at` (server ms) | `{}`. The notes up to `at` are read on every device of the account; see **Notes** |
 | `/api/me/picture` | `picture`: a base64 WebP or JPEG of at most 12000 bytes, square, or `null` to take it off | `{"picture":"<hash>"}` or `{}` |
 
 | Status | Code | When |
@@ -733,14 +739,15 @@ name: it was not there to hear `gone`.
   week, by the latest `utc_offset_min` any device of theirs sent. The lap in progress is not in
   them: it is in `run`.
 - `run` is the member's work lap in progress, so their totals can move as it runs: `ms` is how far
-  it had run at `server_time`, its paused time not counted, as section 7 counts a lap; `today` and
-  `week` say whether it began on the member's current local day and in their current week, as
-  the same offset reads them. A screen adds `ms` to `today_ms` when `today` and to `week_ms` (and
+  it had run at `server_time` (from their local midnight on, if it began the day before), its
+  paused time not counted, as section 7 counts a lap; `today` is true (it will end today) and
+  `week` says whether its counted part lies in their current week, as the same offset reads
+  them. A screen adds `ms` to `today_ms` when `today` and to `week_ms` (and
   the room's week) when `week`, plus the time since `server_time` while `paused` is false. `run`
   is `null` when the phase is not `work`, when the run's bell has gone (its row is coming), and
   when the member is `away`. A device that does not know `run` ignores it and shows the rows alone.
   The member who is `you` is counted from the device's own timer instead, which knows it exactly.
-- `last` is the member's most recent work session that rang today: its run id, when it ended, and
+- `last` is the member's most recent work session that rang today (ended today, section 7): its run id, when it ended, and
   the ids of the members who cheered it. `null` when there is none. A cheer belongs to two people
   and a lap, not to a room: it shows in every room the two share. Only a lap that rang can be
   cheered, never a break, never one's own, and never a member who is away.
@@ -750,8 +757,9 @@ name: it was not there to hear `gone`.
   this week and of last week (seven numbers each, rows only, their own calendar) and their last
   week as far as the same weekday and time, for the person's report. Zeros and 0 for an away
   member.
-- `laps` on each member: their work laps of their local day so far, from their session rows,
-  oldest first, each `[started, ended]` in server ms (paused time inside a lap is not cut out;
+- `laps` on each member: their work laps that touch their local day so far (one that began
+  before midnight included), from their session rows, oldest first, each `[started, ended]` in
+  server ms (paused time inside a lap is not cut out;
   a lap set aside is not there). The lap in progress is not in it: it is `run`. `[]` when there is
   none, and for a member who is `away`. At most 48; past that, the newest 48.
 - `days` and `last_days` are the room's focus per local day of this week and of last week, Monday
@@ -761,13 +769,15 @@ name: it was not there to hear `gone`.
 - `streak` is the room's: `{ "run": 12, "marks": [14 of "kept", "rest", "miss", "open", "none"] }`,
   oldest first, today last, on the calendar of the account the message is for. A day is kept when
   every member in the room on that day (from the day they joined; one who has left is not counted)
-  ran a work lap that rang on their own local day of that date; section 8's rule gives two rest
+  ran a work lap that rang (ended) on their own local day of that date; section 8's rule gives two rest
   days a Monday to Sunday week. Today is `"open"` until it is kept. `"none"` is a day before the
   room was made, or before anything was ever kept: no mark is drawn for it, so a new room is not
   shown misses. A device that meets a mark it does not know draws nothing for it.
 - `call` is the room's open call or `null`: `{ "id", "by": <member id>, "at": <server ms>,
   "in": [member ids, the caller first] }`.
 - `notes_since` is the id of the newest note, so a device knows there is something to fetch.
+- `notes_read` is how far the account the message is for has read the room's notes, server ms,
+  0 for never. See **Notes**.
 - The room's own total for the week is the sum of its members' `week_ms`; `target_ms` is what
   they are filling together, 0 when none is set. `ranked` says whether this room shows its
   members by `week_ms`, most first; otherwise in the live order (see **Order**).
@@ -795,8 +805,11 @@ change: it is not counted and sends no room again.
 "text" }`. `POST /api/rooms/notes` with `room` replies `{"notes": [...]}`, newest first, the last
 seven days. Notes older than seven days are deleted. A note belongs to the room: when its writer
 leaves it stays, written by `"from": null` ("Someone who left"). The server sends no notification
-for a note; what is new is the device's own reckoning (the newest note it has shown), not the
-server's. A device on a lap does not show them. The phone's background service notifies a note
+for a note. What is new is the notes after `notes_read`: a device that shows the notes sends
+`POST /api/rooms/read` with `room` and `at` (the newest note's `at`), and the server keeps the
+larger of that and what it had, never past now, and sends the room again on a change, so the
+account's other devices clear the count at once, as a messaging app does. A device keeps its own
+mark too, so a read made offline counts there at once and is sent when it can be. A device on a lap does not show them. The phone's background service notifies a note
 from someone else ("Lost puppies: sachi" over the line), after fetching its text; one that comes
 during your work lap waits until the lap ends, and nothing is notified while the app is open in
 front. It notifies a new call the moment it appears, from someone else: "lina calls a lap at 15:00",
