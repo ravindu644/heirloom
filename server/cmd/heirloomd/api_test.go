@@ -343,6 +343,53 @@ func TestPushReachesTheOtherDevicesAndNotTheSender(t *testing.T) {
 	c.quiet()
 }
 
+// The phone's background service holds a second socket with the same token and device
+// (protocol section 4). Each socket stands on its own: both go live, a push reaches the
+// other one, a room reaches both, and a sign-out ends both.
+func TestTheSameDeviceTwiceIsTwoSockets(t *testing.T) {
+	w := start(t)
+	ravi := w.signUp("ravi", phone)
+	app, _ := w.connect(ravi.Token, phone, 0)
+	service, _ := w.connect(ravi.Token, phone, 0)
+	lap, _ := w.connect(w.signIn("ravi", laptop).Token, laptop, 0)
+
+	app.push("k1", cell(stamp(1, phone), "task", "t1", "title", `"Pointers"`))
+	app.want("ack")
+	for _, d := range []*device{service, lap} {
+		if live := d.want("cells"); live.From != 0 || live.To != 1 || values(live.Cells) != `"Pointers"` {
+			t.Errorf("the app's push reached another socket as %+v", live)
+		}
+	}
+	app.quiet() // the socket that pushed does not get it back
+
+	lap.push("k2", cell(stamp(2, laptop), "task", "t2", "title", `"Arrays"`))
+	lap.want("ack")
+	for _, d := range []*device{app, service} {
+		if live := d.want("cells"); live.From != 1 || live.To != 2 || values(live.Cells) != `"Arrays"` {
+			t.Errorf("the laptop's push reached the phone as %+v", live)
+		}
+	}
+
+	room := w.ask(ravi.Token, phone, "create", map[string]any{"name": "Both"}).ok(t, "create").Room
+	for _, d := range []*device{app, service, lap} {
+		if m := d.room(); m.Room != room {
+			t.Errorf("room message = %s, want room %s", m.raw, room)
+		}
+	}
+
+	var body map[string]any
+	if status, _ := w.post("/api/logout", creds{"token": ravi.Token}, &body); status != 200 {
+		t.Fatalf("logout = %d", status)
+	}
+	for _, d := range []*device{app, service} {
+		if bye := d.want("bye"); bye.Reason != "token" {
+			t.Errorf("bye = %+v, want reason token", bye)
+		}
+		d.gone()
+	}
+	lap.quiet()
+}
+
 func TestPingIsAnsweredWithServerTime(t *testing.T) {
 	w := start(t)
 	d, _ := w.connect(w.signUp("ravi", phone).Token, phone, 0)
