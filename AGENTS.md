@@ -132,7 +132,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 ## Tools
 | Tool | Use |
 |---|---|
-| `make check` | Every check, each one reported. The gate runs this |
+| `make check` | Every check, each one reported. The gate runs this. A bare `make` lists every target |
 | `make dev` / `web` / `server` / `apk` | Vite beside heirloomd / the built app / the binary for here and arm64 / the debug APK |
 | `make deploy`, `make server-rss` | Build for the server's CPU, copy it there and run `install.sh` (the script a release installs with) / print its memory |
 | `tools/sim/soak.ts`, `load.ts` | Many devices at random against a server for an hour, or a burst of them for a memory reading; `--url --invites --rss --minutes --seed` |

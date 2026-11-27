@@ -11,7 +11,36 @@ HOST := $(HOST_USER)@$(HOST_ADDR)
 need-host = @test -n "$(HOST_USER)" -a -n "$(HOST_ADDR)" || { echo "No server address or SSH user in .local/ENV.md. Copy .local/ENV.example.md and fill it in."; exit 1; }
 
 CHECKS := lint-design contracts test-tools style audit types pure test-core test-android test-server test-sync sim budget e2e
-.PHONY: check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy server-rss
+.PHONY: help check $(CHECKS) tokens web server dev dev-web dev-server apk release-apk bump deploy server-rss
+
+# A bare `make` lists what there is; it used to start the ten-minute check.
+help:
+	@echo "heirloom $(VERSION)"
+	@echo ""
+	@echo "Check:"
+	@echo "  make check        - Every check below, each one reported"
+	@echo "  make test-core    - The client's tests (core, sync, ui)"
+	@echo "  make test-server  - go vet and go test"
+	@echo "  make test-android - The phone's native code, on the JVM"
+	@echo "  make test-sync    - Real devices' code against a real server"
+	@echo "  make e2e          - The app in browsers against a real server"
+	@echo "  make audit        - Every demo state against DESIGN.md"
+	@echo "  make types | style | contracts | lint-design | budget | sim | pure | test-tools"
+	@echo ""
+	@echo "Build and run:"
+	@echo "  make dev          - Vite beside heirloomd, data in .local/data"
+	@echo "  make web          - The built web app"
+	@echo "  make server       - heirloomd for here and for arm64, the web app inside"
+	@echo "  make apk          - The debug APK (SERVER=http://host:8787 to fill in an address)"
+	@echo "  make release-apk  - The signed APK for friends"
+	@echo ""
+	@echo "The server (address and login from .local/ENV.md):"
+	@echo "  make deploy       - Build for its CPU, copy it there, run install.sh"
+	@echo "  make server-rss   - Its memory now"
+	@echo ""
+	@echo "Other:"
+	@echo "  make bump NEW=x.y.z - Set the version (package.json)"
+	@echo "  make tokens       - DESIGN.md to tokens.css"
 
 # -k: one failing check does not hide the others.
 check:

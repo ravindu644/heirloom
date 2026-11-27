@@ -107,3 +107,8 @@ when it is done.
 - [23] Habits: a past day part done (1 of 2) draws the rest ring half under the fill (seen in docs/resources/readme/04-habits.png).
 - [23] Room: scrolled, about 8px of a panel shows between the header and the stuck tabs.
 - [23] A screen opened from the bottom bar keeps the previous screen's scroll (reported twice by the README shoot).
+- client/src/main.tsx:165: a lap that rang before 00:00 and runs on is "Lap 1 today" in the notification while Focus counts it yesterday's (code review, nit).
+- client/src/ui/strings.ts `stopped`: no guard for lap 0 if a counted stop is read before its row lands in `figures().laps` (code review, nit).
+- server/rooms/rooms.go `fill()`: while a lap begun before midnight runs, its part before midnight is in neither yesterday nor `run`, so a friend's week dips until the row lands (server lane, ponytail).
+- Demo: the Focus midnight scenes keep the fixed Tuesday ghost, so 00:10 shows "Last Tue 2h 30m" (design review).
+- Day view: a lap cut at 00:00 or 24:00 has no mark of the cut; ask the user before adding one (design review).
