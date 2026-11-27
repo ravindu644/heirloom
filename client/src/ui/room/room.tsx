@@ -191,7 +191,9 @@ function RoomSheet({ room, rooms, pictures, onClose }: { room: RoomView; rooms: 
               .map((m) => (
                 <li key={m.id}>
                   <Person name={m.name} picture={pictures(m.picture)} pending={pictures(m.picture) === undefined} />
-                  <Twice words={s.room.remove} ask={s.room.removeAsk(m.name)} onDo={async () => setSaid(why(await rooms.remove(room.id, m.id)))} />
+                  <span data-links>
+                    <Twice words={s.room.remove} ask={s.room.removeAsk(m.name)} onDo={async () => setSaid(why(await rooms.remove(room.id, m.id)))} />
+                  </span>
                 </li>
               ))}
           </ul>

@@ -250,6 +250,12 @@ const TODAY: Record<string, Scene> = {
     day: day([...TASKS, { id: 'old1', title: 'Install a C compiler', project: 'c', estimate: 1, squares: [1], deleted: new Date(2026, 10, 22, 21).getTime() }, { id: 'old2', title: 'Watch a talk about monads', estimate: 2, deleted: new Date(2026, 9, 27, 9).getTime() }]),
     tap: 'Recently deleted',
   },
+  'today-deleted-long': {
+    ...idleAt2,
+    about: 'Recently deleted with a short title and a long one: the links stand in one place in every row',
+    day: day([...TASKS, { id: 'old1', title: 'Learn C', estimate: 4, deleted: new Date(2026, 10, 22, 21).getTime() }, { id: 'old2', title: 'Learn Next.js: the app router, server components and caching, a chapter a day', estimate: 4, deleted: new Date(2026, 10, 23, 9).getTime() }]),
+    tap: 'Recently deleted',
+  },
   sheet: { ...idleAt2, about: 'A task open in the sheet', day: day(), tap: 'Exercise 5-3' },
   'sheet-subtasks': {
     ...idleAt2,
@@ -330,6 +336,7 @@ const HABIT_SCENES: Record<string, Scene> = {
   'habits-sheet-new': { ...week, about: 'A habit open that has no check-in yet', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }], tap: 'Read 10 pages' },
   'habits-archived': { ...week, about: 'Archived habits, behind their link', habits: HABITS, tap: 'Archived' },
   'habits-deleted': { ...week, about: 'Recently deleted habits', habits: HABITS, tap: 'Recently deleted' },
+  'habits-deleted-long': { ...week, about: 'Recently deleted habits, one with a long title: the links stand in one place in every row', habits: [...HABITS, { id: 'gone2', title: 'Write down the one thing that went wrong in the last lap before the next one', counts: {}, deleted: true }], tap: 'Recently deleted' },
   'habits-after-delete': { ...week, about: 'Just after deleting a habit: Undo', habits: HABITS, tap: ['Lights out', 'Delete'] },
   'habits-top': { ...week, about: 'A habit at the top of its count, with a 60 character title', habits: [{ ...HABITS[0]!, title: SIXTY, target: 20, counts: { '2026-11-24': 20, '2026-11-23': 20 } }, ...HABITS.slice(1)] },
   'habits-many': { ...week, about: 'Ten habits, one with a very long title', habits: MANY_HABITS },

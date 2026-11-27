@@ -197,14 +197,14 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
       {shelf && (
         <Sheet key="shelf" title={shelf === 'archived' ? s.habits.archivedTitle : s.today.binTitle} close={s.task.close} onClose={() => setShelf(null)}>
           <Note>{shelf === 'archived' ? s.habits.archivedNote : s.habits.binNote}</Note>
-          <Fold gap="sm">
+          <Fold gap="sm" class={css.shelf}>
             {shelved.map((habit) => (
-              <div key={habit.id} class={cx(css.row, css.plain, shelf === 'deleted' && css.shelved)}>
+              <div key={habit.id} class={cx(css.row, css.plain, css.shelved)}>
                 <div class={css.words}>
                   <span class={css.title}>{habit.title}</span>
                   <span class={css.meta}>{[s.habits.plan(habit.days), habit.deleted === null ? '' : s.today.gone(habit.deleted)].filter(Boolean).join(', ')}</span>
                 </div>
-                <div class={cx(css.end, links.links)}>
+                <div class={cx(css.end, links.links)} data-links>
                   <Button kind="link" onClick={() => (shelf === 'archived' ? habits.edit(habit.id, { archived: false }) : habits.restore(habit.id))}>
                     {s.today.restore}
                   </Button>

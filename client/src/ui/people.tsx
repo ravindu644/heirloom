@@ -132,7 +132,7 @@ export function InvitesPanel({ invites }: { invites: Invites }) {
               </span>
               {/* Two sets of links for one place. Both are always drawn there, one of them unseen,
                   so the place is as large as the larger and nothing beside it moves at the tap. */}
-              <span class={css.slot}>
+              <span class={css.slot} data-links>
                 <span class={cx(links.links, taking === invite.invite && css.off)}>{links3(invite)}</span>
                 <span class={cx(links.links, taking !== invite.invite && css.off)}>{links2(invite)}</span>
               </span>
@@ -202,9 +202,13 @@ export function AdminsPanel({ admins, rooms, holder }: { admins: Admins; rooms: 
                 <span>{one.role === 'owner' ? s.people.owner : s.people.admin}</span>
               </span>
               {one.role === 'admin' && (
-                <Button kind="link" aria-label={s.people.lowerLabel(one.username)} onClick={() => lower(one.username)}>
-                  {s.people.lower}
-                </Button>
+                <span class={css.slot} data-links>
+                  <span class={links.links}>
+                    <Button kind="link" aria-label={s.people.lowerLabel(one.username)} onClick={() => lower(one.username)}>
+                      {s.people.lower}
+                    </Button>
+                  </span>
+                </span>
               )}
             </div>
           ))}
@@ -310,7 +314,7 @@ export function ResetsPanel({ resets }: { resets: Resets }) {
                 <span>{s.reset.runsOut(one.expires)}</span>
               </span>
               {/* Both sets of links in one place, one unseen: see the invites' rows. */}
-              <span class={css.slot}>
+              <span class={css.slot} data-links>
                 <span class={cx(links.links, taking === one.username && css.off)}>
                   <Button kind="link" aria-label={s.reset.forName(s.people.takeBack, one.username)} onClick={() => setTaking(one.username)}>
                     {s.people.takeBack}

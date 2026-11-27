@@ -14,7 +14,10 @@
 .rows > li + li .row { border-top: var(--layout-hair) solid var(--line); }
 /* One place for two sets of links: each lies in the same cell, and the one not offered is unseen and cannot be pressed. */
 .slot { display: grid; }
-/* On a phone a row's links stand on their own line, in every row: never beside the words in one and under them in the next. */
+/* A row's links (DESIGN.md, A row's own links): the list's width decides, alike in every row.
+   Under 400px on a line of their own; from there at the row's right end, with the words taking
+   what is left (a basis of nothing, so a long name never pushes them under in one row alone). */
+.rows { container-type: inline-size; }
 .slot { flex-basis: 100%; }
 .slot > * { grid-area: 1 / 1; }
 .off { visibility: hidden; }
@@ -33,7 +36,11 @@
 
 @media (min-width: 720px) {
   .actions > *, .raise button { flex: none; justify-self: start; }
+}
+@container (min-width: 400px) {
   /* Beside the words, and the links shown end at the row's right edge, whichever of the two sets is the wider. */
+  .row { flex-wrap: nowrap; }
+  .row > :first-child { flex: 1 1 0; }
   .slot { flex-basis: auto; }
   .slot > * { justify-self: end; }
 }

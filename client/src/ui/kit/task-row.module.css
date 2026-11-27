@@ -79,8 +79,13 @@ button.words::after { content: ""; position: absolute; inset: 0; border-radius: 
 /* The row itself is measured, not the screen. */
 .measure { container-type: inline-size; }
 
-/* A row with links of its own: at its end where there is room, and under the words in a narrow row. */
+/* A row with links of its own (DESIGN.md, A row's own links): the row's width decides where they
+   stand, and every row of a list is as wide as the next, so all of them stand alike. From 400px
+   at the row's end, with the words taking what is left and a long title wrapping beside them (a
+   basis of nothing, so no title is ever wide enough to push them under); under it, on a line of
+   their own under every row. */
 .linked { flex-wrap: wrap; }
+.linked .lead { flex-basis: 0; }
 .links { position: relative; z-index: 1; display: flex; flex: none; flex-wrap: wrap; gap: 0 var(--space-md); }
 @container (max-width: 400px) {
   .linked .links { flex-basis: 100%; }

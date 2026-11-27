@@ -74,7 +74,7 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
           {end}
         </div>
       )}
-      {links && <div class={css.links}>{links}</div>}
+      {links && <div class={css.links} data-links>{links}</div>}
       </div>
     </div>
   );
