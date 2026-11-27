@@ -99,7 +99,7 @@ export const SAID_MS = 4000;
 const AUTO_LATE_MS = 2 * 60 * 60 * 1000;
 // What the run that starts by itself adds to the id of the run that rang. Two devices that both
 // see the bell make the same id, so they write the same state.
-const AUTO_SUFFIX = '_';
+export const AUTO_SUFFIX = '_';
 // The longest the watch waits before looking again: a browser runs a timer set further out than 2^31 ms at once.
 const DAY_MS = 86400000;
 

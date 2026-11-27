@@ -43,7 +43,7 @@ describe('settings', () => {
     const { s } = await one();
     assert.deepEqual(s.all.value, {
       work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: false, auto_work: false,
-      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
+      sound: 'school', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
     });
   });
 
@@ -53,13 +53,13 @@ describe('settings', () => {
     const d = await w.device('a', { log });
     void d.settings.all.value;
     log.length = 0;
-    assert.equal(d.settings.set({ work_ms: 50 * MIN, auto_break: true, day_target: 8, sound: 'bowl' }), true);
+    assert.equal(d.settings.set({ work_ms: 50 * MIN, auto_break: true, day_target: 8, sound: 'chime' }), true);
     await d.engine.saved();
     assert.equal(log.length, 1);
     assert.deepEqual(log[0]!.cells!.map((c) => c.field), ['work_ms', 'auto_break', 'day_target', 'sound']);
     assert.deepEqual(d.settings.all.value, {
       work_ms: 50 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: true, auto_work: false,
-      sound: 'bowl', celebrate: true, day_target: 8, share_task: false, rooms_hidden: false, rest_days: 0,
+      sound: 'chime', celebrate: true, day_target: 8, share_task: false, rooms_hidden: false, rest_days: 0,
     });
     // And Focus reads the same row: the next lap is fifty minutes.
     d.focus.start();
@@ -80,6 +80,8 @@ describe('settings', () => {
       { day_target: -1 },
       { auto_break: 'yes' },
       { sound: '' },
+      { sound: 'bell' },
+      { sound: 'School' },
       { work_ms: 30 * MIN, celebrate: 1 },
       { marks: {} },
       { rest_days: 128 },
@@ -106,8 +108,20 @@ describe('settings', () => {
     d.engine.write('settings', 'current', { work_ms: 'long', auto_break: 1, sound: 7, celebrate: null, day_target: 2.5, from_a_newer_build: true });
     assert.deepEqual(s.all.value, {
       work_ms: 25 * MIN, short_ms: 5 * MIN, long_ms: 15 * MIN, auto_break: false, auto_work: false,
-      sound: 'bell', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
+      sound: 'school', celebrate: true, day_target: 0, share_task: false, rooms_hidden: false, rest_days: 0,
     });
+  });
+
+  it('the bell: school by default, each of the three read back, and any other value another build wrote reads as school', async () => {
+    const { d, s } = await one();
+    for (const sound of ['struck', 'chime', 'school'] as const) {
+      assert.equal(s.set({ sound }), true);
+      assert.equal(s.all.value.sound, sound);
+    }
+    for (const odd of ['bell', 'bowl', 'CHIME', null, 3]) {
+      d.engine.write('settings', 'current', { sound: odd });
+      assert.equal(s.all.value.sound, 'school', JSON.stringify(odd));
+    }
   });
 
   it('rest days: two pinned read as they are, more than two read as the first two from Monday, anything else as none', async () => {
@@ -157,6 +171,30 @@ describe('settings', () => {
     assert.equal(later.settings.ringHere.value, false);
     later.settings.setRingHere(true);
     assert.equal(later.settings.ringHere.value, true);
+  });
+});
+
+describe('vibrate and ring on silent', () => {
+  it('are this device\'s, each on by default, in no cell, kept across a restart and a sign out, apart from each other', async () => {
+    const { w, d, s } = await one();
+    assert.equal(s.vibrate.value, true);
+    assert.equal(s.ringOnSilent.value, true);
+    s.setVibrate(false);
+    assert.equal(s.vibrate.value, false);
+    assert.equal(s.ringOnSilent.value, true);
+    await d.engine.saved();
+    assert.deepEqual(d.engine.cells(), []);
+    const again = await w.restart(d);
+    assert.equal(again.settings.vibrate.value, false);
+    again.settings.setRingOnSilent(false);
+    assert.deepEqual(await again.engine.signOut(), { ok: true });
+    again.close();
+    await again.engine.stop();
+    const later = await w.device('a', { stores: again.stores });
+    assert.deepEqual([later.settings.vibrate.value, later.settings.ringOnSilent.value, later.settings.ringHere.value, later.settings.keepInStep.value], [false, false, true, true]);
+    later.settings.setVibrate(true);
+    assert.equal(later.settings.vibrate.value, true);
+    assert.equal(later.engine.kept('vibrate', 'device'), true);
   });
 });
 

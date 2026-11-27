@@ -15,6 +15,10 @@ import type { Engine } from './engine.ts';
 
 export type { Mark } from '../core/marks.ts';
 
+/** The bells, as the schema names them. The first is the default, and what any other value reads as. */
+export const SOUNDS = ['school', 'struck', 'chime'] as const;
+export type Sound = (typeof SOUNDS)[number];
+
 /** The synced settings, each with its default when nobody has written it. Lengths in ms. */
 export interface SettingsView {
   work_ms: number;
@@ -23,8 +27,8 @@ export interface SettingsView {
   /** Start the break when a lap rings, and the next lap when a break rings. Both off unless switched on. */
   auto_break: boolean;
   auto_work: boolean;
-  /** The id of the bell. */
-  sound: string;
+  /** The bell. */
+  sound: Sound;
   /** Show the completion moments and marks. On unless switched off. */
   celebrate: boolean;
   /** The day target in laps, 0 for none. */
@@ -46,6 +50,12 @@ export interface Settings {
   /** The phone keeps step while the app is closed (its background connection). Per device like `ringHere`: on unless switched off. */
   readonly keepInStep: ReadonlySignal<boolean>;
   setKeepInStep(on: boolean): void;
+  /** The phone buzzes with the bell. Per device like `ringHere`: on unless switched off. */
+  readonly vibrate: ReadonlySignal<boolean>;
+  setVibrate(on: boolean): void;
+  /** The phone plays the bell as an alarm, through Mute. Per device like `ringHere`: on unless switched off. */
+  readonly ringOnSilent: ReadonlySignal<boolean>;
+  setRingOnSilent(on: boolean): void;
   /**
    * The marks earned by the latest thing that happened on this device, oldest first, for the
    * moment that follows it; empty when celebrations are off. Each mark is given once: `seen()`
@@ -78,7 +88,7 @@ const fits: Record<keyof SettingsView, (v: unknown) => boolean> = {
   long_ms: (v) => whole(v, 1000, DAY_MS),
   auto_break: (v) => typeof v === 'boolean',
   auto_work: (v) => typeof v === 'boolean',
-  sound: (v) => typeof v === 'string' && v.length > 0 && v.length <= 64,
+  sound: (v) => (SOUNDS as readonly unknown[]).includes(v),
   celebrate: (v) => typeof v === 'boolean',
   day_target: (v) => whole(v, 0),
   share_task: (v) => typeof v === 'boolean',
@@ -98,7 +108,7 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
       ...lapLengths(held),
       auto_break: flag('auto_break', false),
       auto_work: flag('auto_work', false),
-      sound: fits.sound(held?.sound) ? (held!.sound as string) : 'bell',
+      sound: fits.sound(held?.sound) ? (held!.sound as Sound) : SOUNDS[0],
       celebrate: flag('celebrate', true),
       day_target: fits.day_target(held?.day_target) ? (held!.day_target as number) : 0,
       share_task: flag('share_task', false),
@@ -107,9 +117,19 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
     };
   });
 
-  // "Ring here" is this device's, whoever is signed in: it lives in the install's own store, not in any cell.
-  const ringHere = signal(engine.kept('ring_here', 'device') !== false);
-  const keepInStep = signal(engine.kept('keep_in_step', 'device') !== false);
+  // These are this device's, whoever is signed in: they live in the install's own store, not in any cell. Each is on unless switched off.
+  const local = (name: string) => {
+    const on = signal(engine.kept(name, 'device') !== false);
+    const set = (value: boolean) => {
+      on.value = value;
+      engine.keep(name, value, 'device');
+    };
+    return [on, set] as const;
+  };
+  const [ringHere, setRingHere] = local('ring_here');
+  const [keepInStep, setKeepInStep] = local('keep_in_step');
+  const [vibrate, setVibrate] = local('vibrate');
+  const [ringOnSilent, setRingOnSilent] = local('ring_on_silent');
 
   // What has been achieved, from the sessions and from the tasks. Each is worked out again only
   // when its own rows change, and not at all while celebrations are off: nothing reads them then.
@@ -168,16 +188,13 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
     },
 
     ringHere,
-    setRingHere(ring) {
-      ringHere.value = ring;
-      engine.keep('ring_here', ring, 'device');
-    },
-
+    setRingHere,
     keepInStep,
-    setKeepInStep(on) {
-      keepInStep.value = on;
-      engine.keep('keep_in_step', on, 'device');
-    },
+    setKeepInStep,
+    vibrate,
+    setVibrate,
+    ringOnSilent,
+    setRingOnSilent,
 
     marks,
     seen() {
