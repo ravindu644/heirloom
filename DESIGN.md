@@ -709,8 +709,8 @@ Built once in `client/src/ui/kit/` and reused.
   stepper, "Done" as a secondary button, and, apart from them at the row's end,
   the link "Remove the target". Every tap of the stepper is already kept; Done only closes.
   Two links side by side that both close an editor are never offered.
-- **The bell** (Settings' bell panel, first): "The bell" over the three sounds as one row of
-  choices, "School bell" (the default), "Struck bell" and "Soft chime"; a tap picks one and plays
+- **The bell** (Settings' bell panel, first, the panel's own title naming them): the three sounds as one row of
+  choices that share the line under 400px, "School bell" (the default), "Struck bell" and "Soft chime"; a tap picks one and plays
   it once. Phone only, kept on each device, under "Ring on this phone": a switch "Vibrate" ("A
   buzz with the bell: two long, one short.") and a switch "Ring even on silent" ("The bell plays
   through Mute, like an alarm. Turn it off for class or the library."), both on. The buzz is 400
