@@ -72,18 +72,21 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .phaseLeft { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); font: var(--type-label); color: var(--muted); }
 /* Three lines hold any title a person would share, as on a task's own row. */
 .task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-/* Cheer: a 40px circle whose target reaches 48px, and once cheered the same circle in the you tint. */
-.cheer, .cheered { display: grid; flex: none; place-items: center; width: var(--space-xl); height: var(--space-xl); border-radius: var(--radius-full); font: var(--type-body-strong); }
-.cheer { position: relative; box-sizing: border-box; padding: 0; border: var(--layout-hair) solid var(--key-edge); background: var(--key); cursor: pointer; pointer-events: auto; }
+/* Cheer: a 40px circle whose target reaches 48px. */
+.cheer { position: relative; box-sizing: border-box; display: grid; flex: none; place-items: center; width: var(--space-xl); height: var(--space-xl); padding: 0; border: var(--layout-hair) solid var(--key-edge); border-radius: var(--radius-full); background: var(--key); font: var(--type-body-strong); cursor: pointer; pointer-events: auto; }
 /* Placed from inside the border: the hair is added back, so the target is the full 48px. */
 .cheer::after { content: ""; position: absolute; inset: calc((var(--space-xl) - var(--layout-touch)) / 2 - var(--layout-hair)); border-radius: var(--radius-full); }
 .cheer:hover { background: color-mix(in srgb, var(--key), var(--ink) var(--state-hover)); }
-.cheered { background: var(--you-tint); }
+/* Where a cheer burst: its place stays while the squares fly, then closes with the gap before it. */
+.burst { width: var(--space-xl); height: var(--space-xl); animation: shut var(--motion-fill) var(--motion-ease) var(--motion-cheer) forwards; }
+@keyframes shut { to { width: 0; margin-left: calc(var(--space-sm) * -1); } }
 
 /* A person's report. */
-.back { display: flex; }
 .who { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-md); }
-.who h1 { font: var(--type-title); overflow-wrap: anywhere; }
+.who > div { min-width: 0; }
+/* Their name, and Back at the right end of its line, as Settings has it beside its heading. */
+.named { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); }
+.named h1 { min-width: 0; font: var(--type-title); overflow-wrap: anywhere; }
 .dayLane { display: grid; gap: var(--space-sm); }
 
 /* Notes: newest first, a circle, the name and time, the line. */

@@ -20,6 +20,7 @@ import type { DemoRecord } from './demo-progress.ts';
 import type { Progress } from '../sync/progress.ts';
 import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
+import { cheerKey } from './room/room.tsx';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
 import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
 import type { DemoHabit, DemoRoom, DemoRooms, DemoServer } from './demo-more.ts';
@@ -351,7 +352,8 @@ const ROOM_SCENES: Record<string, Scene> = {
   'room-none-offline': { ...week, about: 'Not in a room, and no connection', sync: 'offline', room: { rooms: 'none', stale: true } },
   'room-alone': { ...week, about: 'A room of one', run: onKr, room: { members: 'alone' } },
   room: { ...week, about: 'Room: four friends, one cheer given, one away', run: onKr, room: {} },
-  'room-cheered': { ...week, about: 'Just after a cheer: the round button turns to the tinted circle, and the line says who cheered', run: onKr, room: {}, tap: 'css:[aria-label^="Cheer"]' },
+  'room-cheered': { ...week, about: 'Just after a cheer: the 🎉 bursts into six squares and goes, and the line says You cheered this lap', run: onKr, room: {}, tap: 'css:[aria-label^="Cheer"]' },
+  'room-cheer-arriving': { ...week, about: 'Opening People after two cheers on your last lap: squares fly from sachi, then dilan, to you, then the line says who cheered', run: shortBreak, room: { onBreak: true, keeper: 'sachi', pictures: true, cheersIn: ['sachi', 'dilan'] } },
   'room-ranked': { ...week, about: 'A room that has switched its order on', run: onKr, room: { ranked: true } },
   'room-eight': { ...week, about: 'Eight members, a long name, a long task title', run: onKr, room: { members: 'eight', name: 'Second years, block C, the ones who stay up' } },
   'room-stale': { ...week, about: 'No connection: the room as it was last heard from', run: onKr, sync: 'offline', room: { stale: true } },
@@ -674,6 +676,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     return { ok: true };
   };
   let setUp = false;
+  const kept = new Map<string, unknown>();
   const engine: Engine = {
     server: location.origin,
     sync,
@@ -712,8 +715,8 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     wake() {},
     onRoom: () => () => {},
     request: async () => ({ ok: false, error: 'offline' }),
-    kept: () => undefined,
-    keep() {},
+    kept: (name) => kept.get(name),
+    keep: (name, value) => void kept.set(name, value),
     merge: () => 0,
     saved: async () => {},
     cells: () => [],
@@ -726,6 +729,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
   const habits = demoHabits(scene.habits ?? HABITS);
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
+  // Cheers on your lap were shown arriving before, but in the state made to show one arriving.
+  if (!scene.room?.cheersIn)
+    kept.set('cheersSeen', rooms.list.value.flatMap((room) => room.members.flatMap((m) => (m.you && m.last ? m.last.cheers.map((by) => cheerKey(room.id, m.last!.run, by)) : []))));
   const invites = demoInvites(scene.invites ?? 0, now);
   const admins = demoAdmins(scene.admins ?? []);
   const resets = demoResets(scene.resets ?? 0, { look: engine.resetLook, use: engine.resetUse });

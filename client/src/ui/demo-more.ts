@@ -138,6 +138,8 @@ export interface DemoRoom {
   keeper?: 'you' | string | null;
   /** Who cheered your latest lap, for the Focus result. */
   cheered?: string[];
+  /** Who cheered your last lap in the room, not yet shown arriving on this device: their squares fly to you. */
+  cheersIn?: string[];
   /** A lap called for a few minutes from now: by a friend, by a friend with you in, or by you; `long`, by the friend with the longest name, you in. */
   call?: 'theirs' | 'in' | 'mine' | 'long';
   /** You are on a short break, not on the lap the four are drawn with. */
@@ -222,7 +224,7 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
     today_ms: 125 * MIN,
     today_laps: 5,
     week_ms: 325 * MIN,
-    last: lap(1, 9, ['sachi']),
+    last: lap(1, 9, seed.cheersIn ?? ['sachi']),
   });
   const four = [
     you,

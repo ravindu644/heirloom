@@ -27,6 +27,7 @@ import { SplitChip } from '../kit/race.tsx';
 import { useSidebar } from '../kit/wide.ts';
 import { motion } from '../kit/ms.ts';
 import { Fold, Kept } from '../kit/fold.tsx';
+import { burst } from '../kit/burst.ts';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { Name, Note } from '../kit/note.tsx';
@@ -399,6 +400,55 @@ function useSettled(ids: string[]): string[] {
   return [...held, ...ids.filter((id) => !held.includes(id))];
 }
 
+// The cheers on your own last lap that this device has shown arriving, by room, lap and cheerer.
+// ponytail: the latest 100 are kept; a lap is cheered by 15 people at most and is old by tomorrow.
+const SEEN = 'cheersSeen';
+const SEEN_KEPT = 100;
+export const cheerKey = (room: string, run: string, by: string) => `${room}/${run}/${by}`;
+const seenCheers = (engine: Engine) => {
+  const kept = engine.kept(SEEN);
+  return Array.isArray(kept) ? kept.filter((key): key is string => typeof key === 'string') : [];
+};
+const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * A cheer arriving (DESIGN.md, Room): the first time People shows your last lap after someone
+ * cheered it, their squares fly from their circle to yours, one cheer after another, and only then
+ * does the line that says so come. Once per cheer on this device. Returns the cheers (by
+ * `cheerKey`) whose words still wait for their squares.
+ */
+function useCheersIn(engine: Engine, room: RoomView | undefined, on: boolean, circle: (member: string) => Element | null): string[] {
+  const last = on ? room?.members.find((m) => m.you)?.last : null;
+  const seen = last ? seenCheers(engine) : [];
+  const fresh = last ? last.cheerers.map((one) => cheerKey(room!.id, last.run, one.id)).filter((key) => !seen.includes(key)) : [];
+  const [held, setHeld] = useState<string[]>([]);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useLayoutEffect(() => {
+    if (!fresh.length) return;
+    // Seen from now: leaving People in the middle of a flight does not play it again.
+    engine.keep(SEEN, [...seen, ...fresh].slice(-SEEN_KEPT));
+    if (still()) return;
+    setHeld((was) => [...was, ...fresh]);
+    const root = document.documentElement;
+    // After the screen has come in, so the circles are where they stay.
+    const first = motion(root, '--motion-fill');
+    const each = motion(root, '--motion-cheer');
+    const me = room!.members.find((m) => m.you)!.id;
+    fresh.forEach((key, i) =>
+      timers.current.push(
+        setTimeout(() => {
+          const from = circle(key.slice(key.lastIndexOf('/') + 1));
+          const to = circle(me);
+          if (from && to) burst(from, to);
+        }, first + i * each),
+      ),
+    );
+    timers.current.push(setTimeout(() => setHeld((was) => was.filter((key) => !fresh.includes(key))), first + fresh.length * each));
+  }, [fresh.join(' ')]);
+  return still() ? [] : [...held, ...fresh];
+}
+
 /**
  * Friends, side by side: the line that names the room, the finding, a call to start together,
  * and three tabs: People on a track of the day's hours, Notes read on a break, and the Week the
@@ -421,6 +471,10 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const called = !!room?.call;
   useEffect(() => void (called && setCalling(false)), [called]);
   const order = useSettled(room?.members.map((m) => m.id) ?? []);
+  const peopleShown = !!room && tab === 'people' && !rooms.hidden.value && !(reporting && room.members.some((m) => m.id === decodeURIComponent(reporting)));
+  const arriving = useCheersIn(engine, room, peopleShown, (id) => document.querySelector(`[data-member="${CSS.escape(id)}"] .${css.top} > i`));
+  // Cheers sent from here this sitting: their burst's place closes after it, in time, not at once.
+  const [bursting, setBursting] = useState<string[]>([]);
   const pictures = usePictures(rooms, [...(room?.members.map((m) => m.picture) ?? []), ...(room?.notes.map((note) => note.picture) ?? [])], holderOf(engine, rooms));
 
   // Time left, a call's count down and the hours move by themselves, once a second while
@@ -529,15 +583,26 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
         {face(m.name, m.picture, 'sm')}
       </Mark>
     );
-  // Cheer: only while a lap of theirs that rang is not yet cheered by you; then a tinted circle.
+  // Cheer: only while a lap of theirs that rang is not yet cheered by you. A tap bursts it and it
+  // goes; the place it stood closes once the squares have flown, so nothing beside it jumps.
   const cheer = (m: MemberView) =>
     m.last && !m.you ? (
       m.last.cheered ? (
-        <span class={css.cheered} aria-hidden="true">
-          {s.room.cheerMark}
-        </span>
+        bursting.includes(cheerKey(room.id, m.last.run, m.id)) && <span class={css.burst} aria-hidden="true" />
       ) : (
-        <button type="button" class={css.cheer} aria-label={s.room.cheerLabel(m.name)} onClick={() => rooms.cheer(room.id, m.id)}>
+        <button
+          type="button"
+          class={css.cheer}
+          aria-label={s.room.cheerLabel(m.name)}
+          onClick={(event) => {
+            const button = event.currentTarget;
+            burst(button);
+            if (!still()) setBursting((was) => [...was, cheerKey(room.id, m.last!.run, m.id)]);
+            // The button goes: the keyboard stays on the panel it was in, which says what happened.
+            if (document.activeElement === button) button.closest('article')?.querySelector<HTMLElement>(`.${css.cover}`)?.focus({ preventScroll: true });
+            rooms.cheer(room.id, m.id);
+          }}
+        >
           <span aria-hidden="true">{s.room.cheerMark}</span>
         </button>
       )
@@ -552,7 +617,8 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   const task = (m: MemberView) =>
     m.phase === 'work' && (m.task || !m.you || !rooms.shareTask.value) ? <p key="task" class={m.task ? css.task : css.quiet}>{m.task ?? (m.you ? s.room.yoursHidden : s.room.notSharing)}</p> : null;
   const cheered = (m: MemberView) => {
-    const who = m.last?.cheerers.map((one) => (one.id === me?.id ? s.room.you : one.name)) ?? [];
+    // On your own panel a cheer still flying in is said when it lands.
+    const who = m.last?.cheerers.filter((one) => !m.you || !arriving.includes(cheerKey(room.id, m.last!.run, one.id))).map((one) => (one.id === me?.id ? s.room.you : one.name)) ?? [];
     return who.length > 0 && <p key="cheered" class={css.small}>{s.room.cheeredBy(who, m.you)}</p>;
   };
   const named = (m: MemberView, withPhase = true) => (
@@ -573,7 +639,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
       </div>
       <Fold list gap="sm" class={css.rows}>
         {order.map((id) => room.members.find((m) => m.id === id)!).map((m) => (
-          <article key={m.id} class={cx(css.person, wide && css.side)}>
+          <article key={m.id} data-member={m.id} class={cx(css.person, wide && css.side)}>
             {cover(m)}
             {wide ? (
               <div class={css.words}>
@@ -618,7 +684,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
     </section>
   );
 
-  // A person's report takes the room's place, with Back first; the call stays.
+  // A person's report takes the room's place, with Back at the end of its top line; the call stays.
   const person = reporting && room.members.find((m) => m.id === decodeURIComponent(reporting));
   if (person)
     return (
@@ -880,13 +946,16 @@ function Report({ person: m, now, lapMs, face, shareTask, call, phase }: { perso
   const ahead = w?.ahead_ms ?? null;
   return (
     <div ref={top} class={css.room}>
-      <div class={css.back}>
-        <Button onClick={closeReport}>{s.settings.back}</Button>
-      </div>
       <header class={css.who}>
         {face(m.name, m.picture, 'xl')}
         <div>
-          <h1>{name}</h1>
+          {/* Back is Settings' link at the end of its heading's line. */}
+          <div class={css.named}>
+            <h1>{name}</h1>
+            <Button kind="link" class={links.end} onClick={closeReport}>
+              {s.settings.back}
+            </Button>
+          </div>
           <p class={css.small} data-live>{s.room.phaseLeft(phase, m.ends_at === null ? null : Math.max(0, m.ends_at - now))}</p>
         </div>
       </header>

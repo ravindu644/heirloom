@@ -805,7 +805,7 @@ export const room = {
   startedTogether: (at: number) => `You started this lap together at ${wall(at)}.`,
 
   // Notes: one line each, read on a break.
-  noteField: 'A line for the room',
+  noteField: 'Leave a note for the room',
   noteGo: 'Add',
   notesNote: 'Kept for a week. Notes fold away while you are on a lap.',
   notesNone: 'No notes this week.',
@@ -896,7 +896,7 @@ export const room = {
   notSharing: 'Not sharing what they are on.',
   yoursHidden: 'Your task is not shown to the room.',
   cheer: 'Cheer',
-  // The one emoji in the app, the user's choice: on the round Cheer button and the tinted circle after.
+  // The one emoji in the app, the user's choice: on the round Cheer button, which bursts when tapped.
   cheerMark: '🎉',
   cheerLabel: (name: string) => `Cheer ${name}'s lap`,
   cheeredBy: (who: string[], yours: boolean) => `${names(who)} cheered ${yours ? 'your last lap' : 'this lap'}.`,

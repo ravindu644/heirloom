@@ -1,0 +1,13 @@
+/* A cheer's six squares, in the heat colours. Fixed to the screen and laid over everything, so they
+   take no room and never make a page scroll; each is removed when its flight ends. */
+.square { position: fixed; left: 0; top: 0; z-index: 4; width: var(--layout-heat-cell); height: var(--layout-heat-cell); margin: calc(var(--layout-heat-cell) / -2) 0 0 calc(var(--layout-heat-cell) / -2); pointer-events: none; translate: var(--x) var(--y); animation: var(--motion-cheer) var(--motion-ease) forwards; }
+/* Sent: out from the 🎉 a short way, each its sixth of the circle, fading as it goes. */
+.out { animation-name: out; }
+@keyframes out { 40% { opacity: 1; } to { translate: calc(var(--x) + cos(var(--a)) * var(--space-xl)) calc(var(--y) + sin(var(--a)) * var(--space-xl)); opacity: 0; } }
+/* Arriving: from the cheerer's circle to yours, bowed apart on the way, gone as they land. */
+.in { animation-name: in; }
+@keyframes in {
+  50% { translate: calc((var(--x) + var(--x1)) / 2 + cos(var(--a)) * var(--space-lg)) calc((var(--y) + var(--y1)) / 2 + sin(var(--a)) * var(--space-lg)); }
+  80% { opacity: 1; }
+  to { translate: var(--x1) var(--y1); opacity: 0; }
+}
