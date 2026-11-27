@@ -4,7 +4,7 @@
 
 import { addDays, mondayOf, weekTotals } from './progress.ts';
 import type { Days } from './progress.ts';
-import { localDay } from './stats.ts';
+import { lapDay } from './stats.ts';
 import type { Session } from './stats.ts';
 import type { Task } from './today.ts';
 
@@ -62,7 +62,7 @@ export function lapMarks(sessions: readonly Session[], days: Days, today: string
   const focus_ms = weeks.get(monday) ?? 0;
   // Only once there is a week before it: a first week has nothing to pass.
   if (before.length && focus_ms > Math.max(...before)) {
-    const latest = sessions.filter((s) => counted(s) && localDay(s.started, utcOffsetMin) >= monday).sort((a, b) => b.ended - a.ended)[0];
+    const latest = sessions.filter((s) => counted(s) && lapDay(s, utcOffsetMin) >= monday).sort((a, b) => b.ended - a.ended)[0];
     const key = `week-${monday}`;
     if (latest) out.push({ key, at: latest.ended, mark: { key, kind: 'week', focus_ms, before_ms: Math.max(...before) }, cell: ['session', latest.id, 'ended'] });
   }

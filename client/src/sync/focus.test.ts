@@ -738,19 +738,19 @@ describe('undo', () => {
     d.focus.resume();
     w.time.advance(4 * MIN);
     d.focus.stop();
-    assert.deepEqual(last(), { phase: 'work', task: 'task-pointers', started: T0, ran_ms: 9 * MIN, counted: true });
+    assert.deepEqual(last(), { phase: 'work', task: 'task-pointers', ran_ms: 9 * MIN, counted: true });
     // A start taken back: twenty seconds. No row, so the newest row is still the lap before, and this says which stop it was.
     w.time.advance(MIN);
     d.focus.start();
     w.time.advance(20000);
     d.focus.stop();
-    assert.deepEqual(last(), { phase: 'work', task: null, started: T0 + 13 * MIN, ran_ms: 20000, counted: false });
+    assert.deepEqual(last(), { phase: 'work', task: null, ran_ms: 20000, counted: false });
     assert.deepEqual(d.sessions(), ['run-1']);
     // A lap stopped after its bell: it rang, and its whole length ran.
     d.focus.start();
     w.time.advance(LAP + 2 * MIN);
     d.focus.stop();
-    assert.deepEqual(last(), { phase: 'work', task: null, started: T0 + 13 * MIN + 20000, ran_ms: LAP, counted: true });
+    assert.deepEqual(last(), { phase: 'work', task: null, ran_ms: LAP, counted: true });
     // A break, whatever it ran: no lap. And a paused lap stopped: its running time to the pause.
     d.focus.start();
     w.time.advance(MIN);
@@ -798,7 +798,7 @@ describe('undo', () => {
     d.focus.start(id);
     w.time.advance(20000);
     d.today.setDone(id, true);
-    assert.deepEqual(d.focus.lastStop.value, { phase: 'work', task: id, started: T0, ran_ms: 20000, counted: false });
+    assert.deepEqual(d.focus.lastStop.value, { phase: 'work', task: id, ran_ms: 20000, counted: false });
     w.time.advance(2000);
     d.today.setDone(id, false);
     assert.equal(d.focus.lastStop.value, null);
@@ -1307,9 +1307,10 @@ describe('a new day', () => {
     assert.deepEqual(d.focus.view().next, { phase: 'short', set_index: 1 });
     d.focus.start();
     assert.deepEqual([d.focus.state.value.phase, d.focus.state.value.set_index], ['short', 1]);
-    // The whole lap is the day it began in: yesterday's six hours, and none of today's.
-    assert.equal(d.focus.lapsToday(), 0);
-    assert.equal(d.progress.since.value.cells.at(-2)?.focus_ms, 360 * MIN);
+    // Its minutes are cut at midnight, four hours to yesterday and two to today, and the lap is
+    // today's, the day its bell rang.
+    assert.equal(d.focus.lapsToday(), 1);
+    assert.deepEqual(d.progress.since.value.cells.slice(-2).map((cell) => [cell.focus_ms, cell.laps]), [[240 * MIN, 0], [120 * MIN, 1]]);
   });
 
   it('a lap left paused overnight is yesterday\'s half set: the next start is lap one', async () => {

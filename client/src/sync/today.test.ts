@@ -745,7 +745,7 @@ describe('figures', () => {
     assert.deepEqual(rung(), [2, [1, 1], 2, 2, [1, 1]]);
   });
 
-  it('open is the lap in progress, to draw after the fills: none when idle, when its bell has gone, when it rang and runs on, or when it began yesterday', async () => {
+  it('open is the lap in progress, to draw after the fills: none when idle, when its bell has gone, or when it rang and runs on; begun before midnight it is today\'s', async () => {
     const w = world();
     const d = await w.device('a');
     const open = () => d.today.figures().open;
@@ -772,14 +772,14 @@ describe('figures', () => {
     d.focus.start();
     assert.equal(d.focus.state.peek().phase, 'short');
     assert.equal(open(), null);
-    // A lap begun at 23:50 is yesterday's lap at 00:05: not one of today's, growing or whole.
+    // A lap begun at 23:50 is today's at 00:05: it will end today, and today has its minutes from midnight.
     d.focus.stop();
     w.time.advance(T0 + 14 * HOUR - 10 * MIN - d.engine.now());
     d.focus.start();
     w.time.advance(5 * MIN);
     assert.equal(open(), 0.2, 'at 23:55 it is today\'s lap in progress');
     w.time.advance(10 * MIN);
-    assert.deepEqual([open(), d.today.figures().fills], [null, []]);
+    assert.deepEqual([open(), d.today.figures().fills, d.focus.race().you_ms], [0.6, [], 5 * MIN]);
   });
 
   it('a lap whose bell this device heard and may not write is one of the fills, and not drawn again as the lap in progress', async () => {

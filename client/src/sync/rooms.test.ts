@@ -89,6 +89,22 @@ describe('the list', () => {
     assert.equal(lane(r, SACHI).today_ms, 50 * MIN);
   });
 
+  it('your lap begun before midnight is today\'s from midnight on, and once it rings it is one of today\'s laps', async () => {
+    const { w, d, r } = await one();
+    // 23:50 on Tuesday; at 00:10 on Wednesday, the server's rows hold nothing of today yet.
+    w.time.advance(13 * 60 * MIN + 50 * MIN);
+    d.focus.start();
+    w.time.advance(20 * MIN);
+    say(d, room('r_1', [member(ME, 'ravi', { today_ms: 0, week_ms: 30 * MIN }), member(SACHI, 'sachi')]));
+    const mine = () => lane(r, ME);
+    assert.deepEqual([mine().today_ms, mine().week_ms, mine().laps], [10 * MIN, 50 * MIN, []]);
+    assert.equal(mine().today_ms, d.focus.race().you_ms);
+    // Its bell at 00:15: a lap of today in your lane, from where it began.
+    w.time.advance(5 * MIN);
+    await d.settle();
+    assert.deepEqual(mine().laps, [[T0 + 13 * 60 * MIN + 50 * MIN, T0 + 14 * 60 * MIN + 15 * MIN]]);
+  });
+
   it('a friend\'s lap in progress is in their figures from `run`, on since `server_time` while it counts; paused it stands; without it, the rows alone', async () => {
     const { w, d, r } = await one();
     const run = { ms: 14 * MIN, today: true, week: true };
@@ -101,7 +117,7 @@ describe('the list', () => {
     assert.deepEqual(figures(), [[0, 10 * MIN], [67 * MIN, 117 * MIN]], 'moved on at the minute with nobody sending');
     assert.equal(r.list.value[0]!.week_ms, 127 * MIN, 'and the room\'s week with it');
 
-    // Begun yesterday and still running: in the week, not in today.
+    // An older server's `today: false` for a lap begun yesterday: in the week, not in today.
     say(d, room('r_1', [member(ME, 'ravi'), sachi({ run: { ...run, today: false }, ends_at: T0 + 20 * MIN })], { server_time: T0 + 3 * MIN }));
     assert.deepEqual(figures()[1], [50 * MIN, 114 * MIN]);
 
@@ -818,6 +834,48 @@ describe('notes', () => {
     say(again, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { notes_since: 'n4' }));
     await settle();
     assert.equal(again.rooms.list.value[0]!.newNotes, 0);
+  });
+
+  it('read on one device is read on all: the server\'s notes_read clears the count, and Notes shown tells the server', async () => {
+    const { w, d, r } = await one();
+    const READ = '/api/rooms/read';
+    const reads = () => w.server.requests.filter((q) => q.path === READ).map((q) => ({ room: q.body.room, at: q.body.at }));
+    const held = [note('n2', SACHI, T0 - MIN), note('n1', SACHI, T0 - 2 * MIN)];
+    w.server.reply = (path) => ({ status: 200, body: path === NOTES ? { notes: held } : {} });
+    const said = (over: object) => say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { notes_since: 'n2', ...over }));
+    said({ notes_read: 'soon' });
+    await settle();
+    assert.equal(r.list.value[0]!.newNotes, 2, 'a notes_read that is no number is never');
+    // Read on the phone up to the first: only the second is new here.
+    said({ notes_read: T0 - 2 * MIN });
+    assert.equal(r.list.value[0]!.newNotes, 1);
+    // Shown here: read here at once, and the server told how far.
+    r.markNotesRead('r_1');
+    await settle();
+    assert.equal(r.list.value[0]!.newNotes, 0);
+    assert.deepEqual(reads(), [{ room: 'r_1', at: T0 - MIN }]);
+    // The server has it: shown again, nothing is sent.
+    said({ notes_read: T0 - MIN });
+    r.markNotesRead('r_1');
+    await settle();
+    assert.equal(reads().length, 1);
+  });
+
+  it('a read made offline counts here at once and is sent the next time Notes is shown', async () => {
+    const { w, d, r } = await one();
+    const READ = '/api/rooms/read';
+    w.server.reply = (path) => ({ status: 200, body: path === NOTES ? { notes: [note('n1', SACHI, T0 - MIN)] } : {} });
+    say(d, room('r_1', [member(ME, 'ravi'), member(SACHI, 'sachi')], { notes_since: 'n1', notes_read: 0 }));
+    await settle();
+    d.disconnect();
+    r.markNotesRead('r_1');
+    await settle();
+    assert.equal(r.list.value[0]!.newNotes, 0);
+    assert.equal(w.server.requests.filter((q) => q.path === READ).length, 0);
+    await d.connect();
+    r.markNotesRead('r_1');
+    await settle();
+    assert.deepEqual(w.server.requests.filter((q) => q.path === READ).map((q) => q.body.at), [T0 - MIN]);
   });
 });
 

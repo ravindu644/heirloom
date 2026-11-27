@@ -534,7 +534,7 @@ describe('a day\'s timeline', () => {
     return { ...all, project, task, ids: { first, rest, aside, here, there } };
   }
 
-  it('every session that started on the day, oldest first: the break and the lap set aside are in it, and the pair is marked', async () => {
+  it('every session whose time touches the day, oldest first: the break and the lap set aside are in it, and the pair is marked', async () => {
     const { p, project, task, ids } = await morning();
     const view = { id: project, name: 'The C book', color: 'you' };
     assert.deepEqual(p.timeline('2026-11-23'), [
@@ -546,6 +546,33 @@ describe('a day\'s timeline', () => {
     ]);
     assert.equal(p.timeline('2026-11-22').length, 1);
     assert.deepEqual(p.timeline('2026-11-21'), []);
+  });
+
+  it('a lap across midnight: its minutes on both days, the lap on the day it rang, and in both days\' timelines', async () => {
+    const { w, d, p } = await one();
+    // 23:46 on Monday to 00:32 on Tuesday, then a lap begun at 23:50 last night still running at 00:10 on Wednesday.
+    const late = lap(d, '2026-11-23', 23, 46, { ended: at('2026-11-24', 0, 32), planned_ms: 46 * MIN });
+    const cells = () => p.since.value.cells.map((cell) => [cell.day, cell.focus_ms, cell.laps]);
+    assert.deepEqual(cells(), [['2026-11-23', 14 * MIN, 0], ['2026-11-24', 32 * MIN, 1]]);
+    assert.deepEqual([p.lookBack().focus_ms, p.lookBack().laps, d.focus.lapsToday()], [32 * MIN, 1, 1]);
+    assert.deepEqual(p.timeline('2026-11-23').map((entry) => entry.id), [late]);
+    assert.deepEqual(p.timeline('2026-11-24').map((entry) => entry.id), [late]);
+    // Monday's 14 minutes are in the week once, and Tuesday's 32.
+    assert.equal(p.week().you_ms, 46 * MIN);
+
+    // The lap in progress, begun at 23:50 on Tuesday, is Wednesday's from midnight on and drawn in both days.
+    w.time.advance(at('2026-11-24', 23, 50) - d.engine.now());
+    d.focus.start();
+    w.time.advance(20 * MIN);
+    const run = d.focus.state.value.run;
+    assert.deepEqual([p.lookBack().day, p.lookBack().focus_ms, p.lookBack().laps], ['2026-11-25', 10 * MIN, 0]);
+    assert.deepEqual(p.timeline('2026-11-25').map((entry) => [entry.id, entry.live]), [[run, 'running']]);
+    assert.deepEqual(p.timeline('2026-11-24').map((entry) => entry.id), [late, run]);
+    // At its bell at 00:15, a lap of Wednesday's; Tuesday keeps its ten minutes and its one lap.
+    w.time.advance(5 * MIN);
+    await d.settle();
+    assert.deepEqual(cells().slice(-2), [['2026-11-24', 42 * MIN, 1], ['2026-11-25', 15 * MIN, 1]]);
+    assert.equal(d.focus.lapsToday(), 1);
   });
 
   it('a lap stays in its day when its task is deleted; the task is named while it is in Recently deleted, and not once it is gone for good', async () => {

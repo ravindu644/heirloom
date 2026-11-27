@@ -6,6 +6,7 @@
 import { batch, computed, effect, signal, untracked } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { mondayOf } from '../core/progress.ts';
+import { midnight } from '../core/stats.ts';
 import { weekday } from '../core/streak.ts';
 import { view } from '../core/timer.ts';
 import { createCounts } from './counts.ts';
@@ -279,8 +280,11 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   // from these: a message kept from before may hold a call taken back since.
   const heard = signal<ReadonlySet<string>>(new Set());
   // getTimezoneOffset counts minutes west of UTC; the contract counts east.
-  const counts = createCounts(engine, env.utcOffsetMin ?? (() => -new Date().getTimezoneOffset()));
+  const offset = env.utcOffsetMin ?? (() => -new Date().getTimezoneOffset());
+  const counts = createCounts(engine, offset);
   const connected = computed(() => engine.sync.value === 'syncing' || engine.sync.value === 'in-step');
+  // How far the account has read the room's notes, by the server: 0 for never, or from an older server.
+  const serverRead = (msg: RoomNow) => (typeof msg.notes_read === 'number' && Number.isFinite(msg.notes_read) ? msg.notes_read : 0);
 
   function remember(next: ReadonlyMap<string, RoomNow>) {
     rooms.value = next;
@@ -344,19 +348,20 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
   let cancelBell = () => {};
 
   // Your lap in progress as far as it has run, for your own lane: the server's totals are of rows,
-  // and it has none yet. Counted on the day and in the week it began, as Progress counts it.
-  // Your lane: today's laps from your own rows, the open lap in place of a row it has outgrown,
-  // and one past its bell with no row yet is a lap that ended.
+  // and it has none yet. Its minutes are cut at midnight, as Progress cuts them: what no row
+  // holds is its tail, so the part of it after today's (or this week's) midnight is today's.
+  // Your lane: your own laps that touch today, one from before midnight included, the open lap
+  // in place of a row it has outgrown, and one past its bell with no row yet is a lap that ended.
   function yours(now: number): { today: number; week: number; laps: [number, number][]; runStart: number | null } {
     const lap = counts.open(now);
     const today = counts.today(now);
     const rows = (counts.byDay.value.get(today) ?? []).filter((row) => row.kind === 'work' && row.outcome !== 'void' && row.id !== lap?.id);
-    const ended = lap?.outcome === 'rang' && counts.today(lap.started) === today ? [lap] : [];
+    const ended = lap?.outcome === 'rang' && counts.today(lap.ended) === today ? [lap] : [];
     const laps = [...rows, ...ended].sort((a, b) => a.started - b.started).map((row): [number, number] => [row.started, row.ended]);
     if (!lap) return { today: 0, week: 0, laps, runStart: null };
-    const began = counts.today(lap.started);
     const ran = counts.unwritten(now);
-    return { today: began === today ? ran : 0, week: mondayOf(began) === mondayOf(today) ? ran : 0, laps, runStart: lap.outcome === 'rang' ? null : lap.started };
+    const after = (day: string) => Math.min(ran, Math.max(0, lap.ended - midnight(day, offset())));
+    return { today: after(today), week: after(mondayOf(today)), laps, runStart: lap.outcome === 'rang' ? null : lap.started };
   }
 
   // The room's week day by day, this week to today and last week whole, from the server's rows
@@ -457,7 +462,8 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
         picture: (note.from !== null && pictureOf.get(note.from)) || null,
         you: note.from !== null && note.from === you,
       }));
-      const seenAt = read.value[msg.room] ?? -Infinity;
+      // Read here or on another device of the account, whichever reached further.
+      const seenAt = Math.max(read.value[msg.room] ?? -Infinity, serverRead(msg));
       return {
         id: msg.room,
         name: text(msg.name),
@@ -666,9 +672,16 @@ export function createRooms(engine: Engine, env: RoomsEnv): Rooms & { close(): v
 
     markNotesRead(room) {
       const newest = notes.peek().get(room)?.[0]?.at;
-      if (newest === undefined || onLap() || newest <= (read.peek()[room] ?? -Infinity)) return;
-      read.value = { ...read.peek(), [room]: newest };
-      engine.keep('notesRead', read.peek());
+      if (newest === undefined || onLap()) return;
+      if (newest > (read.peek()[room] ?? -Infinity)) {
+        read.value = { ...read.peek(), [room]: newest };
+        engine.keep('notesRead', read.peek());
+      }
+      // The server is told for the account's other devices. Offline, or failed, it is told the
+      // next time Notes is shown: the mark here is ahead of the server's until it hears.
+      const mark = read.peek()[room]!;
+      const held = rooms.peek().get(room);
+      if (!held || mark > serverRead(held)) void ask('/api/rooms/read', { room, at: mark });
     },
 
     calledIn,

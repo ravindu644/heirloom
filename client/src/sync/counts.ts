@@ -4,7 +4,7 @@
 import { computed } from '@preact/signals-core';
 import { stampMs } from '../core/hlc.ts';
 import { isLength, isMoment } from '../core/real.ts';
-import { fill, focusOf, localDay, race } from '../core/stats.ts';
+import { fill, focusOn, lapDay, localDay, race, touches } from '../core/stats.ts';
 import type { Race, Session } from '../core/stats.ts';
 import { view } from '../core/timer.ts';
 import type { TimerState } from '../core/timer.ts';
@@ -46,7 +46,8 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
   const timerStamp = () => engine.stamp('timer', 'current', 'state');
   const today = (ms: number) => localDay(ms, utcOffsetMin());
 
-  // Every session under the local day it started on, and the days newest first. Worked out once
+  // Every session under each local day its time touches, and the days newest first: a lap across
+  // midnight is in both, and a count of a day clips it to that day. Worked out once
   // per change of a session row, so a number asked for on every tick reads two days of sessions
   // and not two years.
   // ponytail: grouped at the UTC offset of that moment. After a change of time zone it is right
@@ -54,10 +55,11 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
   const byDay = computed(() => {
     const days = new Map<string, Session[]>();
     for (const session of sessions.value) {
-      const day = today(session.started);
-      const list = days.get(day);
-      if (list) list.push(session);
-      else days.set(day, [session]);
+      for (const day of touches(session, utcOffsetMin())) {
+        const list = days.get(day);
+        if (list) list.push(session);
+        else days.set(day, [session]);
+      }
     }
     return days;
   });
@@ -125,8 +127,10 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
   }
 
   const counted = (row: Session) => row.kind === 'work' && row.outcome !== 'void';
+  // A lap is the day's it ended on; one that only began on it gave it minutes and is no lap of it.
+  const lapOf = (row: Session, day: string) => counted(row) && lapDay(row, utcOffsetMin()) === day;
   /** The laps of `day`, rang or stopped, by rows alone. */
-  const lapsOn = (day: string): number => (byDay.value.get(day) ?? []).filter(counted).length;
+  const lapsOn = (day: string): number => (byDay.value.get(day) ?? []).filter((row) => lapOf(row, day)).length;
 
   /**
    * One fill per lap of today, oldest first: every counted row, and the lap whose bell has gone
@@ -139,25 +143,27 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
     const day = today(now);
     const rowTells = told(s, now);
     const fills = (byDay.value.get(day) ?? [])
-      .filter((row) => counted(row) && stands(row, s, rowTells))
+      .filter((row) => lapOf(row, day) && stands(row, s, rowTells))
       .sort((a, b) => a.started - b.started)
       .map(fill);
     // Not twice: a row that tells the run up to this bell has the last word on it, set aside or
     // not, and a row of an earlier bell of the same lap is this lap already.
-    if (s.phase === 'work' && s.started !== null && view(s, now).over && !rowTells && !rangOnce(s) && today(s.started) === day) fills.push(1);
+    // A bell that went before midnight is yesterday's lap.
+    const { over, ends_at } = view(s, now);
+    if (s.phase === 'work' && s.started !== null && over && !rowTells && !rangOnce(s) && today(ends_at ?? now) === day) fills.push(1);
     return fills;
   }
 
   /**
    * How full the lap in progress is, when it is not yet one of today's laps: null when no lap is
-   * on, when its bell has gone or it rang once already (then it is in `fillsToday`), or when it
-   * began on an earlier day and so is that day's.
+   * on, or when its bell has gone or it rang once already (then it is in `fillsToday`). Begun
+   * before midnight, it is still today's: a lap is the day's it ends on.
    */
   function fillOpen(): number | null {
     const s = state.value;
     const now = engine.now();
     const { over, left_ms } = view(s, now);
-    if (s.phase !== 'work' || s.started === null || over || rangOnce(s) || today(s.started) !== today(now)) return null;
+    if (s.phase !== 'work' || s.started === null || over || rangOnce(s)) return null;
     return s.planned_ms > 0 ? Math.min(1, Math.max(0, (s.planned_ms - left_ms) / s.planned_ms)) : 0;
   }
 
@@ -184,7 +190,10 @@ export function createCounts(engine: Pick<Engine, 'timer' | 'now' | 'rows' | 'st
       // latest day before today that has. It is handed those two days and nothing more, and
       // from them it makes the same choice.
       const lastWeek = today(now - 7 * DAY_MS);
-      const ghost = focusOf(days.get(lastWeek) ?? []) > 0 ? lastWeek : newestFirst.value.find((d) => d < day && focusOf(days.get(d)!) > 0);
+      const has = (d: string) => focusOn(days.get(d) ?? [], d, utcOffsetMin()) > 0;
+      const ghost = has(lastWeek) ? lastWeek : newestFirst.value.find((d) => d < day && has(d));
+      // A lap across the midnight between the two is in both lists: a union counts it once, and
+      // the race cuts each day at its midnights.
       const two = [...(days.get(day) ?? []), ...((ghost && days.get(ghost)) || [])];
       // A row that ends before the run has got to (see `covered`) would hide the lap in progress.
       const end = s.paused_at ?? Math.min(now, view(s, now).ends_at ?? now);

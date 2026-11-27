@@ -58,9 +58,9 @@ test('a lap for nothing in particular, or on a task this device does not hold op
   assert.doesNotMatch(JSON.stringify(ring), /set|of 4/);
 });
 
-test('a lap begun before midnight, on no task, is not a lap of today', () => {
-  const ring = plan(lapOn(IDLE, null), T0 + MIN, undefined, 0, 0);
-  assert.equal(ring?.during, 'A lap from yesterday');
+test('a lap begun before midnight, on no task, is a lap of today: it ends today', () => {
+  const ring = plan(lapOn(IDLE, null), T0 + MIN, undefined, 0, 1);
+  assert.equal(ring?.during, 'Lap 1 today');
 });
 
 test('the fourth lap in a row earns the long break, at the length given', () => {

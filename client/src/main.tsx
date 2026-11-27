@@ -136,9 +136,6 @@ async function start() {
     ]),
   );
 
-  // A lap still running from before midnight is none of today's laps.
-  const day = (at: number) => new Date(at).toDateString();
-  const begunToday = (started: number | null) => started === null || day(started - (engine.now() - Date.now())) === day(Date.now());
   let held = { bell: '', at: 0 };
   // The ring is planned whenever the timer changes, on any device, and whenever the line beside
   // the countdown would read differently: the task's title, its laps, its estimate. What is
@@ -153,9 +150,11 @@ async function start() {
     const on = state.phase !== 'work' ? undefined : [...app.today.list.value, ...app.today.upcoming.value].find((task) => task.id === state.task);
     // The timer counts in server time and the notifier in this device's own.
     const view = focus.view();
-    // The lap in progress is one more than today's, unless it has rung and runs on: then it is already among them.
+    // The lap in progress is one more than today's, unless it has rung and runs on: then it is
+    // already among them. Begun before midnight it is still today's, the day it will end on; one
+    // that rang before midnight and runs on is yesterday's, and still a lap, never the 0th.
     const fig = app.today.figures();
-    const plan = planFor({ state, view, on, today: begunToday(state.started) ? fig.laps + (fig.open === null ? 0 : 1) : 0, lengths: focus.lengthsFor(state.task), ahead: engine.now() - Date.now() });
+    const plan = planFor({ state, view, on, today: Math.max(1, fig.laps + (fig.open === null ? 0 : 1)), lengths: focus.lengthsFor(state.task), ahead: engine.now() - Date.now() });
     // The distance to the server's clock is smoothed at every ping, so the same bell works out
     // a few ms apart from one run of this to the next. An alarm is not set again for that.
     if (plan && !isPaused(plan)) {

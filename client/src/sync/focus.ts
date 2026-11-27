@@ -63,7 +63,7 @@ export interface Focus {
    * and for any break. The screen's line about a stop reads this, not the newest row: a lap
    * stopped in its first minute leaves no row, and the newest row is then another lap.
    */
-  readonly lastStop: ReadonlySignal<{ phase: 'work' | 'short' | 'long'; task: string | null; started: number; ran_ms: number; counted: boolean } | null>;
+  readonly lastStop: ReadonlySignal<{ phase: 'work' | 'short' | 'long'; task: string | null; ran_ms: number; counted: boolean } | null>;
   /**
    * True for ten seconds after `stop()` on this device, while the timer cell is
    * still the idle state that stop wrote. Any other write to the timer, here or elsewhere, ends it.
@@ -219,7 +219,7 @@ export function createFocus(engine: FocusEngine, env: FocusEnv): Focus & { close
     undone = { before: s, stamp: timerStamp() };
     batch(() => {
       // A break's row is no lap, and a lap that leaves no row was a start taken back.
-      lastStop.value = { phase, task: s.task, started: s.started ?? now, ran_ms: s.planned_ms - view(s, now).left_ms, counted: phase === 'work' && row };
+      lastStop.value = { phase, task: s.task, ran_ms: s.planned_ms - view(s, now).left_ms, counted: phase === 'work' && row };
       undoable.value = true;
     });
     cancelUndo = env.schedule(forget, UNDO_MS);

@@ -46,37 +46,65 @@ export const fill = (s: Pick<Session, 'outcome' | 'started' | 'ended' | 'paused_
 export const localDay = (ms: number, utcOffsetMin: number): string =>
   new Date(ms + utcOffsetMin * 60000).toISOString().slice(0, 10);
 
+/** Where the local day `day` begins, in ms, for someone `utcOffsetMin` minutes east of UTC. */
+export const midnight = (day: string, utcOffsetMin: number): number => Date.parse(day) - utcOffsetMin * 60000;
+
+/** The day a lap is counted on: the day it ended, its bell or its stop. Its minutes are cut at midnight. */
+export const lapDay = (s: Pick<Session, 'ended'>, utcOffsetMin: number): string => localDay(s.ended, utcOffsetMin);
+
+/** Every local day a session's time touches, from the day it started to the day it ended, oldest first. */
+export function touches(s: Pick<Session, 'started' | 'ended'>, utcOffsetMin: number): string[] {
+  // A row can say anything: from the earlier end, so a lap's own day is always listed, and
+  // ponytail: no lap runs a week, so no walk is longer than its last week.
+  const end = Math.max(s.started, s.ended);
+  const days = [localDay(Math.max(Math.min(s.started, s.ended), end - 7 * DAY_MS), utcOffsetMin)];
+  const last = localDay(end, utcOffsetMin);
+  while (days.at(-1)! < last) days.push(localDay(midnight(days.at(-1)!, utcOffsetMin) + DAY_MS, utcOffsetMin));
+  return days;
+}
+
+// A session under every day it touches. A day's total clips its list to the day's midnights, so
+// a lap listed under two days gives each only its own part.
 function byDay<T extends Span>(spans: readonly T[], utcOffsetMin: number): Map<string, T[]> {
   const days = new Map<string, T[]>();
   for (const s of spans) {
-    const day = localDay(s.started, utcOffsetMin);
-    const list = days.get(day);
-    if (list) list.push(s);
-    else days.set(day, [s]);
+    for (const day of touches(s, utcOffsetMin)) {
+      const list = days.get(day);
+      if (list) list.push(s);
+      else days.set(day, [s]);
+    }
   }
   return days;
 }
 
-// The length of the union, with nothing after `upTo` counted: walk the laps by start and add
-// only what reaches past everything before.
-function focus(spans: readonly Span[], upTo = Infinity): number {
+// The length of the union inside `[since, upTo)`: walk the laps by start and add only what
+// reaches past everything before. Clipping keeps the order, so the sort by start still holds.
+function focus(spans: readonly Span[], since = -Infinity, upTo = Infinity): number {
   let total = 0;
   let reach = -Infinity;
   for (const s of spans.toSorted((a, b) => from(a) - from(b))) {
     const end = Math.min(s.ended, upTo);
-    total += Math.max(0, end - Math.max(reach, from(s)));
+    total += Math.max(0, end - Math.max(reach, from(s), since));
     reach = Math.max(reach, end);
   }
   return total;
 }
+
+// The focus of `day` in these spans, nothing after `upTo`.
+const focusIn = (spans: readonly Span[], day: string, utcOffsetMin: number, upTo = Infinity) => {
+  const start = midnight(day, utcOffsetMin);
+  return focus(spans, start, Math.min(upTo, start + DAY_MS));
+};
 
 /** `utcOffsetMin` is the viewer's offset from UTC in minutes, 330 for Sri Lanka. */
 export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats {
   const counted = sessions.filter(counts);
   const days: Stats['days'] = {};
   for (const [day, list] of byDay(counted, utcOffsetMin)) {
-    // A lap that was stopped is a lap, a short one.
-    days[day] = { focus_ms: focus(list), laps: list.length };
+    // A lap that was stopped is a lap, a short one, on the day it ended.
+    const laps = list.filter((s) => lapDay(s, utcOffsetMin) === day).length;
+    const focus_ms = focusIn(list, day, utcOffsetMin);
+    if (laps > 0 || focus_ms > 0) days[day] = { focus_ms, laps };
   }
 
   // By start, each lap is compared only with those that begin before it ends: a year of laps is
@@ -94,8 +122,9 @@ export function stats(sessions: readonly Session[], utcOffsetMin: number): Stats
   return { days, overlaps: overlaps.sort((x, y) => (x[0] !== y[0] ? (x[0] < y[0] ? -1 : 1) : x[1] < y[1] ? -1 : 1)) };
 }
 
-/** The focus in these sessions with nothing after `upTo` counted: the counted ones, minutes two ran at once counted once. */
-export const focusOf = (sessions: readonly Session[], upTo = Infinity): number => focus(sessions.filter(counts), upTo);
+/** The focus of local day `day` in these sessions, nothing after `upTo`: the counted ones, cut at the day's midnights, minutes two ran at once counted once. */
+export const focusOn = (sessions: readonly Session[], day: string, utcOffsetMin: number, upTo = Infinity): number =>
+  focusIn(sessions.filter(counts), day, utcOffsetMin, upTo);
 
 /** Today so far against the same stretch of a past day. `state` is the timer, for the lap in progress. */
 export function race(sessions: readonly Session[], state: TimerState, now: number, utcOffsetMin: number): Race {
@@ -103,22 +132,22 @@ export function race(sessions: readonly Session[], state: TimerState, now: numbe
   const today = localDay(now, utcOffsetMin);
 
   // A lap with no row yet runs to now, to its pause, or to its bell. It joins today's union like
-  // any lap, so the number does not jump when its row is written.
+  // any lap, so the number does not jump when its row is written. Begun yesterday, the clip
+  // counts it from midnight; a lap from yesterday that ran past midnight is in today's list too.
   const spans: Span[] = [...(past.get(today) ?? [])];
   if (state.phase === 'work' && state.started !== null && !sessions.some((s) => s.id === state.run)) {
     const ended = state.paused_at ?? Math.min(now, view(state, now).ends_at ?? now);
-    const open = { started: state.started, paused_ms: state.paused_ms, ended };
-    if (localDay(open.started, utcOffsetMin) === today) spans.push(open);
+    spans.push({ started: state.started, paused_ms: state.paused_ms, ended });
   }
-  const you_ms = focus(spans, now);
+  const you_ms = focusIn(spans, today, utcOffsetMin, now);
 
-  const has = (day: string) => focus(past.get(day) ?? []) > 0;
+  const has = (day: string) => focusIn(past.get(day) ?? [], day, utcOffsetMin) > 0;
   const lastWeek = localDay(now - 7 * DAY_MS, utcOffsetMin);
   const day = has(lastWeek) ? lastWeek : [...past.keys()].filter((d) => d < today && has(d)).sort().at(-1);
   if (!day) return { you_ms, ghost: null, split_ms: null };
 
   const list = past.get(day) ?? [];
   // The same time of day, that many whole days ago.
-  const ms = focus(list, now - (Date.parse(today) - Date.parse(day)));
-  return { you_ms, ghost: { day, ms, total_ms: focus(list) }, split_ms: you_ms - ms };
+  const ms = focusIn(list, day, utcOffsetMin, now - (Date.parse(today) - Date.parse(day)));
+  return { you_ms, ghost: { day, ms, total_ms: focusIn(list, day, utcOffsetMin) }, split_ms: you_ms - ms };
 }

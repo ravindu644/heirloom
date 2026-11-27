@@ -7,7 +7,7 @@ import type { ReadonlySignal } from '@preact/signals-core';
 import { addDays, bests, estimates, outcomeOf, projectShares, since, streakView, weekRace } from '../core/progress.ts';
 import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
 import { KEPT_MS, isDay } from '../core/real.ts';
-import { focusOf, localDay, stats } from '../core/stats.ts';
+import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
 import { asTask } from '../core/today.ts';
@@ -134,7 +134,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     // The days a streak keeps: what is earned needs the bell, so a day of stopped laps has laps and is not kept.
     const kept = new Set<string>();
     for (const session of sessions) {
-      if (session.kind === 'work' && session.outcome === 'rang') kept.add(localDay(session.started, offset()));
+      if (session.kind === 'work' && session.outcome === 'rang') kept.add(lapDay(session, offset()));
       // A task's laps are counted as the task shows them: rang or stopped.
       if (session.task !== null && session.kind === 'work' && session.outcome !== 'void') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
       const list = ofTask.get(session.task);
@@ -183,12 +183,14 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     return totals;
   });
 
-  // The sessions of the days from `from` to `to`, with the lap in progress in the place of its row.
+  // The sessions that touch the days from `from` to `to`, each once, with the lap in progress in
+  // the place of its row. One that reaches past an edge brings its minutes from the other side:
+  // whoever counts these keeps only the days it wants.
   function between(from: string, to: string, now: number): Session[] {
     const open = counts.open(now);
-    const out: Session[] = [];
-    for (let day = from; day <= to; day = addDays(day, 1)) out.push(...(history.value.byDay.get(day) ?? []));
-    return open ? [...out.filter((session) => session.id !== open.id), open] : out;
+    const out = new Set<Session>();
+    for (let day = from; day <= to; day = addDays(day, 1)) for (const session of history.value.byDay.get(day) ?? []) out.add(session);
+    return open ? [...out].filter((session) => session.id !== open.id).concat(open) : [...out];
   }
 
   return {
@@ -196,8 +198,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       const now = engine.now();
       const today = localDay(now, offset());
       void clock.day.value;
-      const lastWeek = history.value.byDay.get(addDays(today, -7)) ?? [];
-      return weekRace(history.value.days, today, counts.race().you_ms, focusOf(lastWeek, now - 7 * DAY_MS));
+      const day = addDays(today, -7);
+      return weekRace(history.value.days, today, counts.race().you_ms, focusOn(history.value.byDay.get(day) ?? [], day, offset(), now - 7 * DAY_MS));
     },
 
     projects() {
@@ -251,10 +253,11 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
 
     timeline(day) {
       const { byDay, overlapping } = history.value;
-      // The lap in progress is in its day as far as it has run, in the place of any row it has outgrown.
+      // Every session whose time touches the day, one across midnight in both days. The lap in
+      // progress is in its days as far as it has run, in the place of any row it has outgrown.
       const open = counts.open(engine.now());
       const rows = byDay.get(day) ?? [];
-      const sessions = open && localDay(open.started, offset()) === day ? [...rows.filter((session) => session.id !== open.id), open] : rows;
+      const sessions = open && touches(open, offset()).includes(day) ? [...rows.filter((session) => session.id !== open.id), open] : rows;
       // The first of a pair to start is on row 0 and the one that began during it on row 1, here
       // and nowhere else, so every screen draws the pair the same way.
       let upper = -Infinity;
