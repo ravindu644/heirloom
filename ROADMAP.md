@@ -351,9 +351,9 @@ On the third build the user found no glitches; four things about how it reads an
 ## 26. The phone in step while heirloom is closed
 
 - [x] [lead] Protocol (a second, read-only socket per device; the phone may notify a note and a call), PRODUCT, ARCHITECTURE section 6 and its log, DESIGN's words and Settings rows
-- [ ] [server] Two sockets of one device each hear the other's push; a sign-out kicks both
-- [ ] [core] The timer cell's stamp beside the state; a `link` signal for the service
+- [x] [server] Two sockets of one device each hear the other's push; a sign-out kicks both
+- [x] [core] The timer cell's stamp beside the state; a `link` signal for the service
 - [ ] [android] The service: start, boot, update; the native drawer with JVM tests; the socket, the alarm receiver, the notes fetch; `allowBackup` off
-- [ ] [ui] Settings: "Ring when heirloom is closed" and the battery row
+- [x] [ui] Settings: "Ring when heirloom is closed" and the battery row
 - [ ] [qa] Each act on the web timed on the phone: screen off 30 min, forced Doze, swiped away, after a reboot; two overnight battery runs
 - [ ] Gate: the user lives with it for a day
