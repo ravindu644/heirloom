@@ -10,6 +10,7 @@ import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
+import { asCheckIn, asHabit } from '../core/habits.ts';
 import { asTask, squares } from '../core/today.ts';
 import { IDLE } from '../core/timer.ts';
 import type { Task } from '../core/today.ts';
@@ -60,23 +61,35 @@ export interface TimelineEntry {
    * written yet. It ends where it has got to.
    */
   live?: 'running' | 'paused' | 'rang';
+  /** What it added to the day's focus: its counted interval cut to the day, less what the entries before it covered. 0 for a lap not counted and a break. */
+  day_ms: number;
+  /** The day's focus once it is added: the last is the day's focus. Null for a lap not counted and a break. */
+  split_ms: number | null;
+  /** What the day's focus loses if it is set aside: the day with it less the day without it. 0 for a lap not counted and a break. */
+  off_ms: number;
+  /** For one that began on an earlier day: that day, and what it would lose without it. Else null. */
+  began: { day: string; ms: number } | null;
+  /** For one that ends on a later day: that day, and what it would lose without it. Else null. */
+  ends: { day: string; ms: number } | null;
 }
 
-export interface LookBack {
+/** A moment of the day: a task done (`id` is the task's), or a habit checked in (`id` is the check-in's, `title` the habit's). */
+export type Moment = { kind: 'done'; id: string; at: number; title: string } | { kind: 'checkin'; id: string; habit: string; at: number; title: string };
+
+export interface DayView {
   day: string;
+  /** The day's focus, the lap in progress included: the last split. */
   focus_ms: number;
+  /** The laps counted on the day, the day each ended. */
   laps: number;
-  /** Tasks done today, in the order they were done. */
-  /** `squares`: one fill per counted lap, oldest first, each as full as it ran (section 7). */
-  done: { id: string; title: string; estimate: number | null; laps: number; squares: number[] }[];
-  note: string;
+  /** Its sessions and moments in the order the day ran, the lap in progress last. */
+  items: (TimelineEntry | Moment)[];
 }
 
 export interface Progress {
   /** Worked out at the engine's now, the lap in progress included. Call it on every tick. */
   week(): WeekRace;
   projects(): ProjectShare[];
-  lookBack(): LookBack;
   /** The local day, `2026-11-24`. It changes at midnight and on `wake()`. */
   readonly today: ReadonlySignal<string>;
   /** The one line about any day, '' when there is none. */
@@ -86,8 +99,8 @@ export interface Progress {
   readonly since: ReadonlySignal<Since>;
   readonly bests: ReadonlySignal<Bests>;
   readonly estimates: ReadonlySignal<Estimates>;
-  /** A day's sessions, oldest first. Breaks and laps set aside are in it. */
-  timeline(day: string): TimelineEntry[];
+  /** The day, lap by lap: its sessions and moments in one list, with its focus and laps. */
+  day(day: string): DayView;
 
   /** Sets a lap aside from the timeline: kept there, counted nowhere. */
   setAside(session: string): void;
@@ -136,9 +149,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const kept = new Set<string>();
     for (const session of sessions) {
       if (session.kind === 'work' && session.outcome === 'rang') kept.add(lapDay(session, offset()));
-      const list = ofTask.get(session.task);
-      if (list) list.push(session);
-      else ofTask.set(session.task, [session]);
+      (ofTask.get(session.task) ?? ofTask.set(session.task, []).get(session.task)!).push(session);
     }
     // All the focus there has ever been on each task, and on no task: counted as a day is, the
     // minutes two devices ran at once on the one task counted once.
@@ -162,12 +173,6 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     return all;
   });
   const projects = computed(() => new Map(projectViews(engine.rows('project').value).map((p) => [p.id, p])));
-  // The task a lap is named for: one still to be seen somewhere, deleted ones while they are in
-  // Recently deleted. The lap itself is the day's whatever became of its task.
-  const named = (task: string | null): Task | undefined => {
-    const held = task === null ? undefined : tasks.value.get(task);
-    return held && (held.deleted === null || engine.now() - held.deleted < KEPT_MS) ? held : undefined;
-  };
   // The project a lap's minutes are counted under: none for no task, a task with none, or a
   // project archived or deleted. A task deleted, even for good, keeps its time in its project.
   const projectOf = (task: string | null): ProjectView | null => {
@@ -175,7 +180,21 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     return (project && projects.value.get(project)) || null;
   };
 
-  const fillsOf = (task: string): number[] => history.value.taskFills.get(task) ?? [];
+  // The day's moments by local day, worked out again when a task, a habit or a check-in changes:
+  // tasks done (top level, not deleted) and live check-ins of a habit that is still there.
+  const moments = computed(() => {
+    const byDay = new Map<string, Moment[]>();
+    const add = (moment: Moment, day = localDay(moment.at, offset())) => (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(moment);
+    for (const t of tasks.value.values()) if (t.parent === null && t.deleted === null && t.done !== null) add({ kind: 'done', id: t.id, at: t.done, title: t.title });
+    const habits = engine.rows('habit').value;
+    for (const [id, row] of engine.rows('checkin').value) {
+      const checkin = asCheckIn(id, row);
+      const held = habits.get(checkin?.habit ?? '');
+      const habit = checkin && held && asHabit(checkin.habit, held);
+      if (habit && habit.deleted === null) add({ kind: 'checkin', id, habit: habit.id, at: checkin.at, title: habit.title }, checkin.day); // the day Habits counts it on
+    }
+    return byDay;
+  });
 
   // All time per project: its tasks' totals added up. Worked out again when a task moves project
   // or a session changes, from the totals the one pass already made, not from the sessions.
@@ -187,16 +206,6 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     }
     return totals;
   });
-
-  // The sessions that touch the days from `from` to `to`, each once, with the lap in progress in
-  // the place of its row. One that reaches past an edge brings its minutes from the other side:
-  // whoever counts these keeps only the days it wants.
-  function between(from: string, to: string, now: number): Session[] {
-    const open = counts.open(now);
-    const out = new Set<Session>();
-    for (let day = from; day <= to; day = addDays(day, 1)) for (const session of history.value.byDay.get(day) ?? []) out.add(session);
-    return open ? [...out].filter((session) => session.id !== open.id).concat(open) : [...out];
-  }
 
   return {
     week() {
@@ -216,7 +225,13 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       const open = counts.open(now);
       const running = counts.unwritten(now);
       const runningFor = open ? (projectOf(open.task)?.id ?? null) : undefined;
-      return projectShares(between(addDays(today, -13), today, now), (session) => projectOf(session.task)?.id ?? null, today, offset()).map(
+      // The sessions that touch these fourteen days, each once, the lap in progress in the place
+      // of its row. One that reaches past an edge brings its minutes from the other side:
+      // projectShares keeps only the days it wants.
+      const within = new Set<Session>();
+      for (let day = addDays(today, -13); day <= today; day = addDays(day, 1)) for (const session of history.value.byDay.get(day) ?? []) if (session.id !== open?.id) within.add(session);
+      if (open) within.add(open);
+      return projectShares([...within], (session) => projectOf(session.task)?.id ?? null, today, offset()).map(
         ({ project, ...sums }) => ({
           project: (project !== null && projects.value.get(project)) || null,
           ...sums,
@@ -227,29 +242,14 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       );
     },
 
-    lookBack() {
-      const now = engine.now();
-      const day = localDay(now, offset());
-      void clock.day.value;
-      const note = engine.rows('day').value.get(day)?.note;
-      const done = [...tasks.value.values()]
-        .filter((t) => t.parent === null && t.deleted === null && t.done !== null && localDay(t.done, offset()) === day)
-        .sort((a, b) => a.done! - b.done!);
-      return {
-        day,
-        focus_ms: counts.race().you_ms,
-        laps: counts.lapsToday(),
-        done: done.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate, laps: fillsOf(t.id).length, squares: fillsOf(t.id) })),
-        note: typeof note === 'string' ? note : '',
-      };
-    },
 
     streak: computed(() => streakView(history.value.kept, clock.day.value, restDays.value)),
     since: computed(() => since(history.value.days, history.value.kept, clock.day.value, restDays.value)),
     bests: computed(() => bests(history.value.days)),
     estimates: computed(() => {
-      const made = estimates([...tasks.value.values()], (id) => fillsOf(id).length, clock.day.value, offset());
-      return { ...made, tasks: made.tasks.map((t) => ({ ...t, squares: fillsOf(t.id) })) };
+      const fills = history.value.taskFills;
+      const made = estimates([...tasks.value.values()], (id) => fills.get(id)?.length ?? 0, clock.day.value, offset());
+      return { ...made, tasks: made.tasks.map((t) => ({ ...t, squares: fills.get(t.id) ?? [] })) };
     }),
 
     today: clock.day,
@@ -259,23 +259,53 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
       return typeof note === 'string' ? note : '';
     },
 
-    timeline(day) {
-      const { byDay, overlapping } = history.value;
-      // Every session whose time touches the day, one across midnight in both days. The lap in
-      // progress is in its days as far as it has run, in the place of any row it has outgrown.
-      const open = counts.open(engine.now());
-      const rows = byDay.get(day) ?? [];
-      const sessions = open && touches(open, offset()).includes(day) ? [...rows.filter((session) => session.id !== open.id), open] : rows;
+    day(day) {
+      const now = engine.now();
+      // The lap in progress, in its days as far as it has run, in the place of any row it has outgrown.
+      const open = counts.open(now);
+      // Every session whose time touches a day, one across midnight in both days.
+      const on = (d: string) => {
+        const rows = history.value.byDay.get(d) ?? [];
+        return open && touches(open, offset()).includes(d) ? [...rows.filter((session) => session.id !== open.id), open] : rows;
+      };
+      // What day `d` loses without `lap`: its focus with the day's counted laps less without it,
+      // so a lap that ran beside another takes off only what was its alone. Cut at now, as the race is.
+      const loss = (lap: Session, d: string) => {
+        const all = on(d);
+        return focusOn(all, d, offset(), now) - focusOn(all.filter((session) => session !== lap), d, offset(), now);
+      };
+      const sessions = on(day);
       // The first of a pair to start is on row 0 and the one that began during it on row 1, here
-      // and nowhere else, so every screen draws the pair the same way.
+      // and nowhere else, so every screen draws the pair the same way. By start, whichever is drawn last.
+      const rows = new Map<Session, 0 | 1>();
       let upper = -Infinity;
-      return sessions
-        .toSorted((a, b) => a.started - b.started)
-        .map((session) => {
-          const task = named(session.task);
-          const overlap = overlapping.has(session.id);
-          const row = overlap && session.started < upper ? 1 : 0;
-          if (overlap && row === 0) upper = session.ended;
+      for (const session of sessions.toSorted((a, b) => a.started - b.started)) {
+        const overlap = history.value.overlapping.has(session.id);
+        rows.set(session, overlap && session.started < upper ? 1 : 0);
+        if (overlap && rows.get(session) === 0) upper = session.ended;
+      }
+      // Sessions at their start and moments at their time, the lap in progress last: it is the
+      // one still being added to. The sort is stable, so a moment at the very minute a lap began
+      // comes after it.
+      const at = (item: Session | Moment) => (item === open ? Infinity : 'at' in item ? item.at : item.started);
+      // Each split is the union of the counted laps so far, cut to the day and at now: the last
+      // is the day's focus, and today's is the race's figure.
+      const counted: Session[] = [];
+      let focus_ms = 0;
+      const items = [...sessions, ...(moments.value.get(day) ?? [])]
+        .sort((a, b) => at(a) - at(b))
+        .map((session): TimelineEntry | Moment => {
+          if ('at' in session) return session;
+          // The task a lap is named for: one still to be seen somewhere, deleted ones while they
+          // are in Recently deleted. The lap itself is the day's whatever became of its task.
+          const held = session.task === null ? undefined : tasks.value.get(session.task);
+          const task = held && (held.deleted === null || now - held.deleted < KEPT_MS) ? held : undefined;
+          const adds = session.kind === 'work' && session.outcome !== 'void';
+          if (adds) counted.push(session);
+          const split_ms = adds ? focusOn(counted, day, offset(), now) : null;
+          const day_ms = split_ms === null ? 0 : split_ms - focus_ms;
+          focus_ms = split_ms ?? focus_ms;
+          const [began, ends] = [localDay(session.started, offset()), localDay(session.ended, offset())];
           return {
             id: session.id,
             kind: session.kind,
@@ -286,11 +316,18 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
             task: task ? { id: task.id, title: task.title } : null,
             // Named only with its task: purged, the lap is named by nothing, though its minutes stay in the project's totals.
             project: task ? projectOf(task.id) : null,
-            overlap,
-            row,
+            overlap: history.value.overlapping.has(session.id),
+            row: rows.get(session)!,
             ...(session === open && { live: open.outcome === 'rang' ? ('rang' as const) : engine.timer.value.paused_at !== null ? ('paused' as const) : ('running' as const) }),
+            day_ms,
+            split_ms,
+            off_ms: loss(session, day),
+            // What setting it aside takes off the days on either side, for "Its first 14 minutes count there".
+            began: began < day ? { day: began, ms: loss(session, began) } : null,
+            ends: ends > day ? { day: ends, ms: loss(session, ends) } : null,
           };
         });
+      return { day, focus_ms, laps: day === clock.day.value ? counts.lapsToday() : (history.value.days[day]?.laps ?? 0), items };
     },
 
     setAside(id) {

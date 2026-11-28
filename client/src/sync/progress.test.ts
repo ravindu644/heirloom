@@ -9,6 +9,7 @@ import { eventStamp } from '../core/hlc.ts';
 import { projectShares } from '../core/progress.ts';
 import { race } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
+import type { TimelineEntry } from './progress.ts';
 import { T0 } from './fakes.ts';
 import { LAP, MIN, OFFSET, world } from './world.ts';
 
@@ -38,6 +39,9 @@ const laps = (d: Device, day: string, count: number) => {
 // A lap stopped after `minutes`.
 const stopped = (d: Device, day: string, hour: number, minute: number, minutes: number, over: Record<string, unknown> = {}) =>
   lap(d, day, hour, minute, { ended: at(day, hour, minute) + minutes * MIN, outcome: 'stopped', ...over });
+
+// The day's sessions as `day()` lists them, without its moments.
+const sessionsOf = (p: Device['progress'], day: string) => p.day(day).items.filter((item): item is TimelineEntry => 'day_ms' in item);
 
 async function one() {
   const w = world();
@@ -192,7 +196,7 @@ describe('the year and since the first lap', () => {
     assert.equal(p.since.value.laps, 1);
     assert.equal(p.week().you_ms, LAP);
     assert.equal(d.focus.race().you_ms, 0);
-    assert.equal(p.timeline('1970-01-01').length, 0);
+    assert.equal(sessionsOf(p, '1970-01-01').length, 0);
     assert.equal(d.engine.rows('session').value.size, 4, 'kept and sent on, only not counted');
   });
 
@@ -319,7 +323,7 @@ describe('the streak', () => {
     p.wake();
     assert.equal(p.streak.value.recent.at(-1)!.day, '2026-11-25');
     assert.equal(p.since.value.cells.at(-1)!.day, '2026-11-25');
-    assert.equal(p.lookBack().day, '2026-11-25');
+    assert.equal(p.today.value, '2026-11-25');
   });
 });
 
@@ -457,15 +461,13 @@ describe('estimates', () => {
     assert.equal(p.estimates.value.ratio, 3 / 2);
     const squares = [1, 10 / 25, 1 / 25];
     assert.deepEqual(p.estimates.value.tasks, [{ id: task, title: 'pointers', estimate: 2, laps: 3, day: '2026-11-24', squares }]);
-    assert.deepEqual(p.lookBack().done, [{ id: task, title: 'pointers', estimate: 2, laps: 3, squares }]);
   });
 
-  it('a stopped lap is drawn as full as it ran: 15.5 of 25 minutes is a square 0.62 full, in the look back and in the estimates', async () => {
+  it('a stopped lap is drawn as full as it ran: 15.5 of 25 minutes is a square 0.62 full in the estimates', async () => {
     const { d, p } = await one();
     const task = d.today.add('Morning Routine ~1')!;
     lap(d, '2026-11-24', 8, 0, { task, ended: at('2026-11-24', 8, 15) + 30000, outcome: 'stopped' });
     d.today.setDone(task, true);
-    assert.deepEqual(p.lookBack().done.map((t) => [t.laps, t.squares]), [[1, [0.62]]]);
     assert.deepEqual(p.estimates.value.tasks.map((t) => [t.laps, t.squares, t.day]), [[1, [0.62], '2026-11-24']]);
   });
 
@@ -547,15 +549,15 @@ describe('a day\'s timeline', () => {
   it('every session whose time touches the day, oldest first: the break and the lap set aside are in it, and the pair is marked', async () => {
     const { p, project, task, ids } = await morning();
     const view = { id: project, name: 'The C book', color: 'you' };
-    assert.deepEqual(p.timeline('2026-11-23'), [
-      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, task: { id: task, title: 'pointers' }, project: view, overlap: false, row: 0 },
-      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, task: null, project: null, overlap: false, row: 0 },
-      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, task: null, project: null, overlap: false, row: 0 },
-      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, task: null, project: null, overlap: true, row: 0 },
-      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, task: null, project: null, overlap: true, row: 1 },
+    assert.deepEqual(sessionsOf(p, '2026-11-23'), [
+      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, task: { id: task, title: 'pointers' }, project: view, overlap: false, row: 0, day_ms: LAP, split_ms: LAP, off_ms: LAP, began: null, ends: null },
+      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
+      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
+      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, task: null, project: null, overlap: true, row: 0, day_ms: LAP, split_ms: 2 * LAP, off_ms: 15 * MIN, began: null, ends: null },
+      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, task: null, project: null, overlap: true, row: 1, day_ms: 5 * MIN, split_ms: 55 * MIN, off_ms: 5 * MIN, began: null, ends: null },
     ]);
-    assert.equal(p.timeline('2026-11-22').length, 1);
-    assert.deepEqual(p.timeline('2026-11-21'), []);
+    assert.equal(sessionsOf(p, '2026-11-22').length, 1);
+    assert.deepEqual(sessionsOf(p, '2026-11-21'), []);
   });
 
   it('a lap across midnight: its minutes on both days, the lap on the day it rang, and in both days\' timelines', async () => {
@@ -564,9 +566,14 @@ describe('a day\'s timeline', () => {
     const late = lap(d, '2026-11-23', 23, 46, { ended: at('2026-11-24', 0, 32), planned_ms: 46 * MIN });
     const cells = () => p.since.value.cells.map((cell) => [cell.day, cell.focus_ms, cell.laps]);
     assert.deepEqual(cells(), [['2026-11-23', 14 * MIN, 0], ['2026-11-24', 32 * MIN, 1]]);
-    assert.deepEqual([p.lookBack().focus_ms, p.lookBack().laps, d.focus.lapsToday()], [32 * MIN, 1, 1]);
-    assert.deepEqual(p.timeline('2026-11-23').map((entry) => entry.id), [late]);
-    assert.deepEqual(p.timeline('2026-11-24').map((entry) => entry.id), [late]);
+    assert.deepEqual([p.day('2026-11-24').focus_ms, p.day('2026-11-24').laps, d.focus.lapsToday()], [32 * MIN, 1, 1]);
+    assert.deepEqual(sessionsOf(p, '2026-11-23').map((entry) => entry.id), [late]);
+    assert.deepEqual(sessionsOf(p, '2026-11-24').map((entry) => entry.id), [late]);
+    // Each day's split is its own part, and the day it began is said where it did not.
+    const said = (day: string) => p.day(day).items.map((item) => ('day_ms' in item ? [item.id, item.day_ms, item.split_ms, item.began] : item.id));
+    assert.deepEqual(said('2026-11-23'), [[late, 14 * MIN, 14 * MIN, null]]);
+    assert.deepEqual(said('2026-11-24'), [[late, 32 * MIN, 32 * MIN, { day: '2026-11-23', ms: 14 * MIN }]]);
+    assert.deepEqual([p.day('2026-11-23').focus_ms, p.day('2026-11-23').laps, p.day('2026-11-24').focus_ms, p.day('2026-11-24').laps], [14 * MIN, 0, 32 * MIN, 1]);
     // Monday's 14 minutes are in the week once, and Tuesday's 32.
     assert.equal(p.week().you_ms, 46 * MIN);
 
@@ -575,32 +582,119 @@ describe('a day\'s timeline', () => {
     d.focus.start();
     w.time.advance(20 * MIN);
     const run = d.focus.state.value.run;
-    assert.deepEqual([p.lookBack().day, p.lookBack().focus_ms, p.lookBack().laps], ['2026-11-25', 10 * MIN, 0]);
-    assert.deepEqual(p.timeline('2026-11-25').map((entry) => [entry.id, entry.live]), [[run, 'running']]);
-    assert.deepEqual(p.timeline('2026-11-24').map((entry) => entry.id), [late, run]);
+    assert.deepEqual([p.today.value, p.day('2026-11-25').focus_ms, p.day('2026-11-25').laps], ['2026-11-25', 10 * MIN, 0]);
+    assert.deepEqual(sessionsOf(p, '2026-11-25').map((entry) => [entry.id, entry.live]), [[run, 'running']]);
+    assert.deepEqual(sessionsOf(p, '2026-11-24').map((entry) => entry.id), [late, run]);
+    // Counted to now: Wednesday's ten minutes so far are the race's, and grow with the clock.
+    assert.deepEqual(said('2026-11-25'), [[run, 10 * MIN, 10 * MIN, { day: '2026-11-24', ms: 10 * MIN }]]);
+    assert.deepEqual([p.day('2026-11-25').focus_ms, d.focus.race().you_ms], [10 * MIN, 10 * MIN]);
+    assert.deepEqual(said('2026-11-24').at(-1), [run, 10 * MIN, 42 * MIN, null]);
+    w.time.advance(2 * MIN);
+    assert.deepEqual([p.day('2026-11-25').focus_ms, d.focus.race().you_ms], [12 * MIN, 12 * MIN]);
     // At its bell at 00:15, a lap of Wednesday's; Tuesday keeps its ten minutes and its one lap.
-    w.time.advance(5 * MIN);
+    w.time.advance(3 * MIN);
     await d.settle();
     assert.deepEqual(cells().slice(-2), [['2026-11-24', 42 * MIN, 1], ['2026-11-25', 15 * MIN, 1]]);
     assert.equal(d.focus.lapsToday(), 1);
+  });
+
+  it('the day, lap by lap: each split is the day so far, two devices at once counted once, none for a lap set aside or a break; the moments at their times', async () => {
+    const { d, p, ids } = await morning();
+    // A task done at 09:50 and a check-in at 09:27; none of a subtask, a deleted task, a check-in taken back or one of a deleted habit.
+    const done = (title: string, over: object = {}) => {
+      const id = d.today.add(title)!;
+      d.engine.write('task', id, { done: at('2026-11-23', 9, 50), ...over });
+      return id;
+    };
+    const essay = done('essay');
+    done('outline', { parent: essay });
+    done('gone', { deleted: at('2026-11-23', 12) });
+    d.engine.write('habit', 'walk', { title: 'Walk after lunch' });
+    d.engine.write('habit', 'old', { title: 'Old', deleted: at('2026-11-23', 12) });
+    d.engine.write('checkin', 'k1', { habit: 'walk', day: '2026-11-23', at: at('2026-11-23', 9, 27) });
+    d.engine.write('checkin', 'k2', { habit: 'walk', day: '2026-11-23', at: at('2026-11-23', 9, 28), deleted: at('2026-11-23', 9, 29) });
+    d.engine.write('checkin', 'k3', { habit: 'old', day: '2026-11-23', at: at('2026-11-23', 9, 29) });
+    const view = p.day('2026-11-23');
+    assert.deepEqual(
+      view.items.map((item) => ('day_ms' in item ? [item.id, item.day_ms, item.split_ms] : [item.kind, item.title, item.at])),
+      [
+        [ids.first, LAP, LAP],
+        [ids.rest, 0, null],
+        ['checkin', 'Walk after lunch', at('2026-11-23', 9, 27)],
+        [ids.aside, 0, null],
+        ['done', 'essay', at('2026-11-23', 9, 50)],
+        [ids.here, LAP, 2 * LAP],
+        [ids.there, 5 * MIN, 55 * MIN],
+      ],
+    );
+    // The last split is the day's focus, as every other count of the day has it.
+    const cell = p.since.value.cells.find((one) => one.day === '2026-11-23')!;
+    assert.deepEqual([view.focus_ms, view.laps], [cell.focus_ms, cell.laps]);
+    assert.deepEqual([view.focus_ms, view.laps], [55 * MIN, 3]);
+  });
+
+  it('what setting a lap aside takes off: of a pair that ran at once, only what was its alone, and the day after is the day less that', async () => {
+    const { p, ids } = await morning();
+    const off = (id: string) => sessionsOf(p, '2026-11-23').find((entry) => entry.id === id)!.off_ms;
+    // 09:00 to 09:25, then 10:05 to 10:30 here beside 10:20 to 10:35 elsewhere: 55 minutes.
+    assert.deepEqual([p.day('2026-11-23').focus_ms, off(ids.first), off(ids.here), off(ids.there), off(ids.aside)], [55 * MIN, LAP, 15 * MIN, 5 * MIN, 0]);
+    for (const id of [ids.here, ids.there]) {
+      const before = p.day('2026-11-23').focus_ms - off(id);
+      p.setAside(id);
+      assert.equal(p.day('2026-11-23').focus_ms, before);
+      p.countAgain(id);
+    }
+  });
+
+  it('a lap across midnight beside another lap of the day before: each day says what it would lose, its pause counted out', async () => {
+    const { d, p } = await one();
+    // 23:30 to 23:55 on Monday, and one from 23:46 to 00:32 on Tuesday, paused 5 minutes.
+    lap(d, '2026-11-23', 23, 30);
+    const late = lap(d, '2026-11-23', 23, 46, { ended: at('2026-11-24', 0, 32), planned_ms: 46 * MIN, paused_ms: 5 * MIN, outcome: 'stopped' });
+    const of = (day: string) => sessionsOf(p, day).find((entry) => entry.id === late)!;
+    // Its counted part is 23:51 to 00:32, 9 minutes of them Monday's: Monday has 23:30 to 24:00, of which only 23:55 to 24:00 is its alone.
+    assert.deepEqual([p.day('2026-11-23').focus_ms, of('2026-11-23').off_ms, of('2026-11-23').began, of('2026-11-23').ends], [30 * MIN, 5 * MIN, null, { day: '2026-11-24', ms: 32 * MIN }]);
+    assert.deepEqual([p.day('2026-11-24').focus_ms, of('2026-11-24').off_ms, of('2026-11-24').began, of('2026-11-24').ends, of('2026-11-24').ran_ms], [32 * MIN, 32 * MIN, { day: '2026-11-23', ms: 5 * MIN }, null, 41 * MIN]);
+    // Set aside, Monday loses those 5 and Tuesday its 32.
+    p.setAside(late);
+    assert.deepEqual([p.day('2026-11-23').focus_ms, p.day('2026-11-24').focus_ms], [25 * MIN, 0]);
+  });
+
+  it('the lap in progress in a pair keeps the row its start gives it, though it is drawn last', async () => {
+    const { w, d, p } = await one();
+    // A lap here from 10:00 rings at 10:25 beside one elsewhere from 10:10 to 10:26, and runs on.
+    d.focus.start();
+    w.time.advance(26 * MIN);
+    await d.settle();
+    const elsewhere = lap(d, '2026-11-24', 10, 10, { ended: at('2026-11-24', 10, 26), device: 'b2c3d4e5f6071829', outcome: 'stopped', planned_ms: LAP });
+    d.focus.extend();
+    w.time.advance(2 * MIN);
+    const run = d.focus.state.value.run;
+    assert.deepEqual(
+      sessionsOf(p, '2026-11-24').map((entry) => [entry.id, entry.overlap, entry.row, entry.live ?? null]),
+      [
+        [elsewhere, true, 1, null],
+        [run, true, 0, 'running'],
+      ],
+    );
   });
 
   it('a lap stays in its day when its task is deleted; the task is named while it is in Recently deleted, and not once it is gone for good', async () => {
     const { w, d, p } = await one();
     const task = d.today.add('pointers ~1')!;
     lap(d, '2026-11-23', 9, 0, { task });
-    const named = () => p.timeline('2026-11-23').map((entry) => entry.task?.title ?? null);
+    const named = () => sessionsOf(p, '2026-11-23').map((entry) => entry.task?.title ?? null);
     d.today.setDone(task, true);
     assert.deepEqual(named(), ['pointers']);
     d.today.remove(task);
     assert.deepEqual(named(), ['pointers'], 'still to be found, and brought back');
-    assert.deepEqual(p.lookBack().done, []);
+    assert.deepEqual(p.day('2026-11-24').items.filter((item) => item.kind === 'done'), []);
     d.today.purge(task);
     assert.deepEqual(named(), [null]);
-    assert.equal(p.timeline('2026-11-23').length, 1, 'the lap itself is the day\'s, and stays');
+    assert.equal(sessionsOf(p, '2026-11-23').length, 1, 'the lap itself is the day\'s, and stays');
     assert.equal(p.since.value.laps, 1);
     assert.equal(p.estimates.value.ratio, null);
-    assert.deepEqual(p.lookBack().done, []);
+    assert.deepEqual(p.day('2026-11-24').items.filter((item) => item.kind === 'done'), []);
     void w;
   });
 
@@ -612,7 +706,7 @@ describe('a day\'s timeline', () => {
     d.today.edit(task, { project: programming });
     const share = () => p.projects().find((s) => s.project?.id === programming);
     const loose = () => p.projects().find((s) => s.project === null);
-    const day = () => p.timeline('2026-11-24').map((e) => ({ task: e.task?.title ?? null, project: e.project?.id ?? null, ran: e.ran_ms, live: e.live ?? null }));
+    const day = () => sessionsOf(p, '2026-11-24').map((e) => ({ task: e.task?.title ?? null, project: e.project?.id ?? null, ran: e.ran_ms, live: e.live ?? null }));
 
     d.focus.start(task);
     w.time.advance(5 * MIN);
@@ -655,7 +749,7 @@ describe('a day\'s timeline', () => {
     b.disconnect();
     w.time.advance(LAP + MIN);
     assert.deepEqual(
-      b.progress.timeline('2026-11-24').map((e) => [e.outcome, e.ran_ms, e.live]),
+      sessionsOf(b.progress, '2026-11-24').map((e) => [e.outcome, e.ran_ms, e.live]),
       [['rang', LAP, 'rang']],
     );
   });
@@ -665,8 +759,8 @@ describe('a day\'s timeline', () => {
     const long = lap(d, '2026-11-23', 9, 0, { ended: at('2026-11-23', 9, 40), planned_ms: 40 * MIN });
     const short = stopped(d, '2026-11-23', 9, 5, 5);
     const elsewhere = stopped(d, '2026-11-23', 9, 20, 10, { device: 'b2c3d4e5f6071829' });
-    assert.deepEqual(p.timeline('2026-11-23').map((entry) => [entry.id, entry.overlap]), [[long, true], [short, false], [elsewhere, true]]);
-    assert.deepEqual(p.timeline('2026-11-23').map((entry) => entry.row), [0, 0, 1], 'the first to start is on row 0, the one that began during it on row 1');
+    assert.deepEqual(sessionsOf(p, '2026-11-23').map((entry) => [entry.id, entry.overlap]), [[long, true], [short, false], [elsewhere, true]]);
+    assert.deepEqual(sessionsOf(p, '2026-11-23').map((entry) => entry.row), [0, 0, 1], 'the first to start is on row 0, the one that began during it on row 1');
   });
 
   it('a second pair later in the day starts on row 0 again, and a chain of three alternates', async () => {
@@ -678,7 +772,7 @@ describe('a day\'s timeline', () => {
     lap(d, '2026-11-23', 9, 30);
     lap(d, '2026-11-23', 14, 0, other);
     lap(d, '2026-11-23', 14, 5);
-    assert.deepEqual(p.timeline('2026-11-23').map((entry) => [entry.overlap, entry.row]), [[true, 0], [true, 1], [true, 0], [true, 0], [true, 1]]);
+    assert.deepEqual(sessionsOf(p, '2026-11-23').map((entry) => [entry.overlap, entry.row]), [[true, 0], [true, 1], [true, 0], [true, 0], [true, 1]]);
   });
 
   it('setting aside one of an overlapping pair is the way out: the mark goes from both, and the minutes are no longer counted once too few', async () => {
@@ -687,7 +781,7 @@ describe('a day\'s timeline', () => {
     // 09:00 to 09:25, then 10:05 to 10:35 with the two as one stretch.
     assert.equal(focus(), 55 * MIN);
     p.setAside(ids.there);
-    assert.deepEqual(p.timeline('2026-11-23').slice(-2).map((entry) => [entry.outcome, entry.overlap]), [['rang', false], ['void', false]]);
+    assert.deepEqual(sessionsOf(p, '2026-11-23').slice(-2).map((entry) => [entry.outcome, entry.overlap]), [['rang', false], ['void', false]]);
     assert.equal(focus(), 50 * MIN);
   });
 
@@ -724,7 +818,7 @@ describe('a day\'s timeline', () => {
   });
 });
 
-describe('the look back', () => {
+describe('the day and its note', () => {
   it('today\'s focus and laps with the lap in progress, the tasks done today in order, and the note', async () => {
     const { w, d, p } = await one();
     const [first, second] = [d.today.add('pointers ~2')!, d.today.add('arrays')!];
@@ -738,16 +832,10 @@ describe('the look back', () => {
     p.setNote('2026-11-24', '  Pointers finally clicked.  ');
     d.focus.start();
     w.time.advance(9 * MIN);
-    assert.deepEqual(p.lookBack(), {
-      day: '2026-11-24',
-      focus_ms: 59 * MIN,
-      laps: 2,
-      done: [
-        { id: second, title: 'arrays', estimate: null, laps: 1, squares: [1] },
-        { id: first, title: 'pointers', estimate: 2, laps: 2, squares: [1, 1] },
-      ],
-      note: 'Pointers finally clicked.',
-    });
+    const view = p.day('2026-11-24');
+    assert.deepEqual([view.day, view.focus_ms, view.laps], ['2026-11-24', 59 * MIN, 2]);
+    assert.deepEqual(view.items.flatMap((item) => (item.kind === 'done' ? [[item.id, item.title]] : [])), [[second, 'arrays'], [first, 'pointers']]);
+    assert.equal(p.note('2026-11-24'), 'Pointers finally clicked.');
   });
 
   it('any day\'s note can be read, and `today` is the local day as a signal', async () => {
@@ -763,9 +851,9 @@ describe('the look back', () => {
 
   it('the note is the day row\'s: empty is an empty string, a long one is cut at 280, and what is not a day is not written', async () => {
     const { d, p } = await one();
-    assert.equal(p.lookBack().note, '');
+    assert.equal(p.note('2026-11-24'), '');
     p.setNote('2026-11-24', 'x'.repeat(300));
-    assert.equal(p.lookBack().note.length, 280);
+    assert.equal(p.note('2026-11-24').length, 280);
     p.setNote('2026-11-24', '');
     assert.deepEqual(d.engine.rows('day').value.get('2026-11-24'), { id: '2026-11-24', note: '' });
     p.setNote('tomorrow', 'no');
@@ -782,8 +870,8 @@ describe('the look back', () => {
     w.time.advance(MIN);
     b.progress.setNote('2026-11-24', 'written on the laptop, later');
     w.exchange(a, b);
-    assert.equal(a.progress.lookBack().note, 'written on the laptop, later');
-    assert.equal(b.progress.lookBack().note, 'written on the laptop, later');
+    assert.equal(a.progress.note('2026-11-24'), 'written on the laptop, later');
+    assert.equal(b.progress.note('2026-11-24'), 'written on the laptop, later');
     assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
     // A day row is a dataset the server has never heard of: it is pushed like any other.
     await a.connect();
@@ -812,7 +900,7 @@ describe('keeping the work down', () => {
     void p.bests.value;
     void p.estimates.value;
     void p.week();
-    void p.timeline('2026-11-23');
+    void sessionsOf(p, '2026-11-23');
     assert.equal(p.recomputed(), 1);
 
     // Typing a task's title, forty keystrokes, with the Progress screen reading after each.
@@ -829,7 +917,7 @@ describe('keeping the work down', () => {
       w.time.advance(1000);
       void p.week();
       void p.projects();
-      void p.lookBack();
+      void p.day(p.today.value);
       void p.since.value;
     }
     d.focus.pause();

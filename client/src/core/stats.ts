@@ -68,11 +68,7 @@ export function touches(s: Pick<Session, 'started' | 'ended'>, utcOffsetMin: num
 function byDay<T extends Span>(spans: readonly T[], utcOffsetMin: number): Map<string, T[]> {
   const days = new Map<string, T[]>();
   for (const s of spans) {
-    for (const day of touches(s, utcOffsetMin)) {
-      const list = days.get(day);
-      if (list) list.push(s);
-      else days.set(day, [s]);
-    }
+    for (const day of touches(s, utcOffsetMin)) (days.get(day) ?? days.set(day, []).get(day)!).push(s);
   }
   return days;
 }
