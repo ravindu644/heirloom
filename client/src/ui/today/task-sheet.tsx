@@ -1,15 +1,15 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { UNDO_MS } from '../../sync/focus.ts';
 import { COLORS, ESTIMATE_MAX, PROJECT_NAME_MAX } from '../../sync/today.ts';
 import type { ProjectColor, SubtaskView, TaskView, Today } from '../../sync/today.ts';
 import { Button } from '../kit/button.tsx';
-import { Check } from '../kit/check.tsx';
 import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import { Fold } from '../kit/fold.tsx';
 import { hueHex, toneOf } from '../kit/hue.ts';
 import { Lengths } from '../kit/lengths.tsx';
+import { useLift } from '../kit/lift.ts';
 import type { LengthsOf } from '../kit/lengths.tsx';
 import { Picker } from '../kit/picker.tsx';
 import { QuickAdd } from '../kit/quick-add.tsx';
@@ -26,13 +26,37 @@ import css from './task-sheet.module.css';
 // PRODUCT: over this many laps a task wants breaking down.
 const NUDGE_OVER = 7;
 
+/** A subtask in the sheet: its words, which a tap turns into a field where they stand, and Remove. Ticking is Today's. */
 function Subtask({ sub, today, onRemove }: { sub: SubtaskView; today: Today; onRemove: () => void }) {
   // An empty title is not saved: the last one that said something stays.
   const title = useTyped(sub.title, (text) => text.trim() && today.editSubtask(sub.id, { title: text }));
+  const [editing, setEditing] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    if (editing) field.current?.focus({ preventScroll: true });
+  }, [editing]);
   return (
-    <div class={css.sub}>
-      <Check checked={sub.done} label={s.task.subtaskCheck(sub.title)} onChange={(done) => today.editSubtask(sub.id, { done })} />
-      <input aria-label={s.task.subtaskTitle} {...title} />
+    <div class={css.sub} data-lift={sub.id}>
+      {editing ? (
+        <input
+          ref={field}
+          name="subtask-title"
+          aria-label={s.task.subtaskTitle}
+          enterkeyhint="done"
+          {...title}
+          onBlur={() => {
+            title.onBlur();
+            setEditing(false);
+          }}
+          onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+        />
+      ) : (
+        // A press and hold carries it; a tap edits it.
+        // Done on Today is struck through here as there: no box, the tick is Today's.
+        <button type="button" class={sub.done ? css.struck : undefined} data-grip aria-label={s.task.subtaskEdit(sub.title, sub.done)} onClick={() => setEditing(true)}>
+          {sub.title}
+        </button>
+      )}
       <Button kind="link" onClick={onRemove}>
         {s.task.remove}
       </Button>
@@ -104,8 +128,16 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app
     onClose();
   };
 
-  // A subtask removed can be had back for as long as any Undo lasts.
-  const [removed, setRemoved] = useState<SubtaskView | null>(null);
+  // A subtask removed can be had back for as long as any Undo lasts. Said where it stood: a bar
+  // would be under the sheet.
+  const [removed, setRemoved] = useState<{ sub: SubtaskView; at: number } | null>(null);
+  // Subtasks are put in order by pressing and holding, among their own.
+  const subList = useRef<HTMLFieldSetElement>(null);
+  const [placed, setPlaced] = useState('');
+  useLift(subList, (id, before, at, of) => {
+    today.move(id, before);
+    setPlaced(s.today.nowAt(task.subtasks.find((sub) => sub.id === id)?.title ?? '', at, of));
+  });
   useEffect(() => {
     if (!removed) return;
     const timer = setTimeout(() => setRemoved(null), UNDO_MS);
@@ -397,34 +429,43 @@ export function TaskSheet({ task, today, onClose, onDone, onRemove, lengths, app
         </Fold>
       </fieldset>
 
-      <fieldset class={form.group}>
+      <fieldset class={form.group} ref={subList}>
         <legend>{s.task.subtasks}</legend>
+        <p class="sr" role="status">
+          {placed}
+        </p>
         <Fold gap="sm">
-        {task.subtasks.map((sub) => (
-          <Subtask
-            key={sub.id}
-            sub={sub}
-            today={today}
-            onRemove={() => {
-              today.remove(sub.id);
-              setRemoved(sub);
-            }}
-          />
-        ))}
-        {removed && (
-          <p key="removed" class={css.removed} role="status">
-            {s.task.subtaskRemoved(removed.title)}
-            <Button
-              kind="link"
-              onClick={() => {
-                today.restore(removed.id);
-                setRemoved(null);
+        {(() => {
+          const rows = task.subtasks.map((sub, at) => (
+            <Subtask
+              key={sub.id}
+              sub={sub}
+              today={today}
+              onRemove={() => {
+                today.remove(sub.id);
+                setRemoved({ sub, at });
               }}
-            >
-              {s.today.undo}
-            </Button>
-          </p>
-        )}
+            />
+          ));
+          if (removed)
+            rows.splice(
+              Math.min(removed.at, rows.length),
+              0,
+              <p key="removed" class={cx(css.removed, css.stood)} role="status">
+                {s.task.subtaskRemoved(removed.sub.title)}
+                <Button
+                  kind="link"
+                  onClick={() => {
+                    today.restore(removed.sub.id);
+                    setRemoved(null);
+                  }}
+                >
+                  {s.today.undo}
+                </Button>
+              </p>,
+            );
+          return rows;
+        })()}
         <QuickAdd key="add" name="subtask" label={s.task.subtaskNew} hint={s.task.subtaskHint} go={s.today.addGo} onAdd={(text) => today.addSubtask(task.id, text.trim()) !== null} />
         </Fold>
       </fieldset>

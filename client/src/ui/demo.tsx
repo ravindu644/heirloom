@@ -22,7 +22,7 @@ import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
 import { cheerKey } from './room/room.tsx';
 import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
-import { HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
+import { GMAIL, HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
 import type { DemoHabit, DemoRoom, DemoRooms, DemoServer } from './demo-more.ts';
 import type { Admins } from '../sync/admins.ts';
 import type { Invites } from '../sync/invites.ts';
@@ -126,6 +126,16 @@ const TASKS: DemoTask[] = [
   { id: 'ttt', title: 'Tic-tac-toe tutorial: lift state up', project: 'react', estimate: 3, due: DAY },
   { id: 'nextjs', title: 'Next.js: layouts and pages', project: 'next', estimate: 2, due: DAY },
   { id: 'maths', title: 'Discrete maths, tutorial sheet 6', project: 'uni', estimate: 2, squares: [1, 1], done: true, due: DAY },
+];
+// Subtasks: four on the Next card, two of them done, and three on a task under Later.
+const SUBS: DemoTask[] = [
+  { id: 'k1', title: 'Read 5.1 and 5.2', parent: 'kr', done: true },
+  { id: 'k2', title: 'Exercise 5-1: getint', parent: 'kr', done: true },
+  { id: 'k3', title: 'Exercise 5-3 with pointers only', parent: 'kr' },
+  { id: 'k4', title: 'Read why a[i] is the same as *(a+i)', parent: 'kr' },
+  { id: 's1', title: 'Write it with array indexes first', parent: 'ex', done: true },
+  { id: 's2', title: 'Rewrite with two pointers', parent: 'ex' },
+  { id: 's3', title: 'Test with an empty string, a string of one letter, and two strings that are the same string', parent: 'ex' },
 ];
 const day = (tasks: DemoTask[] = TASKS, more: Partial<DemoDay> = {}): DemoDay => ({ tasks, target: 8, done_ms: 125 * MIN, laps: 5, ghost: { total_ms: 200 * MIN, laps: 8 }, ...more });
 const onKr = { ...lap2, task: 'kr' };
@@ -242,9 +252,15 @@ const TODAY: Record<string, Scene> = {
   'sheet-project-edit': { ...idleAt2, about: 'A project being edited where it is chosen: its name and colour, Done, and Delete project', day: day(), tap: ['Exercise 5-3', 'Edit project'] },
   'today-subtasks': {
     ...idleAt2,
-    about: 'A task with subtasks says so on its row',
-    day: day([...TASKS, { id: 'sub1', title: 'Write it with array indexes first', parent: 'ex', done: true }, { id: 'sub2', title: 'Rewrite with two pointers', parent: 'ex' }, { id: 'sub3', title: 'Test with an empty string', parent: 'ex' }]),
+    about: 'Tasks with subtasks, closed: the box finishes the task; "2 of 4 subtasks" with its arrow opens them',
+    day: day([...TASKS, ...SUBS]),
   },
+  'today-subtasks-open': { ...idleAt2, about: 'The Next card open: its subtasks, each with its box in the box column, struck through when done', day: day([...TASKS, ...SUBS]), tap: '2 of 4 subtasks' },
+  'today-subtask-tick': { ...idleAt2, about: 'Open, a subtask ticked: struck through where it stands, the bar says 3 of 4 subtasks', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', 'Exercise 5-3 with pointers only'] },
+  'today-subtask-untick': { ...idleAt2, about: 'Open, a ticked subtask taken back: not done again, nothing said', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', 'Read 5.1 and 5.2'] },
+  'today-subtasks-last': { ...idleAt2, about: 'The last subtask ticked, the task not: the bar says so whole, "All 4 subtasks done. Tick the task to finish it."', day: day([...TASKS, ...SUBS.map((sub) => (sub.id === 'k3' ? { ...sub, done: true } : sub))]), tap: ['3 of 4 subtasks', 'Read why a[i]'] },
+  'today-subtasks-all': { ...idleAt2, about: 'Every subtask ticked and the task not: "4 of 4 subtasks" beside an empty box, still Next', day: day([...TASKS, ...SUBS.map((sub) => (sub.parent === 'kr' ? { ...sub, done: true } : sub))]) },
+  'today-subtasks-both': { ...idleAt2, about: 'Two tasks open at once, one in Later: opening one leaves the other open', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', '1 of 3 subtasks'] },
   'today-360': { about: 'Today with a six hour lap on its strip: hours on the strip too', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-99': { about: 'Today with a lap of 99 minutes on its strip: the widest the clock is without hours', run: { ...onKr, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-deleted': {
@@ -271,6 +287,8 @@ const TODAY: Record<string, Scene> = {
     ]),
     tap: 'Exercise 5-3',
   },
+  'sheet-subtask-edit': { ...idleAt2, about: 'A subtask tapped in the sheet: a field where it stands, kept as typed', day: day([...TASKS, ...SUBS]), tap: ['Exercise 5-3', 'Rewrite with two pointers', 'fill:subtask-title=Rewrite with two pointers, no index'] },
+  'sheet-subtask-removed': { ...idleAt2, about: 'A subtask removed in the sheet: said where it stood, with Undo', day: day([...TASKS, ...SUBS]), tap: ['Exercise 5-3', 'css:dialog [data-lift="s2"] button:last-child'] },
   'sheet-nudge': { ...idleAt2, about: 'The sheet with an estimate over 7', day: day(swap('ex', { estimate: 8 })), tap: 'Exercise 5-3' },
   'sheet-project': { ...idleAt2, about: 'The sheet making a new project', day: day(), tap: ['Exercise 5-3', 'New project'] },
   'today-timed': { ...idleAt2, about: 'Tasks with a time: today at 16:40, and one tomorrow', day: day([...swap('ex', { time: '16:40' }), { id: 'viva', title: 'Viva practice with Sachi', project: 'uni', estimate: 1, due: '2026-11-25', time: '09:30' }]) },
@@ -333,7 +351,7 @@ const HABIT_SCENES: Record<string, Scene> = {
   'habits-one': { ...week, about: 'One habit, never checked in', habits: [{ id: 'read', title: 'Read 10 pages of K&R', counts: {} }] },
   habits: { ...week, about: 'Habits: six, three done, one counted through the day', habits: HABITS },
   'habits-part-past': { ...week, about: 'A habit done twice a day, once yesterday and once so far today: both days half filled', habits: [{ id: 'drink', title: 'Drink water', target: 2, counts: { '2026-11-23': 1, '2026-11-24': 1 } }, ...HABITS] },
-  'habits-checked': { ...week, about: 'Just after a check-in on a counted habit: Undo', habits: HABITS, tap: 'Check in: A glass of water' },
+  'habits-checked': { ...week, about: 'A counted habit\'s 3rd time ticked: the box shows it, and no bar speaks', habits: HABITS, tap: ["Today's times", '3rd time'] },
   'habits-all': { ...week, about: 'Every habit of today done', habits: HABITS.map((habit) => ({ ...habit, counts: { ...habit.counts, '2026-11-24': habit.target ?? 1 } })) },
   'habits-sheet': { ...week, about: 'A habit open: days, count, reminder, its record', habits: HABITS, tap: 'Push one commit' },
   'habits-sheet-twice': { ...week, about: 'A habit done twice a day: a reminder for each time', habits: [{ id: 'teeth', title: 'Brush teeth', target: 2, reminds: ['06:00', '22:00'], counts: { '2026-11-24': 1, '2026-11-23': 2 } }, ...HABITS], tap: 'Brush teeth' },
@@ -350,6 +368,13 @@ const HABIT_SCENES: Record<string, Scene> = {
   'habits-after-delete': { ...week, about: 'Just after deleting a habit: Undo', habits: HABITS, tap: ['Lights out', 'Delete'] },
   'habits-top': { ...week, about: 'A habit at the top of its count, with a 60 character title', habits: [{ ...HABITS[0]!, title: SIXTY, target: 20, counts: { '2026-11-24': 20, '2026-11-23': 20 } }, ...HABITS.slice(1)] },
   'habits-many': { ...week, about: 'Ten habits, one with a very long title', habits: MANY_HABITS },
+  'habits-rounds': { ...week, about: 'A habit done five times a day, closed: the arrow in the box column, its squares and 3 of 5 at the title line\'s end', habits: [GMAIL, ...HABITS] },
+  'habits-rounds-open': { ...week, about: 'That habit open: a short row for each time, its box in the box column; 08:00 done at 08:12, No time set', habits: [GMAIL, ...HABITS], tap: "Today's times" },
+  'habits-round-tick': { ...week, about: 'Open, a tap on the 4th time: that box is ticked, 4 of 5, and no bar speaks', habits: [GMAIL, ...HABITS], tap: ["Today's times", '4th time'] },
+  'habits-round-back': { ...week, about: 'Open, a tap on ticked 08:00: 08:00 itself is taken back, and no bar speaks', habits: [GMAIL, ...HABITS], tap: ["Today's times", '08:00'] },
+  'habits-round-any': { ...week, about: 'Times ticked in any order: 08:00 skipped, 12:00 done, and a tap on 16:00 ticks 16:00', habits: [{ ...GMAIL, at: [null, '12:05'], counts: { ...GMAIL.counts, [DAY]: 1 } }, ...HABITS], tap: ["Today's times", '16:00'] },
+  'habits-rounds-done': { ...week, about: 'Every time of the day done, closed: five squares filled, 5 of 5', habits: [{ ...GMAIL, counts: { ...GMAIL.counts, [DAY]: 5 }, at: ['08:12', '12:40', '13:55', '14:30', '16:05'] }, ...HABITS] },
+  'habits-rounds-two': { ...week, about: 'Two counted habits open at once: opening one leaves the other open', habits: [GMAIL, ...HABITS], tap: ["Today's times", 'css:[data-habit="water"] button[aria-expanded]'] },
 };
 
 // Room: no room first, then a room of one, the mockup's four, and eight.
@@ -733,7 +758,7 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
   };
   const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
   const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
-  const habits = demoHabits(scene.habits ?? HABITS);
+  const habits = demoHabits(scene.habits ?? HABITS, now);
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
   // Cheers on your lap were shown arriving before, but in the state made to show one arriving.
   if (!scene.room?.cheersIn)
@@ -836,7 +861,9 @@ const find = <T extends Element>(selector: string, words: string): T => {
       // A week back in the year, by the keyboard, or with `demo:day:ArrowUp` a day.
       document.querySelector('[role=slider]')!.dispatchEvent(new KeyboardEvent('keydown', { key: words.slice(9) || 'ArrowLeft', bubbles: true }));
     } else {
-      const button = [...document.querySelectorAll('button')].find((one) => (one.textContent || one.ariaLabel)?.startsWith(words));
+      // A row's opener is named by the words it lies over.
+      const named = (one: HTMLButtonElement) => one.textContent || one.ariaLabel || one.getAttribute('aria-labelledby')?.split(' ').map((id) => document.getElementById(id)?.textContent).join(' ');
+      const button = [...document.querySelectorAll('button')].find((one) => named(one)?.startsWith(words));
       if (!button) throw new Error(`demo state "${name}": no button starts with "${words}"`);
       button.click();
     }

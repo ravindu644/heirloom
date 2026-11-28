@@ -38,6 +38,7 @@ export function wall(ms: number): string {
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const nth = (n: number) => `${ordinal(n)} time`;
 const ordinal = (n: number) => `${n}${n % 100 > 10 && n % 100 < 14 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 
 /** A day to come, as people say it: "tomorrow", "on Thursday", "on Thursday the 3rd". */
@@ -507,6 +508,11 @@ export const today = {
   // A1: the task ticked while its lap ran. Said after "Done: <title>."
   // B13: on a row's small line.
   subtasks: (done: number, of: number) => `${done} of ${plural(of, 'subtask', 'subtasks')}`,
+  // A subtask ticked on Today: "Ticked: <title>." then how many, apart from a task finished.
+  saidTicked: 'Ticked:',
+  saidSubtasks: (done: number, of: number) => `${done} of ${plural(of, 'subtask', 'subtasks')}.`,
+  // The last subtask ticked while the task is not: the whole sentence, so a phone shows it all.
+  allSubtasks: (n: number) => `All ${n} subtasks done. Tick the task to finish it`,
   // A3: a project deleted from the sheet.
   saidProjectGone: 'Deleted project',
   projectKeeps: 'Its tasks stay, with no project.',
@@ -564,9 +570,10 @@ export const task = {
   subtasks: 'Subtasks',
   // The field has its own name, so a screen reader hears "New subtask" when the nudge sends the cursor there.
   subtaskNew: 'New subtask',
-  subtaskHint: 'A smaller piece of it',
+  subtaskHint: 'Add a subtask',
   subtaskTitle: 'Subtask',
-  subtaskCheck: (title: string) => `Done: ${title}`,
+  // A subtask's words in the sheet are a button until tapped: it says what the tap does.
+  subtaskEdit: (title: string, ticked: boolean) => `Change: ${title}${ticked ? ', ticked' : ''}`,
   remove: 'Remove',
   subtaskRemoved: (title: string) => `Removed: ${title}.`,
 
@@ -741,14 +748,22 @@ export const habits = {
   empty: 'Add the first thing you want to do most days. One tap a day checks it in.',
   list: 'Habits',
   plan: (days: number) => (days === 127 ? 'Every day' : days === 31 ? 'Weekdays' : days === 96 ? 'Weekends' : WEEKDAYS_SHORT.filter((_, bit) => days & (1 << bit)).join(', ')),
-  running: (n: number) => (n === 1 ? '1 day running' : `${n} days running`),
+  // A run of one is no run yet: nothing is said until the second day. A habit done more than once
+  // a day counts only its full days, and says so.
+  running: (n: number, full = false) => (n > 1 ? `${n} ${full ? 'full ' : ''}days in a row` : ''),
   keptOf: (kept: number, of: number) => `${kept} of the last ${of} planned days`,
   check: (title: string) => `Check in: ${title}`,
   of: (target: number) => ` of ${target}`,
   days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
   weekLabel: (done: number, planned: number) => `This week: ${done} of ${planned} planned days done.`,
-  saidIn: 'Checked in:',
-  saidCount: (count: number, target: number) => `${count} of ${target}.`,
+  // The arrow in a counted habit's box column: what it opens, said with how far today has got.
+  rounds: (count: number, target: number) => `Today's times, ${count} of ${target} done`,
+  // One time of a counted habit, open under it.
+  // A time with no reminder says which one it is.
+  nth: (n: number) => nth(n),
+  doneAt: (at: number) => `done at ${wall(at)}`,
+  // A round's box, for a screen reader: the habit and which time. Ticked or not is the box's own state.
+  roundCheck: (title: string, time: string | undefined, n: number) => `${title}, ${time ?? nth(n)}`,
   saidArchived: 'Archived:',
   holdHint: 'Press and hold a habit to move it.',
   archived: (n: number) => `Archived, ${n}`,
@@ -782,7 +797,6 @@ export const habits = {
   remindNote: 'On the days it is planned, until it is checked in.',
   // B12: a habit done more than once a day, beside how often.
   countToday: (count: number, target: number) => `${count} of ${target} today.`,
-  takeBack: 'Take one back',
   // B22: the last day of a habit, tapped.
   lastDay: 'A habit keeps at least one day.',
   // B2: under the sheet's foot buttons.

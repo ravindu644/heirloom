@@ -30,6 +30,9 @@
 .name { display: flex; flex: 0 1 auto; gap: var(--space-xs); min-width: 0; }
 .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tail { flex: none; }
+/* Said whole: on two lines where one is too short. */
+.whole > span { height: auto; padding: var(--space-sm) 0; white-space: normal; }
+.whole .title { overflow: visible; }
 .said button { color: var(--ground); text-decoration-color: var(--ground); }
 .said button:hover { color: var(--ground); }
 

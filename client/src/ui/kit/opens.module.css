@@ -1,0 +1,28 @@
+.opens { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: var(--space-sm); padding: 0; border: 0; background: none; cursor: pointer; }
+/* In a row's control column: a target of its own, its arrow centred where a box's tick would be. */
+.alone { position: relative; z-index: 1; width: var(--layout-touch); height: var(--layout-touch); }
+/* The kit's link in a line, taking no more height than the line. Its 48px target is laid over
+   the line, a stroke lower than centred: it must stop short of the middle of the title over it,
+   whose press opens the row, and of the row under it. */
+.line { position: relative; z-index: 1; min-height: 0; }
+.line::after { content: ""; position: absolute; top: calc((var(--layout-touch) - 1lh) / -2 + var(--layout-stroke)); right: 0; left: 0; height: var(--layout-touch); }
+/* The arrow: two strokes, drawn as the tick is. Down is closed, up is open, turning between. */
+.opens i {
+  width: var(--space-sm);
+  height: var(--space-sm);
+  border: solid var(--ink);
+  border-width: 0 var(--layout-stroke) var(--layout-stroke) 0;
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform var(--motion-fill) var(--motion-ease);
+}
+.opens[aria-expanded="true"] i { transform: translateY(25%) rotate(-135deg); }
+
+/* What a row opens into: under a line that runs to the row's right edge. The room round the line
+   lets the 48px target of a link on the line over it end before the first short row starts. */
+.shorts { display: grid; grid-template-columns: minmax(0, 1fr); margin: var(--space-md) calc(var(--space-md) * -1) 0 0; padding: var(--space-sm) var(--space-md) 0 0; border-top: var(--layout-hair) solid var(--line); }
+/* A short row: one target, the box and its words, over the row's own target. Painted as the
+   row is, so it reads as part of it. */
+.short { position: relative; z-index: 1; display: grid; background: var(--row, var(--surface)); }
+.short button > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); min-width: 0; overflow-wrap: break-word; }
+.short button > span > :first-child { min-width: 0; text-decoration: line-through transparent; transition: color var(--motion-fill) var(--motion-ease), text-decoration-color var(--motion-fill) var(--motion-ease); }
+.struck button > span > :first-child { color: var(--muted); text-decoration-color: currentcolor; }

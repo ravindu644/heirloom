@@ -30,6 +30,8 @@ export interface DemoHabit {
   reminds?: string[];
   /** Check-ins by day. */
   counts: Record<string, number>;
+  /** Today's rounds, in round order: when each was ticked, `08:12`, or null while it is empty. Left out, the first of today's count were ticked an hour apart from 07:00. */
+  at?: (string | null)[];
   archived?: boolean;
   deleted?: boolean;
 }
@@ -53,6 +55,8 @@ export const HABITS: DemoHabit[] = [
   { id: 'old', title: 'Duolingo, one lesson', counts: ran(40, 0, [1, 2, 3, 4, 5, 6]), archived: true },
   { id: 'gone', title: 'Cold shower', counts: ran(4, 0, [1]), deleted: true },
 ];
+// A habit done five times a day, three of its times set: three check-ins so far.
+export const GMAIL: DemoHabit = { id: 'gmail', title: 'Check Gmail', target: 5, reminds: ['08:00', '12:00', '16:00'], at: ['08:12', '12:40', '13:55'], counts: ran(9, 3, [], 5) };
 export const MANY_HABITS: DemoHabit[] = [
   { id: 'long', title: 'Write down the one thing that went wrong in the last lap before starting the next one, even when nothing did', days: 0b0010101, counts: ran(9, 1, [2]) },
   ...['Read 10 pages of K&R', 'Push one commit', 'Stretch', 'Walk after lunch', 'Anki, 20 cards', 'Tidy the desk', 'Call home', 'Sinhala, one page', 'Lights out by 00:30'].map(
@@ -60,21 +64,47 @@ export const MANY_HABITS: DemoHabit[] = [
   ),
 ];
 
-export function demoHabits(seed: DemoHabit[]): Habits {
+const two = (n: number) => String(n).padStart(2, '0');
+// Today's rounds: when each was ticked, or null.
+const slots = (habit: DemoHabit) => Array.from({ length: habit.target ?? 1 }, (_, k) => (habit.at ? (habit.at[k] ?? null) : k < (habit.counts[DAY] ?? 0) ? `${two(7 + k)}:00` : null));
+const ms = (time: string) => Date.parse(`${DAY}T${time}:00`);
+
+export function demoHabits(seed: DemoHabit[], now: () => number = Date.now): Habits {
   const all = signal(seed);
   let ids = 0;
   const change = (id: string, fields: Partial<DemoHabit>) => void (all.value = all.value.map((habit) => (habit.id === id ? { ...habit, ...fields } : habit)));
   const view = (habit: DemoHabit): HabitView => {
     const days = habit.days ?? 127;
     const target = habit.target ?? 1;
-    return { id: habit.id, title: habit.title, days, target, reminds: habit.reminds ?? (habit.remind ? [habit.remind] : []), remind: habit.reminds?.[0] ?? habit.remind ?? null, deleted: habit.deleted ? DELETED_AT : null, ...habitDays({ days, target }, new Map(Object.entries(habit.counts)), DAY) };
+    return { id: habit.id, title: habit.title, days, target, reminds: habit.reminds ?? (habit.remind ? [habit.remind] : []), remind: habit.reminds?.[0] ?? habit.remind ?? null, deleted: habit.deleted ? DELETED_AT : null, ...days_(habit) };
   };
-  const bump = (id: string, by: number) => {
+  const days_ = (habit: DemoHabit) => {
+    const worked = habitDays({ days: habit.days ?? 127, target: habit.target ?? 1 }, new Map(Object.entries(habit.counts)), DAY);
+    const filled = slots(habit);
+    const rounds = filled.map((time, k) => ({ round: k + 1, at: time ? ms(time) : null, checkin: time ? `${habit.id}@${k + 1}@${time}` : null }));
+    return { ...worked, today: { ...worked.today, at: filled.filter((time) => time !== null).map(ms).sort((a, b) => a - b), rounds } };
+  };
+  // Round `round` set to `time`, or emptied with null; today's count follows the filled rounds.
+  const set = (id: string, round: number, time: string | null) => {
     const habit = all.value.find((one) => one.id === id);
     if (!habit) return;
-    const count = Math.max(0, (habit.counts[DAY] ?? 0) + by);
-    change(id, { counts: Object.fromEntries(Object.entries({ ...habit.counts, [DAY]: count }).filter(([, n]) => n > 0)) });
-    tapped.value += by;
+    const at = slots(habit);
+    const was = at.filter(Boolean).length;
+    at[round - 1] = time;
+    const count = at.filter(Boolean).length;
+    change(id, { at, counts: Object.fromEntries(Object.entries({ ...habit.counts, [DAY]: count }).filter(([, n]) => n > 0)) });
+    tapped.value += count - was;
+  };
+  const clock = () => {
+    const stamp = new Date(now());
+    return `${two(stamp.getHours())}:${two(stamp.getMinutes())}`;
+  };
+  const takeBack = (id: string, round: number) => {
+    const habit = all.value.find((one) => one.id === id);
+    const time = habit && slots(habit)[round - 1];
+    if (!time) return [];
+    set(id, round, null);
+    return [`${id}@${round}@${time}`];
   };
   const tapped = signal(0);
   const list = computed(() => all.value.filter((habit) => !habit.archived && !habit.deleted).map(view));
@@ -107,11 +137,17 @@ export function demoHabits(seed: DemoHabit[]): Habits {
       const times = fields.reminds ?? (fields.remind === undefined ? (held.reminds ?? (held.remind ? [held.remind] : [])) : fields.remind === null ? [] : [fields.remind]);
       change(id, { ...fields, title: fields.title?.trim() || held.title, remind: undefined, reminds: [...times].sort().slice(0, target) } as Partial<DemoHabit>);
     },
-    checkIn(id) {
-      bump(id, 1);
+    // A check-in fills the round asked for, or the first empty one.
+    checkIn(id, round) {
+      const habit = all.value.find((one) => one.id === id);
+      if (!habit) return null;
+      const at = slots(habit);
+      const k = round === undefined ? at.indexOf(null) : round - 1;
+      if (k < 0 || at[k] !== null) return null;
+      set(id, k + 1, clock());
       return `in-${++ids}`;
     },
-    undo: (id) => bump(id, -1),
+    takeBack,
     remove: (id) => change(id, { deleted: true }),
     restore: (id) => change(id, { deleted: false }),
     purge: (id) => void (all.value = all.value.filter((habit) => habit.id !== id)),

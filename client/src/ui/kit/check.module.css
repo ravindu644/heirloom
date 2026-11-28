@@ -37,3 +37,6 @@
 .check:disabled { cursor: default; }
 .check:disabled i, .check:disabled[aria-checked="true"] i { border-color: transparent; background: var(--key-quiet); }
 .check:disabled i::after { border-color: var(--muted); }
+/* A box with its words: the box in a 48px column, the words after it on the row's words' edge. */
+.worded { grid-template-columns: var(--layout-touch) minmax(0, 1fr); gap: var(--space-xs); place-items: center start; width: 100%; height: auto; min-height: var(--layout-touch); color: inherit; font: inherit; text-align: left; }
+.worded i { justify-self: center; }

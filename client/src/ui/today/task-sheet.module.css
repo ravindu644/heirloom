@@ -32,19 +32,42 @@ p.nudge { color: var(--ink); }
 .timed { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-md); font: var(--type-label); color: var(--muted); }
 .timed span { text-wrap: pretty; }
 
-.sub { display: flex; align-items: center; gap: var(--space-sm); }
-.sub input {
+/* A subtask: its words on a raised row, Remove at its end. Tapped, the words are a field where
+   they stand: the row takes a field's look, its line in ink. */
+.sub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--layout-touch);
+  padding-right: var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--row, var(--raised));
+  transition: background-color var(--motion-press) var(--motion-ease);
+}
+/* Drawn inside the row, so a field takes no room the words did not. */
+.sub:has(input) { outline: var(--layout-hair) solid var(--ink); outline-offset: calc(var(--layout-hair) * -1); background: var(--surface); }
+.sub > :first-child {
   flex: 1;
   min-width: 0;
   min-height: var(--layout-touch);
-  padding: 0 var(--space-md);
-  border: var(--layout-hair) solid var(--edge);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  /* A title of three lines keeps the room a field has round its words. */
+  padding: var(--space-sm) var(--space-md);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: var(--type-body);
+  text-align: left;
+  overflow-wrap: break-word;
+  cursor: pointer;
 }
-.sub input:focus-visible { border-color: var(--ink); outline-offset: 0; }
+.sub input { cursor: text; }
+.sub .struck { color: var(--muted); text-decoration: line-through; }
+.sub input:focus-visible { outline: none; }
 
 /* What a tap did, with its Undo: a note, as the habit's removed reminders are. */
 .removed { font: var(--type-label); color: var(--muted); }
 .removed button { margin: calc((1lh - var(--layout-touch)) / 2) 0 calc((1lh - var(--layout-touch)) / 2) var(--space-sm); vertical-align: middle; }
 
+/* Where a removed subtask stood: a line as tall as a row, so its Undo is a full target that reaches into no row beside it. */
+p.stood { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-sm); min-height: var(--layout-touch); }
+p.stood button { margin: 0; }

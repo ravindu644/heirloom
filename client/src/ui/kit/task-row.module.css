@@ -1,8 +1,4 @@
 .row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm) var(--space-xs);
   min-height: calc(var(--layout-touch) + var(--space-md));
   padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xs);
   border-radius: var(--radius-md);
@@ -10,6 +6,8 @@
   background: var(--row, var(--surface));
   --track: var(--row-track, var(--raised));
 }
+/* The row's own line: its box and words, and what stands at its end. What it opens into goes under. */
+.line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-xs); min-height: var(--layout-touch); }
 .plain { padding-left: var(--space-md); }
 /* The one to start next. Drawn inside the row, so it takes no room and moves nothing. */
 .next { --row-ring: inset 0 0 0 2px var(--you); box-shadow: var(--row-ring); }
@@ -27,13 +25,9 @@
   min-height: var(--layout-touch);
   /* As tall as the row, which what stands at its end may have made taller than the words. */
   align-self: stretch;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  cursor: pointer;
 }
-div.words { cursor: auto; }
+/* What opens the task: laid over the whole row, with nothing of a button's look. */
+.open { position: absolute; inset: 0; padding: 0; border: 0; border-radius: var(--radius-md); background: none; cursor: pointer; }
 /* The title always has its room. It breaks between words and never inside one (a word longer
    than the whole line is the one thing that is cut), and runs to two lines; the sheet shows the
    rest. `break-word`, not `anywhere`: with `anywhere` a title could be squeezed to one letter a
@@ -41,7 +35,9 @@ div.words { cursor: auto; }
 .title { display: -webkit-box; flex: 1 1 auto; min-width: 0; overflow: hidden; font: var(--type-body); text-decoration: line-through transparent; transition: color var(--motion-fill) var(--motion-ease), text-decoration-color var(--motion-fill) var(--motion-ease); overflow-wrap: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; text-wrap: pretty; }
 /* With a line under it the title has its own. */
 .lined .title { flex-basis: 100%; }
-/* The line under it likewise: two lines at most. */
+/* The line under it: the project and the notes, then the link that opens the row. */
+.below { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 0 var(--space-sm); min-width: 0; }
+/* Its words likewise: two lines at most. */
 .meta { display: flex; flex: 0 1 auto; flex-wrap: wrap; min-width: 0; align-items: center; gap: var(--space-xs) var(--space-sm); max-height: calc(2lh + var(--space-xs)); overflow: hidden; font: var(--type-label); color: var(--muted); }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); min-width: 0; color: var(--ink); overflow-wrap: break-word; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
@@ -54,13 +50,15 @@ div.words { cursor: auto; }
 .lead { display: flex; flex: 1 1 auto; align-items: center; gap: var(--space-xs); min-width: 0; background: inherit; }
 .under { display: flex; flex: none; margin-left: auto; }
 /* On the project's line the squares' first line stands on that line, however many lines follow it: the count reads on with the project. */
-.lined .meta { align-self: flex-start; }
+.lined .below { align-self: flex-start; }
 .lined .under { align-self: flex-start; padding-top: var(--space-xs); }
 /* What ends the row: its control, beside the words. */
-.end { position: relative; z-index: 1; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-sm) var(--space-md); margin-left: auto; padding-left: var(--space-sm); }
+.end { position: relative; z-index: 1; pointer-events: none; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-sm) var(--space-md); margin-left: auto; padding-left: var(--space-sm); }
+/* Only its control takes a press: the rest of the end, which may stretch across a wide row, and the squares are the row's, and open it. */
+.end > :not(.beside) { pointer-events: auto; }
 /* An end that holds only the pair is no part of a narrow row. */
 .beside, .end.solo { display: none; }
-.trailed { flex-wrap: nowrap; }
+.trailed > .line { flex-wrap: nowrap; }
 
 /* A wide row has room beside any title: the pair stands there, at the row's end and left of its
    control, and under the control where a title of two lines' length leaves it no room. */
@@ -72,10 +70,9 @@ div.words { cursor: auto; }
   .trailed .lead { flex: 0 1 auto; }
   .trailed .end { flex: 1 0 min-content; flex-wrap: wrap-reverse; }
 }
-/* The words open the task, and so does the row's empty room: the target is laid over the whole row, under its box and what stands at its end. */
+/* The row's box and what stands at its end are over the target that opens it. */
 .row { position: relative; }
-.lead > :first-child:not(.words) { position: relative; z-index: 1; }
-button.words::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.lead > :first-child:not(.words, .open) { position: relative; z-index: 1; }
 /* The row itself is measured, not the screen. */
 .measure { container-type: inline-size; }
 
@@ -84,7 +81,7 @@ button.words::after { content: ""; position: absolute; inset: 0; border-radius: 
    at the row's end, with the words taking what is left and a long title wrapping beside them (a
    basis of nothing, so no title is ever wide enough to push them under); under it, on a line of
    their own under every row. */
-.linked { flex-wrap: wrap; }
+.linked > .line { flex-wrap: wrap; }
 .linked .lead { flex-basis: 0; }
 .links { position: relative; z-index: 1; display: flex; flex: none; flex-wrap: wrap; gap: 0 var(--space-md); }
 @container (max-width: 400px) {
@@ -100,7 +97,7 @@ button.words::after { content: ""; position: absolute; inset: 0; border-radius: 
   .under { display: none; }
   .beside { display: contents; }
   .end.solo { display: flex; }
-  .trailed { flex-wrap: wrap; }
+  .trailed > .line { flex-wrap: wrap; }
   .trailed .lead { flex: 0 1 auto; }
   .trailed .end { flex: 1 0 100%; flex-wrap: wrap-reverse; }
 }

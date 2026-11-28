@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { useId } from 'preact/hooks';
 import type { TaskView } from '../../sync/today.ts';
 import { Check } from './check.tsx';
 import { cx } from './cx.ts';
@@ -25,29 +26,41 @@ interface Props {
   links?: ComponentChildren;
   /** It can be put in order by pressing and holding (kit/lift.ts): the row is marked for it. */
   lift?: boolean;
+  /** A link at the end of the line under the title, the fold arrow's ("2 of 4 subtasks"). */
+  opens?: ComponentChildren;
+  /** What the row opens into, under its line and inside the row. */
+  children?: ComponentChildren;
 }
 
 /** A task as a row: the box, the title, its project and laps, and the count. The words open it. */
-export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, onOpen, lift }: Props) {
+export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, onOpen, lift, opens, children }: Props) {
   // The laps as squares, with the count they picture. They sit at the row's right, apart from the
   // project's square: side by side the two would read as one more lap.
   // They are drawn in two places, and the row's width says which shows: beside the title in a wide
   // row, and in a narrow one at the right end of the last line of the words.
   const laps = (task.laps > 0 || task.estimate !== null || task.squares.length > 0) && (() => <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={of} />);
   const meta = !!(task.project || note);
+  const id = useId();
   const words = (
     <>
-      <span class={css.title}>{task.title}</span>
-      {meta && (
-        <span class={css.meta}>
-          {task.project && (
-            <span class={css.project}>
-              {/* The square is never alone: the name follows it. */}
-              <Square color={task.project.color} />
-              {task.project.name}
+      <span class={css.title} id={`${id}t`}>
+        {task.title}
+      </span>
+      {(meta || opens) && (
+        <span class={css.below}>
+          {meta && (
+            <span class={css.meta} id={`${id}m`}>
+              {task.project && (
+                <span class={css.project}>
+                  {/* The square is never alone: the name follows it. */}
+                  <Square color={task.project.color} />
+                  {task.project.name}
+                </span>
+              )}
+              {note && <span>{note}</span>}
             </span>
           )}
-          {note && <span>{note}</span>}
+          {opens}
         </span>
       )}
       {laps && <span class={css.under}>{laps()}</span>}
@@ -56,17 +69,14 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
   return (
     // The box round the row is what is measured, so the row itself can be laid out by its width: it wraps where it is very narrow.
     <div class={css.measure}>
-    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked, meta && css.lined)} data-lift={lift ? task.id : undefined}>
+    <div class={cx(css.row, next && css.next, task.done && css.done, !onDone && css.plain, !!end && css.trailed, !!links && css.linked, (meta || !!opens) && css.lined)} data-lift={lift ? task.id : undefined}>
+      <div class={css.line}>
       {/* The box and the words are one piece: a row that breaks never parts them. */}
       <div class={css.lead}>
         {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
-        {onOpen ? (
-          <button type="button" class={css.words} data-task={task.id} data-grip onClick={onOpen}>
-            {words}
-          </button>
-        ) : (
-          <div class={css.words}>{words}</div>
-        )}
+        {/* What opens the task is the whole row: a target laid over it, under its box and what stands at its end, named by the title and the line under it. */}
+        {onOpen && <button type="button" class={css.open} data-task={task.id} data-grip aria-labelledby={meta ? `${id}t ${id}m` : `${id}t`} onClick={onOpen} />}
+        <div class={css.words}>{words}</div>
       </div>
       {(laps || end) && (
         <div class={cx(css.end, !end && css.solo)}>
@@ -75,6 +85,8 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
         </div>
       )}
       {links && <div class={css.links} data-links>{links}</div>}
+      </div>
+      {children}
       </div>
     </div>
   );

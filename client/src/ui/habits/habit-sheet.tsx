@@ -6,7 +6,6 @@ import { cx } from '../kit/cx.ts';
 import { Field } from '../kit/field.tsx';
 import { Fold } from '../kit/fold.tsx';
 import form from '../kit/form.module.css';
-import links from '../kit/links.module.css';
 import { Heat } from '../kit/heat.tsx';
 import { Name, Note } from '../kit/note.tsx';
 import { Sheet } from '../kit/sheet.tsx';
@@ -121,16 +120,11 @@ export function HabitSheet({ habit, habits, run, onClose, onArchive, onRemove, o
           top={habit.target >= TARGET_MAX}
           floor={habit.target <= 1}
         />
-        {/* Done more than once a day: how far today has got, and the way to take the last one back. */}
+        {/* Done more than once a day: how far today has got. Its times are ticked and unticked on the list. */}
         <Fold>
           {habit.target > 1 && (
             <p class={css.sofar}>
               {s.habits.countToday(habit.today.count, habit.target)}
-              {habit.today.count > 0 && (
-                <Button kind="link" class={links.end} onClick={() => habits.undo(habit.id)}>
-                  {s.habits.takeBack}
-                </Button>
-              )}
             </p>
           )}
         </Fold>

@@ -15,6 +15,8 @@ export interface Saying {
   tail?: string;
   /** The tail goes on in the same sentence: a comma after the title, not a full stop. */
   comma?: boolean;
+  /** A sentence that must be read whole: it takes a second line rather than be cut. */
+  whole?: boolean;
   undo?: () => void;
 }
 
@@ -43,7 +45,7 @@ function Bar({ said, undo }: { said: Saying; undo: string }) {
     bar.current!.style.width = column ? `${column.width}px` : '';
   }, [beside]);
   return (
-    <p ref={bar} class={cx(css.said, useGoing() && css.going)}>
+    <p ref={bar} class={cx(css.said, said.whole && css.whole, useGoing() && css.going)}>
       <span>
         <span class={css.name}>
           {said.lead} <span class={css.title}>{said.title}{said.comma ? ',' : '.'}</span>

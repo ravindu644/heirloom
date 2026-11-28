@@ -15,6 +15,8 @@ import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
 import { Note } from '../kit/note.tsx';
+import { Laps } from '../kit/laps.tsx';
+import { Opens, Short, Shorts, isOpen, toggle } from '../kit/opens.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import * as s from '../strings.ts';
 import { useTick } from '../tick.ts';
@@ -22,7 +24,8 @@ import { HabitSheet } from './habit-sheet.tsx';
 import css from './habits.module.css';
 
 /** Its run, or after a miss the days kept: never the miss itself. */
-const run = (habit: HabitView) => (habit.missed ? s.habits.keptOf(habit.kept, habit.of) : habit.streak > 0 ? s.habits.running(habit.streak) : '');
+const run = (habit: HabitView) => (habit.missed ? s.habits.keptOf(habit.kept, habit.of) : s.habits.running(habit.streak, habit.target > 1));
+
 
 /**
  * The routine. The heading is today's count; each habit is a row with the app's one box to check
@@ -51,20 +54,26 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
     wasOpen.current = !!open;
   }, [open]);
 
-  // One tap is one check-in. On a day already done the box takes the latest one back.
-  const check = (habit: HabitView) => {
-    if (habit.today.done) {
-      habits.undo(habit.id);
-      return say(null);
-    }
-    habits.checkIn(habit.id);
-    say({
-      lead: s.habits.saidIn,
-      title: habit.title,
-      comma: habit.target > 1,
-      tail: habit.target > 1 ? s.habits.saidCount(habit.today.count + 1, habit.target) : undefined,
-      undo: () => habits.undo(habit.id),
+  // A box is ticked and unticked where it stands, and says so itself: no bar, no Undo (the box is
+  // the way back). A habit done once a day has one round; a counted one's times are ticked each on
+  // its own, in any order, so the box tapped is the one that changes.
+  const round = (habit: HabitView, r: number, ticked: boolean) => void (ticked ? habits.takeBack(habit.id, r) : habits.checkIn(habit.id, r));
+  // How far a counted day has got, as a task's laps are drawn: beside the title where there is
+  // room, at the end of the line under it on a phone.
+  const count = (habit: HabitView, where: string | undefined) => (
+    <span class={cx(css.count, where)} data-count>
+      <Laps laps={habit.today.count} estimate={habit.target} of={s.habits.of(habit.target)} />
+    </span>
+  );
+  // A press on the row opens the habit; a press on its count opens its times, as the arrow does.
+  // Worked out here, not by a second button: the arrow is the one control a keyboard and a screen reader meet.
+  const press = (habit: HabitView, event: MouseEvent) => {
+    const onCount = [...(event.currentTarget as HTMLElement).parentElement!.querySelectorAll('[data-count]')].some((el) => {
+      const box = el.getBoundingClientRect();
+      return box.width > 0 && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
     });
+    if (onCount) toggle(habit.id);
+    else setOpen(habit.id);
   };
   const archive = (habit: HabitView) => {
     habits.edit(habit.id, { archived: true });
@@ -120,29 +129,58 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
           ) : (
             <section key="list" aria-label={s.habits.list}>
               <Fold gap="sm">
-                {list.map((habit) => (
+                {list.map((habit) => {
+                  const counted = habit.target > 1;
+                  return (
                   <div key={habit.id} class={css.row} data-habit={habit.id} data-lift={habit.id}>
-                    <Check checked={habit.today.done} label={s.habits.check(habit.title)} onChange={() => check(habit)} />
-                    {/* Everything of the row but its box and its count is one target: it opens the habit. */}
-                    <button type="button" class={css.open} data-grip onClick={() => setOpen(habit.id)}>
-                      <span class={css.words}>
-                        <span class={css.title}>{habit.title}</span>
-                        <span class={css.meta}>{[s.habits.plan(habit.days), run(habit)].filter(Boolean).join(', ')}</span>
-                        {/* A habit done more than once a day says how far it has got. */}
-                        {habit.target > 1 && (
-                          <span class={css.count}>
-                            <b>{habit.today.count}</b>
-                            {s.habits.of(habit.target)}
-                          </span>
-                        )}
+                    {/* The control column: a habit done once a day has its box; one done more often, the arrow to its times. */}
+                    {counted ? (
+                      <Opens id={habit.id} label={s.habits.rounds(habit.today.count, habit.target)} />
+                    ) : (
+                      <Check checked={habit.today.done} label={s.habits.check(habit.title)} onChange={() => round(habit, 1, habit.today.done)} />
+                    )}
+                    {/* Everything of the row but its controls opens the habit: this target is laid over the whole row, named by its words. */}
+                    <button type="button" class={css.open} data-grip aria-labelledby={`h-${habit.id} hm-${habit.id}`} onClick={(event) => press(habit, event)} />
+                    <span class={css.words}>
+                      <span class={css.line}>
+                        <span class={css.title} id={`h-${habit.id}`}>
+                          {habit.title}
+                        </span>
+                        {counted && count(habit, css.beside)}
                       </span>
+                      <span class={css.under}>
+                        <span class={css.meta} id={`hm-${habit.id}`}>
+                          {[s.habits.plan(habit.days), run(habit)].filter(Boolean).join(', ')}
+                        </span>
+                        {counted && count(habit, css.after)}
+                      </span>
+                    </span>
+                    {counted && (
+                      <Fold class={css.rounds}>
+                        {isOpen(habit.id) && (
+                          <Shorts key="rounds">
+                            {habit.today.rounds.map((r) => {
+                              const time = habit.reminds[r.round - 1];
+                              return (
+                                <Short key={r.round} checked={!!r.checkin} label={s.habits.roundCheck(habit.title, time, r.round)} onChange={() => round(habit, r.round, !!r.checkin)}>
+                                  {time ? <span class={css.time}>{time}</span> : <span class={css.none}>{s.habits.nth(r.round)}</span>}
+                                  {r.at !== null && <small class={css.at}>{s.habits.doneAt(r.at)}</small>}
+                                </Short>
+                              );
+                            })}
+                          </Shorts>
+                        )}
+                      </Fold>
+                    )}
+                    <span class={css.week}>
                       <Week
                         label={s.habits.weekLabel(habit.week.filter((d) => d.planned && d.done).length, habit.week.filter((d) => d.planned).length)}
                         days={habit.week.map((d, i) => ({ letter: s.habits.days[i]!, done: d.done, rest: d.rest, share: d.count / habit.target, off: !d.planned, today: d.day === habit.today.day }))}
                       />
-                    </button>
+                    </span>
                   </div>
-                ))}
+                  );
+                })}
               </Fold>
             </section>
           )}

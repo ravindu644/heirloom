@@ -4,7 +4,7 @@ import { UNDO_MS } from '../../sync/focus.ts';
 import type { Engine } from '../../sync/engine.ts';
 import type { Focus } from '../../sync/focus.ts';
 import type { Settings } from '../../sync/settings.ts';
-import type { TaskView, Today } from '../../sync/today.ts';
+import type { SubtaskView, TaskView, Today } from '../../sync/today.ts';
 import { upNext } from '../../core/today.ts';
 import { Button } from '../kit/button.tsx';
 import { Figures } from '../kit/figures.tsx';
@@ -22,6 +22,7 @@ import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
 import { Note } from '../kit/note.tsx';
+import { Opens, Short, Shorts, isOpen } from '../kit/opens.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { cx } from '../kit/cx.ts';
@@ -205,12 +206,27 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
   // An Upcoming row carried up among today's is due today once let go, and says so already.
   const comingToday = (task: TaskView) => carry?.id === task.id && [shown.next, ...shown.later].includes(task);
 
-  const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => (
+  // A subtask is ticked here and nothing else: its task's own box finishes the task.
+  const tickSub = (task: TaskView, sub: SubtaskView, isDone: boolean) => {
+    today.editSubtask(sub.id, { done: isDone });
+    // Unticking says nothing, and leaves another act's bar and its Undo where they are.
+    if (!isDone) return;
+    const done = task.subtasks.filter((other) => other.done || other.id === sub.id).length;
+    const undo = () => today.editSubtask(sub.id, { done: false });
+    // Every one ticked finishes nothing but them: said whole, since the row looks done and is not.
+    if (done === task.subtasks.length && !task.done) return say({ lead: '', title: s.today.allSubtasks(done), whole: true, undo });
+    say({ lead: s.today.saidTicked, title: sub.title, tail: s.today.saidSubtasks(done, task.subtasks.length), undo });
+  };
+
+  const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => {
+    const subs = task.subtasks;
+    return (
     <TaskRow
       key={task.id}
       task={task}
       of={s.today.of(task.estimate)}
-      note={[task.due && task.due !== day && !comingToday(task) ? s.today.due(task.due, day) : '', task.time ?? '', task.subtasks.length ? s.today.subtasks(task.subtasks.filter((sub) => sub.done).length, task.subtasks.length) : ''].filter(Boolean).join(', ')}
+      note={[task.due && task.due !== day && !comingToday(task) ? s.today.due(task.due, day) : '', task.time ?? ''].filter(Boolean).join(', ')}
+      opens={subs.length > 0 && <Opens id={task.id}>{s.today.subtasks(subs.filter((sub) => sub.done).length, subs.length)}</Opens>}
       checkLabel={s.today.check(task.title)}
       onDone={(isDone) => setDone(task, isDone)}
       onOpen={() => {
@@ -220,8 +236,23 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
       next={extra.next}
       end={extra.end}
       lift={list !== 'done'}
-    />
-  );
+    >
+      {subs.length > 0 && (
+        <Fold>
+          {isOpen(task.id) && (
+            <Shorts key="subs">
+              {subs.map((sub) => (
+                <Short key={sub.id} checked={sub.done} struck label={s.today.check(sub.title)} onChange={(isDone) => tickSub(task, sub, isDone)}>
+                  <span>{sub.title}</span>
+                </Short>
+              ))}
+            </Shorts>
+          )}
+        </Fold>
+      )}
+    </TaskRow>
+    );
+  };
 
   const loose = [next, ...later].filter((task) => task && task.estimate === null).length;
   const strip: Figure[] = [
