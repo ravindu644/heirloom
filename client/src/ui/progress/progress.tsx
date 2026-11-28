@@ -21,7 +21,7 @@ const YEAR_DAYS = 371;
 /**
  * The record. It opens with a finding, not a title: how this week stands against the last one
  * and what closes the gap. Under it the evidence, most recent first: the week, the streak, the
- * days since the first lap, one day hour by hour, then where the time went and how the guesses
+ * days since the first lap, one day lap by lap, then where the time went and how the guesses
  * held. On a phone they stack in that order: what changes every lap on top, what a person
  * studies once a week at the foot.
  */

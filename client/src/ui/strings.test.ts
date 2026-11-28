@@ -38,7 +38,19 @@ test('a stop says how far the lap ran as the clock says it, and a break after mi
 test('a task in Estimates says the day it was done, so a repeating one done twice reads as two days', () => {
   assert.equal(progress.doneOn('2026-11-28', '2026-11-28'), 'today');
   assert.equal(progress.doneOn('2026-11-27', '2026-11-28'), 'yesterday');
-  assert.equal(progress.doneOn('2026-11-25', '2026-11-28'), 'Wed');
+  assert.equal(progress.doneOn('2026-11-25', '2026-11-28'), 'Wed 25 Nov');
   assert.equal(progress.doneOn('2026-11-12', '2026-11-28'), 'Thu 12 Nov');
   assert.equal(progress.guesses([{ ratio: 1.3 }]), 'This week: 1.3.');
+});
+
+test('setting a lap aside says what left which day, and the fold counts as the heading does', () => {
+  assert.equal(progress.off(10 * 60000, '2026-11-24', '2026-11-24'), '10 minutes off today');
+  // No zero parts: a lead part under a minute is said as the row says it, and an other day under a minute is left out.
+  assert.equal(progress.off(20000, '2026-11-24', '2026-11-24', { ms: 30000, day: '2026-11-23' }), 'Under a minute off today');
+  assert.equal(progress.off(32 * 60000, '2026-11-24', '2026-11-24', { ms: 14 * 60000, day: '2026-11-23' }), '32 minutes off today, 14 off Monday');
+  assert.equal(progress.off(14 * 60000, '2026-11-23', '2026-11-24', { ms: 32 * 60000, day: '2026-11-24' }), '14 minutes off Monday, 32 off today');
+  assert.equal(progress.earlier(4, 1, 75 * 60000), '4 earlier laps, 1 not counted, 1h 15m');
+  assert.equal(progress.earlier(4, 0, 100 * 60000), '4 earlier laps, 1h 40m');
+  assert.equal(progress.earlier(2, 2, 0), '2 earlier laps, 2 not counted');
+  assert.equal(progress.focused(7, true, 'running'), 'focused today, in 7 laps, and one running');
 });

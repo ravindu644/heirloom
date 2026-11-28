@@ -910,7 +910,7 @@ function WeekTab({ room, me, now }: { room: RoomView; me: MemberView | undefined
                 ))}
               </span>
               <p class={css.small}>
-                {restBack < marks.length && restBack > 0 ? `${s.room.restWas(Date.parse(addDays(today, -restBack)))} ` : ''}
+                {restBack < marks.length && restBack > 0 ? `${s.room.restWas(addDays(today, -restBack))} ` : ''}
                 {s.room.todayNeeds(ran, room.members.length)}
               </p>
             </section>

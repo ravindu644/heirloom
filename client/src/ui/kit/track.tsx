@@ -73,15 +73,17 @@ export function Hours({ window: w, now, hour, nowWord }: { window: Window; now: 
 /**
  * One person's lane over the same stretch: a grey track across it all, and on it each lap that
  * ran as a filled block, `mine` in you and anyone else's muted; the lap running is filled as far
- * as now. A break is a gap. `children` stand in the lane at a moment (`Mark`): a circle at a call.
+ * as now. A break is a gap, unless it is given as a block of its own (`rest`, in the rest green);
+ * a lap not counted is hollow (`aside`). `sliver` draws it at the `lane` height, 8px, for a lane
+ * cut into rows. `children` stand in the lane at a moment (`Mark`): a circle at a call.
  */
-export function Lane({ window: w, laps, mine, children }: { window: Window; laps: { start: number; end: number }[]; mine?: boolean; children?: ComponentChildren }) {
+export function Lane({ window: w, laps, mine, sliver, children }: { window: Window; laps: { start: number; end: number; kind?: 'rest' | 'aside' }[]; mine?: boolean; sliver?: boolean; children?: ComponentChildren }) {
   return (
-    <div class={css.lane} aria-hidden="true">
+    <div class={cx(css.lane, sliver && css.sliver)} aria-hidden="true">
       {laps
         .filter((lap) => lap.end > w.from && lap.start < w.to)
         .map((lap) => (
-          <i key={lap.start} class={cx(css.lap, mine && css.mine)} style={`left:${at(w, lap.start)}%;width:${at(w, lap.end) - at(w, lap.start)}%`} />
+          <i key={lap.start} class={cx(css.lap, mine && css.mine, lap.kind && css[lap.kind])} style={`left:${at(w, lap.start)}%;width:${at(w, lap.end) - at(w, lap.start)}%`} />
         ))}
       {children}
     </div>

@@ -26,6 +26,10 @@ export function total(ms: number): string {
 
 /** A length in a sentence: "6 minutes", "1h 5m". */
 const length = (ms: number) => (mins(ms) < 60 ? plural(mins(ms), 'minute', 'minutes') : total(ms));
+// How long a session ran: a lap stopped in its first seconds still ran.
+const ran = (ms: number) => (ms < MIN ? 'under a minute' : length(ms));
+// The same after a first length that named the unit: "25 minutes, 15 of them".
+const few = (ms: number) => (mins(ms) < 60 ? mins(ms) : total(ms));
 
 /** The time on the wall: "16:59". */
 export function wall(ms: number): string {
@@ -575,6 +579,8 @@ const WEEKDAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Monday first, as a week runs.
 const weekdayName = (day: string) => WEEKDAYS[new Date(day).getUTCDay()]!;
+// "Thursday the 19th was a rest day.", of a day such as `2026-11-19`.
+const restOn = (day: string) => `${weekdayName(day)} the ${ordinal(new Date(day).getUTCDate())} was a rest day.`;
 const shortDate = (day: string) => dated(day, { weekday: 'short', day: 'numeric', month: 'short' });
 // Pinned rest days, 0 Monday to 6 Sunday: one leaves a second to come where it is needed.
 const pinned = (days: number[]) => {
@@ -598,14 +604,12 @@ export const progress = {
 
   week: 'This week against last week',
   weekAlone: 'This week',
-  weekdays: WEEKDAYS_SHORT,
   hours: (h: number) => `${h}h`,
   byNow: (ms: number, day: string) => `Last week had ${total(ms)} by this time on ${weekdayName(day)}.`,
   noLastWeek: 'Last week has nothing to race. This week becomes the one to beat.',
   // A room's week chart: its top line.
   target: 'target',
-  chart: (you: number, ghostNow: number, ghostTotal: number) =>
-    ghostTotal > 0 ? `This week ${total(you)} so far. Last week ${total(ghostNow)} by now, ${total(ghostTotal)} in all.` : `This week ${total(you)} so far.`,
+  chart: (you: number, ghostNow: number, ghostTotal: number) => (ghostTotal > 0 ? room.chartSaid(you, ghostNow, ghostTotal, 0) : `This week ${total(you)} so far.`),
   total,
 
   streak: 'Streak',
@@ -616,7 +620,7 @@ export const progress = {
   pinned,
   pinnedStart: (days: number[]) => `A day counts with one lap run to its bell. ${pinned(days)}`,
   todayOpen: 'No lap has reached its bell today yet.',
-  restDay: (day: string) => `${weekdayName(day)} the ${ordinal(new Date(day).getUTCDate())} was a rest day. Two a week keep the streak going.`,
+  restDay: (day: string) => `${restOn(day)} Two a week keep the streak going.`,
   restKeeps: 'Two rest days a week keep it going.',
   dots: (kept: number, rest: number) => `The last 14 days: ${kept} with a lap${rest ? `, ${plural(rest, 'rest day', 'rest days')}` : ''}.`,
 
@@ -650,7 +654,7 @@ export const progress = {
     return `${plural(n, 'lap', 'laps')}, ${change}, ${total(all)} in all`;
   },
   before: 'the 7 days before',
-  noProjects: 'No lap in these 7 days was on a task with a project. Give a task a project on Today and its time shows here.',
+  noProjects: 'No lap in these 7 days had a project. Give a task one on Today.',
 
   estimates: 'Estimates',
   ratio: (ratio: number) => `A task takes about ${ratio.toFixed(1)} laps for each one you estimate.`,
@@ -661,43 +665,56 @@ export const progress = {
     weeks.length === 1
       ? `This week: ${weeks[0]!.ratio?.toFixed(1) ?? 'nothing to go by'}.`
       : `The last ${weeks.length} weeks, oldest first: ${weeks.map((week) => (week.ratio === null ? 'nothing to go by' : week.ratio.toFixed(1))).join(', ')}.`,
-  /** The day a task in Estimates was done: "today", "yesterday", "Wed", "Thu 12 Nov". */
-  doneOn: (day: string, today: string) => {
-    const ago = Math.round((Date.parse(today) - Date.parse(day)) / (24 * 60 * MIN));
-    // A done stamp a little ahead (a fast clock, a new offset) is today, never last week's weekday.
-    return ago <= 0 ? 'today' : ago === 1 ? 'yesterday' : dated(day, ago < 7 ? { weekday: 'short' } : { weekday: 'short', day: 'numeric', month: 'short' });
-  },
-  noEstimates: 'No estimate to check yet. Give a task an estimate, finish it, and this says how close it was.',
+  /** The day a task in Estimates was done: "today", "yesterday", "Thu 12 Nov". A done stamp a little ahead (a fast clock) is today. */
+  doneOn: (day: string, now: string) => (day >= now ? 'today' : today.due(day, now)),
+  noEstimates: 'No estimate to check yet. Estimate a task, finish it, and see how close it was.',
 
-  dayTitle: (day: string, today: string) => (day === today ? 'Today, hour by hour' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, hour by hour`),
+  dayTitle: (day: string, today: string) => (day === today ? 'Today, lap by lap' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, lap by lap`),
   toToday: 'Back to today',
-  // Over a day's list of sessions when it holds more than its latest few: how many more, and the way back.
-  earlier: (n: number, isToday: boolean) => `${n} earlier ${isToday ? 'today' : 'that day'}`,
-  latest: (n: number) => `Show the latest ${n}`,
+  // Beside the day's focus: "focused today, in 2 laps".
+  // The lap in progress is in the figure and not yet in the count, so it is said: "in 7 laps, and one running".
+  focused: (laps: number, isToday: boolean, live?: string) => `focused ${isToday ? 'today' : 'that day'}, in ${plural(laps, 'lap', 'laps')}${live ? `, and one ${live}` : ''}`,
+  // Over the column of running totals, and the figure at a lap's end.
+  soFar: (isToday: boolean) => (isToday ? 'Day so far' : "Day's total"),
+  // Over a day's laps when it holds more than its latest few: how many more and what they gave, and the way back.
+  // The laps not counted are named, so the count adds up with the one at the top: "4 earlier laps, 1 not counted, 1h 15m".
+  earlier: (n: number, aside: number, ms: number) => `${plural(n, 'earlier lap', 'earlier laps')}${aside ? `, ${aside} not counted` : ''}${ms < MIN ? '' : `, ${total(ms)}`}`,
+  latest: (n: number) => `Show only the latest ${n} laps`,
   lap: 'Lap',
   stopped: 'Stopped lap',
   aside: 'Lap, not counted',
   running: 'Lap, running',
   paused: 'Lap, paused',
-  shortBreak: 'Short break',
-  longBreak: 'Long break',
   span: (start: number, end: number) => `${wall(start)} to ${wall(end)}`,
   spanNow: (start: number) => `${wall(start)} to now`,
-  ran: (ms: number) => (ms < MIN ? 'under a minute' : length(ms)),
+  ran,
+  // A lap cut at midnight says what it gave this day: "31 minutes today".
+  gave: (ms: number, isToday: boolean) => `${ran(ms)} ${isToday ? 'today' : 'that day'}`,
+  // Under a lap that began the day before: "Began on Friday. Its first 14 minutes count there."
+  began: (day: string, ms: number) => `Began on ${dated(day, { weekday: 'long' })}.${ms < MIN ? '' : ` Its first ${length(ms)} count there.`}`,
+  // Its mirror, under a lap that ran past the day's midnight: the lap is the next day's.
+  ends: (day: string) => `Ended on ${dated(day, { weekday: 'long' })}, where it counts as a lap.`,
+  // The second of two laps that ran at once adds only what the first had not: "25 minutes, 15 of them already counted".
+  shared: (ms: number, already: number) => `${length(ms)}, ${few(already)} of them already counted`,
+  // The last hour of a whole day: its end, not the next day's start.
+  dayEnd: '24:00',
+  // The quiet rows of a day, at their time: "11:19  Done: Morning routine".
+  doneAt: 'Done:',
+  checkedIn: 'Checked in:',
   twoDevices: 'ran on two devices',
   setAside: "Don't count it",
   countAgain: 'Count it again',
-  ranAside: (ms: number) => `${ms < MIN ? 'under a minute' : length(ms)}, not counted`,
   forLap: (words: string, start: number) => `${words}, the lap at ${wall(start)}`,
   // On the bar, with Undo: "Not counted. It adds nothing to your day, week or streak."
-  asideSaid: 'Not counted',
-  asideAdds: 'It adds nothing to your day, week or streak.',
+  // On the bar after "Don't count it", short enough for a phone: what left which day.
+  // "10 minutes off today, 14 off Monday."
+  off: (ms: number, day: string, today: string, other?: { ms: number; day: string }) => {
+    const name = (d: string) => (d === today ? 'today' : dated(d, { weekday: 'long' }));
+    return `${cap(ran(ms))} off ${name(day)}${other && other.ms >= MIN ? `, ${few(other.ms)} off ${name(other.day)}` : ''}`;
+  },
   dayEmpty: (isToday: boolean) => (isToday ? 'Nothing has run today yet. The first lap starts on Focus.' : 'Nothing ran on this day.'),
 
-  lookBack: 'Looking back on today',
-  lookTotals: (ms: number, n: number) => (n === 0 && ms < MIN ? 'No lap has rung today yet.' : `${cap(length(ms))} of focus in ${plural(n, 'lap', 'laps')}.`),
-  lookDone: 'Done today',
-  note: 'A line or two about today',
+  note: 'A line about today',
   noteThen: 'The line you wrote that day',
   noteHint: 'what went well, or what got in the way',
   noteLeft: (n: number) => plural(n, 'character left', 'characters left'),
@@ -797,8 +814,6 @@ export const room = {
   hour: (ms: number) => wall(ms),
   now: 'now',
   todayWeek: (today: number, week: number) => (today < MIN ? `Nothing today yet, ${total(week)} this week.` : `${total(today)} today, ${total(week)} this week.`),
-  todayOnly: (today: number) => (today < MIN ? 'Nothing today yet' : `${total(today)} today`),
-  weekOnly: (week: number) => `${total(week)} this week`,
 
   // A lap called for a minute: who called it, when it starts, and who is in.
   calls: (by: string, yours: boolean) => (yours ? 'You call a lap' : `${by} calls a lap`),
@@ -851,7 +866,7 @@ export const room = {
   chartKey: (target: number) => (target > 0 ? 'Solid is this week, dashed is last week. The top line is the room’s target.' : 'Solid is this week, dashed is last week.'),
   streakDays: (run: number) => (run === 1 ? 'day in a row, everyone in' : 'days in a row, everyone in'),
   streakSaid: (run: number) => `${plural(run, 'day', 'days')} in a row on which everyone ran a lap`,
-  restWas: (ms: number) => `${new Date(ms).toLocaleDateString('en-GB', { weekday: 'long' })} the ${ordinal(new Date(ms).getDate())} was a rest day. Two a week keep it going.`,
+  restWas: (day: string) => `${restOn(day)} Two a week keep it going.`,
   todayNeeds: (ran: number, of: number) => (ran >= of ? `Today is kept: ${everyone(of)} have run a lap.` : `Today counts once ${everyone(of)} have run a lap: ${ran} of ${of} so far.`),
   yourPart: 'Your part',
   partOf: (room: number) => `of the room’s ${total(room)} this week`,
@@ -918,7 +933,6 @@ export const room = {
   left: (ms: number) => `${clock(ms)} left`,
   notSharing: 'Not sharing what they are on.',
   yoursHidden: 'Your task is not shown to the room.',
-  cheer: 'Cheer',
   // The one emoji in the app, the user's choice: on the round Cheer button, which bursts when tapped.
   cheerMark: '🎉',
   cheerLabel: (name: string) => `Cheer ${name}'s lap`,

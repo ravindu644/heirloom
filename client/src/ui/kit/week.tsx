@@ -68,7 +68,7 @@ export function WeekChart({ week, today, target = 0, label, muted }: { week: Wee
       <div class={css.days} aria-hidden="true">
         {week.days.map((d, i) => (
           <span key={d.day} class={d.day === today ? css.today : undefined} style={`left:${(i / 6) * 100}%`}>
-            {s.progress.weekdays[i]}
+            {s.progress.rowNames[i]}
           </span>
         ))}
       </div>
