@@ -6,12 +6,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { Device as Node } from '../sync/harness.ts';
-import { accountWith, go, ready, signIn, startButton, token, username } from './app.ts';
+import { accountWith, go, ready, settle, signIn, startButton, token, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
 const SIDEWAYS = { width: 915, height: 412 };
+const NARROW_LAPTOP = { width: 980, height: 800 };
+const JUST_UNDER = { width: 970, height: 800 };
 const LAPTOP = { width: 1440, height: 900 };
 const MIN = 60000;
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -55,7 +57,9 @@ const parts = (page: Page, who: string) =>
       const r = el!.getBoundingClientRect();
       return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width };
     };
-    return { panel: box(panel), name: box(panel.querySelector('p b')), lane: box(panel.querySelector('[class*="_lane_"]')) };
+    const time = panel.querySelector('[class*="_left_"]');
+    const words = panel.querySelector('[class*="_words_"]');
+    return { panel: box(panel), name: box(panel.querySelector('p b')), lane: box(panel.querySelector('[class*="_lane_"]')), time: time && box(time), words: words && box(words) };
   });
 
 /** How many hours the row of hours shows, from two of its names and where they stand. */
@@ -72,14 +76,20 @@ const windowHours = (page: Page) =>
     return (((b.min - a.min) % 1440) + 1440) % 1440 / 60 / ((b.at - a.at) / 100);
   });
 
-test('People: on an upright phone each person is a panel with the lane under the words across it, about six hours; sideways and on a laptop the lane stands beside the words and is 340px or more', async ({ deviceA: a, deviceB: b }) => {
+test('People: under 980px (an upright phone, sideways at 915, and 970) each person is a panel with the lane under the words across it; from 980px the words are a column beside the lane, 340px or more, with the time on the name\'s row at the column\'s end', async ({ deviceA: a, deviceB: b }) => {
   const [nameA, nameB] = [username('fa'), username('fb')];
   await person(a, nameA);
   await person(b, nameB);
   await room(a, b);
+  // A on a lap, so A's panel carries the time left.
+  await go(a.page, 'Focus');
+  await startButton(a.page).click();
   await go(a.page, 'Room');
 
   await a.page.setViewportSize(PHONE);
+  // On a lap, A moves to the top of the live order: measured once the panels have glided there.
+  await expect.poll(() => panels(a.page).first().textContent()).toContain('You');
+  await settle(a.page);
   for (const who of ['You', nameB]) {
     const p = await parts(a.page, who);
     expect(p.lane.width, `${who}'s lane at 412`).toBeGreaterThanOrEqual(300);
@@ -93,15 +103,37 @@ test('People: on an upright phone each person is a panel with the lane under the
   // Two panels, apart.
   const [first, second] = [await parts(a.page, 'You'), await parts(a.page, nameB)];
   expect(Math.min(Math.abs(second.panel.y - first.panel.bottom), Math.abs(first.panel.y - second.panel.bottom)), 'the panels touch').toBeGreaterThanOrEqual(7);
+  const phoneLane = first.lane.width;
 
-  for (const size of [SIDEWAYS, LAPTOP]) {
+  // Sideways at 915, and at 970 just under the switch: still stacked, the lane under the words and
+  // across the panel, much wider than upright.
+  for (const size of [SIDEWAYS, JUST_UNDER]) {
     await a.page.setViewportSize(size);
-    await a.page.waitForTimeout(300);
+    await settle(a.page);
+    for (const who of ['You', nameB]) {
+      const p = await parts(a.page, who);
+      expect(p.lane.y, `${who}'s lane is not under the words at ${size.width}`).toBeGreaterThanOrEqual(p.name.bottom - 1);
+      expect(p.lane.width, `${who}'s lane does not span the panel at ${size.width}`).toBeGreaterThanOrEqual(p.panel.width - 2 * 16 - 2);
+      expect(p.lane.width, `${who}'s lane at ${size.width} is not much wider than at 412`).toBeGreaterThan(phoneLane * 1.5);
+    }
+  }
+
+  // From 980: the words a column at the left, the lane beside it, the time at the end of the name's row.
+  for (const size of [NARROW_LAPTOP, LAPTOP]) {
+    await a.page.setViewportSize(size);
+    await settle(a.page);
     for (const who of ['You', nameB]) {
       const p = await parts(a.page, who);
       expect(p.lane.x, `${who}'s lane is not beside the words at ${size.width}`).toBeGreaterThanOrEqual(p.name.right - 1);
       expect(p.lane.width, `${who}'s lane at ${size.width}`).toBeGreaterThanOrEqual(340);
     }
+    const you = await parts(a.page, 'You');
+    expect(you.time, `no time on A's panel at ${size.width}`).not.toBeNull();
+    expect(you.words, `no words column at ${size.width}`).not.toBeNull();
+    expect(you.time!.y, `the time is under the name at ${size.width}`).toBeLessThan(you.name.bottom);
+    expect(you.time!.bottom, `the time is not on the name's row at ${size.width}`).toBeGreaterThan(you.name.y);
+    expect(Math.abs(you.time!.right - you.words!.right), `the time is not at the words column's right end at ${size.width}`).toBeLessThanOrEqual(2);
+    expect(you.lane.x, `the lane is not after the words column at ${size.width}`).toBeGreaterThanOrEqual(you.words!.right - 1);
   }
 });
 
