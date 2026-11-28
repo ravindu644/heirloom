@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clock, focus, result, ring } from './strings.ts';
+import { clock, focus, progress, result, ring } from './strings.ts';
 
 test('the long break is earned by four laps, and from the second of the day by four more', () => {
   assert.equal(result.set(4), 'Four laps. The long break is earned!');
@@ -33,4 +33,12 @@ test('a stop says how far the lap ran as the clock says it, and a break after mi
   assert.equal(focus.stopped(1, 120 * MIN), 'Lap 1 today stopped at 2h.');
   assert.equal(focus.stoppedAfter(2), 'Stopped after lap 2 today.');
   assert.equal(focus.stoppedAfter(0), "Stopped after yesterday's lap.");
+});
+
+test('a task in Estimates says the day it was done, so a repeating one done twice reads as two days', () => {
+  assert.equal(progress.doneOn('2026-11-28', '2026-11-28'), 'today');
+  assert.equal(progress.doneOn('2026-11-27', '2026-11-28'), 'yesterday');
+  assert.equal(progress.doneOn('2026-11-25', '2026-11-28'), 'Wed');
+  assert.equal(progress.doneOn('2026-11-12', '2026-11-28'), 'Thu 12 Nov');
+  assert.equal(progress.guesses([{ ratio: 1.3 }]), 'This week: 1.3.');
 });

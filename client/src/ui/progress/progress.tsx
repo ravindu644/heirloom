@@ -229,8 +229,12 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
           <ul class={css.tasks}>
             {estimates.tasks.map((task) => (
               <li key={task.id}>
-                <span>{task.title}</span>
-                <Laps laps={task.laps} estimate={task.estimate} of={s.today.of(task.estimate)} />
+                {/* The day it was done: a task that repeats is done under one name on many days. */}
+                <span>
+                  <span>{task.title}</span>
+                  <span class={css.line}>{s.progress.doneOn(task.day, today)}</span>
+                </span>
+                <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={s.today.of(task.estimate)} />
               </li>
             ))}
           </ul>

@@ -144,7 +144,7 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
               {look.done.map((task) => (
                 <li key={task.id}>
                   <span>{task.title}</span>
-                  <Laps laps={task.laps} estimate={task.estimate} of={s.today.of(task.estimate)} />
+                  <Laps laps={task.laps} squares={task.squares} estimate={task.estimate} of={s.today.of(task.estimate)} />
                 </li>
               ))}
             </ul>

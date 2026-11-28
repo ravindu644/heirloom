@@ -26,6 +26,8 @@ export interface DemoRecord {
   fill?: string[];
   projects?: 'usual' | 'long' | 'many' | 'none';
   estimates?: boolean;
+  /** Estimates for someone who has guessed only this week, with a task that repeats daily done twice and a lap stopped at 15 minutes. */
+  firstGuesses?: boolean;
   note?: string;
   /** False: today's timeline is plain laps, not the scripted one with a break, a lap set aside, a stopped lap and a pair on two devices. */
   scripted?: boolean;
@@ -157,16 +159,25 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   };
   const guesses: Estimates = record.estimates === false
     ? NO_GUESSES
-    : {
+    : record.firstGuesses
+      ? {
+          ratio: 1,
+          weeks: NO_GUESSES.weeks.map((week, i) => ({ ...week, ratio: i === 7 ? 1 : null })),
+          tasks: [
+            { id: 'm2', title: 'Morning routine', estimate: 1, laps: 1, squares: [0.6], day: DAY },
+            { id: 'm1', title: 'Morning routine', estimate: 1, laps: 1, squares: [1], day: '2026-11-23' },
+          ],
+        }
+      : {
         ratio: 1.3,
         // Eight weeks, getting closer; one with no task done that had a guess.
         weeks: [1.9, 1.7, 1.8, null, 1.5, 1.6, 1.4, 1.3].map((ratio, i) => ({ monday: addDays('2026-11-23', (i - 7) * 7), ratio })),
         tasks: [
-          { id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 },
-          { id: 'e1', title: 'K&R chapter 4: functions and program structure', estimate: 4, laps: 6 },
-          { id: 'e2', title: 'React: the tic-tac-toe tutorial', estimate: 3, laps: 3 },
-          { id: 'e3', title: 'Set up a C toolchain', estimate: 1, laps: 3 },
-          { id: 'e4', title: 'Lecture notes, week 9', estimate: 2, laps: 1 },
+          { id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2, squares: [1, 0.6], day: DAY },
+          { id: 'e1', title: 'K&R chapter 4: functions and program structure', estimate: 4, laps: 6, squares: [1, 1, 1, 1, 1, 1], day: '2026-11-20' },
+          { id: 'e2', title: 'React: the tic-tac-toe tutorial', estimate: 3, laps: 3, squares: [1, 1, 1], day: '2026-11-18' },
+          { id: 'e3', title: 'Set up a C toolchain', estimate: 1, laps: 3, squares: [1, 0.3, 1], day: '2026-11-13' },
+          { id: 'e4', title: 'Lecture notes, week 9', estimate: 2, laps: 1, squares: [1], day: '2026-11-03' },
         ],
       };
   const note = signal((record.note ?? '').slice(0, 280));
@@ -195,7 +206,8 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
       day: DAY,
       focus_ms: todayMin() * MIN + lapNow(),
       laps: Math.floor(todayMin() / 25),
-      done: todayMin() >= 50 ? [{ id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2 }] : [],
+      // Its second lap was stopped part way: drawn as full as it ran.
+      done: todayMin() >= 50 ? [{ id: 'maths', title: 'Discrete maths, tutorial sheet 6', estimate: 2, laps: 2, squares: [1, 0.6] }] : [],
       note: note.value,
     }),
     today: signal(DAY),

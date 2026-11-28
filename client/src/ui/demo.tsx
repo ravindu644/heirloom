@@ -320,6 +320,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-long-project': { ...week, about: 'A long project name, and time under no project', record: { projects: 'long' } },
   'progress-many-projects': { ...week, about: 'Nine rows by project', record: { projects: 'many' } },
   'progress-no-projects': { ...week, about: 'No projects and no estimates yet', record: { projects: 'none', estimates: false } },
+  'progress-first-guesses': { ...week, about: 'Estimates in the first week of guessing: the chart says this week only, a daily task done twice reads as two days, and a lap stopped at 15 minutes is a part square', record: { firstGuesses: true } },
 };
 
 // Habits: the empty screen first, then the mockup's five and one counted through the day.

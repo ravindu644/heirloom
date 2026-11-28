@@ -657,7 +657,16 @@ export const progress = {
   ratioFigure: (ratio: number) => ratio.toFixed(1),
   guessed: '1.0',
   thisWeek: 'this week',
-  guesses: (weeks: { ratio: number | null }[]) => `The last ${weeks.length} weeks, oldest first: ${weeks.map((week) => (week.ratio === null ? 'nothing to go by' : week.ratio.toFixed(1))).join(', ')}.`,
+  guesses: (weeks: { ratio: number | null }[]) =>
+    weeks.length === 1
+      ? `This week: ${weeks[0]!.ratio?.toFixed(1) ?? 'nothing to go by'}.`
+      : `The last ${weeks.length} weeks, oldest first: ${weeks.map((week) => (week.ratio === null ? 'nothing to go by' : week.ratio.toFixed(1))).join(', ')}.`,
+  /** The day a task in Estimates was done: "today", "yesterday", "Wed", "Thu 12 Nov". */
+  doneOn: (day: string, today: string) => {
+    const ago = Math.round((Date.parse(today) - Date.parse(day)) / (24 * 60 * MIN));
+    // A done stamp a little ahead (a fast clock, a new offset) is today, never last week's weekday.
+    return ago <= 0 ? 'today' : ago === 1 ? 'yesterday' : dated(day, ago < 7 ? { weekday: 'short' } : { weekday: 'short', day: 'numeric', month: 'short' });
+  },
   noEstimates: 'No estimate to check yet. Give a task an estimate, finish it, and this says how close it was.',
 
   dayTitle: (day: string, today: string) => (day === today ? 'Today, hour by hour' : `${dated(day, { weekday: 'long', day: 'numeric', month: 'long' })}, hour by hour`),
@@ -814,7 +823,7 @@ export const room = {
   callErrors: {
     call: 'Someone has just called a lap here. It is above.',
     bad_request: 'A lap is called 1 to 30 minutes ahead.',
-    slow_down: 'That is 6 calls today, the most there can be.',
+    slow_down: 'That is the most calls there can be today.',
   } as Record<string, string>,
   startedTogether: (at: number) => `You started this lap together at ${wall(at)}.`,
 

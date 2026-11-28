@@ -81,10 +81,14 @@ export function WeekChart({ week, today, target = 0, label, muted }: { week: Wee
  * line at one, where a task took what was guessed. A week with nothing to go by is a gap in the
  * line, never a zero; a week that stands alone is a dot.
  */
-export function Guesses({ weeks }: { weeks: { monday: string; ratio: number | null }[] }) {
+export function Guesses({ weeks: all }: { weeks: { monday: string; ratio: number | null }[] }) {
+  // The line starts at the first week with something to go by: a person whose first guess was
+  // this week is not shown seven empty weeks, and "from" never names a week before it. A week
+  // alone is this week, drawn at its end.
+  const weeks = all.slice(Math.max(0, all.findIndex((week) => week.ratio !== null)));
   const top = Math.max(2, ...weeks.map((week) => week.ratio ?? 0));
   const y = (ratio: number) => 1 - ratio / top;
-  const at = (i: number) => (i / Math.max(1, weeks.length - 1)) * 100;
+  const at = (i: number) => (weeks.length === 1 ? 100 : (i / (weeks.length - 1)) * 100);
   // The line breaks at every week without a ratio.
   const runs: [number, number][][] = [];
   weeks.forEach((week, i) => {
@@ -113,7 +117,7 @@ export function Guesses({ weeks }: { weeks: { monday: string; ratio: number | nu
         )}
       </div>
       <div class={css.days} aria-hidden="true">
-        <span class={css.start}>{s.progress.from(weeks[0]!.monday)}</span>
+        {weeks.length > 1 && <span class={css.start}>{s.progress.from(weeks[0]!.monday)}</span>}
         <span class={css.end}>{s.progress.thisWeek}</span>
       </div>
     </div>
