@@ -119,3 +119,6 @@ when it is done.
 - Progress: the year grid's caption ("Tuesday 24 November: 2h 27m, 7 laps") repeats the day panel's figure under it; the user's call whether one goes (stranger walk).
 - Day panel: folded earlier laps also hide the tasks done and check-ins among them, and the fold link names only laps (code review, nit).
 - Day panel: the bar names a day more than a week back by its weekday only ("25 minutes off Tuesday"); use the short date as doneOn does (code review, nit).
+- Habits: a counted habit keeps its fold arrow at full count while the heading counts it done; A2's filled box would say done there (stranger walk, nit, A1 chosen).
+- Today: the Next card can show two "2 of 4" on one line (subtasks and laps); a task ticked with subtasks open says nothing of them; the sheet never says subtasks move by press and hold (stranger walk, nits).
+- e2e first-hour "reduced motion: Escape or Close on a habit's sheet hands the focus back to its row" fails about once a full run under load and passes alone (flaky).
