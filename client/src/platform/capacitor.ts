@@ -8,6 +8,7 @@ import { App } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import type { TimerState } from '../core/timer.ts';
+import type { Theme } from '../sync/settings.ts';
 import { MOMENT_MS, isPaused } from './notifier.ts';
 import type { Act, Call, Keep, Notifier, Paused, Ring, Timer } from './notifier.ts';
 import { AHEAD_DAYS, MAX_DUE, isReminderId, upcoming } from './reminders.ts';
@@ -298,11 +299,32 @@ export function whenResumed(app: { addListener(event: 'resume', run: () => void)
 
 export const onFront = whenResumed(App);
 
+// The page's own calls to the plugin, beside the Notifier's. Registered once: Capacitor warns on a second.
+interface CountdownPlugin extends Countdown {
+  addListener(event: 'action', heard: (data: { act: string; run?: string | null }) => void): Promise<unknown>;
+  addListener(event: 'open', heard: () => void): Promise<unknown>;
+  night(options: { theme: Theme }): Promise<void>;
+}
+let registered: CountdownPlugin | undefined;
+const plugin = (): CountdownPlugin => (registered ??= registerPlugin<CountdownPlugin>('Countdown'));
+
+let told: Theme | undefined;
+/** Settings' "Light or dark" for the native parts: the bars' icons and the activity (MainActivity.night). */
+export function setNight(theme: Theme): void {
+  if (theme === told) return;
+  told = theme;
+  plugin().night({ theme }).catch((error: unknown) => {
+    // An older app without the method: the bars follow the system, as before.
+    told = undefined;
+    console.warn('heirloom: night', error);
+  });
+}
+
 /** The phone's notifier, on the real plugins. */
 export function capacitorNotifier(channels: Channels): Notifier {
   // Only for a bell Android cannot give: Capacitor's WebView plays audio without a gesture.
   const bell = bellOnDemand(() => new AudioContext(), timer);
-  const countdown = registerPlugin<Countdown & { addListener(event: 'open', heard: () => void): Promise<unknown> }>('Countdown');
+  const countdown = plugin();
   // A room's note or call in the shade opens the Room.
   void countdown.addListener('open', () => (location.hash = '#/room'));
   return createCapacitorNotifier({

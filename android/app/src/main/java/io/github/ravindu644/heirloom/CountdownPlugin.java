@@ -129,6 +129,17 @@ public class CountdownPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Settings' "Light or dark": { theme: system, light or dark }, for the bars and the activity (MainActivity.night). */
+    @PluginMethod
+    public void night(PluginCall call) {
+        String theme = call.getString("theme", "system");
+        getBridge().executeOnMainThread(() -> {
+            // While the app is closing there is no activity to theme; the page sends it again at the next start.
+            if (getActivity() instanceof MainActivity activity) activity.night(theme);
+            call.resolve();
+        });
+    }
+
     /** Whether Android lets heirloom run in the background unrestricted: out of battery optimisation. */
     @PluginMethod
     public void background(PluginCall call) {

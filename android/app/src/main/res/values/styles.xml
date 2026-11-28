@@ -8,6 +8,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- The page's own ground, light or dark as the activity is: behind the bars below API 35,
+             and what shows before the WebView's first paint, so neither is a different grey. -->
+        <item name="android:windowBackground">@color/ground</item>
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">

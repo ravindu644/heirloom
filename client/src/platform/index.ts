@@ -1,8 +1,9 @@
-// The one door to the platform for main.tsx: the right Notifier, the back button on the phone, and
-// a way to hear that the app is in front again.
+// The one door to the platform for main.tsx: the right Notifier, the back button on the phone, the
+// theme for the phone's bars, and a way to hear that the app is in front again.
 
 import type { Channels } from './capacitor.ts';
 import type { Notifier } from './notifier.ts';
+import type { Theme } from '../sync/settings.ts';
 import { webNotifier, whenVisible } from './web.ts';
 import type { PushFrom } from './web.ts';
 
@@ -30,4 +31,13 @@ export async function startPlatform(channels: Channels, push?: PushFrom): Promis
 export function onFront(run: () => void): void {
   if (!native) return whenVisible(document)(run);
   void import('./capacitor.ts').then((phone) => phone.onFront(run));
+}
+
+/**
+ * Light or dark for what the page does not draw: on the phone, the status and navigation bars and
+ * the activity around the WebView. The page sets its own `data-theme`. Call at start and on every
+ * change; the same theme twice does nothing. The browser has nothing else to set.
+ */
+export function setNight(theme: Theme): void {
+  if (native) void import('./capacitor.ts').then((phone) => phone.setNight(theme));
 }
