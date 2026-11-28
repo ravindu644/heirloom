@@ -67,6 +67,8 @@ const lapRows = (day: ReturnType<Page['locator']>) => day.getByRole('listitem').
 const splits = (day: ReturnType<Page['locator']>) => lapRows(day).locator('[class*="_split_"]').allInnerTexts().then((all) => all.map((t) => t.trim()));
 /** The day's focus at the top of the panel. */
 const figure = (day: ReturnType<Page['locator']>) => day.locator('[class*="_big_"] b');
+/** To the nearest minute, as the day panel shows a clock time. */
+const near = (ms: number) => Math.round(ms / MIN) * MIN;
 const wall = (ms: number) => {
   const at = new Date(ms);
   return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
@@ -197,17 +199,21 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(lapRows(panel(a.page, 'Today, lap by lap'))).toHaveCount(1);
 });
 
-test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done at its time and no habit check-in; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
+test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done between laps is a quiet row, one done in a lap or in its break is that lap\'s "Task done."; no habit check-in; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   const start = Date.now() - 2 * HOUR;
   let pair: string[] = [];
   const { name } = await seeded([a, b], 'pday', (node) => {
     laps(node, [{ started: start, outcome: 'void' }]);
     laps(node, [{ started: start + 30 * MIN, ms: 12 * MIN, outcome: 'stopped' }]);
-    // Between the stopped lap and the pair: a task done.
+    // Between the stopped lap and the pair, in no lap and no break: a task done.
     node.engine.write('task', 'essay', { title: 'essay outline', order: 'V', done: start + 45 * MIN });
     // The same 25 minutes, 10 of them shared, on this device and another.
     pair = laps(node, [{ started: start + 50 * MIN }, { started: start + 65 * MIN, device: 'abcdef0123456789' }]);
+    // One task finished inside the first of the pair, another in the break after the second.
+    node.engine.write('task', 'notes', { title: 'reading notes', order: 'W', done: start + 55 * MIN });
+    laps(node, [{ started: start + 90 * MIN, ms: 5 * MIN, kind: 'short' }]);
+    node.engine.write('task', 'mail', { title: 'reply to Sam', order: 'X', done: start + 92 * MIN });
     // After the pair: a habit checked in.
     node.engine.write('habit', 'walk', { title: 'walk after lunch', days: 127, target: 1, order: 'V' });
     node.engine.write('checkin', 'c1', { habit: 'walk', day: today(), at: start + 100 * MIN });
@@ -223,8 +229,13 @@ test('today, lap by lap: each counted lap\'s Day so far is the running total and
   expect(texts[0]).toContain('25 minutes');
   expect(texts[1]).toContain('Stopped lap');
   expect(texts[1]).toContain('12 minutes');
-  expect(texts[2]).toBe(`${wall(start + 45 * MIN)} Done: essay outline`);
+  // Done outside any lap: a quiet row, at its time to the nearest minute.
+  expect(texts[2]).toBe(`essay outline done at ${wall(near(start + 45 * MIN))}`);
   for (const i of [3, 4]) expect(texts[i]).toContain('ran on two devices');
+  // Done in a lap, or in the break after it: that lap's, at the end of its facts, and no row of its own.
+  for (const i of [3, 4]) expect(texts[i]).toMatch(/\. Task done\.( |$)/);
+  for (const i of [0, 1]) expect(texts[i]).not.toContain('Task done.');
+  await expect(day(a.page).getByText(/reading notes|reply to Sam/)).toHaveCount(0);
   await expect(day(a.page).getByText('walk after lunch')).toHaveCount(0);
 
   // Day so far: none for the lap not counted, then 12, 12 + 25, and the second of the pair adds
@@ -261,7 +272,7 @@ test('today, lap by lap: each counted lap\'s Day so far is the running total and
   await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);
 });
 
-test('a lap across midnight: today shows only its part after 00:00, with its real times, and says where its first minutes count', async ({ deviceA: a }) => {
+test('a lap across midnight: today shows only its part after 00:00, its facts "23:50 <weekday> to 00:15, 15 of 25 minutes today"', async ({ deviceA: a }) => {
   const since = Date.now() - midnight(today());
   test.skip(since < 30 * MIN, 'the lap across midnight must have ended before now');
   // From 23:50 last night to 00:15: ten minutes yesterday, fifteen today.
@@ -270,12 +281,27 @@ test('a lap across midnight: today shows only its part after 00:00, with its rea
   const day = panel(a.page, 'Today, lap by lap');
   const row = lapRows(day);
   await expect(row).toHaveCount(1);
-  const weekday = new Date(`${back(1)}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
-  await expect(row).toContainText(`${wall(started)} to ${wall(started + LAP)}`);
-  await expect(row).toContainText('15 minutes today');
-  await expect(row).toContainText(`Began on ${weekday}. Its first 10 minutes count there.`);
+  const weekday = new Date(`${back(1)}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  await expect(row).toContainText(`${wall(started)} ${weekday} to ${wall(started + LAP)}, 15 of 25 minutes today`);
+  await expect(row).not.toContainText('Began on');
   await expect.poll(() => splits(day)).toEqual(['15m']);
   await expect(figure(day)).toHaveText('15m');
+});
+
+test('a lap\'s minutes, its step in Day so far and the figure at the top agree: 15 m 30 s from hh:mm:20 shows hh:mm to hh:mm+16, 16 minutes, and the next lap of 10 adds 10', async ({ deviceA: a }) => {
+  test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
+  // A whole minute an hour back, then 20 s into it: the start rounds down, the end (at :50) up.
+  const minute = Math.floor((Date.now() - HOUR) / MIN) * MIN;
+  const first = minute + 20 * 1000;
+  const second = minute + 30 * MIN + 40 * 1000;
+  await seeded([a], 'pround', (node) => laps(node, [{ started: first, ms: 15.5 * MIN }, { started: second, ms: 10 * MIN }]));
+  const day = panel(a.page, 'Today, lap by lap');
+  await expect(lapRows(day)).toHaveCount(2);
+  await expect(lapRows(day).nth(0)).toContainText(`${wall(minute)} to ${wall(minute + 16 * MIN)}, 16 minutes`);
+  await expect(lapRows(day).nth(1)).toContainText(`${wall(minute + 31 * MIN)} to ${wall(minute + 41 * MIN)}, 10 minutes`);
+  // Each split is the day's focus so far rounded to the nearest minute, as the row's own minutes are, and the figure is the last.
+  await expect.poll(() => splits(day)).toEqual(['16m', '26m']);
+  await expect(figure(day)).toHaveText('26m');
 });
 
 test('the look back: a line typed key by key is saved with no button, shows on B, and is there after a reload offline', async ({ deviceA: a, deviceB: b }) => {
