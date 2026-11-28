@@ -11,7 +11,10 @@
 .plain { padding-left: var(--space-md); }
 .plain .open { left: calc(var(--space-md) * -1); }
 /* The one to start next. Drawn inside the row, so it takes no room and moves nothing. */
-.next { --row-ring: inset 0 0 0 2px var(--you); box-shadow: var(--row-ring); }
+.next { --row-ring: inset 0 0 0 2px var(--you); position: relative; }
+/* Drawn over what the card holds: an open subtask band paints its rows to the card's edge, and
+   with the ring on the card itself those rows cut two notches out of it. */
+.next::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: var(--row-ring); pointer-events: none; }
 
 .words {
   /* A line that breaks: the title; under it the project's line; and at the right end of the
