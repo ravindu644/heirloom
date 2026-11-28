@@ -152,6 +152,21 @@ describe('settings', () => {
     }
   });
 
+  it('the theme is this device\'s: system by default, in no cell, kept across a restart; anything else held reads as system', async () => {
+    const { w, d, s } = await one();
+    assert.equal(s.theme.value, 'system');
+    s.setTheme('dark');
+    assert.equal(s.theme.value, 'dark');
+    await d.engine.saved();
+    assert.deepEqual(d.engine.cells(), []);
+    const again = await w.restart(d);
+    assert.equal(again.settings.theme.value, 'dark');
+    again.engine.keep('theme', 'purple', 'device');
+    await again.engine.saved();
+    const junk = await w.restart(again);
+    assert.equal(junk.settings.theme.value, 'system');
+  });
+
   it('"ring here" is this device\'s: on by default, in no cell, kept across a restart and across a sign out', async () => {
     const { w, d, s } = await one();
     assert.equal(s.ringHere.value, true);

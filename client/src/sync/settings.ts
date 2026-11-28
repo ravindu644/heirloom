@@ -40,6 +40,9 @@ export interface SettingsView {
   rest_days: number;
 }
 
+/** Light or dark, or as the system has it. Per device, like `ringHere`. */
+export type Theme = 'system' | 'light' | 'dark';
+
 export interface Settings {
   readonly all: ReadonlySignal<SettingsView>;
   /** Writes the fields given; values outside the schema are refused whole, nothing written. True when written. */
@@ -56,6 +59,9 @@ export interface Settings {
   /** The phone plays the bell as an alarm, through Mute. Per device like `ringHere`: on unless switched off. */
   readonly ringOnSilent: ReadonlySignal<boolean>;
   setRingOnSilent(on: boolean): void;
+  /** Light or dark on this device, kept locally, never synced. `system` unless set; anything else held reads as `system`. */
+  readonly theme: ReadonlySignal<Theme>;
+  setTheme(theme: Theme): void;
   /**
    * The marks earned by the latest thing that happened on this device, oldest first, for the
    * moment that follows it; empty when celebrations are off. Each mark is given once: `seen()`
@@ -130,6 +136,8 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
   const [keepInStep, setKeepInStep] = local('keep_in_step');
   const [vibrate, setVibrate] = local('vibrate');
   const [ringOnSilent, setRingOnSilent] = local('ring_on_silent');
+  const asTheme = (value: unknown): Theme => (value === 'light' || value === 'dark' ? value : 'system');
+  const theme = signal(asTheme(engine.kept('theme', 'device')));
 
   // What has been achieved, from the sessions and from the tasks. Each is worked out again only
   // when its own rows change, and not at all while celebrations are off: nothing reads them then.
@@ -195,6 +203,11 @@ export function createSettings(engine: Engine, env: SettingsEnv): Settings & { c
     setVibrate,
     ringOnSilent,
     setRingOnSilent,
+    theme,
+    setTheme(value) {
+      theme.value = asTheme(value);
+      engine.keep('theme', theme.value, 'device');
+    },
 
     marks,
     seen() {
