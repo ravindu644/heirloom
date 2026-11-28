@@ -156,6 +156,42 @@ export async function seed(addr = '127.0.0.1:8799') {
   checkin('water', today, '12:05', 2);
   checkin('water', today, '16:10', 3);
   checkin('read', today, '08:40');
+
+  // The months before, so the year grid has a year in it: from late April, school weeks with a
+  // dip in August and a run up to October's exams. Its own random sequence, and laps written
+  // straight, so every number in the five weeks above stays as it was. Lighter than those weeks,
+  // so the bests stay theirs.
+  let oldState = 20260501;
+  const old = () => {
+    oldState = (oldState + 0x6d2b79f5) | 0;
+    let t = Math.imul(oldState ^ (oldState >>> 15), 1 | oldState);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const earlier = [
+    { id: 'bio1', title: 'Biology: cells and tissues', project: 'study', done: 170 },
+    { id: 'summer', title: 'Summer reading list', project: 'study', done: 110 },
+    { id: 'chem', title: 'Chemistry revision', project: 'study', done: 75 },
+    { id: 'mock', title: 'Mock exam papers', project: 'study', done: 40 },
+  ];
+  earlier.forEach((t, i) => m.write('task', t.id, { title: t.title, project: t.project, estimate: 3, done: at(back(t.done), '17:00'), order: `Q${i}` }));
+  // A lap belongs to the task finished soonest after its day.
+  const oldTask = (n: number) => earlier.filter((t) => t.done < n).sort((x, y) => y.done - x.done)[0]?.id ?? 'read2';
+  for (let n = 215; n >= 36; n--) {
+    const day = back(n);
+    const wd = weekday(day);
+    const holiday = n > 95 && n < 125; // August
+    const exams = n > 45 && n < 70;
+    const off = wd === 6 ? 0.7 : holiday ? 0.55 : wd === 5 ? 0.35 : 0.1;
+    if (old() < off) continue;
+    const most = holiday ? 2 : exams ? 6 : wd < 5 ? 5 : 3;
+    const laps = 1 + Math.floor(old() * most);
+    let t = at(day, ['08:50', '09:30', '14:00', '16:30'][Math.floor(old() * 4)]!);
+    for (let k = 0; k < laps; k++) {
+      lap(maya, t, old() < 0.85 ? oldTask(n) : null);
+      t += LAP + 5 * MIN + Math.floor(old() * 20) * MIN;
+    }
+  }
   await sent(maya, "maya's history");
 
   // The friends, each with a week of laps and a day of them at their own hours, and what they are doing now.

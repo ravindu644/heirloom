@@ -105,6 +105,13 @@ try {
     document.querySelector('main')!.scrollTop -= 16;
   });
   await shot(page, '03b-progress-day');
+  // The year: the grid of every day since the first lap, at the top of the screen.
+  const since = page.getByRole('heading', { name: 'Since your first lap' });
+  await since.evaluate((el) => {
+    el.closest('section')!.scrollIntoView({ block: 'start' });
+    document.querySelector('main')!.scrollTop -= 16;
+  });
+  await shot(page, '07-year');
 
   await go('Habits');
   await page.getByRole('button', { name: /^Today's times/ }).first().click();

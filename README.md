@@ -39,7 +39,7 @@ No friend with a server? [Run your own](docs/DEPLOY.md): one file for Linux on x
     <td width="25%" align="center"><img src="docs/resources/readme/04-habits.png" width="100%"><br>Habits, a few times a day</td>
     <td width="25%" align="center"><img src="docs/resources/readme/05-room.png" width="100%"><br>Room</td>
     <td width="25%" align="center"><img src="docs/resources/readme/06-welcome.png" width="100%"><br>Welcome</td>
-    <td width="25%"></td>
+    <td width="25%" align="center"><img src="docs/resources/readme/07-year.png" width="100%"><br>Every day since the first lap</td>
   </tr>
 </table>
 
