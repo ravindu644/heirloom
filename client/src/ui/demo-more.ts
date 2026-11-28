@@ -12,7 +12,7 @@ import type { InviteView, Invites } from '../sync/invites.ts';
 import type { ResetView, Resets } from '../sync/resets.ts';
 import type { MemberView, RoomResult, RoomView, Rooms } from '../sync/rooms.ts';
 import type { ServerChoice, ServerRefusal } from '../sync/server.ts';
-import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
+import type { Mark, Settings, SettingsView, Theme } from '../sync/settings.ts';
 import { DAY } from './demo-today.ts';
 
 const MIN = 60000;
@@ -439,7 +439,7 @@ export function demoRooms(seed: DemoRoom, now: () => number, prefs: { all: { val
   };
 }
 
-export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settings {
+export function demoSettings(seed: Partial<SettingsView>, marks: Mark[], picked: Theme = 'system'): Settings {
   const all = signal<SettingsView>({
     work_ms: 25 * MIN,
     short_ms: 5 * MIN,
@@ -458,6 +458,7 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
   const keepInStep = signal(true);
   const vibrate = signal(true);
   const ringOnSilent = signal(true);
+  const theme = signal<Theme>(picked);
   const shown = signal(marks);
   return {
     all,
@@ -473,6 +474,8 @@ export function demoSettings(seed: Partial<SettingsView>, marks: Mark[]): Settin
     setVibrate: (on) => void (vibrate.value = on),
     ringOnSilent,
     setRingOnSilent: (on) => void (ringOnSilent.value = on),
+    theme,
+    setTheme: (value) => void (theme.value = value),
     marks: computed(() => (all.value.celebrate ? shown.value : [])),
     seen: () => void (shown.value = []),
     exportAll: () => JSON.stringify({ heirloom: 1, exported: Date.now(), account: 'ravi', cells: [] }),

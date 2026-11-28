@@ -143,6 +143,19 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
     await sendPicture(bytes);
   };
 
+  // Light or dark, each device its own; the choice is put on the page where the app starts.
+  const themePanel = (
+    <Panel title={s.settings.theme}>
+      <div class={cx(form.choices, form.share)} role="group" aria-label={s.settings.theme}>
+        {(['system', 'light', 'dark'] as const).map((theme) => (
+          <button key={theme} type="button" class={form.choice} aria-pressed={settings.theme.value === theme} onClick={() => settings.setTheme(theme)}>
+            {s.settings.themes[theme]}
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+
   const accountPanel = (
     <Panel title={s.settings.account}>
       <Person name={account.username} picture={mine} pending={!made && shown === undefined} />
@@ -329,6 +342,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
           <div class={css.col}>{timer}</div>
           <div class={css.col}>
             {accountPanel}
+            {themePanel}
             {people}
             {rest}
           </div>
@@ -336,6 +350,7 @@ export function Settings({ engine, settings, invites, admins, resets, rooms, ser
       ) : (
         <>
           {accountPanel}
+          {themePanel}
           {timer}
           {people}
           {rest}

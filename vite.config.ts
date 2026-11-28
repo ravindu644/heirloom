@@ -14,9 +14,11 @@ const offline = (): Plugin => ({
   apply: 'build',
   enforce: 'post',
   generateBundle(_, bundle) {
-    const files = ['/', ...Object.keys(bundle).filter((f) => f !== 'index.html').map((f) => `/${f}`)];
+    // theme.js is a public file, so not in the bundle: kept too, or an offline start would lose the theme.
+    const files = ['/', '/theme.js', ...Object.keys(bundle).filter((f) => f !== 'index.html').map((f) => `/${f}`)];
     // The names carry content hashes, so the list changes exactly when the app does.
-    const version = createHash('sha256').update(files.join()).digest('hex').slice(0, 12);
+    // theme.js keeps its name across changes, so its contents go into the version too.
+    const version = createHash('sha256').update(files.join()).update(readFileSync(new URL('./client/public/theme.js', import.meta.url))).digest('hex').slice(0, 12);
     this.emitFile({
       type: 'asset',
       fileName: 'sw.js',

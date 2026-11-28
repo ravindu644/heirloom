@@ -4,7 +4,7 @@
 // up, and the buttons work. Its own few words are for us, so they are not in strings.ts.
 
 import { render } from 'preact';
-import { signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import { GONE } from '../core/real.ts';
 import { IDLE, act, view } from '../core/timer.ts';
 import type { Phase, TimerState } from '../core/timer.ts';
@@ -21,7 +21,8 @@ import type { Progress } from '../sync/progress.ts';
 import type { Habits } from '../sync/habits.ts';
 import type { Rooms } from '../sync/rooms.ts';
 import { cheerKey } from './room/room.tsx';
-import type { Mark, Settings, SettingsView } from '../sync/settings.ts';
+import type { Mark, Settings, SettingsView, Theme } from '../sync/settings.ts';
+import { applyTheme } from './theme.ts';
 import { GMAIL, HABITS, MANY_HABITS, demoAdmins, demoHabits, demoInvites, demoResets, demoRooms, demoServer, demoSettings } from './demo-more.ts';
 import type { DemoHabit, DemoRoom, DemoRooms, DemoServer } from './demo-more.ts';
 import type { Admins } from '../sync/admins.ts';
@@ -77,6 +78,8 @@ interface Scene {
   cheered?: string[];
   /** As the phone app is: a file cannot be saved from here. */
   phoneApp?: boolean;
+  /** Light or dark picked on this device, over the system's. */
+  theme?: Theme;
   /** The device will not let heirloom notify. */
   ringBlocked?: boolean;
   /** The phone app, where Android may still stop heirloom in the background to save battery. */
@@ -452,6 +455,10 @@ const MORE: Record<string, Scene> = {
   'settings-phone-app': { ...idleAt2, about: 'Settings in the phone app, where a copy cannot be saved to a file', settings: true, day: day(), phoneApp: true },
   'settings-phone-asleep': { ...idleAt2, about: 'Settings in the phone app while Android may stop heirloom in the background: the way to let it run, under the bell', settings: true, day: day(), phoneApp: true, mayStop: true },
   'settings-phone-ring-off': { ...idleAt2, about: 'The phone app with Ring here off: vibrate, ring on silent and ring when closed have nothing to ring and take no press, and the battery link goes with it', settings: true, day: day(), phoneApp: true, mayStop: true, tap: 'Ring on this' },
+  'settings-theme-light': { ...idleAt2, about: 'Light picked on this device', settings: true, day: day(), theme: 'light' },
+  'settings-theme-dark': { ...idleAt2, about: 'Dark picked on this device: the whole page is dark on a light system', settings: true, day: day(), theme: 'dark' },
+  'settings-theme-system': { ...idleAt2, about: 'System, the default: the page follows the device', settings: true, day: day(), theme: 'system' },
+  'today-dark': { ...idleAt2, about: 'Today with Dark picked, on a light system: every colour from the dark set', day: day(), today: true, theme: 'dark' },
   'settings-rest-one': { ...idleAt2, about: 'Settings with Sunday pinned as a rest day: the other six can still be chosen', settings: true, day: day(), prefs: { rest_days: 64 } },
   'settings-rest-two': { ...idleAt2, about: 'Settings with Saturday and Sunday pinned: the other five take no press', settings: true, day: day(), prefs: { rest_days: 96 } },
   'mark-first': { about: 'The first lap ever: its mark, under the result', run: { phase: 'work', lap: 0, left: 0 }, you: 0, laps: 0, marks: [{ key: 'laps-1', kind: 'laps', tier: 1 }] },
@@ -775,7 +782,9 @@ function stage(scene: Scene): { engine: Engine; focus: Focus; today: Today; prog
     resetUse: (reset, password) => (reset === 'dead' ? Promise.resolve({ ok: false, error: 'reset' }) : answer('sachi', password)),
   };
   const progress = demoProgress(scene.record ?? {}, () => (lapOpen() ? ran() : 0));
-  const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? []);
+  const settings = demoSettings(scene.prefs ?? {}, scene.marks ?? [], scene.theme);
+  // The page follows the pick, as main.tsx has it follow the real one.
+  effect(() => applyTheme(settings.theme.value, false));
   const habits = demoHabits(scene.habits ?? HABITS, now);
   const rooms = demoRooms({ ...scene.room, cheered: scene.cheered }, now, settings);
   // Cheers on your lap were shown arriving before, but in the state made to show one arriving.

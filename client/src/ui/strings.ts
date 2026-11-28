@@ -315,6 +315,9 @@ export const settings = {
   targetMore: 'One lap more',
 
   bell: 'The bell',
+  // Each device its own: a laptop can stay dark while the phone follows its system.
+  theme: 'Light or dark',
+  themes: { system: 'System', light: 'Light', dark: 'Dark' },
   // The three bells, as tools/bells.mjs draws them; a tap picks one and plays it once.
   sounds: { school: 'School bell', struck: 'Struck bell', chime: 'Soft chime' },
   ringHere: (device: string) => `Ring on this ${device}`,

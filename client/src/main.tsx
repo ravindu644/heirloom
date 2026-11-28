@@ -1,7 +1,7 @@
 import './old-browsers.ts';
 import { computed, effect, signal, untracked } from '@preact/signals-core';
 import { render } from 'preact';
-import { onFront, startPlatform } from './platform/index.ts';
+import { onFront, setNight, startPlatform } from './platform/index.ts';
 import { heldTaps, isPaused } from './platform/notifier.ts';
 import { serverChoice, startApp } from './sync/browser.ts';
 import type { Focus } from './sync/focus.ts';
@@ -9,8 +9,13 @@ import { App, Elsewhere } from './ui/app.tsx';
 import { FirstRun } from './ui/welcome.tsx';
 import { planFor } from './plan.ts';
 import { clock, result, ring, room } from './ui/strings.ts';
+import { applyTheme, keptTheme } from './ui/theme.ts';
 
 const root = document.getElementById('app')!;
+// The theme this device picked, before anything is drawn: a reload or a cold start never shows the
+// other one for a frame while the engine loads. The engine's kept choice takes over once it is up.
+applyTheme(keptTheme());
+setNight(keptTheme());
 
 // The phone app (`make apk`) is another origin from its server and asks which one. In a browser
 // the server is the page's own and nothing asks.
@@ -82,6 +87,12 @@ async function start() {
   // "Ring here" is this device's own switch; and the notifier is told who is signed in, so a
   // sign out stops this browser being pushed to.
   effect(() => notifier.ringHere(settings.ringHere.value));
+  // The page, the browser's bar and, in the phone app, Android's own night mode and status bar.
+  effect(() => {
+    const theme = settings.theme.value;
+    applyTheme(theme);
+    setNight(theme);
+  });
   effect(() => notifier.account(engine.account.value ? 'in' : 'out'));
   // A closed tab's bell is worded by the server from what it was last sent: send again when
   // the lengths change, in Settings or with the task the lap is on, or a push would say
