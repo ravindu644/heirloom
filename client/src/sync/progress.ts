@@ -10,8 +10,6 @@ import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
-import { asCheckIn, asHabit, fillRounds } from '../core/habits.ts';
-import type { CheckIn } from '../core/habits.ts';
 import { asTask, squares } from '../core/today.ts';
 import { IDLE } from '../core/timer.ts';
 import type { Task } from '../core/today.ts';
@@ -75,7 +73,7 @@ export interface TimelineEntry {
 }
 
 /** A moment of the day: a task done (`id` is the task's), or a habit checked in (`id` is the check-in's, `title` the habit's). */
-export type Moment = { kind: 'done'; id: string; at: number; title: string } | { kind: 'checkin'; id: string; habit: string; at: number; title: string };
+export type Moment = { kind: 'done'; id: string; at: number; title: string };
 
 export interface DayView {
   day: string;
@@ -181,27 +179,12 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     return (project && projects.value.get(project)) || null;
   };
 
-  // The day's moments by local day, worked out again when a task, a habit or a check-in changes:
-  // tasks done (top level, not deleted) and live check-ins of a habit that is still there.
+  // The day's moments by local day, worked out again when a task changes: tasks done (top level,
+  // not deleted). Habits are not in it: the user found check-ins clutter a day of laps.
   const moments = computed(() => {
     const byDay = new Map<string, Moment[]>();
     const add = (moment: Moment, day = localDay(moment.at, offset())) => (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(moment);
     for (const t of tasks.value.values()) if (t.parent === null && t.deleted === null && t.done !== null) add({ kind: 'done', id: t.id, at: t.done, title: t.title });
-    // A check-in shows as Habits counts it, on the day it counts for and only when it fills a
-    // round, so a round ticked on two devices, or a tap past the target, is not said twice.
-    const habits = engine.rows('habit').value;
-    const live = new Map<string, CheckIn[]>();
-    for (const [id, row] of engine.rows('checkin').value) {
-      const c = asCheckIn(id, row);
-      const key = c && `${c.habit} ${c.day}`;
-      if (c && key) (live.get(key) ?? live.set(key, []).get(key)!).push(c);
-    }
-    for (const list of live.values()) {
-      const held = habits.get(list[0]!.habit);
-      const habit = held && asHabit(list[0]!.habit, held);
-      if (habit && habit.deleted === null)
-        for (const c of fillRounds(list, habit.target)) if (c) add({ kind: 'checkin', id: c.id, habit: habit.id, at: c.at, title: habit.title }, c.day);
-    }
     return byDay;
   });
 

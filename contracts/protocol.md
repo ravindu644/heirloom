@@ -598,7 +598,7 @@ the day already covered, so two at once count once), and `split_ms`, the day's f
 added: the last `split_ms` is the day's `focus_ms`. A lap not counted and a break carry 0 for
 `day_ms` and no `split_ms`. The lap in progress is the last entry, counted to now. With the
 sessions come the day's moments, each with its time: a task done (its `done` that day, not
-deleted) and a habit check-in (live, its `at` that day), in time order among the sessions.
+deleted), in time order among the sessions. Habit check-ins are not among them.
 
 **Setting a lap aside from the timeline** writes `outcome: void` on its row. Counting it again
 writes back what it was, which the row itself says: `rang` if it ran its whole plan

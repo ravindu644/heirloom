@@ -594,7 +594,7 @@ Built once in `client/src/ui/kit/` and reused.
   the figure at the top (a lap not counted has none; two laps that ran at once add only what
   the second added). A lap across midnight says, under its words, "Began on Friday. Its first
   14 minutes count there." (not counted, only "Began on Friday."). Breaks are only on the slivers. Quiet one-line `label` rows at their
-  time: "11:19  Done: Morning routine", "13:05  Checked in: Walk after lunch". The lap in
+  time: "11:19  Done: Morning routine" (habits are not here: a day of laps is not a log of check-ins). The lap in
   progress is the last row, its split and sliver growing. Five latest laps show; one link over them says how many more and what
   they gave, naming any not counted ("4 earlier laps, 1 not counted, 1h 15m"), and opens them in
   place, then reads "Show only the latest 5 laps".

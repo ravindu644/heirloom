@@ -37,7 +37,7 @@ export interface DemoRecord {
   rest?: number;
   /** A lap from 23:46 the day before to 00:32 today, on both days' timelines. */
   midnight?: boolean;
-  /** Today as one of two written days: the user's own (a lap from before midnight, a break, a stopped lap, a task done) or a full one (nine laps, one not counted, tasks done, a habit checked in). */
+  /** Today as one of two written days: the user's own (a lap from before midnight, a break, a stopped lap, a task done) or a full one (nine laps, one not counted, tasks done). */
   script?: 'real' | 'full' | 'long';
 }
 
@@ -270,7 +270,6 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
       ],
       moments: [
         { kind: 'done', id: 'ttt', at: at(DAY, 11, 26), title: 'Tic-tac-toe in React' },
-        { kind: 'checkin', id: 'walk-1', habit: 'walk', at: at(DAY, 13, 5), title: 'Walk after lunch' },
         { kind: 'done', id: 'notes', at: at(DAY, 15, 36), title: 'Lecture notes, week 10' },
       ],
     },

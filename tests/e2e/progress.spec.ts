@@ -61,7 +61,7 @@ async function seeded(devices: Device[], tag: string, seed: (node: Node) => void
 const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 const panel = (page: Page, title: string | RegExp) => page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 2 }) });
 const words = (locator: ReturnType<Page['locator']>) => locator.innerText().then((text) => text.replace(/\s+/g, ' ').trim());
-/** A lap's row in a day, lap by lap: every lap's row has a "Day so far" cell, empty when it is not counted; a task done or a check-in has none. */
+/** A lap's row in a day, lap by lap: every lap's row has a "Day so far" cell, empty when it is not counted; a task done has none. */
 const lapRows = (day: ReturnType<Page['locator']>) => day.getByRole('listitem').filter({ has: day.page().locator('[class*="_split_"]') });
 /** The "Day so far" of each lap row shown, top to bottom: '' for a lap not counted. */
 const splits = (day: ReturnType<Page['locator']>) => lapRows(day).locator('[class*="_split_"]').allInnerTexts().then((all) => all.map((t) => t.trim()));
@@ -197,7 +197,7 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(lapRows(panel(a.page, 'Today, lap by lap'))).toHaveCount(1);
 });
 
-test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done and a check-in at their time; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
+test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done at its time and no habit check-in; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   const start = Date.now() - 2 * HOUR;
   let pair: string[] = [];
@@ -215,9 +215,9 @@ test('today, lap by lap: each counted lap\'s Day so far is the running total and
   const day = (page: Page) => panel(page, 'Today, lap by lap');
   await expect(a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 })).toBeVisible();
 
-  // In the order the day ran: the laps, the task done between them, the check-in after.
+  // In the order the day ran: the laps and the task done between them. The habit checked in after is not there.
   const rows = day(a.page).getByRole('listitem');
-  await expect(rows).toHaveCount(6);
+  await expect(rows).toHaveCount(5);
   const texts = (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
   expect(texts[0]).toContain('Lap, not counted');
   expect(texts[0]).toContain('25 minutes');
@@ -225,7 +225,7 @@ test('today, lap by lap: each counted lap\'s Day so far is the running total and
   expect(texts[1]).toContain('12 minutes');
   expect(texts[2]).toBe(`${wall(start + 45 * MIN)} Done: essay outline`);
   for (const i of [3, 4]) expect(texts[i]).toContain('ran on two devices');
-  expect(texts[5]).toBe(`${wall(start + 100 * MIN)} Checked in: walk after lunch`);
+  await expect(day(a.page).getByText('walk after lunch')).toHaveCount(0);
 
   // Day so far: none for the lap not counted, then 12, 12 + 25, and the second of the pair adds
   // only its 15 minutes not shared. The last is the figure at the top. A stopped lap is a lap: three.

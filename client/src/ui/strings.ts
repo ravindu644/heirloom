@@ -707,7 +707,6 @@ export const progress = {
   dayEnd: '24:00',
   // The quiet rows of a day, at their time: "11:19  Done: Morning routine".
   doneAt: 'Done:',
-  checkedIn: 'Checked in:',
   twoDevices: 'ran on two devices',
   setAside: "Don't count it",
   countAgain: 'Count it again',

@@ -97,7 +97,7 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
         <div key={`${item.kind}-${item.id}`} class={css.quiet}>
           <span>{s.wall(item.at)}</span>
           <span>
-            <b>{item.kind === 'done' ? s.progress.doneAt : s.progress.checkedIn}</b> {item.title}
+            <b>{s.progress.doneAt}</b> {item.title}
           </span>
         </div>
       );

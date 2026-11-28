@@ -332,7 +332,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-day': { ...week, about: 'A day chosen in the year: its laps, and the way back to today', record: {}, tap: 'demo:day' },
   'progress-real-day': { ...week, about: 'The user\'s own day: a lap from 23:46 the night before, its break, a lap stopped at 16 minutes, a task done', record: { script: 'real' } },
   'progress-real-day-aside': { ...week, about: 'The lap from 23:46 not counted: its row says only where it began, and the bar what left each day', record: { script: 'real' }, tap: "Don't count it" },
-  'progress-full-day': { ...week, about: 'A full day: nine laps, one not counted, two tasks done and a habit checked in; the five latest show', record: { script: 'full' } },
+  'progress-full-day': { ...week, about: 'A full day: nine laps, one not counted, two tasks done; the five latest show', record: { script: 'full' } },
   'progress-full-day-open': { ...week, about: 'That day with its earlier laps opened in place', record: { script: 'full' }, tap: '4 earlier laps' },
   'progress-long-day': { ...week, about: 'A day of 12h 30m: the widest split there is beside the sliver', record: { script: 'long' } },
   'progress-midnight': { ...week, about: 'A lap from 23:46 to 00:32: today\'s timeline starts at midnight, and its list says the lap\'s real times', record: { midnight: true } },
