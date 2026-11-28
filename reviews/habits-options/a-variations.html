@@ -1,0 +1,343 @@
+<title>A, folded three ways</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap");
+:root{--ground:#EEF0EC;--surface:#FFFFFF;--raised:#E4E7E2;--ink:#121412;--muted:#474C47;--line:#D5D9D3;--edge:#7C827B;--you:#C4321A;--you-tint:#FBE2DA;--on-you:#FFFFFF;--ghost:#8A9089;--rest:#23704E;--key:#E4E7E2;--key-edge:#121412;--key-quiet:#E4E7E2;--teal:#0F7B7F;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;color-scheme:dark}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--raised);color:var(--ink);font:400 16px/1.45 Barlow,system-ui,sans-serif;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow-x:hidden}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.page{max-width:1240px;margin:0 auto;display:grid;gap:40px}
+.intro{display:grid;gap:16px}
+.intro h1{font:600 34px/1.1 Barlow,sans-serif;letter-spacing:-.02em}
+.intro p{max-width:72ch;text-wrap:pretty}
+.intro .bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.theme{display:inline-flex;gap:4px}
+.theme button{font:600 16px/1.3 Barlow,sans-serif;height:48px;padding:0 16px;border-radius:4px;border:1px solid var(--edge);background:var(--surface);color:var(--ink);cursor:pointer}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.theme button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.mut{color:var(--muted)}
+.edges{display:grid;gap:8px;padding:16px;background:var(--surface);border-radius:8px}
+.edges h2{font:600 16px/1.3 Barlow,sans-serif}
+.edges p{color:var(--muted);max-width:72ch}
+.opt{display:grid;gap:24px;padding-top:40px;border-top:1px solid var(--edge)}
+.opt-head{display:flex;gap:16px;align-items:flex-start}
+.letter{font:600 44px/1 "Barlow Condensed",sans-serif;color:var(--you);flex:none}
+.idea{display:grid;gap:16px;padding-top:4px;min-width:0}
+.idea h2{font:600 24px/1.2 Barlow,sans-serif;max-width:52ch;text-wrap:balance}
+.tagp{display:inline-block;font:600 14px/1 "Barlow Condensed",sans-serif;background:var(--you);color:var(--on-you);padding:4px 8px;border-radius:4px;vertical-align:4px;margin-right:4px}
+.ans{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:8px 24px;max-width:96ch}
+.ans dt{font:600 16px/1.3 Barlow,sans-serif;padding-top:1px}
+.ans dd{color:var(--muted)}
+@media (max-width:719px){.ans{grid-template-columns:minmax(0,1fr);gap:4px}.ans dd{margin-bottom:8px}}
+.show{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
+@media (min-width:860px){.show{grid-template-columns:minmax(0,412px) minmax(0,1fr)}}
+figure{display:grid;gap:8px;min-width:0}
+figcaption{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.fbox{width:100%;overflow:hidden;border-radius:8px;outline:1px solid var(--edge);background:var(--ground)}
+.fbox.p{max-width:412px}
+.frame{transform:scale(var(--k,1));transform-origin:0 0;width:max-content}
+.moments{display:grid;gap:24px;align-content:start}
+.mo{display:grid;gap:8px}
+.mo>p{text-wrap:pretty;max-width:60ch}
+.mini{max-width:412px;border-radius:8px;outline:1px solid var(--edge);padding:16px;display:grid;gap:8px}
+.tag{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+
+/* Inside a screen: heirloom's own tokens and roles. */
+.scr{background:var(--ground);color:var(--ink);font:400 16px/1.45 Barlow,sans-serif;user-select:none;-webkit-user-select:none;text-align:left}
+.lab,.mt,.hint,.who{font:500 13px/1.3 Barlow,sans-serif}
+.ph{width:412px;min-height:915px;display:grid;grid-template-rows:auto 1fr auto}
+.hd{display:flex;align-items:center;justify-content:space-between;height:48px;margin:8px 20px 0}
+.brand{display:inline-flex;align-items:center;gap:8px;font:600 16px/1.3 Barlow,sans-serif;color:var(--ink)}
+.mark{height:22px;width:10px;flex:none}
+.m-you{fill:var(--you)}.m-gh{fill:none;stroke:var(--ghost);stroke-width:1.6;stroke-dasharray:2.1 2.1}
+.me{display:inline-flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif}
+.av{width:40px;height:40px;border-radius:50%;background:var(--teal);color:var(--on-you);display:grid;place-items:center;font:600 16px/1 Barlow,sans-serif;flex:none}
+.ct{padding:16px 20px 40px;display:grid;gap:24px;align-content:start}
+.sh{display:grid;gap:4px}
+.sh .lab{color:var(--muted)}
+.ti{font:600 24px/1.2 Barlow,sans-serif;text-wrap:balance}
+.add{height:48px;border:1px solid var(--edge);border-radius:4px;background:var(--surface);padding:0 16px;display:flex;align-items:center;color:var(--muted)}
+.list{display:grid;gap:8px}
+.hint{color:var(--muted)}
+.bb{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:64px;border-top:1px solid var(--line);background:var(--ground)}
+.bb span{display:grid;place-items:center;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted);border-top:2px solid transparent;margin-top:-1px}
+.bb .on{border-top-color:var(--you);color:var(--ink)}
+
+/* A habit's row. Two edges and only two: the control column (a 48px target from the row's
+   4px inset, its mark's ink at 18px) and the words (56px), which the title, the line under it,
+   the boxes of the times and the week all start on. */
+.row{background:var(--surface);border-radius:8px;padding:8px 16px 8px 4px;display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;row-gap:8px;align-items:center;--track:var(--raised)}
+.c1{grid-column:1;grid-row:1}
+.wd{grid-column:2;grid-row:1;display:grid;gap:4px;min-height:48px;align-content:center;min-width:0}
+.tl{display:flex;align-items:center;gap:16px;min-width:0}
+.tt{flex:1;min-width:0;font:400 16px/1.45 Barlow,sans-serif}
+.mt{color:var(--muted)}
+.wkw{grid-column:2;min-width:0}
+/* The count on its way, as the task row draws it: squares, then "3 of 5". */
+.cnt{display:inline-flex;align-items:center;gap:8px;flex:none;font:600 14px/1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;color:var(--muted);white-space:nowrap}
+.cnt b{font-weight:600;color:var(--ink)}
+.sq{display:inline-flex;gap:4px}
+.sq i{width:8px;height:8px;background:var(--track)}
+.sq i.f{background:var(--you)}
+/* The kit's box: 20px to the eye, 48px to a thumb. */
+.ck{width:48px;height:48px;display:grid;place-items:center;flex:none}
+.ck i{position:relative;width:20px;height:20px;border:2px solid var(--muted);border-radius:4px;display:grid;place-items:center;overflow:hidden}
+.ck.on i{background:var(--ink);border-color:var(--ink)}
+.ck.on i::after{content:"";width:4px;height:8px;margin-top:-2px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* A2, A3: a box that fills as far as the day has got, as the week's square does. */
+.ck.part i{border-color:var(--ink)}
+.ck.part i::before{content:"";position:absolute;inset:0 auto 0 0;width:calc(var(--s) * 100%);background:var(--ink)}
+/* The fold: two strokes, as the tick is drawn. Down is closed, up is open. */
+.fold{width:48px;height:48px;display:grid;place-items:center;flex:none}
+.fold i{width:9px;height:9px;margin-top:-5px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg);transition:transform 160ms cubic-bezier(0.2,0,0,1)}
+.fold.up i{margin-top:5px;transform:rotate(-135deg)}
+.tl .fold{margin:-8px -12px -8px -8px}
+/* A1: a time is a short row inside the habit: the box in the control column, the time as its words. */
+.subs{grid-column:1 / -1;display:grid;border-top:1px solid var(--line);margin-right:-16px;padding-right:16px}
+.sub{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;align-items:center;min-height:48px}
+.sub>span:last-child{display:flex;align-items:baseline;gap:8px}
+.sub small{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.tmw{font:400 16px/1.45 Barlow,sans-serif;font-feature-settings:"tnum" 1}
+.sub .any{font:400 16px/1.45 Barlow,sans-serif;color:var(--muted)}
+/* A2: the times as boxes at the words' edge, each time under its box. */
+.rds{grid-column:2;display:flex;flex-wrap:wrap;gap:0 4px}
+.rd{display:grid;width:48px;justify-items:start}
+.rd .ck{width:48px;justify-items:start}
+.rd small{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted);margin-top:-10px;min-height:17px}
+/* A3: the week, or today in its place, the same 48px tall, the fold at its end. */
+.strip{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr) 48px;column-gap:4px;align-items:end}
+.strip .fold{margin-right:-12px}
+.strip .wk{padding-top:3px}
+.day{display:flex;gap:0;height:48px}
+.dc{width:48px;height:48px;display:grid;grid-template-rows:17px 1fr;align-content:start;gap:4px;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.dc i{position:relative;width:20px;height:20px;border:2px solid var(--muted);border-radius:4px;display:grid;place-items:center}
+.dc.on i{background:var(--ink);border-color:var(--ink)}
+.dc.on i::after{content:"";width:4px;height:8px;margin-top:-2px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* The week: seven short lanes under their letters. */
+.wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wk>span{display:grid;gap:4px;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted);text-align:center}
+.wk .td{color:var(--ink)}
+.b{position:relative;display:grid;place-items:center;height:24px;background:var(--track)}
+.b.dn{background:var(--you)}
+.b.pt::before{content:"";position:absolute;inset:0 auto 0 0;width:calc(var(--s) * 100%);background:var(--you)}
+.b.rs::after{content:"";position:relative;box-sizing:border-box;width:12px;height:12px;border:2px solid var(--rest);border-radius:50%}
+.wk .td i{outline:1px solid var(--ink)}
+/* The week against last, as built. */
+.panel{background:var(--surface);border-radius:8px;padding:16px;display:grid;gap:16px;--track:var(--raised)}
+.panel h2{font:600 16px/1.3 Barlow,sans-serif}
+.race{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px 16px}
+.who{color:var(--muted)}
+.lane{position:relative;height:16px;background:var(--track)}
+.lane i{position:absolute;inset:0 auto 0 0;background:var(--you)}
+.lane.gh i{background:none;border:1px dashed var(--ghost)}
+.val{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;text-align:right;color:var(--muted)}
+.val.y{color:var(--ink)}
+/* What the last tap did. */
+.said{display:flex;align-items:center;gap:16px;min-height:48px;padding:0 16px;border-radius:8px;background:var(--ink);color:var(--ground);box-shadow:0 12px 40px rgb(18 20 18 / 0.18)}
+.said span{flex:1;min-width:0}
+.said u{font:500 13px/1.3 Barlow,sans-serif;text-underline-offset:4px}
+
+/* The laptop: the week keeps one column at every row's end. */
+.lp{width:1440px;height:900px;display:grid;grid-template-columns:232px minmax(0,1fr);overflow:hidden}
+.sb{display:grid;grid-template-rows:auto 1fr auto;padding:16px 16px 24px;gap:24px}
+.sb .brand{height:48px;padding-left:8px}
+.sb nav{display:grid;gap:4px;align-content:start}
+.sb nav span{height:48px;display:flex;align-items:center;padding:0 8px;border-radius:4px;color:var(--muted)}
+.sb nav .on{background:var(--raised);color:var(--ink)}
+.me2{display:flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif;padding-left:8px}
+.mn{padding:32px;display:grid;gap:24px;align-content:start;max-width:1208px}
+.cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;align-items:start}
+.col{display:grid;gap:24px;align-content:start}
+.lp .row{grid-template-columns:48px minmax(0,1fr) 240px}
+.lp .row .wd{padding-right:24px}
+.lp .row .wkw{grid-column:3;grid-row:1}
+.lp .row .rds{grid-column:2;grid-row:2}
+.lp .row .subs{grid-column:1 / 3;grid-row:2;margin-right:0;padding-right:24px}
+.lp .row.a3{grid-template-columns:48px minmax(0,1fr) 292px}
+.lp .row .strip{grid-column:3;grid-row:1}
+</style>
+
+<main class="page">
+<header class="intro">
+  <h1>A, folded: three ways</h1>
+  <p><b>My pick is A2.</b> Closed, its box still checks in with one tap and fills a little with every tap, so the tap is seen and the box ends in a tick; the arrow at the end of the title opens the times, each with its own box under its time. It keeps today's one-tap habit for the person in a hurry and gives the person who wants "the 08:00 one" their boxes, at the same left edge as the title and the week.</p>
+  <div class="bar">
+    <p class="mut">Saturday 28 November, 14:20. Check Gmail is open in each phone picture. Drawn with heirloom's own colours, type and kit.</p>
+    <div class="theme" role="group" aria-label="Colours"><button type="button" data-t="light">Light</button><button type="button" data-t="dark">Dark</button><button type="button" data-t="system">System</button></div>
+  </div>
+</header>
+
+<section class="edges" aria-labelledby="e-h">
+  <h2 id="e-h">The fix for "its contents are misaligned", in all three</h2>
+  <p>Every row has the same two edges. The control column holds the box, or in A1 the arrow, and its mark's ink sits 18px into the row. Everything else starts on the words' edge, 56px in: the title, the line under it, the boxes of the times and the week. A once-a-day habit and a counted one line up down the list. No arrow on a once-a-day habit: its box is its one time.</p>
+  <p id="measured"></p>
+</section>
+
+<section class="opt" aria-labelledby="a1-h">
+  <div class="opt-head"><span class="letter">A1</span><div class="idea"><h2 id="a1-h">The arrow takes the box's place</h2>
+    <dl class="ans">
+      <dt>Closed shows</dt><dd>The squares and "3 of 5" at the end of the title, as a task row shows its laps, and "Every day, 9 days in a row" under it.</dd>
+      <dt>One tap closed</dt><dd>No. The left place opens the habit's times, and you check in where you can see which time you tick. A counted habit never shows a tick while closed; the squares say when it is done.</dd>
+      <dt>The arrow</dt><dd>In the box column, where a once-a-day habit has its box. One thing to press at the left of every row.</dd>
+      <dt>Open</dt><dd>One short row per time inside the habit, the box in the same column as the arrow: "08:00, done at 08:12", "12:00", "No time set".</dd>
+      <dt>Opening one</dt><dd>Leaves the others open. Closing a row above would move the one just tapped, which DESIGN.md forbids.</dd>
+      <dt>The week</dt><dd>Both: always at the row's foot.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="a1-phone"></div></div><figcaption>Phone, drawn whole. Check Gmail open, Watch Sunset closed.</figcaption></figure>
+    <div class="moments" id="a1-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="a1-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="opt" aria-labelledby="a2-h">
+  <div class="opt-head"><span class="letter">A2</span><div class="idea"><h2 id="a2-h"><span class="tagp">My pick</span> The box fills, the arrow opens</h2>
+    <dl class="ans">
+      <dt>Closed shows</dt><dd>The box filled as far as the day has got, a tick once it is all done, "3 of 5" before the arrow, and "Every day, 9 days in a row" under the title.</dd>
+      <dt>One tap closed</dt><dd>Yes. The box checks in the next time and fills a fifth more, so every tap shows. A full box takes the last one back, as a once-a-day box does today.</dd>
+      <dt>The arrow</dt><dd>At the right end of the title's line, after the count.</dd>
+      <dt>Open</dt><dd>The times as boxes in a line on the words' edge, each time under its box, between the title and the week.</dd>
+      <dt>Opening one</dt><dd>Leaves the others open, for the same reason as A1.</dd>
+      <dt>The week</dt><dd>Both, under the title, and under the times when open.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="a2-phone"></div></div><figcaption>Phone, drawn whole.</figcaption></figure>
+    <div class="moments" id="a2-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="a2-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="opt" aria-labelledby="a3-h">
+  <div class="opt-head"><span class="letter">A3</span><div class="idea"><h2 id="a3-h">Today takes the week's place</h2>
+    <dl class="ans">
+      <dt>Closed shows</dt><dd>The filling box, "3 of 5" at the end of the title, and the week, where today's square is filled as far.</dd>
+      <dt>One tap closed</dt><dd>Yes, as A2.</dd>
+      <dt>The arrow</dt><dd>At the end of the week strip, after Sunday: it turns the week into today.</dd>
+      <dt>Open</dt><dd>Today's times stand where the week stood, each time over its box as each letter stands over its day, in the same 48px of height. The week is back on closing.</dd>
+      <dt>Opening one</dt><dd>Closes the others. A row is the same height open or closed, so nothing on the list moves when it does.</dd>
+      <dt>The week</dt><dd>Closed only. Open, today is in its place.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="a3-phone"></div></div><figcaption>Phone, drawn whole.</figcaption></figure>
+    <div class="moments" id="a3-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="a3-lap"></div></div><figcaption>Laptop, 1440 wide: the week's column is 52px wider here, for the arrow.</figcaption></figure>
+</section>
+</main>
+
+<script>
+(function(){
+  var root=document.documentElement, KEY='heirloom-habits-a-theme';
+  function set(t){ if(t==='system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',t);
+    document.querySelectorAll('.theme button').forEach(function(b){b.setAttribute('aria-pressed', String(b.dataset.t===t));}); }
+  var saved='system'; try{ saved=localStorage.getItem(KEY)||'system'; }catch(e){}
+  var q=new URLSearchParams(location.search).get('theme'); if(q) saved=q;
+  set(saved);
+  document.querySelectorAll('.theme button').forEach(function(b){ b.addEventListener('click',function(){ set(b.dataset.t); try{localStorage.setItem(KEY,b.dataset.t);}catch(e){} }); });
+
+  var D=['M','T','W','T','F','S','S'];
+  // A week: 'd' done, a share such as '.5' filled that far, a trailing 'r' a rest day, 'e' empty. Saturday is today.
+  function wk(s){ return '<span class="wk" role="img" aria-label="This week">'+s.map(function(v,i){
+    var c='b', st='', share=parseFloat(v);
+    if(v==='d') c+=' dn'; else if(!isNaN(share)){ c+=' pt'; st=' style="--s:'+share+'"'; }
+    if(v.slice(-1)==='r') c+=' rs';
+    return '<span'+(i===5?' class="td"':'')+'>'+D[i]+'<i class="'+c+'"'+st+'></i></span>'; }).join('')+'</span>'; }
+  function ck(on){ return '<span class="ck'+(on?' on':'')+'"><i></i></span>'; }
+  // A box for the day: empty, filled as far as it has got, or ticked.
+  function fill(n,t){ return n>=t?ck(true):n===0?ck(false):'<span class="ck part" style="--s:'+(n/t)+'"><i></i></span>'; }
+  function fold(open){ return '<span class="fold'+(open?' up':'')+'"><i></i></span>'; }
+  function cnt(n,t,sq){ var s=''; if(sq){ for(var i=0;i<t;i++) s+='<i'+(i<n?' class="f"':'')+'></i>'; s='<span class="sq">'+s+'</span>'; } return '<span class="cnt">'+s+'<span><b>'+n+'</b> of '+t+'</span></span>'; }
+  function meta(h){ return [h.plan,h.run].filter(Boolean).join(', '); }
+  function mix(h,o){ var r={}; for(var k in h) r[k]=h[k]; for(var j in o) r[j]=o[j]; return r; }
+  function share(n,t){ return n>=t?'d':String(n/t); }
+  function today(h){ var w=h.week.slice(); w[5]=share(h.n,h.target)+(h.week[5].slice(-1)==='r'?'r':''); return w; }
+
+  var gmail={t:'Check Gmail',plan:'Every day',run:'9 days in a row',target:5,n:3,times:['08:00','12:00','16:00'],at:['08:12','12:40','13:55','',''],week:['d','d','d','.8r','d','.6','e']};
+  var sun={t:'Watch Sunset',plan:'Every day',run:'2 days in a row',target:2,n:1,times:[],at:['13:10',''],week:['.5r','r','d','.5r','d','.5','e']};
+  var water={t:'Water the plants',plan:'Every day',run:'6 days in a row',target:1,n:1,week:['d','d','r','d','d','d','e']};
+  function g(n,o){ return mix(gmail,mix({n:n,run:n>=5?'10 days in a row':'9 days in a row'},o||{})); }
+
+  function words(h,right){ return '<span class="wd"><span class="tl"><span class="tt">'+h.t+'</span>'+(right||'')+'</span><span class="mt">'+meta(h)+'</span></span>'; }
+  function once(h){ return '<div class="row"><span class="c1">'+ck(h.n>=1)+'</span>'+words(h)+'<span class="wkw">'+wk(today(h))+'</span></div>'; }
+  function timeOf(h,i){ return (h.times&&h.times[i])||''; }
+
+  // A1: the arrow in the box column; open, a short row per time.
+  function a1(h,open){ if(h.target===1) return once(h);
+    var subs=''; if(open){ for(var i=0;i<h.target;i++){ var on=i<h.n, t=timeOf(h,i);
+      subs+='<div class="sub">'+ck(on)+'<span>'+(t?'<b class="tmw">'+t+'</b>':'<b class="any">No time set</b>')+(on&&h.at[i]?'<small>done at '+h.at[i]+'</small>':'')+'</span></div>'; }
+      subs='<div class="subs">'+subs+'</div>'; }
+    return '<div class="row"><span class="c1">'+fold(open)+'</span>'+words(h,cnt(h.n,h.target,true))+subs+'<span class="wkw">'+wk(today(h))+'</span></div>'; }
+  // A2: the box fills; the arrow at the end of the title; open, the times as boxes on the words' edge.
+  function a2(h,open){ if(h.target===1) return once(h);
+    var rds=''; if(open){ var timed=h.times.length>0; for(var i=0;i<h.target;i++) rds+='<span class="rd">'+ck(i<h.n)+(timed?'<small>'+timeOf(h,i)+'</small>':'')+'</span>'; rds='<span class="rds">'+rds+'</span>'; }
+    return '<div class="row"><span class="c1">'+fill(h.n,h.target)+'</span>'+words(h,cnt(h.n,h.target,false)+fold(open))+rds+'<span class="wkw">'+wk(today(h))+'</span></div>'; }
+  // A3: the week, or today in its place, with the arrow at its end.
+  function a3(h,open){ var tail;
+    if(h.target===1) return '<div class="row a3"><span class="c1">'+ck(h.n>=1)+'</span>'+words(h)+'<span class="strip">'+wk(today(h))+'<span></span></span></div>';
+    if(open){ var d=''; for(var i=0;i<h.target;i++) d+='<span class="dc'+(i<h.n?' on':'')+'"><span>'+(timeOf(h,i)||'&nbsp;')+'</span><i></i></span>'; tail='<span class="day">'+d+'</span>'; }
+    else tail=wk(today(h));
+    return '<div class="row a3"><span class="c1">'+fill(h.n,h.target)+'</span>'+words(h,cnt(h.n,h.target,false))+'<span class="strip">'+tail+fold(open)+'</span></div>'; }
+  function said(lead,title,tail){ return '<div class="said"><span>'+lead+' '+title+tail+'</span><u>Undo</u></div>'; }
+
+  var mark='<svg class="mark" viewBox="0 0 10 22" aria-hidden="true"><circle class="m-you" cx="5" cy="5.5" r="4.2"/><circle class="m-gh" cx="5" cy="16.2" r="3.9"/></svg>';
+  var brand='<span class="brand">'+mark+'heirloom</span>';
+  function nav(){ return ['Focus','Today','Progress','Habits','Room'].map(function(n){ return '<span'+(n==='Habits'?' class="on"':'')+'>'+n+'</span>'; }).join(''); }
+  function head(f){ return '<div class="sh"><p class="lab">Habits, Saturday 28 November</p><h1 class="ti">'+f+'</h1></div>'; }
+  var add='<div class="add">Add a habit</div>';
+  var hint='<p class="hint">Press and hold a habit to move it.</p>';
+  var panel='<section class="panel"><h2>This week against last</h2><div class="race"><span class="who">This week</span><span class="lane"><i style="width:100%"></i></span><span class="val y">41</span><span class="who">Last week</span><span class="lane gh"><i style="width:88%"></i></span><span class="val">36</span></div><p>Five ahead of last week at this time.</p></section>';
+  function phone(body){ return '<div class="scr ph"><header class="hd">'+brand+'<span class="me"><span>nadia</span><span class="av">N</span></span></header><div class="ct">'+body+'</div><nav class="bb">'+nav()+'</nav></div>'; }
+  function lap(top,left,right){ return '<div class="scr lp"><aside class="sb">'+brand+'<nav>'+nav()+'</nav><span class="me2"><span class="av">N</span><span>nadia</span></span></aside><div class="mn">'+top+'<div class="cols"><div class="col">'+left+'</div><div class="col">'+right+'</div></div></div></div>'; }
+  function mo(text,parts){ return '<div class="mo"><p>'+text+'</p><div class="scr mini">'+parts.join('')+'</div></div>'; }
+  function tag(t){ return '<p class="tag">'+t+'</p>'; }
+  function put(id,html){ document.getElementById(id).innerHTML=html; }
+  var finding='1 of 3 today. Two left.';
+  function screens(id,row){
+    var list='<div class="list">'+row(gmail,true)+row(sun,false)+row(water,false)+'</div>';
+    put(id+'-phone',phone(head(finding)+add+list+hint+panel));
+    put(id+'-lap',lap(head(finding),add+list+hint,panel));
+  }
+
+  screens('a1',a1);
+  put('a1-mo',
+    mo('Closed: the squares and the count say how far, and the arrow opens the times.',[a1(gmail,false)])+
+    mo('A tick: open, tap an empty box and the next time ticks.',[tag('After a tap on the first empty box'),a1(g(4,{at:['08:12','12:40','13:55','14:20','']}),true),said('Checked in:','Check Gmail',', 4 of 5.')])+
+    mo('A take-back: tap a ticked box and the last tick comes off, here 16:00.',[a1(g(2),true),said('Taken back:','Check Gmail',', 2 of 5.')])+
+    mo('The whole day done, closed: every square filled, 5 of 5, and the row of days goes from 9 to 10.',[a1(g(5),false)])
+  );
+
+  screens('a2',a2);
+  put('a2-mo',
+    mo('Closed: the box is three fifths filled, the count says 3 of 5, the arrow opens the times.',[a2(gmail,false)])+
+    mo('One tap on the closed box: the next time is checked in and the box fills to four fifths.',[a2(g(4),false),said('Checked in:','Check Gmail',', 4 of 5.')])+
+    mo('Open, a take-back: tap a ticked box and the last tick comes off, here 16:00.',[a2(g(2),true),said('Taken back:','Check Gmail',', 2 of 5.')])+
+    mo('The whole day done: the box carries its tick, closed or open, and the row of days goes from 9 to 10. A tap on it takes the last one back.',[a2(g(5),false),a2(g(5),true)])
+  );
+
+  screens('a3',a3);
+  put('a3-mo',
+    mo('Closed: the box is filled as far, and so is today’s square on the week; the arrow at its end opens today.',[a3(gmail,false)])+
+    mo('One tap on the closed box, or a tap on an empty box when open: the next time is checked in.',[a3(g(4),true),said('Checked in:','Check Gmail',', 4 of 5.')])+
+    mo('A take-back: tap a ticked box and the last tick comes off, here 16:00.',[a3(g(2),true),said('Taken back:','Check Gmail',', 2 of 5.')])+
+    mo('The whole day done, closed: a tick in the box, today’s square full, and the row of days goes from 9 to 10.',[a3(g(5),false)])
+  );
+
+  // Measured, not judged: the ink of every block's left edge, from each row's own left.
+  function edges(){ var out=[]; ['a1','a2','a3'].forEach(function(id){
+    var rows=document.querySelectorAll('#'+id+'-phone .row'), xs={};
+    rows.forEach(function(r){ var L=r.getBoundingClientRect().left, k=parseFloat(getComputedStyle(r.closest('.frame')).getPropertyValue('--k'))||1;
+      function at(sel,name,mid){ r.querySelectorAll(sel).forEach(function(e){ var b=e.getBoundingClientRect(), x=Math.round(((mid?b.left+b.width/2:b.left)-L)/k); (xs[name]=xs[name]||{})[x]=1; }); }
+      at('.c1 .ck i, .c1 .fold i, .sub .ck i','control centre',true); at('.tt','title'); at('.mt','line under'); at('.wk','week'); at('.rds .ck i, .dc i','time boxes'); });
+    out.push(id.toUpperCase()+': '+Object.keys(xs).map(function(n){ return n+' '+Object.keys(xs[n]).join(' and '); }).join(', ')); });
+    document.getElementById('measured').textContent='Measured on the phone pictures, from each row’s left: '+out.join('. ')+'.'; }
+
+  function fit(box){ var f=box.firstElementChild, w=f.firstElementChild?f.firstElementChild.offsetWidth:0; if(!w) return;
+    var k=Math.min(1,box.clientWidth/w); f.style.setProperty('--k',k); box.style.height=(f.offsetHeight*k)+'px'; }
+  var boxes=[].slice.call(document.querySelectorAll('.fbox'));
+  function all(){ boxes.forEach(fit); edges(); }
+  all(); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(all);
+  if('ResizeObserver' in window){ var ro=new ResizeObserver(function(){ boxes.forEach(fit); }); boxes.forEach(function(b){ ro.observe(b); }); } else window.addEventListener('resize',all);
+})();
+</script>

@@ -1,0 +1,313 @@
+<title>Subtasks, Jira's rule</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap");
+:root{--ground:#EEF0EC;--surface:#FFFFFF;--raised:#E4E7E2;--ink:#121412;--muted:#474C47;--line:#D5D9D3;--edge:#7C827B;--you:#C4321A;--you-tint:#FBE2DA;--on-you:#FFFFFF;--ghost:#8A9089;--rest:#23704E;--key:#E4E7E2;--key-edge:#121412;--key-quiet:#E4E7E2;--teal:#0F7B7F;--sky:#1F6FB5;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;--sky:#6FB3EE;color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;--sky:#6FB3EE;color-scheme:dark}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--raised);color:var(--ink);font:400 16px/1.45 Barlow,system-ui,sans-serif;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow-x:hidden}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.page{max-width:1240px;margin:0 auto;display:grid;gap:40px}
+.intro{display:grid;gap:16px}
+.intro h1{font:600 34px/1.1 Barlow,sans-serif;letter-spacing:-.02em}
+.intro p{max-width:72ch;text-wrap:pretty}
+.intro .bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.theme{display:inline-flex;gap:4px}
+.theme button{font:600 16px/1.3 Barlow,sans-serif;height:48px;padding:0 16px;border-radius:4px;border:1px solid var(--edge);background:var(--surface);color:var(--ink);cursor:pointer}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.theme button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.mut{color:var(--muted)}
+.card{display:grid;gap:16px;padding:16px;background:var(--surface);border-radius:8px}
+.card h2{font:600 16px/1.3 Barlow,sans-serif}
+.card p{color:var(--muted);max-width:76ch}
+.ans{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:8px 24px;max-width:100ch}
+.ans dt{font:600 16px/1.3 Barlow,sans-serif;padding-top:1px}
+.ans dd{color:var(--muted)}
+@media (max-width:719px){.ans{grid-template-columns:minmax(0,1fr);gap:4px}.ans dd{margin-bottom:8px}}
+.opt{display:grid;gap:24px;padding-top:40px;border-top:1px solid var(--edge)}
+.opt>h2{font:600 24px/1.2 Barlow,sans-serif}
+.show{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
+@media (min-width:860px){.show{grid-template-columns:minmax(0,412px) minmax(0,1fr)}}
+figure{display:grid;gap:8px;min-width:0}
+figcaption{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.fbox{width:100%;overflow:hidden;border-radius:8px;outline:1px solid var(--edge);background:var(--ground)}
+.fbox.p{max-width:412px}
+.frame{transform:scale(var(--k,1));transform-origin:0 0;width:max-content}
+.moments{display:grid;gap:24px;align-content:start}
+.mo{display:grid;gap:8px}
+.mo>p{text-wrap:pretty;max-width:60ch}
+.mini{max-width:412px;border-radius:8px;outline:1px solid var(--edge);padding:16px;display:grid;gap:8px}
+.mini>*{min-width:0}
+.mini.sf{background:var(--surface);--row:var(--raised)}
+.tag{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+
+/* Inside a screen: heirloom's own tokens and roles. */
+.scr{background:var(--ground);color:var(--ink);font:400 16px/1.45 Barlow,sans-serif;user-select:none;-webkit-user-select:none;text-align:left}
+.lab,.ml,.hint{font:500 13px/1.3 Barlow,sans-serif}
+.ph{width:412px;min-height:915px;display:grid;grid-template-rows:auto 1fr auto}
+.hd{display:flex;align-items:center;justify-content:space-between;height:48px;margin:8px 20px 0}
+.brand{display:inline-flex;align-items:center;gap:8px;font:600 16px/1.3 Barlow,sans-serif;color:var(--ink)}
+.mark{height:22px;width:10px;flex:none}
+.m-you{fill:var(--you)}.m-gh{fill:none;stroke:var(--ghost);stroke-width:1.6;stroke-dasharray:2.1 2.1}
+.me{display:inline-flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif}
+.av{width:40px;height:40px;border-radius:50%;background:var(--teal);color:var(--on-you);display:grid;place-items:center;font:600 16px/1 Barlow,sans-serif;flex:none}
+.ct{padding:16px 20px 40px;display:grid;gap:24px;align-content:start}
+.th{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.th h1{font:600 24px/1.2 Barlow,sans-serif}
+.th span{color:var(--muted)}
+.figs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface);border-radius:8px}
+.figs>div{padding:16px;display:grid;gap:4px;align-content:start}
+.figs>div+div{border-left:1px solid var(--line)}
+.figs b{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1}
+.figs .y{color:var(--you)}
+.dayb{display:grid;gap:8px}
+.lapbar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.lapbar i{height:8px;background:var(--line)}
+.lapbar i.f{background:var(--you)}
+.tgt{display:flex;justify-content:space-between;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.tgt u{color:var(--ink);text-underline-offset:4px}
+.blk{display:grid;gap:8px}
+.gh{display:flex;justify-content:space-between;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.add{height:48px;border:1px solid var(--edge);border-radius:4px;background:var(--surface);padding:0 16px;display:flex;align-items:center;color:var(--muted)}
+.list{display:grid;gap:8px}
+.hint{color:var(--muted)}
+.bb{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:64px;border-top:1px solid var(--line);background:var(--ground)}
+.bb span{display:grid;place-items:center;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted);border-top:2px solid transparent;margin-top:-1px}
+.bb .on{border-top-color:var(--you);color:var(--ink)}
+
+/* A task row on its two edges: the box (a 48px target from the row's 4px inset, centred 28px
+   in) and the words, 56px in. A subtask's box and words stand on the same two. */
+.row{background:var(--surface);border-radius:8px;padding:8px 16px 8px 4px;display:grid;grid-template-columns:48px minmax(0,1fr) auto;column-gap:4px;align-items:center;--track:var(--raised)}
+.row.next{box-shadow:inset 0 0 0 2px var(--you)}
+.c1{grid-column:1;grid-row:1}
+.wd{grid-column:2;grid-row:1;display:grid;gap:4px;min-height:48px;align-content:center;min-width:0;padding-block:4px}
+.tt{font:400 16px/1.45 Barlow,sans-serif;text-wrap:pretty}
+.row.done .tt{color:var(--muted);text-decoration:line-through}
+.ml{display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap;color:var(--muted)}
+.pj{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+.pj i{width:8px;height:8px;background:var(--c)}
+.ml .laps{margin-left:auto}
+/* The fold: the count of subtasks is a link in a line with its arrow, a 48px target made by
+   padding and an equal negative margin, so the line keeps its height. */
+.tog{display:inline-flex;align-items:center;gap:6px;color:var(--ink);padding:15px 8px;margin:-15px -8px}
+.tog u{text-underline-offset:4px}
+.tog i{width:7px;height:7px;margin-top:-4px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg);transition:transform 160ms cubic-bezier(0.2,0,0,1)}
+.tog.up i{margin-top:4px;transform:rotate(-135deg)}
+.end{grid-column:3;grid-row:1;display:flex;align-items:center;gap:16px;padding-left:12px}
+.end .laps{display:none}
+.laps{display:inline-flex;align-items:center;gap:8px;font:600 14px/1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;color:var(--muted);white-space:nowrap}
+.laps b{font-weight:600;color:var(--ink)}
+.sq{display:inline-flex;gap:4px}
+.sq i{width:8px;height:8px;background:var(--track)}
+.sq i.f{background:var(--you)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 20px;border-radius:4px;font:600 16px/1.3 Barlow,sans-serif;white-space:nowrap;flex:none}
+.btn.pri{background:var(--you);color:var(--on-you)}
+.btn.sec{background:var(--key);color:var(--ink);box-shadow:inset 0 0 0 1px var(--key-edge)}
+.btn.quiet{background:var(--key-quiet);color:var(--ink)}
+.btn.in{height:40px;padding:0 16px}
+/* The kit's box: 20px to the eye, 48px to a thumb. */
+.ck{width:48px;height:48px;display:grid;place-items:center;flex:none}
+.ck i{width:20px;height:20px;border:2px solid var(--muted);border-radius:4px;display:grid;place-items:center}
+.ck.on i{background:var(--ink);border-color:var(--ink)}
+.ck.on i::after{content:"";width:4px;height:8px;margin-top:-2px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg)}
+/* Open on Today: the subtasks and their boxes, nothing else. */
+.subs{grid-column:1 / -1;display:grid;margin:8px -16px 0 0;padding-right:16px;border-top:1px solid var(--line)}
+.sub{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;align-items:center;min-height:48px}
+.sub>span:last-child{padding-block:12px}
+.sub.on>span:last-child{color:var(--muted);text-decoration:line-through}
+/* What the last tap did. */
+.said{display:flex;align-items:center;gap:16px;min-height:48px;padding:0 16px;border-radius:8px;background:var(--ink);color:var(--ground);box-shadow:0 12px 40px rgb(18 20 18 / 0.18)}
+.said .s{display:flex;flex:1;min-width:0}
+.said .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.said .tl{flex:none;white-space:nowrap}
+.said u{font:500 13px/1.3 Barlow,sans-serif;text-underline-offset:4px}
+
+/* The task's sheet, as built: from the bottom on a phone, a centred panel on a laptop. */
+.dim{position:relative}
+.dim::after{content:"";position:absolute;inset:0;background:color-mix(in srgb,var(--ground) 48%,transparent)}
+.sheet{background:var(--surface);border-top:1px solid var(--line);border-radius:8px 8px 0 0;box-shadow:0 12px 40px rgb(18 20 18 / 0.18);padding:8px 20px 24px;display:grid;gap:24px;align-content:start;--row:var(--raised)}
+.shd{display:flex;align-items:center;justify-content:space-between;min-height:48px}
+.shd h2{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.lnk{font:500 13px/1.3 Barlow,sans-serif;color:var(--ink);text-decoration:underline;text-underline-offset:4px;white-space:nowrap;padding:15px 0;margin:-15px 0}
+.lnk.m{color:var(--muted)}
+.fg{display:grid;gap:4px}
+.fg>span{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.inp{height:48px;border:1px solid var(--edge);border-radius:4px;background:var(--surface);padding:0 16px;display:flex;align-items:center;color:var(--ink);min-width:0;white-space:nowrap;overflow:hidden}
+.inp.hold{color:var(--muted)}
+.inp.typing{border-color:var(--ink);padding-right:4px;justify-content:space-between;gap:8px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.chs{display:flex;flex-wrap:wrap;gap:8px}
+.chs span{height:48px;padding:0 16px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--edge);border-radius:4px;background:var(--surface);font:600 16px/1.3 Barlow,sans-serif}
+.chs .on{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.chs i{width:8px;height:8px;background:var(--c)}
+.stp{display:flex;align-items:center;gap:16px}
+.stp output{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;min-width:5ch;text-align:center}
+.key{width:48px;height:48px;display:grid;place-items:center;border-radius:4px;background:var(--key);box-shadow:inset 0 0 0 1px var(--key-edge);font:600 16px/1.3 Barlow,sans-serif}
+.stp .lab{color:var(--muted)}
+/* Subtasks in the sheet: words to change, no box. A row is held to move, its title tapped to
+   change in place, and "Remove" takes it out, with the way back said where it stood. */
+.srows{display:grid;gap:8px}
+.srow{min-height:48px;border-radius:8px;background:var(--row);padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.srow>span:first-child{padding-block:12px;min-width:0}
+.srow.edit{background:var(--surface);border:1px solid var(--ink);padding-left:15px}
+.srow.lift{box-shadow:0 12px 40px rgb(18 20 18 / 0.18),inset 0 0 0 1px var(--ink)}
+.caret{display:inline-block;width:1px;height:20px;background:var(--ink);vertical-align:-4px;margin-left:1px}
+.gone{display:flex;align-items:center;gap:8px;min-height:48px;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.note{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.ends{display:flex;gap:8px;flex-wrap:wrap}
+.lpsheet{position:absolute;left:50%;top:40px;width:600px;max-height:820px;transform:translateX(-50%);overflow:hidden;border-radius:8px;border:0}
+
+/* The laptop: the lists, and Done beside them. */
+.lp{position:relative;width:1440px;height:900px;display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:900px;overflow:hidden}
+.lp .mn{overflow:hidden}
+.sb{display:grid;grid-template-rows:auto 1fr auto;padding:16px 16px 24px;gap:24px}
+.sb .brand{height:48px;padding-left:8px}
+.sb nav{display:grid;gap:4px;align-content:start}
+.sb nav span{height:48px;display:flex;align-items:center;padding:0 8px;border-radius:4px;color:var(--muted)}
+.sb nav .on{background:var(--raised);color:var(--ink)}
+.me2{display:flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif;padding-left:8px}
+.mn{padding:32px;display:grid;gap:24px;align-content:start;max-width:1208px}
+.cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;align-items:start}
+.col{display:grid;gap:24px;align-content:start}
+.lp .ml .laps{display:none}
+.lp .end .laps{display:inline-flex}
+</style>
+
+<main class="page">
+<header class="intro">
+  <h1>Subtasks: ticked on Today, made in the sheet</h1>
+  <p><b>My pick: the task keeps its own box at the left, and the fold moves to the line under the title as "2 of 4 subtasks" with its arrow.</b> Every task row then starts the same way, a box that finishes the task, and Jira's rule reads off the closed row with no words added: "4 of 4 subtasks" beside a box still empty.</p>
+  <div class="bar">
+    <p class="mut">Saturday 28 November, 14:20. Drawn with heirloom's own colours, type and kit.</p>
+    <div class="theme" role="group" aria-label="Colours"><button type="button" data-t="light">Light</button><button type="button" data-t="dark">Dark</button><button type="button" data-t="system">System</button></div>
+  </div>
+</header>
+
+<section class="card" aria-labelledby="d-h">
+  <h2 id="d-h">What is decided</h2>
+  <dl class="ans">
+    <dt>Ticking the task</dt><dd>Its own box, at the left, as every task has. It finishes the task whatever its subtasks say; open ones go with it as they are. Ticking every subtask finishes nothing but them.</dd>
+    <dt>Opening</dt><dd>"2 of 4 subtasks" on the line under the title is a link in a line with an arrow after it: down closed, up open. It starts on the words' edge (56) when the task has no project, after the project when it has one.</dd>
+    <dt>Closed shows</dt><dd>How many subtasks are done, with its noun; the squares stay the task's laps. Every one ticked and the task not: "4 of 4 subtasks" beside an empty box, still in its place on the list, Next still Next.</dd>
+    <dt>Open on Today</dt><dd>The subtasks, each with its box on the box column (28) and its words on 56, struck through when done and kept where they stand. No field, no editing, no Remove.</dd>
+    <dt>In the sheet</dt><dd>The subtasks as words with no box: tap a title to change it in place, "Remove" takes one out and says so where it stood with Undo (a bar would lie under the sheet), press and hold to move one, and "Add a subtask" at the foot. "Mark done" there still finishes the task.</dd>
+    <dt>Close second</dt><dd>The arrow at the end of the title's line, as in A2: on the phone's Next card it stands between the title and Start and leaves the title about 170px.</dd>
+    <dt>Opening one</dt><dd>Leaves the others open, as A1.</dd>
+    <dt>Contract</dt><dd>None. A subtask is a task with `parent`; its `done`, `title`, `order` and `deleted` are cells it already has. The rule "a subtask done ends nothing" already holds.</dd>
+  </dl>
+  <p id="measured"></p>
+</section>
+
+<section class="opt" aria-labelledby="today-h">
+  <h2 id="today-h">On Today: the box finishes the task, the count opens its subtasks</h2>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="t-phone"></div></div><figcaption>Phone, drawn whole. The Next card open, Morning Routine closed, Q/A heirloom with no subtasks.</figcaption></figure>
+    <div class="moments" id="t-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="t-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="opt" aria-labelledby="sheet-h">
+  <h2 id="sheet-h">In the task's sheet: the subtasks to make and change, no box</h2>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="s-phone"></div></div><figcaption>Phone, the sheet drawn whole over Today. Tapping the task's words opens it.</figcaption></figure>
+    <div class="moments" id="s-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="s-lap"></div></div><figcaption>Laptop, 1440 wide: the sheet is a centred panel, here scrolled to its subtasks.</figcaption></figure>
+</section>
+</main>
+
+<script>
+(function(){
+  var root=document.documentElement, KEY='heirloom-subtasks2-theme';
+  function set(t){ if(t==='system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',t);
+    document.querySelectorAll('.theme button').forEach(function(b){b.setAttribute('aria-pressed', String(b.dataset.t===t));}); }
+  var saved='system'; try{ saved=localStorage.getItem(KEY)||'system'; }catch(e){}
+  var q=new URLSearchParams(location.search).get('theme'); if(q) saved=q;
+  set(saved);
+  document.querySelectorAll('.theme button').forEach(function(b){ b.addEventListener('click',function(){ set(b.dataset.t); try{localStorage.setItem(KEY,b.dataset.t);}catch(e){} }); });
+
+  function ck(on){ return '<span class="ck'+(on?' on':'')+'"><i></i></span>'; }
+  function laps(n,t){ if(!t) return ''; var s=''; for(var i=0;i<t;i++) s+='<i'+(i<n?' class="f"':'')+'></i>'; return '<span class="laps"><span class="sq">'+s+'</span><span><b>'+n+'</b> of '+t+'</span></span>'; }
+  function mix(h,o){ var r={}; for(var k in h) r[k]=h[k]; for(var j in o) r[j]=o[j]; return r; }
+  var HT='HTML refresh - write a well structured page';
+  var html={t:HT,pj:['Web','var(--sky)'],laps:[1,3],subs:[['Outline the sections',true],['Write the head and nav',true],['Main content with headings in order',false],['Check it in the validator',false]]};
+  var qa={t:'Q/A heirloom',pj:['heirloom','var(--teal)'],laps:[0,2]};
+  var morning={t:'Morning Routine \u{1F64F}',subs:[['Make the bed',true],['Stretch for ten minutes',false],['Read one page',false]]};
+  function tick(h,n){ return mix(h,{subs:h.subs.map(function(s,i){ return [s[0], i<n]; })}); }
+
+  // A task as a row: its box finishes it; "x of y subtasks" opens the subtasks. o: {next, open, start, done}
+  function row(h,o){ o=o||{}; var subs=h.subs||[], n=subs.filter(function(s){return s[1];}).length;
+    var tog=subs.length?'<span class="tog'+(o.open?' up':'')+'"><u>'+n+' of '+subs.length+' subtasks</u><i></i></span>':'';
+    var ml=(h.pj?'<span class="pj" style="--c:'+h.pj[1]+'"><i></i>'+h.pj[0]+'</span>':'')+tog+(h.laps?laps(h.laps[0],h.laps[1]):'');
+    var open=subs.length&&o.open?'<div class="subs">'+subs.map(function(s){ return '<div class="sub'+(s[1]?' on':'')+'">'+ck(s[1])+'<span>'+s[0]+'</span></div>'; }).join('')+'</div>':'';
+    var end=(h.laps?laps(h.laps[0],h.laps[1]):'')+(o.start?'<span class="btn pri">Start</span>':'');
+    return '<div class="row'+(o.next?' next':'')+(o.done?' done':'')+'"><span class="c1">'+ck(!!o.done)+'</span><span class="wd"><span class="tt">'+h.t+'</span>'+(ml?'<span class="ml">'+ml+'</span>':'')+'</span>'+(end?'<span class="end">'+end+'</span>':'')+open+'</div>'; }
+  // As the kit's bar: a long title is cut, what follows it shows whole.
+  function said(lead,title,tail){ return '<div class="said"><span class="s"><span class="t">'+lead+' '+title+'</span><span class="tl">'+tail+'</span></span><u>Undo</u></div>'; }
+
+  var mark='<svg class="mark" viewBox="0 0 10 22" aria-hidden="true"><circle class="m-you" cx="5" cy="5.5" r="4.2"/><circle class="m-gh" cx="5" cy="16.2" r="3.9"/></svg>';
+  var brand='<span class="brand">'+mark+'heirloom</span>';
+  function nav(){ return ['Focus','Today','Progress','Habits','Room'].map(function(n){ return '<span'+(n==='Today'?' class="on"':'')+'>'+n+'</span>'; }).join(''); }
+  var top='<div class="th"><h1>Today</h1><span>Saturday 28 November</span></div>'
+    +'<div class="figs"><div><span class="lab">Focused</span><b class="y">1h 15m</b><span class="lab">3 laps</span></div><div><span class="lab">Still planned</span><b>2h 5m</b><span class="lab">5 laps</span></div><div><span class="lab">Last Sat</span><b>1h 40m</b><span class="lab">4 laps</span></div></div>'
+    +'<div class="dayb"><div class="lapbar"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i></div><p class="tgt"><span>3 of 6 laps today</span><u>Change</u></p></div>';
+  var hint='<p class="hint">Press and hold a task to move it.</p>';
+  function lists(open){ return '<div class="add">Add a task</div><div class="blk"><p class="gh"><span>Next</span></p>'+row(html,{next:true,open:open,start:true})+'</div>'
+    +'<div class="blk"><p class="gh"><span>Later today</span><span>2 tasks, 2 laps</span></p><div class="list">'+row(qa)+row(morning)+'</div></div>'+hint; }
+  var done='<div class="blk"><p class="gh"><span>Done</span></p>'+row({t:'Reply to Sam about Friday',laps:[1,1]},{done:true})+'</div>';
+  function phone(body){ return '<div class="scr ph"><header class="hd">'+brand+'<span class="me"><span>nadia</span><span class="av">N</span></span></header><div class="ct">'+body+'</div><nav class="bb">'+nav()+'</nav></div>'; }
+  function lap(left,right,over){ return '<div class="scr lp"><aside class="sb">'+brand+'<nav>'+nav()+'</nav><span class="me2"><span class="av">N</span><span>nadia</span></span></aside><div class="mn">'+top+'<div class="cols"><div class="col">'+left+'</div><div class="col">'+right+'</div></div></div>'+(over||'')+'</div>'; }
+  function mo(text,parts,sf){ return '<div class="mo"><p>'+text+'</p><div class="scr mini'+(sf?' sf':'')+'">'+parts.join('')+'</div></div>'; }
+  function tag(t){ return '<p class="tag">'+t+'</p>'; }
+  function put(id,h){ document.getElementById(id).innerHTML=h; }
+
+  // Today.
+  put('t-phone',phone(top+lists(true)+done));
+  put('t-lap',lap(lists(true),done));
+  put('t-mo',
+    mo('Closed: the box finishes the task; "2 of 4 subtasks" with its arrow opens them.',[row(html,{next:true,start:true})])+
+    mo('Open, a tick: a subtask’s box marks it done, or not done again.',[row(tick(html,3),{next:true,open:true,start:true}),said('Done:','Main content with headings in order','. 3 of 4 subtasks.')])+
+    mo('Every subtask ticked, the task is not: the closed row says so, and it is still Next.',[row(tick(html,4),{next:true,start:true})])+
+    mo('The task’s own box finishes it, and it goes to Done with its subtasks.',[row(tick(html,4),{done:true}),said('Done:',HT,'.')])
+  );
+
+  // The sheet.
+  function srow(t,o){ o=o||{}; return '<div class="srow'+(o.edit?' edit':'')+(o.lift?' lift':'')+'"><span>'+t+(o.edit?'<span class="caret"></span>':'')+'</span><span class="lnk m">Remove</span></div>'; }
+  function subsGroup(o){ o=o||{}; var names=o.names||html.subs.map(function(s){return s[0];}), rows='';
+    names.forEach(function(t){ if(t.indexOf('gone:')===0) rows+='<p class="gone">Removed: '+t.slice(5)+'.<span class="lnk">Undo</span></p>'; else rows+=srow(t.replace(/^(edit|lift):/,''),{edit:t.indexOf('edit:')===0,lift:t.indexOf('lift:')===0}); });
+    var f=o.typing?'<span class="inp typing"><span>'+o.typing+'<span class="caret"></span></span><span class="btn sec in">Add</span></span>':'<span class="inp hold">Add a subtask</span>';
+    return '<div class="fg"><span>Subtasks</span><div class="srows">'+rows+'</div></div>'+f; }
+  function sheet(o){ return '<div class="sheet"><div class="shd"><h2>Task</h2><span class="lnk">Close</span></div>'
+    +'<label class="fg"><span>Title</span><span class="inp">'+HT+'</span></label>'
+    +'<div class="fg"><span>Project</span><div class="chs"><span>None</span><span class="on" style="--c:var(--sky)"><i></i>Web</span><span style="--c:var(--teal)"><i></i>heirloom</span></div></div>'
+    +'<div class="fg"><span>Estimate</span><div class="stp"><span class="key">−</span><output>3 laps</output><span class="key">+</span><span class="lab">1 of 3 laps run</span></div></div>'
+    +'<div class="pair"><label class="fg"><span>Due</span><span class="inp">28/11/2026</span></label><label class="fg"><span>At</span><span class="inp hold">--:--</span></label></div>'
+    +'<div class="fg" id="subs-'+o.id+'">'+subsGroup(o)+'</div>'
+    +'<div class="fg"><p class="note">Changes are saved as you make them.</p><div class="ends"><span class="btn sec">Mark done</span><span class="btn quiet">Delete</span></div></div></div>'; }
+  var dimmed='<div class="dim"><header class="hd" style="margin-bottom:8px">'+brand+'<span class="me"><span>nadia</span><span class="av">N</span></span></header><div class="ct" style="padding-bottom:8px">'+'<div class="th"><h1>Today</h1><span>Saturday 28 November</span></div></div></div>';
+  put('s-phone','<div class="scr ph" style="grid-template-rows:auto 1fr">'+dimmed+sheet({id:'p'})+'</div>');
+  put('s-lap',lap(lists(false),done,'<div class="dim" style="position:absolute;inset:0"></div><div class="lpsheet" id="lps">'+sheet({id:'l'})+'</div>'));
+  put('s-mo',
+    mo('Add: type at the foot and Add, or Enter. The new one lands over the field, which keeps the keyboard for the next; no bar speaks.',[tag('Typing'),subsGroup({typing:'Fix the footer links'}),tag('After Add'),subsGroup({names:html.subs.map(function(s){return s[0];}).concat(['Fix the footer links'])})],true)+
+    mo('Edit: tap a title and it is a field where it stands. Each change is kept as it is typed; an empty title keeps the last one.',[subsGroup({names:['Outline the sections','edit:Write the head, nav and footer','Main content with headings in order','Check it in the validator']})],true)+
+    mo('Delete: "Remove" takes it out, and where it stood the sheet says so with Undo, for ten seconds. A bar would be under the sheet, where nobody reads it.',[subsGroup({names:['Outline the sections','Write the head and nav','Main content with headings in order','gone:Check it in the validator']})],true)+
+    mo('Move: press and hold a row and it lifts, as rows do on Today; the others glide out of its way.',[subsGroup({names:['Outline the sections','Write the head and nav','lift:Check it in the validator','Main content with headings in order']})],true)
+  );
+
+  // Measured, not judged: where each block starts, from its row's left, on the phone picture of Today.
+  function edges(){ var xs={};
+    document.querySelectorAll('#t-phone .row').forEach(function(r){ var L=r.getBoundingClientRect().left, k=parseFloat(getComputedStyle(r.closest('.frame')).getPropertyValue('--k'))||1;
+      function at(sel,name,mid){ r.querySelectorAll(sel).forEach(function(e){ var b=e.getBoundingClientRect(), x=Math.round(((mid?b.left+b.width/2:b.left)-L)/k); (xs[name]=xs[name]||{})[x]=1; }); }
+      at('.c1 .ck i, .sub .ck i','box centre',true); at('.tt','title'); at('.ml','line under'); at('.sub>span:last-child','subtask words'); at('.tog u','the count that opens'); });
+    document.getElementById('measured').textContent='Measured on the phone picture of Today, in px from each row’s left: '+Object.keys(xs).map(function(n){ return n+' '+Object.keys(xs[n]).join(' and '); }).join(', ')+'. The count that opens starts on 56 where the task has no project.'; }
+
+  function fit(box){ var f=box.firstElementChild, w=f.firstElementChild?f.firstElementChild.offsetWidth:0; if(!w) return;
+    var k=Math.min(1,box.clientWidth/w); f.style.setProperty('--k',k); box.style.height=(f.offsetHeight*k)+'px'; }
+  var boxes=[].slice.call(document.querySelectorAll('.fbox'));
+  function all(){ boxes.forEach(fit); edges(); var l=document.getElementById('lps'), s=document.getElementById('subs-l'); if(l&&s) l.scrollTop=s.offsetTop-120; }
+  all(); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(all);
+  if('ResizeObserver' in window){ var ro=new ResizeObserver(function(){ boxes.forEach(fit); }); boxes.forEach(function(b){ ro.observe(b); }); } else window.addEventListener('resize',all);
+})();
+</script>

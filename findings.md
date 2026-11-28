@@ -115,3 +115,7 @@ when it is done.
 - iOS 15 Safari: color-mix() with var() is dropped (no sheet scrim, no press tint) and @container rules are ignored; layout is best effort there (code review, pre-existing).
 - server/rooms/rooms.go:319: the last member leaving deletes the room and, by cascade, its call rows, so their calls drop out of the day's limits (code review, pre-existing).
 - client/src/ui/strings.ts `progress.doneOn` repeats the relative-day wording of `today.ghostDay` and `today.due`; share one helper (code review, nit).
+- Day panel: nothing names the green block on a lap's sliver (the break after it) (stranger walk, nit).
+- Progress: the year grid's caption ("Tuesday 24 November: 2h 27m, 7 laps") repeats the day panel's figure under it; the user's call whether one goes (stranger walk).
+- Day panel: folded earlier laps also hide the tasks done and check-ins among them, and the fold link names only laps (code review, nit).
+- Day panel: the bar names a day more than a week back by its weekday only ("25 minutes off Tuesday"); use the short date as doneOn does (code review, nit).
