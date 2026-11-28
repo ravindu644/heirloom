@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, list, server, settle, signedInto, startButton, strip, taskRow, titles } from './app.ts';
+import { go, habitRow, list, roundsOf, server, settle, signedInto, startButton, strip, taskRow, titles } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -198,4 +198,188 @@ for (const [how, size] of [['a finger at 412', { width: 412, height: 915 }], ['a
     // Open on the row, as the strip's was.
     await expect(row.getByRole('checkbox', { name: 'Done: outline', exact: true })).toHaveAttribute('aria-checked', 'true');
   });
+
+  test(`${how}: a card with its subtasks open, and a habit with its times open, are carried closed: no rows under them in the hand, set down in their new place, still closed`, async ({ deviceA, phone }) => {
+    const d = pick({ deviceA, phone });
+    const name = await ready(d, 'carryshut', (node) => {
+      node.engine.write('task', 'essay', { title: 'essay', order: 'A' });
+      node.engine.write('task', 'b', { title: 'bravo', order: 'B' });
+      ['outline', 'sources'].forEach((title, i) => node.engine.write('task', `s${i}`, { title, parent: 'essay', order: `V${i}` }));
+      node.engine.write('habit', 'w', { title: 'water', days: 127, target: 3, reminds: ['08:00', '12:00', '18:00'], order: 'V1' });
+      node.engine.write('habit', 'r', { title: 'read', days: 127, target: 1, order: 'V2' });
+    });
+    const hand = await handOf(d.page, touch);
+    // Held as each hand holds: a finger rests, a mouse presses and moves.
+    const pickUp = async (at: { x: number; y: number }) => {
+      await hand.down(at.x, at.y);
+      if (touch) await d.page.waitForTimeout(500);
+      else await hand.move(at.x, at.y + 12);
+      await expect(d.page.locator('[data-lifted]'), 'the card did not lift').toHaveCount(1);
+    };
+    const titleOf = async (locator: ReturnType<Page['locator']>) => {
+      const b = await box(locator);
+      return { x: b.x + Math.min(b.width / 2, 8), y: b.y + b.height / 2 };
+    };
+
+    // The task: its band opened, then the card carried below bravo.
+    const band = (text: string) => taskRow(d.page, 'essay').getByRole('button', { name: text, exact: true });
+    await press(band('0 of 2 subtasks'), touch);
+    await expect(band('0 of 2 subtasks')).toHaveAttribute('aria-expanded', 'true');
+    const subs = d.page.getByRole('checkbox', { name: /^Done: (outline|sources)$/ }).filter({ visible: true });
+    await expect(subs).toHaveCount(2);
+    await settle(d.page);
+    await pickUp(await titleOf(taskRow(d.page, 'essay').getByText('essay', { exact: true })));
+    await expect(subs, 'the subtasks are carried open').toHaveCount(0);
+    await expect(band('0 of 2 subtasks')).toHaveAttribute('aria-expanded', 'false');
+    const bravo = await box(taskRow(d.page, 'bravo'));
+    await hand.move(bravo.x + bravo.width / 2, bravo.y + bravo.height + 8);
+    await d.page.waitForTimeout(300);
+    await expect(subs, 'the subtasks opened again in the hand').toHaveCount(0);
+    await hand.up();
+    await settle(d.page);
+    await expect.poll(() => titles(d.page)).toEqual(['bravo', 'essay']);
+    await expect.poll(() => order(name)).toEqual(['bravo', 'essay']);
+    await expect(band('0 of 2 subtasks'), 'set down, the band opened again').toHaveAttribute('aria-expanded', 'false');
+    await expect(subs).toHaveCount(0);
+
+    // The habit: its times opened, then the row carried below read.
+    await go(d.page, 'Habits');
+    await expect(habitRow(d.page, 'water')).toBeVisible();
+    await settle(d.page);
+    await roundsOf(d.page, 'water');
+    const arrow = habitRow(d.page, 'water').getByRole('button', { name: /^Today's times, / });
+    const rounds = d.page.getByRole('checkbox', { name: /^water, / }).filter({ visible: true });
+    await expect(rounds).toHaveCount(3);
+    await settle(d.page);
+    await pickUp(await titleOf(habitRow(d.page, 'water').locator('[id^="h-"]')));
+    await expect(rounds, 'the times are carried open').toHaveCount(0);
+    await expect(arrow).toHaveAttribute('aria-expanded', 'false');
+    const read = await box(habitRow(d.page, 'read'));
+    await hand.move(read.x + read.width / 2, read.y + read.height + 8);
+    await d.page.waitForTimeout(300);
+    await hand.up();
+    // Straight after the drop, inside the 300 ms the release's click is swallowed for: a tap on
+    // the bottom bar is not that click (a finger's release makes none), so it must go through.
+    await go(d.page, 'Today');
+    await expect(taskRow(d.page, 'essay'), 'the tap after the drop was eaten').toBeVisible({ timeout: 1000 });
+    const habits = async () =>
+      [...(await serverRows(server, name, 'habit')).values()].sort((x, y) => String(x.order).localeCompare(String(y.order))).map((r) => r.title);
+    await expect.poll(habits).toEqual(['read', 'water']);
+    await go(d.page, 'Habits');
+    await settle(d.page);
+    await expect(arrow, 'set down, the times opened again').toHaveAttribute('aria-expanded', 'false');
+    await expect(rounds).toHaveCount(0);
+  });
+
+  test(`${how}: an open card let go while its subtasks are still folding, and one carried and brought back to where it started: nothing moves, no sheet opens, and the band is open again`, async ({ deviceA, phone }) => {
+    const d = pick({ deviceA, phone });
+    const name = await ready(d, 'foldback', (node) => {
+      node.engine.write('task', 'essay', { title: 'essay', order: 'A' });
+      node.engine.write('task', 'b', { title: 'bravo', order: 'B' });
+      ['outline', 'sources'].forEach((title, i) => node.engine.write('task', `s${i}`, { title, parent: 'essay', order: `V${i}` }));
+    });
+    const hand = await handOf(d.page, touch);
+    const band = taskRow(d.page, 'essay').getByRole('button', { name: '0 of 2 subtasks', exact: true });
+    const subs = d.page.getByRole('checkbox', { name: /^Done: (outline|sources)$/ }).filter({ visible: true });
+    const words = async () => {
+      const b = await box(taskRow(d.page, 'essay').getByText('essay', { exact: true }));
+      return { x: b.x + Math.min(b.width / 2, 8), y: b.y + b.height / 2 };
+    };
+    const unchanged = async (what: string) => {
+      await d.page.waitForTimeout(400);
+      await expect(d.page.locator('dialog[open]'), `${what}: the release opened the task`).toHaveCount(0);
+      await expect(band, `${what}: the band did not open again`).toHaveAttribute('aria-expanded', 'true');
+      await expect(subs, `${what}: its subtasks are not back`).toHaveCount(2);
+      // The tasks' own boxes only: an open band's subtasks have "Done:" boxes too.
+      const tasks = await d.page.getByRole('checkbox', { name: /^Done: (essay|bravo)$/ }).evaluateAll((els) => els.filter((el) => !el.closest('[inert]')).map((el) => el.getAttribute('aria-label')));
+      expect(tasks, `${what}: a row moved`).toEqual(['Done: essay', 'Done: bravo']);
+    };
+    await press(band, touch);
+    await expect(band).toHaveAttribute('aria-expanded', 'true');
+    await expect(subs).toHaveCount(2);
+    await settle(d.page);
+
+    // Let go at once, while it folds: the finger after its hold, the mouse as soon as it has moved past the slop.
+    const at = await words();
+    await hand.down(at.x, at.y);
+    if (touch) await d.page.waitForTimeout(500);
+    else await hand.move(at.x, at.y + 12);
+    await hand.up();
+    await unchanged('let go while folding');
+
+    // Carried past bravo, then brought back to where it started, and let go there.
+    await settle(d.page);
+    const from = await words();
+    await hand.down(from.x, from.y);
+    if (touch) await d.page.waitForTimeout(500);
+    else await hand.move(from.x, from.y + 12);
+    await expect(d.page.locator('[data-lifted]')).toHaveCount(1);
+    await d.page.waitForTimeout(400);
+    const bravo = await box(taskRow(d.page, 'bravo'));
+    await hand.move(from.x, bravo.y + bravo.height + 8);
+    await d.page.waitForTimeout(300);
+    await hand.move(from.x, from.y);
+    await d.page.waitForTimeout(300);
+    await hand.up();
+    await settle(d.page);
+    await unchanged('brought back');
+    await expect.poll(() => order(name)).toEqual(['essay', 'bravo']);
+  });
 }
+
+test('in the task sheet a subtask held and carried down past another: the row passed glides there, not jumps; let go, the order holds, on the server and when the sheet is opened again', async ({ deviceA: a }) => {
+  await a.page.setViewportSize({ width: 1440, height: 900 });
+  const { name } = await signedInto(a, 'sheetglide', (node) => {
+    node.engine.write('task', 'essay', { title: 'essay', order: 'A' });
+    ['one', 'two', 'three'].forEach((title, i) => node.engine.write('task', `s${i}`, { title, parent: 'essay', order: `V${i}` }));
+  });
+  await go(a.page, 'Today');
+  const open = async () => {
+    const target = taskRow(a.page, 'essay').getByRole('button', { name: /^essay/ });
+    const [t, w] = [await box(target), await box(taskRow(a.page, 'essay').getByText('essay', { exact: true }))];
+    await target.click({ position: { x: w.x - t.x + 4, y: w.y - t.y + w.height / 2 } });
+    const sheet = a.page.getByRole('dialog', { name: 'Task', exact: true });
+    await expect(sheet).toBeVisible();
+    await settle(a.page);
+    return sheet;
+  };
+  let sheet = await open();
+  const shown = (dialog: typeof sheet) => dialog.getByRole('button', { name: /^Change: / }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')!.slice('Change: '.length)));
+  expect(await shown(sheet)).toEqual(['one', 'two', 'three']);
+  const rowOf = (title: string) => sheet.locator('[data-lift]').filter({ has: a.page.getByRole('button', { name: `Change: ${title}`, exact: true }) });
+  await rowOf('two').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await settle(a.page);
+
+  const one = await box(rowOf('one'));
+  const two = await box(rowOf('two'));
+  await a.page.mouse.move(one.x + one.width / 2, one.y + one.height / 2);
+  await a.page.mouse.down();
+  await a.page.waitForTimeout(500);
+  await expect(a.page.locator('[data-lifted]')).toHaveCount(1);
+  // Where "two" stands, frame by frame, while "one" is carried past its middle.
+  const frames = rowOf('two').evaluate(async (el) => {
+    const seen: number[] = [];
+    for (let i = 0; i < 45; i++) {
+      seen.push(new DOMMatrix(getComputedStyle(el).transform).m42);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return seen;
+  });
+  await a.page.mouse.move(one.x + one.width / 2, two.y + two.height + 6, { steps: 10 });
+  const seen = await frames;
+  const last = seen.at(-1)!;
+  expect(Math.abs(last), `"two" never moved out of the way: ${seen.join(', ')}`).toBeGreaterThan(one.height / 2);
+  // Between where it stood and where it went: some frame in the middle of the way.
+  expect(seen.some((y) => Math.abs(y) > 1 && Math.abs(y) < Math.abs(last) - 1), `"two" jumped, with no frame on the way: ${seen.join(', ')}`).toBe(true);
+  await a.page.mouse.up();
+  await settle(a.page);
+
+  await expect.poll(() => shown(sheet)).toEqual(['two', 'one', 'three']);
+  const subs = async () =>
+    [...(await serverRows(server, name, 'task')).values()].filter((r) => r.parent === 'essay' && !r.deleted).sort((x, y) => String(x.order).localeCompare(String(y.order))).map((r) => r.title);
+  await expect.poll(subs).toEqual(['two', 'one', 'three']);
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expect(a.page.locator('dialog[open]')).toHaveCount(0);
+  sheet = await open();
+  expect(await shown(sheet)).toEqual(['two', 'one', 'three']);
+});
