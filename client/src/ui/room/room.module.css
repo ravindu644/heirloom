@@ -64,6 +64,8 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .cover { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
 .top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-sm); }
 .top > div { display: grid; gap: var(--space-xs); min-width: 0; }
+/* The time keeps the last column, the cheer standing before it: when the cheer goes, the time stays put. */
+.top > .left { grid-column: -2; }
 .name { font: var(--type-label); color: var(--muted); }
 .name b { font: var(--type-body-strong); color: var(--ink); }
 .left { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }

@@ -676,8 +676,8 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
                     {named(m)}
                     <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
                   </div>
-                  {left(m)}
                   {cheer(m)}
+                  {left(m)}
                 </div>
                 <Fold within="sm">{task(m)}</Fold>
               </>

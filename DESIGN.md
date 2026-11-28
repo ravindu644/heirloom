@@ -687,7 +687,7 @@ Built once in `client/src/ui/kit/` and reused.
     started together runs, the line that says so. While a lap
     is called, each person who is in has their circle
     (24px, a 2px `surface` ring) standing in their lane at the call's start.
-    **Cheer** is a 40px round button with 🎉 at the end of the person's top line (`key` fill, a
+    **Cheer** is a 40px round button with 🎉 on the person's top line, just before their time (so the time stays where it is when the button goes) (`key` fill, a
     `hair` of `key-edge`, named "Cheer lina's lap" to a screen reader), there only while a lap of
     theirs that rang is not yet cheered by you. A tap bursts it: the 🎉 breaks into six lap squares
     in the heat colours that fly out a short way and fade (`cheer` 600ms), and the button is gone;
