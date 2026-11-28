@@ -7,7 +7,7 @@ import type { ReadonlySignal } from '@preact/signals-core';
 import { addDays, bests, estimates, outcomeOf, projectShares, since, streakView, weekRace } from '../core/progress.ts';
 import type { Bests, Since, StreakView, WeekRace } from '../core/progress.ts';
 import { KEPT_MS, isDay } from '../core/real.ts';
-import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
+import { fill, focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
 import { asTask, squares } from '../core/today.ts';
@@ -48,6 +48,8 @@ export interface TimelineEntry {
   ended: number;
   /** Running time: the end less the start less the pauses. */
   ran_ms: number;
+  /** How full its square is drawn (section 7): 1 for a lap that rang, else what it ran over its plan, never over 1; the lap in progress so far. 0 for a break. */
+  fill: number;
   task: { id: string; title: string } | null;
   project: ProjectView | null;
   /** One of a pair that ran on two devices at once. */
@@ -305,6 +307,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
             started: session.started,
             ended: session.ended,
             ran_ms: Math.max(0, session.ended - session.started - session.paused_ms),
+            // The lap in progress ends where it has got to, so this is how far it has run.
+            fill: session.kind === 'work' ? fill(session) : 0,
             task: task ? { id: task.id, title: task.title } : null,
             // Named only with its task: purged, the lap is named by nothing, though its minutes stay in the project's totals.
             project: task ? projectOf(task.id) : null,

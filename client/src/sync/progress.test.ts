@@ -550,11 +550,11 @@ describe('a day\'s timeline', () => {
     const { p, project, task, ids } = await morning();
     const view = { id: project, name: 'The C book', color: 'you' };
     assert.deepEqual(sessionsOf(p, '2026-11-23'), [
-      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, task: { id: task, title: 'pointers' }, project: view, overlap: false, row: 0, day_ms: LAP, split_ms: LAP, off_ms: LAP, began: null, ends: null },
-      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
-      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
-      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, task: null, project: null, overlap: true, row: 0, day_ms: LAP, split_ms: 2 * LAP, off_ms: 15 * MIN, began: null, ends: null },
-      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, task: null, project: null, overlap: true, row: 1, day_ms: 5 * MIN, split_ms: 55 * MIN, off_ms: 5 * MIN, began: null, ends: null },
+      { id: ids.first, kind: 'work', outcome: 'rang', started: at('2026-11-23', 9), ended: at('2026-11-23', 9, 25), ran_ms: LAP, fill: 1, task: { id: task, title: 'pointers' }, project: view, overlap: false, row: 0, day_ms: LAP, split_ms: LAP, off_ms: LAP, began: null, ends: null },
+      { id: ids.rest, kind: 'short', outcome: 'rang', started: at('2026-11-23', 9, 25), ended: at('2026-11-23', 9, 30), ran_ms: 5 * MIN, fill: 0, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
+      { id: ids.aside, kind: 'work', outcome: 'void', started: at('2026-11-23', 9, 30), ended: at('2026-11-23', 9, 40), ran_ms: 10 * MIN, fill: 10 / 25, task: null, project: null, overlap: false, row: 0, day_ms: 0, split_ms: null, off_ms: 0, began: null, ends: null },
+      { id: ids.here, kind: 'work', outcome: 'rang', started: at('2026-11-23', 10), ended: at('2026-11-23', 10, 30), ran_ms: LAP, fill: 1, task: null, project: null, overlap: true, row: 0, day_ms: LAP, split_ms: 2 * LAP, off_ms: 15 * MIN, began: null, ends: null },
+      { id: ids.there, kind: 'work', outcome: 'stopped', started: at('2026-11-23', 10, 20), ended: at('2026-11-23', 10, 35), ran_ms: 15 * MIN, fill: 15 / 25, task: null, project: null, overlap: true, row: 1, day_ms: 5 * MIN, split_ms: 55 * MIN, off_ms: 5 * MIN, began: null, ends: null },
     ]);
     assert.equal(sessionsOf(p, '2026-11-22').length, 1);
     assert.deepEqual(sessionsOf(p, '2026-11-21'), []);
@@ -654,6 +654,15 @@ describe('a day\'s timeline', () => {
     // Set aside, Monday loses those 5 and Tuesday its 32.
     p.setAside(late);
     assert.deepEqual([p.day('2026-11-23').focus_ms, p.day('2026-11-24').focus_ms], [25 * MIN, 0]);
+  });
+
+  it('each entry says how full its square is: a lap that rang whole, the lap in progress as far as it has run, a break nothing', async () => {
+    const { w, d, p } = await one();
+    lap(d, '2026-11-24', 8, 0);
+    lap(d, '2026-11-24', 8, 25, { kind: 'short', ended: at('2026-11-24', 8, 30), planned_ms: 5 * MIN });
+    d.focus.start();
+    w.time.advance(10 * MIN);
+    assert.deepEqual(sessionsOf(p, '2026-11-24').map((entry) => [entry.kind, entry.fill]), [['work', 1], ['short', 0], ['work', 10 / 25]]);
   });
 
   it('the lap in progress in a pair keeps the row its start gives it, though it is drawn last', async () => {
