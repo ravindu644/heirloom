@@ -1,0 +1,418 @@
+<title>Subtasks, a new opener</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap");
+:root{--ground:#EEF0EC;--surface:#FFFFFF;--raised:#E4E7E2;--ink:#121412;--muted:#474C47;--line:#D5D9D3;--edge:#7C827B;--you:#C4321A;--you-tint:#FBE2DA;--on-you:#FFFFFF;--ghost:#8A9089;--rest:#23704E;--key:#E4E7E2;--key-edge:#121412;--key-quiet:#E4E7E2;--teal:#0F7B7F;--sky:#1F6FB5;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;--sky:#6FB3EE;color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#0E100E;--surface:#181A18;--raised:#232623;--ink:#F0F2EE;--muted:#A4A9A3;--line:#2B2F2B;--edge:#7C827B;--you:#FF6A4D;--you-tint:#3B1D16;--on-you:#140806;--ghost:#7C827B;--rest:#5DBE8D;--key:#343934;--key-edge:#343934;--key-quiet:#232623;--teal:#4FC3C0;--sky:#6FB3EE;color-scheme:dark}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--raised);color:var(--ink);font:400 16px/1.45 Barlow,system-ui,sans-serif;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow-x:hidden}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.page{max-width:1240px;margin:0 auto;display:grid;gap:40px}
+.intro{display:grid;gap:16px}
+.intro h1{font:600 34px/1.1 Barlow,sans-serif;letter-spacing:-.02em}
+.intro p{max-width:72ch;text-wrap:pretty}
+.intro .bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.theme{display:inline-flex;gap:4px}
+.theme button{font:600 16px/1.3 Barlow,sans-serif;height:48px;padding:0 16px;border-radius:4px;border:1px solid var(--edge);background:var(--surface);color:var(--ink);cursor:pointer}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+.theme button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.mut{color:var(--muted)}
+.card{display:grid;gap:16px;padding:16px;background:var(--surface);border-radius:8px}
+.card h2{font:600 16px/1.3 Barlow,sans-serif}
+.card p{color:var(--muted);max-width:76ch}
+.ans{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:8px 24px;max-width:100ch}
+.ans dt{font:600 16px/1.3 Barlow,sans-serif;padding-top:1px}
+.ans dd{color:var(--muted)}
+@media (max-width:719px){.ans{grid-template-columns:minmax(0,1fr);gap:4px}.ans dd{margin-bottom:8px}}
+.opt{display:grid;gap:24px;padding-top:40px;border-top:1px solid var(--edge)}
+.opt-head{display:flex;gap:16px;align-items:flex-start}
+.letter{font:600 44px/1 "Barlow Condensed",sans-serif;color:var(--you);flex:none}
+.idea{display:grid;gap:16px;padding-top:4px;min-width:0}
+.idea h2{font:600 24px/1.2 Barlow,sans-serif;max-width:52ch;text-wrap:balance}
+.tagp{display:inline-block;font:600 14px/1 "Barlow Condensed",sans-serif;background:var(--you);color:var(--on-you);padding:4px 8px;border-radius:4px;vertical-align:4px;margin-right:4px}
+.show{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
+@media (min-width:860px){.show{grid-template-columns:minmax(0,412px) minmax(0,1fr)}}
+figure{display:grid;gap:8px;min-width:0}
+figcaption{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.fbox{width:100%;overflow:hidden;border-radius:8px;outline:1px solid var(--edge);background:var(--ground)}
+.fbox.p{max-width:412px}
+.frame{transform:scale(var(--k,1));transform-origin:0 0;width:max-content}
+.moments{display:grid;gap:24px;align-content:start}
+.mo{display:grid;gap:8px}
+.mo>p{text-wrap:pretty;max-width:60ch}
+.mini{max-width:412px;border-radius:8px;outline:1px solid var(--edge);padding:16px;display:grid;gap:8px}
+.mini>*{min-width:0}
+.tag{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+
+/* Inside a screen: heirloom's own tokens and roles. */
+.scr{background:var(--ground);color:var(--ink);font:400 16px/1.45 Barlow,sans-serif;user-select:none;-webkit-user-select:none;text-align:left}
+.lab,.ml,.hint{font:500 13px/1.3 Barlow,sans-serif}
+.phone{width:412px;min-height:915px;display:grid;grid-template-rows:auto 1fr auto}
+.hd{display:flex;align-items:center;justify-content:space-between;height:48px;margin:8px 20px 0}
+.brand{display:inline-flex;align-items:center;gap:8px;font:600 16px/1.3 Barlow,sans-serif;color:var(--ink)}
+.mark{height:22px;width:10px;flex:none}
+.m-you{fill:var(--you)}.m-gh{fill:none;stroke:var(--ghost);stroke-width:1.6;stroke-dasharray:2.1 2.1}
+.me{display:inline-flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif}
+.av{width:40px;height:40px;border-radius:50%;background:var(--teal);color:var(--on-you);display:grid;place-items:center;font:600 16px/1 Barlow,sans-serif;flex:none}
+.ct{padding:16px 20px 24px;display:grid;gap:24px;align-content:start}
+.th{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.th h1{font:600 24px/1.2 Barlow,sans-serif}
+.th span{color:var(--muted)}
+.figs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface);border-radius:8px}
+.figs>div{padding:16px;display:grid;gap:4px;align-content:start}
+.figs>div+div{border-left:1px solid var(--line)}
+.figs b{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1}
+.figs .y{color:var(--you)}
+.dayb{display:grid;gap:8px}
+.lapbar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.lapbar i{position:relative;height:8px;background:var(--line);overflow:hidden}
+.lapbar i.f{background:var(--you)}
+.lapbar i.p::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--s);background:var(--you)}
+.tgt{display:flex;justify-content:space-between;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.tgt u{color:var(--ink);text-underline-offset:4px}
+.blk{display:grid;gap:8px}
+.gh{display:flex;justify-content:space-between;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.add{height:48px;border:1px solid var(--edge);border-radius:4px;background:var(--surface);padding:0 16px;display:flex;align-items:center;color:var(--muted)}
+.list{display:grid;gap:8px}
+.bb{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:64px;border-top:1px solid var(--line);background:var(--ground)}
+.bb span{display:grid;place-items:center;font:500 13px/1.3 Barlow,sans-serif;color:var(--muted);border-top:2px solid transparent;margin-top:-1px}
+.bb .on{border-top-color:var(--you);color:var(--ink)}
+
+/* Task rows, as built on Today. */
+.row{background:var(--surface);border-radius:8px;padding:8px 16px 8px 4px;display:grid;grid-template-columns:48px minmax(0,1fr) auto;column-gap:4px;align-items:center;--track:var(--raised)}
+.row.next{box-shadow:inset 0 0 0 2px var(--you)}
+.row.done .tt{color:var(--muted);text-decoration:line-through}
+.c1{grid-column:1;grid-row:1}
+.wd{grid-column:2;grid-row:1;display:grid;gap:4px;min-height:48px;align-content:center;min-width:0;padding-block:4px}
+.tt{font:400 16px/1.45 Barlow,sans-serif}
+.ml{display:flex;align-items:center;gap:4px 12px;flex-wrap:wrap;color:var(--muted)}
+.pj{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+.pj i{width:8px;height:8px;background:var(--c)}
+.ml .laps{margin-left:auto}
+.tog{display:inline-flex;align-items:center;gap:6px;color:var(--ink);padding:15px 8px;margin:-15px -8px}
+.tog u{text-underline-offset:4px}
+.tog i{width:7px;height:7px;margin-top:-4px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.end{grid-column:3;grid-row:1;display:flex;align-items:center;gap:16px;padding-left:12px}
+.end .laps{display:none}
+.laps{display:inline-flex;align-items:center;gap:8px;font:600 14px/1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;color:var(--muted);white-space:nowrap}
+.laps b{font-weight:600;color:var(--ink)}
+.sq{display:inline-flex;gap:4px}
+.sq i{width:8px;height:8px;background:var(--track)}
+.sq i.f{background:var(--you)}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 20px;border-radius:4px;font:600 16px/1.3 Barlow,sans-serif;white-space:nowrap;flex:none}
+.btn.pri{background:var(--you);color:var(--on-you)}
+.btn.sec{background:var(--key);color:var(--ink);box-shadow:inset 0 0 0 1px var(--key-edge)}
+.btn.quiet{background:var(--key-quiet);color:var(--ink)}
+.btn.onbar{background:var(--ground);color:var(--ink)}
+.ck{width:48px;height:48px;display:grid;place-items:center;flex:none}
+.ck i{width:20px;height:20px;border:2px solid var(--muted);border-radius:4px;display:grid;place-items:center}
+.ck.on i{background:var(--ink);border-color:var(--ink)}
+.ck.on i::after{content:"";width:4px;height:8px;margin-top:-2px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.fold{width:48px;height:48px;display:grid;place-items:center;flex:none}
+.fold i{width:9px;height:9px;margin-top:-5px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg);transition:transform 160ms cubic-bezier(0.2,0,0,1)}
+.fold.up i{margin-top:5px;transform:rotate(-135deg)}
+
+/* The strip of the lap in progress, on the same two edges as a row: its dot centred 28px in,
+   the time on 56. */
+.strip{display:grid;grid-template-columns:48px auto minmax(0,1fr) auto;column-gap:4px;align-items:center;padding:8px 8px 8px 4px;border-radius:8px;background:var(--ink);color:var(--ground)}
+.strip>i{justify-self:center;width:8px;height:8px;border-radius:50%;background:var(--you)}
+.strip>i.rest{background:var(--rest)}
+.strip b{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;margin-right:12px}
+.strip .paused{opacity:.6}
+.strip u{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-underline-offset:4px;min-height:48px;display:flex;align-items:center}
+.strip>span:last-child{margin-left:12px}
+.held{display:grid}
+.held .strip.withtray{border-radius:8px 8px 0 0}
+/* The running task's subtasks: one surface under the strip, or a panel on Focus. Closed it is
+   one row, the arrow in the box column and the count on 56; open, a row per subtask. */
+.tray{background:var(--surface);border-radius:0 0 8px 8px;padding:0 16px 0 4px;display:grid}
+.tray.panel{border-radius:8px}
+.tray .fr{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;align-items:center;min-height:48px}
+.tray .fr>span:last-child{padding-block:12px}
+.tray .fr.lead>span:last-child{font:600 16px/1.3 Barlow,sans-serif}
+.tray .fr.on>span:last-child{color:var(--muted);text-decoration:line-through}
+.tray .fr+.fr{border-top:1px solid var(--line)}
+.tray .fr.lead+.fr{border-top:1px solid var(--line)}
+.said{display:flex;align-items:center;gap:16px;min-height:48px;padding:0 16px;border-radius:8px;background:var(--ink);color:var(--ground);box-shadow:0 12px 40px rgb(18 20 18 / 0.18)}
+.said .s{display:flex;flex:1;min-width:0}
+.said .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.said .tl{flex:none;white-space:nowrap}
+.said u{font:500 13px/1.3 Barlow,sans-serif;text-underline-offset:4px}
+
+/* Focus, as built: the task over the digits, the race under them, the buttons at the foot. */
+.fo{padding:16px 20px 24px;display:grid;grid-template-rows:auto 1fr auto;gap:24px}
+.fo .top{display:grid;gap:24px;align-content:start}
+.task{display:grid;gap:8px}
+.task h2{font:600 24px/1.2 Barlow,sans-serif;text-wrap:balance}
+.bar3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.bar3 i{position:relative;height:8px;background:var(--line);overflow:hidden}
+.bar3 i.f{background:var(--you)}
+.bar3 i.p::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--s);background:var(--you)}
+.dig{display:grid;gap:8px}
+.dig b{font:600 168px/.9 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;letter-spacing:-.01em;margin-left:-.024em}
+.dig b.gr{color:var(--muted)}
+.dig span{color:var(--muted)}
+.rp{background:var(--surface);border-radius:8px;padding:16px;display:grid;gap:16px;--track:var(--raised)}
+.rp h3{font:600 16px/1.3 Barlow,sans-serif}
+.race{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px 16px}
+.race .who{font:500 13px/1.3 Barlow,sans-serif;color:var(--muted)}
+.lane{position:relative;height:16px;background:var(--track)}
+.lane i{position:absolute;inset:0 auto 0 0;background:var(--you)}
+.lane.gh i{background:none;border:1px dashed var(--ghost)}
+.val{font:500 26px/1.1 "Barlow Condensed",sans-serif;font-feature-settings:"tnum" 1;text-align:right}
+.val.m{color:var(--muted)}
+.chip{font:600 14px/1 "Barlow Condensed",sans-serif;background:var(--you-tint);color:var(--ink);padding:2px 8px;border-radius:4px;margin-right:4px}
+.foot{display:grid;gap:16px;align-content:end}
+.ql{display:flex;justify-content:space-between;font:500 13px/1.3 Barlow,sans-serif}
+.ql u{text-underline-offset:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.later{display:grid}
+.later p{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line)}
+.later p:first-of-type{border-top:0}
+
+/* The laptop. */
+.lp{position:relative;width:1440px;height:900px;display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:900px;overflow:hidden}
+.lp .mn{overflow:hidden}
+.sb{display:grid;grid-template-rows:auto 1fr auto;padding:16px 16px 24px;gap:24px}
+.sb .brand{height:48px;padding-left:8px}
+.sb nav{display:grid;gap:4px;align-content:start}
+.sb nav span{height:48px;display:flex;align-items:center;padding:0 8px;border-radius:4px;color:var(--muted)}
+.sb nav .on{background:var(--raised);color:var(--ink)}
+.me2{display:flex;align-items:center;gap:8px;font:500 13px/1.3 Barlow,sans-serif;padding-left:8px}
+.mn{padding:32px;display:grid;gap:24px;align-content:start;max-width:1208px}
+.cols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;align-items:start}
+.col{display:grid;gap:24px;align-content:start}
+.lp .ml .laps{display:none}
+.lp .end .laps{display:inline-flex}
+.lp .dig b{font-size:300px}
+.lp .fo{padding:0}
+.lp .two{display:flex}
+.lp .ct{padding:0}
+
+/* Part 2: three openers for a task's subtasks. The task's box keeps the left. */
+.part{display:grid;gap:16px;padding-top:40px;border-top:2px solid var(--ink)}
+.part>h2{font:600 34px/1.1 Barlow,sans-serif;letter-spacing:-.02em}
+.part>p{max-width:72ch}
+.decided{display:inline-block;font:600 14px/1 "Barlow Condensed",sans-serif;background:var(--ink);color:var(--ground);padding:4px 8px;border-radius:4px;vertical-align:8px;margin-right:8px}
+.why{color:var(--ink)!important}
+/* S1: the arrow at the row's right end, its centre 28px from the right as the box's is from the left. */
+.row.s1{grid-template-columns:48px minmax(0,1fr) auto 48px;padding-right:4px}
+.row.s1 .end{padding-right:0}
+.row.s1 .ar{grid-column:4;grid-row:1}
+.row.s1 .end:empty{display:none}
+.tray .fr.s1lead{grid-template-columns:48px minmax(0,1fr) 48px;margin-right:-12px}
+.cnt{color:var(--muted)}
+.subs{grid-column:1 / -1;display:grid;margin:8px -16px 0 0;padding-right:16px;border-top:1px solid var(--line)}
+.sub{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;align-items:center;min-height:48px}
+.sub>span:last-child{padding-block:12px}
+.sub.on>span:last-child{color:var(--muted);text-decoration:line-through}
+.row.s1 .subs{margin-right:-4px;padding-right:4px}
+.row .tt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+/* S2: the band, a row of its own at the card's foot: the arrow in the box column, the count on 56. */
+.band{grid-column:1 / -1;display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:4px;align-items:center;min-height:48px;margin:8px -16px -8px 0;padding-right:16px;border-top:1px solid var(--line)}
+.band>span:last-child{color:var(--ink)}
+.row .subs.after{margin-top:0;border-top:1px solid var(--line)}
+.tray .fr.lead.plain>span:last-child{font:400 16px/1.45 Barlow,sans-serif}
+/* S3: the subtasks as boxes in miniature, a line on 56 that is the opener, the arrow after them. */
+.minis{grid-column:2;grid-row:2;display:inline-flex;align-items:center;gap:6px;justify-self:start;padding:14px 8px 14px 0;margin:-10px 0 -6px}
+.minis i{width:12px;height:12px;border:2px solid var(--muted);border-radius:3px}
+.minis i.f{background:var(--ink);border-color:var(--ink)}
+.minis b{width:7px;height:7px;margin:-4px 0 0 4px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.minis.up b{margin-top:4px;transform:rotate(-135deg)}
+.row.s3 .subs{grid-row:3}
+.tray .fr.s3lead{min-height:48px}
+.tray .fr.s3lead .minis{grid-column:2;grid-row:1;margin:-14px 0}
+.lp .row.s1{grid-template-columns:48px minmax(0,1fr) auto 48px}
+</style>
+
+<main class="page">
+<header class="intro">
+  <h1>Subtasks on Today: the strip, and a new way to open them</h1>
+  <div class="bar">
+    <p class="mut">Saturday 28 November, 14:20. Drawn with heirloom's own colours, type and kit.</p>
+    <div class="theme" role="group" aria-label="Colours"><button type="button" data-t="light">Light</button><button type="button" data-t="dark">Dark</button><button type="button" data-t="system">System</button></div>
+  </div>
+</header>
+
+<section class="part" aria-labelledby="p1-h">
+  <h2 id="p1-h"><span class="decided">Decided</span>R1: the running task's subtasks under Today's strip</h2>
+  <dl class="ans">
+    <dt>The shape</dt><dd>One surface hangs from the strip. Closed it is one row: the fold arrow in the box column (centred 28px in) and "2 of 4 subtasks" on 56. Open, a row per subtask, its box on 28 and its words on 56, struck through where it stands when done. Only ticking: making and changing stay in the task's sheet. Focus does not change.</dd>
+    <dt>The strip</dt><dd>Its dot is centred 28px in and its time starts on 56, so the surface under it lines up with it. It was 20 and 36.</dd>
+    <dt>Paused</dt><dd>The strip says Resume and keeps its subtasks.</dd>
+    <dt>The lap ends, a break</dt><dd>The task goes back to its place in the list, its row open if the strip's was. In a break the strip is the break's ("4:12 Short break") and holds no subtasks.</dd>
+    <dt>No subtasks</dt><dd>Nothing new appears: the strip is as it is now.</dd>
+    <dt>Undo</dt><dd>The bar, as now: "Done: Main content with headings in order. 3 of 4 subtasks."</dd>
+  </dl>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="r1-phone"></div></div><figcaption>Today on the phone during a lap, drawn whole, the subtasks open.</figcaption></figure>
+    <div class="moments" id="r1-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="r1-lap"></div></div><figcaption>Today on the laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="part" aria-labelledby="p2-h">
+  <h2 id="p2-h">A new way to open a task's subtasks</h2>
+  <p><b>My pick is S2, the band.</b> It gives the opener what Habits' arrow has, the box column and a whole row to itself, by giving it a row of its own under the task, so the task's box keeps the line above. It is also already the strip's tray, so Today opens subtasks one way everywhere and R1 does not change.</p>
+  <p class="mut">In all three the task's box stays at the left (centre 28, words on 56), ticking happens only on Today, editing only in the sheet, and Jira's rule holds: "3 of 3 subtasks" beside an empty box is a task still open.</p>
+  <p class="mut" id="measured"></p>
+</section>
+
+<section class="opt" aria-labelledby="s1-h">
+  <div class="opt-head"><span class="letter">S1</span><div class="idea"><h2 id="s1-h">The arrow at the right end, as Habits' at the left</h2>
+    <dl class="ans">
+      <dt>The opener</dt><dd>A 48px arrow at the row's right end, its centre 28px from the right as the box's is from the left. The count is plain words on the line under the title, "1 of 3 subtasks".</dd>
+      <dt>Not the box</dt><dd>It stands at the other end of the row, has no square round it, and is the same mark Habits opens with.</dd>
+      <dt>Not Start</dt><dd>Start is a filled word; the arrow stands after it, bare, on the card's edge.</dd>
+      <dt>Its cost</dt><dd>On a phone's Next card the title shares its line with Start and the arrow, about 170px.</dd>
+      <dt>In the tray</dt><dd>The tray's row turns to match: the count on 56, the arrow at its right end.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="s1-phone"></div></div><figcaption>Today on the phone, drawn whole: the Next card closed, Morning Routine open, a long title closed.</figcaption></figure>
+    <div class="moments" id="s1-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="s1-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="opt" aria-labelledby="s2-h">
+  <div class="opt-head"><span class="letter">S2</span><div class="idea"><h2 id="s2-h"><span class="tagp">My pick</span> The band: a row of its own at the card's foot</h2>
+    <dl class="ans">
+      <dt>The opener</dt><dd>Under a rule at the card's foot, a full-width row 48px tall: the arrow in the box column, "1 of 3 subtasks" on 56. The whole band is the target. Open, the subtasks follow it on the same two edges, so it reads as the first line of the list it opens.</dd>
+      <dt>Not the box</dt><dd>It stands on its own line under a rule; the task's box is on the task's line above, and an arrow is not a square.</dd>
+      <dt>Not Start</dt><dd>Start stays on the task's line, a filled word; the band holds no button.</dd>
+      <dt>Its cost</dt><dd>A task with subtasks is 48px taller, closed.</dd>
+      <dt>In the tray</dt><dd>The same row, as decided: the tray already is a band.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="s2-phone"></div></div><figcaption>Today on the phone, drawn whole.</figcaption></figure>
+    <div class="moments" id="s2-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="s2-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+
+<section class="opt" aria-labelledby="s3-h">
+  <div class="opt-head"><span class="letter">S3</span><div class="idea"><h2 id="s3-h">The subtasks in miniature</h2>
+    <dl class="ans">
+      <dt>The opener</dt><dd>A line on 56 under the title: one small box per subtask, filled when done, and the arrow after them. The line is the target, 48px tall by padding. What opens is the same boxes at full size.</dd>
+      <dt>Not the box</dt><dd>They are a third of its size, several in a row, on a line of their own under the words.</dd>
+      <dt>Not Start</dt><dd>Start is a filled word at the row's end; the small boxes sit under the title, far from it.</dd>
+      <dt>Its cost</dt><dd>No number is written, and a task of 12 subtasks is a long line of small boxes; a screen reader hears "1 of 3 subtasks".</dd>
+      <dt>In the tray</dt><dd>The tray's row becomes the same small boxes and arrow, on 56.</dd>
+    </dl></div></div>
+  <div class="show">
+    <figure><div class="fbox p"><div class="frame" id="s3-phone"></div></div><figcaption>Today on the phone, drawn whole.</figcaption></figure>
+    <div class="moments" id="s3-mo"></div>
+  </div>
+  <figure><div class="fbox"><div class="frame" id="s3-lap"></div></div><figcaption>Laptop, 1440 wide.</figcaption></figure>
+</section>
+</main>
+
+<script>
+(function(){
+  var root=document.documentElement, KEY='heirloom-subtasks3-theme';
+  function set(t){ if(t==='system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',t);
+    document.querySelectorAll('.theme button').forEach(function(b){b.setAttribute('aria-pressed', String(b.dataset.t===t));}); }
+  var saved='system'; try{ saved=localStorage.getItem(KEY)||'system'; }catch(e){}
+  var q=new URLSearchParams(location.search).get('theme'); if(q) saved=q;
+  set(saved);
+  document.querySelectorAll('.theme button').forEach(function(b){ b.addEventListener('click',function(){ set(b.dataset.t); try{localStorage.setItem(KEY,b.dataset.t);}catch(e){} }); });
+
+  var HT='HTML refresh - write a well structured page';
+  var HS=[['Outline the sections',true],['Write the head and nav',true],['Main content with headings in order',false],['Check it in the validator',false]];
+  var MS=[['Make the bed',true],['Stretch for ten minutes',false],['Read one page',false]];
+  var LT='Read chapter 4 of the networking book and write a one page summary for Monday';
+  var LS=[['Read 4.1 to 4.3',true],['Read 4.4 to 4.6',false],['Write the summary',false]];
+  function tick(subs,n){ return subs.map(function(s,i){ return [s[0], i<n]; }); }
+  function ck(on){ return '<span class="ck'+(on?' on':'')+'"><i></i></span>'; }
+  function fold(open){ return '<span class="fold'+(open?' up':'')+'"><i></i></span>'; }
+  function laps(n,t){ var s=''; for(var i=0;i<t;i++) s+='<i'+(i<n?' class="f"':'')+'></i>'; return '<span class="laps"><span class="sq">'+s+'</span><span><b>'+n+'</b> of '+t+'</span></span>'; }
+  function count(subs){ var n=subs.filter(function(s){return s[1];}).length; return n+' of '+subs.length+' subtasks'; }
+  function minis(subs,open){ return '<span class="minis'+(open?' up':'')+'" aria-label="'+count(subs)+'">'+subs.map(function(s){ return '<i'+(s[1]?' class="f"':'')+'></i>'; }).join('')+'<b></b></span>'; }
+  function subrows(subs){ return subs.map(function(s){ return '<div class="sub'+(s[1]?' on':'')+'">'+ck(s[1])+'<span>'+s[0]+'</span></div>'; }).join(''); }
+  function said(lead,title,tail){ return '<div class="said"><span class="s"><span class="t">'+lead+' '+title+'</span><span class="tl">'+tail+'</span></span><u>Undo</u></div>'; }
+
+  // A task row in one of the three ways (v: 's1', 's2', 's3', or '' for a task with no subtasks).
+  // o: {subs, open, next, start, pj, laps, done}
+  function row(v,t,o){ o=o||{}; var subs=o.subs||[], has=subs.length>0; if(!has) v='';
+    var ml=(o.pj?'<span class="pj" style="--c:'+o.pj[1]+'"><i></i>'+o.pj[0]+'</span>':'')+(has&&v==='s1'?'<span class="cnt">'+count(subs)+'</span>':'')+(has&&v==='link'?'<span class="tog"><u>'+count(subs)+'</u><i></i></span>':'')+(o.laps?laps(o.laps[0],o.laps[1]):'');
+    var end=(o.laps?laps(o.laps[0],o.laps[1]):'')+(o.start?'<span class="btn pri">Start</span>':'');
+    var h='<div class="row '+v+(o.next?' next':'')+(o.done?' done':'')+'"><span class="c1">'+ck(!!o.done)+'</span><span class="wd"><span class="tt">'+t+'</span>'+(ml?'<span class="ml">'+ml+'</span>':'')+'</span>'+(v==='s1'||end?'<span class="end">'+end+'</span>':'');
+    if(v==='s1') h+='<span class="ar">'+fold(o.open)+'</span>'+(o.open?'<div class="subs">'+subrows(subs)+'</div>':'');
+    if(v==='s2') h+='<div class="band">'+fold(o.open)+'<span>'+count(subs)+'</span></div>'+(o.open?'<div class="subs after">'+subrows(subs)+'</div>':'');
+    if(v==='s3') h+=minis(subs,o.open)+(o.open?'<div class="subs">'+subrows(subs)+'</div>':'');
+    return h+'</div>'; }
+
+  // The strip and its tray. v picks the tray's opener; '' is R1 as decided.
+  function strip(o,v){ o=o||{};
+    if(o.brk) return '<div class="strip"><i class="rest"></i><b>4:12</b><span>Short break</span><span></span></div>';
+    var s='<div class="strip'+(o.subs?' withtray':'')+'"><i></i><b'+(o.paused?' class="paused"':'')+'>42:05</b><u>'+(o.title||HT)+'</u><span class="btn onbar">'+(o.paused?'Resume':'Pause')+'</span></div>';
+    var t='';
+    if(o.subs){ var lead;
+      if(v==='s1') lead='<div class="fr s1lead"><span></span><span>'+count(o.subs)+'</span>'+fold(o.open)+'</div>';
+      else if(v==='s3') lead='<div class="fr s3lead"><span></span>'+minis(o.subs,o.open)+'</div>';
+      else lead='<div class="fr lead'+(v==='s2'?' plain':'')+'">'+fold(o.open)+'<span>'+count(o.subs)+'</span></div>';
+      t='<div class="tray">'+lead+(o.open?o.subs.map(function(s){ return '<div class="fr'+(s[1]?' on':'')+'">'+ck(s[1])+'<span>'+s[0]+'</span></div>'; }).join(''):'')+'</div>'; }
+    return '<div class="held">'+s+t+'</div>'; }
+
+  var mark='<svg class="mark" viewBox="0 0 10 22" aria-hidden="true"><circle class="m-you" cx="5" cy="5.5" r="4.2"/><circle class="m-gh" cx="5" cy="16.2" r="3.9"/></svg>';
+  var brand='<span class="brand">'+mark+'heirloom</span>';
+  function nav(){ return ['Focus','Today','Progress','Habits','Room'].map(function(n){ return '<span'+(n==='Today'?' class="on"':'')+'>'+n+'</span>'; }).join(''); }
+  function phone(body){ return '<div class="scr phone"><header class="hd">'+brand+'<span class="me"><span>nadia</span><span class="av">N</span></span></header><div class="ct">'+body+'</div><nav class="bb">'+nav()+'</nav></div>'; }
+  function lap(left,right){ return '<div class="scr lp"><aside class="sb">'+brand+'<nav>'+nav()+'</nav><span class="me2"><span class="av">N</span><span>nadia</span></span></aside><div class="mn">'+top+'<div class="cols"><div class="col">'+left+'</div><div class="col">'+right+'</div></div></div></div>'; }
+  function mo(text,parts){ return '<div class="mo"><p>'+text+'</p><div class="scr mini">'+parts.join('')+'</div></div>'; }
+  function tag(t){ return '<p class="tag">'+t+'</p>'; }
+  function put(id,h){ document.getElementById(id).innerHTML=h; }
+  var top='<div class="th"><h1>Today</h1><span>Saturday 28 November</span></div>'
+    +'<div class="figs"><div><span class="lab">Focused</span><b class="y">1h 15m</b><span class="lab">3 laps</span></div><div><span class="lab">Still planned</span><b>2h 5m</b><span class="lab">5 laps</span></div><div><span class="lab">Last Sat</span><b>1h 40m</b><span class="lab">4 laps</span></div></div>'
+    +'<div class="dayb"><div class="lapbar"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i></div><p class="tgt"><span>3 of 6 laps today</span><u>Change</u></p></div>';
+  var done='<div class="blk"><p class="gh"><span>Done</span></p>'+row('','Reply to Sam about Friday',{done:true,laps:[1,1]})+'</div>';
+
+  // Part 1: R1 as decided, its lap running.
+  var laterR='<div class="blk"><p class="gh"><span>Next</span></p>'+row('','Q/A heirloom',{next:true,start:true,pj:['heirloom','var(--teal)'],laps:[0,2]})+'</div>'
+    +'<div class="blk"><p class="gh"><span>Later today</span><span>1 task</span></p><div class="list">'+row('link','Morning Routine \u{1F64F}',{subs:MS})+'</div></div>';
+  function todayR(s){ return '<div class="add">Add a task</div>'+s+laterR; }
+  put('r1-phone',phone(top+todayR(strip({subs:HS,open:true}))+done));
+  put('r1-lap',lap(todayR(strip({subs:HS,open:true})),done));
+  put('r1-mo',
+    mo('Closed: one row under the strip, the arrow on 28 and the count on 56.',[strip({subs:HS})])+
+    mo('A tick: the box marks it done where it stands, and the bar says so with Undo.',[strip({subs:tick(HS,3),open:true}),said('Done:','Main content with headings in order','. 3 of 4 subtasks.')])+
+    mo('Paused: the strip says Resume, the subtasks stay.',[strip({subs:tick(HS,3),open:true,paused:true})])+
+    mo('A break: the strip is the break’s and holds no subtasks; the task is back on the list.',[strip({brk:true})])+
+    mo('A task with no subtasks: the strip as it is now.',[strip({title:'Q/A heirloom'})])
+  );
+
+  // Part 2: the three openers.
+  function lists(v){ return '<div class="add">Add a task</div><div class="blk"><p class="gh"><span>Next</span></p>'+row(v,HT,{subs:HS,next:true,start:true,pj:['Web','var(--sky)'],laps:[1,3]})+'</div>'
+    +'<div class="blk"><p class="gh"><span>Later today</span><span>3 tasks, 4 laps</span></p><div class="list">'+row(v,'Morning Routine \u{1F64F}',{subs:MS,open:true})+row(v,'Q/A heirloom',{pj:['heirloom','var(--teal)'],laps:[0,2]})+row(v,LT,{subs:LS,pj:['Uni','var(--rest)'],laps:[0,2]})+'</div></div>'; }
+  ['s1','s2','s3'].forEach(function(v){
+    put(v+'-phone',phone(top+lists(v)+done));
+    put(v+'-lap',lap(lists(v),done));
+    put(v+'-mo',
+      mo('Closed and open.',[row(v,'Morning Routine \u{1F64F}',{subs:MS}),row(v,'Morning Routine \u{1F64F}',{subs:MS,open:true})])+
+      mo('Every subtask ticked, the task is not: "3 of 3 subtasks" beside an empty box.',[row(v,'Morning Routine \u{1F64F}',{subs:tick(MS,3)})])+
+      mo('The Next card with Start, open.',[row(v,HT,{subs:HS,next:true,start:true,pj:['Web','var(--sky)'],laps:[1,3],open:true})])+
+      mo('In the strip’s tray during a lap, closed and open: the same opener.',[strip({subs:HS},v),strip({subs:tick(HS,3),open:true},v)])
+    );
+  });
+
+  // Measured, on the phone pictures of part 2, from each row's left (and right, for S1's arrow).
+  function edges(){ var out=[]; ['s1','s2','s3'].forEach(function(v){ var xs={};
+    document.querySelectorAll('#'+v+'-phone .row, #'+v+'-mo .tray').forEach(function(r){ var R=r.getBoundingClientRect(), k=parseFloat(getComputedStyle(r.closest('.frame')||r).getPropertyValue('--k'))||1;
+      function at(sel,name,mid,right){ r.querySelectorAll(sel).forEach(function(e){ var b=e.getBoundingClientRect(), x=right?Math.round((R.right-(b.left+b.width/2))/k):Math.round(((mid?b.left+b.width/2:b.left)-R.left)/k); (xs[name]=xs[name]||{})[x]=1; }); }
+      at('.c1 .ck i','box centre',true); at('.tt','title'); at('.sub>span:last-child, .fr>span:not(:empty):not(.fold):not(.ck):not(.minis)','subtask and count words');
+      at('.sub .ck i, .fr .ck i','subtask box centre',true);
+      if(v==='s1') at('.ar .fold i, .s1lead .fold i','arrow centre from the right',false,true);
+      if(v==='s2') { at('.band .fold i, .fr.lead .fold i','arrow centre',true); at('.band>span:last-child','band words'); }
+      if(v==='s3') at('.minis','small boxes start'); });
+    out.push(v.toUpperCase()+': '+Object.keys(xs).map(function(n){ return n+' '+Object.keys(xs[n]).join(' and '); }).join(', ')); });
+    document.getElementById('measured').textContent='Measured, in px from each row’s left: '+out.join('. ')+'.'; }
+
+  function fit(box){ var f=box.firstElementChild, w=f.firstElementChild?f.firstElementChild.offsetWidth:0; if(!w) return;
+    var k=Math.min(1,box.clientWidth/w); f.style.setProperty('--k',k); box.style.height=(f.offsetHeight*k)+'px'; }
+  var boxes=[].slice.call(document.querySelectorAll('.fbox'));
+  function all(){ boxes.forEach(fit); edges(); }
+  all(); if(document.fonts&&document.fonts.ready) document.fonts.ready.then(all);
+  if('ResizeObserver' in window){ var ro=new ResizeObserver(function(){ boxes.forEach(fit); }); boxes.forEach(function(b){ ro.observe(b); }); } else window.addEventListener('resize',all);
+})();
+</script>
