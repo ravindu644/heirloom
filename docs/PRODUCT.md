@@ -116,6 +116,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 |---|---|
 | Works fully offline; syncs when it can; a quiet indicator says which | User requirement |
 | Light and dark, following the system | Comfort at night |
+| On a laptop, Chrome or Edge can install the web app: its own window, an icon in the taskbar or dock, the bell through Web Push as before. No native build | A desktop app without a second codebase; the user chose it over Tauri, which wants a Windows signing certificate and a native bell of its own |
 | Export everything as JSON; import it back | Your data is yours; Focus To-Do users lost theirs |
 | Invite-only accounts on the user's own server | Free, private |
 | A way back in for someone who forgot their password: the server's owner makes a link that sets a new one, once, within 24 hours; the owner's own way back is a command on the server. No email, no recovery questions | The user: good to have. A friend will forget a password, and a server on a phone has no email to send |
@@ -163,3 +164,4 @@ noise, app blocking during focus, a companion character, widgets, a public read-
 | 2026-11-27 | A room holds 16 people, up from 8: the user wants to invite more friends. The server sends the whole room to everyone at each change, about 400 bytes a person, so 16 is light for the server; past about 25 the People tab would want the people not on a lap folded away |
 | 2026-11-27 | Rest days can be pinned: the user wants a whole Sunday to be a rest day by plan. Still two a week; a pinned day holds its place, the rest stay automatic so a bad day is still covered, and a pinned day kept gives its place back. Only the focus streak: habits rest on the days they are not planned, and a room keeps its own automatic two |
 | 2026-11-27 | The phone stays in step while heirloom is closed: a foreground service holds its own connection to the server, so a lap started or paused on the web updates the phone's countdown and bell within a second, and room notes and called laps notify. The user chose it over UnifiedPush (an extra app for every friend) and Firebase (a Google project tied to every self-hosted server), as self-hosted apps like Home Assistant and Gotify do. A silent notification says it is running; a Settings switch turns it off |
+| 2026-11-28 | The web app is installable (a manifest and icons): the user asked what native Linux and Windows builds would cost, and took the installable web app over Tauri. Tauri stays under "Later, maybe" for a bell with the browser closed or a tray icon |

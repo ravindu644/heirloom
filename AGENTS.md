@@ -145,6 +145,7 @@ adjectives: "4 of 5 pomodoros" beats "great progress". The lead does a copy pass
 | `tools/budget.mjs` | Built JS, CSS, fonts and the server binary against ARCHITECTURE section 7 |
 | `tools/bells.mjs` | Draws the three bells and writes them to `client/public/sounds/` and the phone's `res/raw/` (needs ffmpeg) |
 | `tools/contracts-check.mjs` | Every cell, session and timer state in the fixtures against the schemas |
+| `tools/icons.mjs` | The installable web app's icons and manifest, from DESIGN.md's colours, into `client/public/` |
 | `tools/readme/shoot.ts` | The README's pictures: a seeded throwaway server on 8799, seven phone screens and the hero, into `docs/resources/readme/`. Run after `make server` |
 
 ## Gotchas

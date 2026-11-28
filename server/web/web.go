@@ -36,7 +36,7 @@ var dist embed.FS
 //	form-action 'none'               the app posts no forms, so nothing can be made to
 //	frame-ancestors 'none'           nobody frames the app to trick a tap out of someone
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; " +
-	"font-src 'self'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	"font-src 'self'; img-src 'self' blob:; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // Missing is what / answers when the binary was built without the web app.
 const Missing = "This heirloomd was built without the web app: build it with make server."

@@ -6,6 +6,12 @@
     <meta name="color-scheme" content="light dark">
     <title>heirloom</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <!-- Installable from Chrome and Edge on a laptop: its own window and icon (tools/icons.mjs
+         writes the manifest and icons). The window's title bar takes the ground of the theme in
+         use, DESIGN.md's ground and dark-ground. -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#EEF0EC">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E100E">
     <!-- The timer's digits are the first thing read, so their weight is the one font that may block.
          Vite rewrites this path in the build only; under `make dev` the font loads from the CSS. -->
     <link rel="preload" as="font" type="font/woff2" href="../design/fonts/barlow-condensed-600.woff2" crossorigin>

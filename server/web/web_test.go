@@ -83,6 +83,7 @@ func TestPolicyAllowsOnlyWhatTheAppDoes(t *testing.T) {
 		"font-src":        "'self'",
 		"img-src":         "'self' blob:", // the tab's icon and room pictures the page made into blobs; no host, or an injected image could carry data out
 		"connect-src":     "'self'",
+		"manifest-src":    "'self'", // the manifest that lets Chrome and Edge install the app in its own window
 		"base-uri":        "'none'",
 		"form-action":     "'none'",
 		"frame-ancestors": "'none'",
