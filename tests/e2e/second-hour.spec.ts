@@ -208,6 +208,78 @@ test('press and hold moves a row, with the mouse and with a finger; a tap still 
   await expect.poll(() => titles(b.page)).toEqual(['alpha', 'charlie', 'bravo', ...many.slice(3)]);
 });
 
+test('at laptop width, 1440 by 900, with a mouse: a task held on its words and one held on the empty part of its row each lift, carry and set down, and the server holds the new order; a habit too', async ({ deviceA: a }) => {
+  const { name } = await signedInto(a, 'holdwide', (node) => {
+    tasks('alpha', 'bravo', 'charlie', 'delta')(node);
+    node.engine.write('habit', 'h1', { title: 'walk', days: 127, target: 1, order: 'V1' });
+    node.engine.write('habit', 'h2', { title: 'read', days: 127, target: 1, order: 'V2' });
+    node.engine.write('habit', 'h3', { title: 'stretch', days: 127, target: 1, order: 'V3' });
+  });
+  await a.page.setViewportSize({ width: 1440, height: 900 });
+  await go(a.page, 'Today');
+  // Held still past the hold, then carried in steps and let go, as a hand does with a mouse.
+  const carry = async (from: { x: number; y: number }, toY: number) => {
+    await a.page.mouse.move(from.x, from.y);
+    await a.page.mouse.down();
+    await a.page.waitForTimeout(500);
+    await expect(a.page.locator('[data-lifted]'), 'the held row did not lift').toHaveCount(1);
+    await a.page.mouse.move(from.x, toY, { steps: 14 });
+    await a.page.waitForTimeout(150);
+    await a.page.mouse.up();
+    await settle(a.page);
+  };
+  const byOrder = async (dataset: 'task' | 'habit') =>
+    [...(await serverRows(server, name, dataset)).values()].sort((x, y) => String(x.order).localeCompare(String(y.order))).map((r) => r.title);
+
+  // Pressed on the words: alpha, the Next card, below charlie.
+  const words = (await taskRow(a.page, 'alpha').getByText('alpha', { exact: true }).boundingBox())!;
+  await carry({ x: words.x + 4, y: words.y + words.height / 2 }, (await middle(a.page, 'charlie')).bottom + 4);
+  await expect.poll(() => titles(a.page)).toEqual(['bravo', 'charlie', 'alpha', 'delta']);
+  await expect(a.page.locator('dialog[open]'), 'letting go opened the row').toHaveCount(0);
+  await expect.poll(() => byOrder('task')).toEqual(['bravo', 'charlie', 'alpha', 'delta']);
+
+  // Pressed on the empty part of the row, far right of the words: delta to the top.
+  const row = (await taskRow(a.page, 'delta').boundingBox())!;
+  await carry({ x: row.x + row.width - 40, y: row.y + row.height / 2 }, (await taskRow(a.page, 'bravo').boundingBox())!.y - 4);
+  await expect.poll(() => titles(a.page)).toEqual(['delta', 'bravo', 'charlie', 'alpha']);
+  await expect.poll(() => byOrder('task')).toEqual(['delta', 'bravo', 'charlie', 'alpha']);
+
+  // Habits: stretch over walk.
+  await go(a.page, 'Habits');
+  const habit = (title: string) => a.page.locator('[data-lift]').filter({ hasText: title });
+  const stretch = (await habit('stretch').boundingBox())!;
+  await carry({ x: stretch.x + stretch.width / 2, y: stretch.y + stretch.height / 2 }, (await habit('walk').boundingBox())!.y - 4);
+  await expect.poll(() => byOrder('habit')).toEqual(['stretch', 'walk', 'read']);
+});
+
+test('with a mouse a press that moves picks the row up at once, as a desktop drag does: moved at 150ms it carries and the server holds the new order; a plain click still opens the row', async ({ deviceA: a }) => {
+  const { name } = await signedInto(a, 'mousedrag', tasks('alpha', 'bravo', 'charlie', 'delta'));
+  await a.page.setViewportSize({ width: 1440, height: 900 });
+  await go(a.page, 'Today');
+  const byOrder = async () => [...(await serverRows(server, name, 'task')).values()].sort((x, y) => String(x.order).localeCompare(String(y.order))).map((r) => r.title);
+
+  // Pressed on bravo's words and moved at 150ms, long before the hold: the row is up at once.
+  const words = (await taskRow(a.page, 'bravo').getByText('bravo', { exact: true }).boundingBox())!;
+  const from = { x: words.x + 4, y: words.y + words.height / 2 };
+  await a.page.mouse.move(from.x, from.y);
+  await a.page.mouse.down();
+  await a.page.waitForTimeout(150);
+  await a.page.mouse.move(from.x, from.y + 12, { steps: 3 });
+  await expect(a.page.locator('[data-lifted]'), 'a mouse press that moved did not lift the row').toHaveCount(1);
+  await a.page.mouse.move(from.x, (await middle(a.page, 'delta')).bottom + 4, { steps: 14 });
+  await a.page.waitForTimeout(150);
+  await a.page.mouse.up();
+  await settle(a.page);
+  await expect.poll(() => titles(a.page)).toEqual(['alpha', 'charlie', 'delta', 'bravo']);
+  await expect(a.page.locator('dialog[open]'), 'letting go opened the row').toHaveCount(0);
+  await expect.poll(() => byOrder()).toEqual(['alpha', 'charlie', 'delta', 'bravo']);
+
+  // A click that does not move still opens the row, and lifts nothing.
+  await taskRow(a.page, 'charlie').getByText('charlie', { exact: true }).click();
+  await expect(a.page.locator('dialog[open]')).toHaveCount(1);
+  await expect(a.page.locator('[data-lifted]')).toHaveCount(0);
+});
+
 test('Habits: press and hold moves a habit, Alt and the arrows too, and the order holds on a second device', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await signedInto(a, 'holdh');
   await also(b, name);

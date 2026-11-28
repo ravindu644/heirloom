@@ -381,9 +381,9 @@ test('a daily task carried in from tomorrow and done today: the first of a serie
   await expect(list(a.page, 'Upcoming')).toContainText('read');
 });
 
-// 4. Today, hour by hour: the five latest.
+// 4. Today, lap by lap: the five latest.
 
-test('the day\'s sessions: with twelve the list shows the five latest in the day\'s order under "7 earlier today", which opens all twelve in place and stays under the pointer; with five there is no link', async ({ deviceA: a, deviceB: b }) => {
+test('the day\'s laps: with twelve the list shows the five latest in the day\'s order under "7 earlier laps, 14m", which opens all twelve in place and stays under the pointer; with five there is no link', async ({ deviceA: a, deviceB: b }) => {
   const since = Date.now() - (Date.parse(`${today()}T00:00:00Z`) - OFF * MIN);
   test.skip(since < 45 * MIN, 'within 45 minutes after local midnight, today cannot hold the seeded laps');
   const seed = (n: number) => (node: Node) => {
@@ -393,25 +393,27 @@ test('the day\'s sessions: with twelve the list shows the five latest in the day
   };
   await signedInto(a, 'twelve', seed(12));
   await go(a.page, 'Progress');
-  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, hour by hour', level: 2 }) });
-  const rows = day.getByRole('listitem');
+  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
+  // A lap's row has a Day so far; a task done or a check-in, which are list items too, has none.
+  const rows = day.getByRole('listitem').filter({ has: a.page.locator('[class*="_split_"]') });
   await expect(rows).toHaveCount(5);
   const starts = await rows.evaluateAll((els) => els.map((el) => el.textContent?.match(/\d\d:\d\d/)?.[0] ?? ''));
   expect([...starts].sort(), 'the five are not in the day\'s order').toEqual(starts);
-  const more = day.getByRole('button', { name: '7 earlier today' });
+  // Seven 2 minute laps: how many, and what they gave the day.
+  const more = day.getByRole('button', { name: '7 earlier laps, 14m' });
   await expect(more).toBeVisible();
   // On the screen before it is tapped, as a person's finger finds it.
   await more.scrollIntoViewIfNeeded();
   await settle(a.page);
-  await staysPut(a.page, more, () => more.click(), day.getByRole('button', { name: 'Show the latest 5' }));
+  await staysPut(a.page, more, () => more.click(), day.getByRole('button', { name: 'Show only the latest 5 laps' }));
   await expect(rows).toHaveCount(12);
   const all = await rows.evaluateAll((els) => els.map((el) => el.textContent?.match(/\d\d:\d\d/)?.[0] ?? ''));
   expect(all.slice(-5), 'the five latest are not the end of the twelve').toEqual(starts);
 
   await signedInto(b, 'five', seed(5));
   await go(b.page, 'Progress');
-  const five = b.page.locator('section').filter({ has: b.page.getByRole('heading', { name: 'Today, hour by hour', level: 2 }) });
-  await expect(five.getByRole('listitem')).toHaveCount(5);
-  await expect(five.getByRole('button', { name: /earlier today|Show the latest/ })).toHaveCount(0);
+  const five = b.page.locator('section').filter({ has: b.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
+  await expect(five.getByRole('listitem').filter({ has: b.page.locator('[class*="_split_"]') })).toHaveCount(5);
+  await expect(five.getByRole('button', { name: /earlier laps?|Show only the latest/ })).toHaveCount(0);
 });
 

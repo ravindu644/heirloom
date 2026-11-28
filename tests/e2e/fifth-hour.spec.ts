@@ -499,7 +499,7 @@ test('a task deleted on another device while its lap runs keeps its lap: named w
   await expect(startNow(a.page)).toBeVisible({ timeout: 80000 });
   await expect.poll(async () => [...(await serverRows(server, name, 'session')).values()].filter((r) => r.kind === 'work' && r.task === 't').length).toBe(1);
   await go(a.page, 'Progress');
-  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, hour by hour', level: 2 }) });
+  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
   await expect(day, 'Progress\'s day list does not name the deleted task').toContainText('chapter 2');
   const projects = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Last 7 days by project', level: 2 }) });
   await expect(projects.getByRole('listitem').filter({ hasText: 'Thesis' }), 'the project\'s total lost the deleted task\'s lap').toContainText('1 lap');

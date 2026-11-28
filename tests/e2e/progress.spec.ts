@@ -61,6 +61,16 @@ async function seeded(devices: Device[], tag: string, seed: (node: Node) => void
 const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 const panel = (page: Page, title: string | RegExp) => page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 2 }) });
 const words = (locator: ReturnType<Page['locator']>) => locator.innerText().then((text) => text.replace(/\s+/g, ' ').trim());
+/** A lap's row in a day, lap by lap: every lap's row has a "Day so far" cell, empty when it is not counted; a task done or a check-in has none. */
+const lapRows = (day: ReturnType<Page['locator']>) => day.getByRole('listitem').filter({ has: day.page().locator('[class*="_split_"]') });
+/** The "Day so far" of each lap row shown, top to bottom: '' for a lap not counted. */
+const splits = (day: ReturnType<Page['locator']>) => lapRows(day).locator('[class*="_split_"]').allInnerTexts().then((all) => all.map((t) => t.trim()));
+/** The day's focus at the top of the panel. */
+const figure = (day: ReturnType<Page['locator']>) => day.locator('[class*="_big_"] b');
+const wall = (ms: number) => {
+  const at = new Date(ms);
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+};
 
 test('a first day with nothing: the first-week words, no year, one sentence each for what will show', async ({ deviceA: a }) => {
   await seeded([a], 'pfirst', () => {});
@@ -157,15 +167,15 @@ test('the year: a seeded day\'s square says its time and laps; the keyboard and 
   for (let i = 0; i < Math.floor(daysBack / 7); i++) await a.page.keyboard.press('ArrowLeft');
   for (let i = 0; i < daysBack % 7; i++) await a.page.keyboard.press('ArrowUp');
   await expect(year).toHaveAttribute('aria-valuetext', say(four, '1h 40m, 4 laps'));
-  await expect(a.page.getByRole('heading', { name: `${long(four)}, hour by hour` })).toBeVisible();
-  await expect(panel(a.page, `${long(four)}, hour by hour`).getByRole('listitem')).toHaveCount(4);
+  await expect(a.page.getByRole('heading', { name: `${long(four)}, lap by lap` })).toBeVisible();
+  await expect(lapRows(panel(a.page, `${long(four)}, lap by lap`))).toHaveCount(4);
 
   // A tap on the other day's square.
   const cells = year.locator('i[class*="level"]');
   const index = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${four}T00:00:00Z`)) / DAY);
   await cells.nth(index(one)).click();
   await expect(year).toHaveAttribute('aria-valuetext', say(one, '25m, 1 lap'));
-  await expect(a.page.getByRole('heading', { name: `${long(one)}, hour by hour` })).toBeVisible();
+  await expect(a.page.getByRole('heading', { name: `${long(one)}, lap by lap` })).toBeVisible();
 
   const levelOf = async (day: string) => Number((await cells.nth(index(day)).getAttribute('class'))!.match(/level(\d)/)![1]);
   expect(await levelOf(four)).toBe(2);
@@ -184,56 +194,93 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(b.page.getByRole('button', { name: 'Start 1 min break' })).toBeVisible({ timeout: 8000 });
   await expect(since).toContainText('of focus, 1 lap', { timeout: 3000 });
   await expect(since).toContainText('One square so far. Every day with a lap adds the next.');
-  await expect(panel(a.page, 'Today, hour by hour').getByRole('listitem')).toHaveCount(1);
+  await expect(lapRows(panel(a.page, 'Today, lap by lap'))).toHaveCount(1);
 });
 
-test('the timeline: a lap not counted, a stopped lap and a pair that ran on two devices; not counting one of the pair, and Count it again', async ({ deviceA: a, deviceB: b }) => {
+test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done and a check-in at their time; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   const start = Date.now() - 2 * HOUR;
   let pair: string[] = [];
-  const { name } = await seeded([a, b], 'ptimeline', (node) => {
+  const { name } = await seeded([a, b], 'pday', (node) => {
     laps(node, [{ started: start, outcome: 'void' }]);
     laps(node, [{ started: start + 30 * MIN, ms: 12 * MIN, outcome: 'stopped' }]);
+    // Between the stopped lap and the pair: a task done.
+    node.engine.write('task', 'essay', { title: 'essay outline', order: 'V', done: start + 45 * MIN });
     // The same 25 minutes, 10 of them shared, on this device and another.
     pair = laps(node, [{ started: start + 50 * MIN }, { started: start + 65 * MIN, device: 'abcdef0123456789' }]);
+    // After the pair: a habit checked in.
+    node.engine.write('habit', 'walk', { title: 'walk after lunch', days: 127, target: 1, order: 'V' });
+    node.engine.write('checkin', 'c1', { habit: 'walk', day: today(), at: start + 100 * MIN });
   });
-  const day = (page: Page) => panel(page, 'Today, hour by hour');
-  const items = (page: Page) => day(page).getByRole('listitem');
-  await expect(items(a.page)).toHaveCount(4);
-  await expect(items(a.page).nth(0)).toContainText('Lap, not counted');
-  await expect(items(a.page).nth(0)).toContainText('25 minutes, not counted');
-  await expect(items(a.page).nth(1)).toContainText('Stopped lap');
-  await expect(items(a.page).nth(1)).toContainText('12 minutes');
-  for (const i of [2, 3]) await expect(items(a.page).nth(i)).toContainText('ran on two devices');
-  // Counted once: 12 + 25 + 25 less the 10 shared. A stopped lap is a lap, a short one: three.
-  const totals = (page: Page) => page.getByRole('region', { name: 'Looking back on today' }).locator('p').first();
-  await expect(totals(a.page)).toHaveText('52 minutes of focus in 3 laps.');
+  const day = (page: Page) => panel(page, 'Today, lap by lap');
+  await expect(a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 })).toBeVisible();
 
-  const at = new Date(start + 65 * MIN);
-  const wall = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-  await day(a.page).getByRole('button', { name: `Don't count it, the lap at ${wall}` }).click();
+  // In the order the day ran: the laps, the task done between them, the check-in after.
+  const rows = day(a.page).getByRole('listitem');
+  await expect(rows).toHaveCount(6);
+  const texts = (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  expect(texts[0]).toContain('Lap, not counted');
+  expect(texts[0]).toContain('25 minutes');
+  expect(texts[1]).toContain('Stopped lap');
+  expect(texts[1]).toContain('12 minutes');
+  expect(texts[2]).toBe(`${wall(start + 45 * MIN)} Done: essay outline`);
+  for (const i of [3, 4]) expect(texts[i]).toContain('ran on two devices');
+  expect(texts[5]).toBe(`${wall(start + 100 * MIN)} Checked in: walk after lunch`);
+
+  // Day so far: none for the lap not counted, then 12, 12 + 25, and the second of the pair adds
+  // only its 15 minutes not shared. The last is the figure at the top. A stopped lap is a lap: three.
+  for (const page of [a.page, b.page]) {
+    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '52m']);
+    await expect(figure(day(page))).toHaveText('52m');
+    await expect(day(page)).toContainText('focused today, in 3 laps');
+  }
+
+  const at = wall(start + 65 * MIN);
+  await day(a.page).getByRole('button', { name: `Don't count it, the lap at ${at}` }).click();
   // What it did is said on the bar, with its Undo.
-  const bar = a.page.getByRole('status').filter({ hasText: 'Not counted' });
-  await expect(bar).toContainText('Not counted. It adds nothing to your day, week or streak.');
+  const bar = a.page.getByRole('status').filter({ hasText: 'off today' });
+  await expect(bar).toContainText('15 minutes off today.');
   await expect(bar.getByRole('button', { name: 'Undo' })).toBeVisible();
   for (const page of [a.page, b.page]) {
     await expect(day(page).getByText('ran on two devices')).toHaveCount(0, { timeout: 2000 });
-    await expect(items(page).nth(3)).toContainText('Lap, not counted');
-    await expect(totals(page)).toHaveText('37 minutes of focus in 2 laps.');
+    await expect(lapRows(day(page)).nth(3)).toContainText('Lap, not counted');
+    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '']);
+    await expect(figure(day(page))).toHaveText('37m');
+    await expect(day(page)).toContainText('focused today, in 2 laps');
   }
   const outcome = async () => (await serverRows(server, name, 'session')).get(pair[1]!)?.outcome;
   await expect.poll(outcome).toBe('void');
 
-  // The way back is offered at once, and stays: Count it again, never a passing Undo.
-  await day(a.page).getByRole('button', { name: `Count it again, the lap at ${wall}` }).click();
+  // The way back is offered at once, and stays: Count it again, never a passing Undo. Its split comes back.
+  await day(a.page).getByRole('button', { name: `Count it again, the lap at ${at}` }).click();
   await expect.poll(outcome).toBe('rang');
-  await expect(totals(b.page)).toHaveText('52 minutes of focus in 3 laps.');
+  for (const page of [a.page, b.page]) {
+    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '52m']);
+    await expect(figure(day(page))).toHaveText('52m');
+  }
   await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);
+});
+
+test('a lap across midnight: today shows only its part after 00:00, with its real times, and says where its first minutes count', async ({ deviceA: a }) => {
+  const since = Date.now() - midnight(today());
+  test.skip(since < 30 * MIN, 'the lap across midnight must have ended before now');
+  // From 23:50 last night to 00:15: ten minutes yesterday, fifteen today.
+  const started = midnight(today()) - 10 * MIN;
+  await seeded([a], 'pmidnight', (node) => laps(node, [{ started }]));
+  const day = panel(a.page, 'Today, lap by lap');
+  const row = lapRows(day);
+  await expect(row).toHaveCount(1);
+  const weekday = new Date(`${back(1)}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+  await expect(row).toContainText(`${wall(started)} to ${wall(started + LAP)}`);
+  await expect(row).toContainText('15 minutes today');
+  await expect(row).toContainText(`Began on ${weekday}. Its first 10 minutes count there.`);
+  await expect.poll(() => splits(day)).toEqual(['15m']);
+  await expect(figure(day)).toHaveText('15m');
 });
 
 test('the look back: a line typed key by key is saved with no button, shows on B, and is there after a reload offline', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await seeded([a, b], 'pnote', () => {});
-  const field = (page: Page) => page.getByLabel('A line or two about today');
+  const field = (page: Page) => page.getByLabel('A line about today');
   await field(a.page).pressSequentially('slept badly, still did two laps');
   await expect(field(a.page)).toHaveValue('slept badly, still did two laps');
   await expect(field(b.page)).toHaveValue('slept badly, still did two laps', { timeout: 2000 });
