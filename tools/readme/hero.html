@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- Usage: rendered by tools/readme/shoot.ts to docs/resources/readme/hero.png at 2400x1200; it sets each status bar's time and each phone's picture (data-shot). -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>heirloom hero</title>
+<style>
+  @font-face { font-family: "Barlow"; font-weight: 400; src: url("../../design/fonts/barlow-400.woff2") format("woff2"); }
+  @font-face { font-family: "Barlow"; font-weight: 500; src: url("../../design/fonts/barlow-500.woff2") format("woff2"); }
+  @font-face { font-family: "Barlow"; font-weight: 600; src: url("../../design/fonts/barlow-600.woff2") format("woff2"); }
+  /* DESIGN.md's dark tokens. */
+  :root { --ground: #0E100E; --raised: #232623; --ink: #F0F2EE; --muted: #A4A9A3; --you: #FF6A4D; }
+  html, body { margin: 0; width: 2400px; height: 1200px; overflow: hidden; background: var(--ground); color: var(--ink); font-family: Barlow, sans-serif; }
+  .words { position: absolute; left: 150px; top: 0; bottom: 0; width: 740px; display: flex; flex-direction: column; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 22px; font-weight: 600; font-size: 64px; letter-spacing: -0.01em; position: absolute; top: 130px; }
+  .brand svg { height: 68px; width: auto; }
+  h1 { margin: 0; font-weight: 600; font-size: 124px; line-height: 1.02; letter-spacing: -0.025em; }
+  h1 em { font-style: normal; color: var(--you); }
+  p { margin: 56px 0 0; font-size: 38px; line-height: 1.4; color: var(--muted); max-width: 720px; }
+  .phone { position: absolute; width: 400px; border: 8px solid var(--raised); border-radius: 52px; overflow: hidden; background: var(--ground); }
+  .phone img { display: block; width: 100%; }
+  /* Android's own bars over the app's ground, about 24dp each at this scale. */
+  .status { height: 30px; padding: 6px 30px 0; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 500; }
+  .status span { display: flex; gap: 6px; align-items: center; }
+  .status svg { height: 13px; width: auto; fill: var(--ink); }
+  .pill { height: 26px; display: flex; align-items: center; justify-content: center; }
+  .pill i { width: 120px; height: 5px; border-radius: 3px; background: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="words">
+    <div class="brand">
+      <svg viewBox="0 0 140 324" aria-hidden="true">
+        <circle cx="70" cy="70" r="70" fill="#FF6A4D" />
+        <circle cx="70" cy="254" r="56" fill="none" stroke="#7C827B" stroke-width="28" stroke-dasharray="35.2 23.4" transform="rotate(-15 70 254)" />
+      </svg>
+      heirloom
+    </div>
+    <h1>Race the <em>you</em> of last week.</h1>
+    <p>A free Pomodoro, tasks and habits app. Your phone and laptop in step, on a server you or a friend runs.</p>
+  </div>
+  <template id="phone">
+    <div class="phone">
+      <div class="status"><b class="clock" style="font-weight: 500"></b><span>
+        <svg viewBox="0 0 16 14"><path d="M16 0v14H0z"/></svg>
+        <svg viewBox="0 0 18 14"><path d="M9 14 0 3.6A13.6 13.6 0 0 1 9 0a13.6 13.6 0 0 1 9 3.6z"/></svg>
+        <svg viewBox="0 0 26 14"><rect x="0.75" y="0.75" width="21.5" height="12.5" rx="3" fill="none" stroke="#F0F2EE" stroke-width="1.5"/><rect x="3" y="3" width="13" height="8" rx="1.5"/><rect x="23.5" y="4.5" width="2" height="5" rx="1"/></svg>
+      </span></div>
+      <img alt="">
+      <div class="pill"><i></i></div>
+    </div>
+  </template>
+  <div data-shot="02-today" style="position: absolute; left: 954px; top: 150px"></div>
+  <div data-shot="01-focus" style="position: absolute; left: 1394px; top: 90px"></div>
+  <div data-shot="05-room" style="position: absolute; left: 1834px; top: 150px"></div>
+  <script>
+    // shoot.ts calls this with the screenshots' clock, then waits for the pictures.
+    window.fill = (clock) => {
+      for (const slot of document.querySelectorAll('[data-shot]')) {
+        const phone = document.getElementById('phone').content.cloneNode(true);
+        phone.querySelector('.clock').textContent = clock;
+        phone.querySelector('img').src = `../../docs/resources/readme/${slot.dataset.shot}.png`;
+        slot.append(phone);
+      }
+      return Promise.all([...document.images].map((img) => img.decode()));
+    };
+  </script>
+</body>
+</html>
