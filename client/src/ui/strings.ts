@@ -3,9 +3,11 @@
 // behind is a fact with a way back, and one exclamation mark in the whole app, for a set.
 
 const MIN = 60000;
-// Whole minutes, never rounded up: a figure must not claim more than was run, and the same
-// seconds must read the same on every screen.
-const mins = (ms: number) => Math.floor(ms / MIN);
+// A duration said in minutes is rounded to the nearest one, everywhere, so 46m55s is 47m on
+// every screen and agrees with clock times shown to the minute (the day panel's rows add up to
+// its figure). Only what counts down rounds up (the clock, "N minutes left"), and less than a
+// minute of something that ran is said in words ("under a minute", "in its first minute").
+const mins = (ms: number) => Math.round(ms / MIN);
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 export const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const two = (n: number) => String(n).padStart(2, '0');
@@ -118,7 +120,7 @@ export const focus = {
   // What Stop did: which lap of the day ended and how far it ran, as the clock says it: "at 12 min",
   // and from an hour "at 4h 40m". A lap is the day's it ended on, so a stopped one is always today's.
   stopped: (lap: number, ran: number) =>
-    `Lap ${lap} today stopped ${ran < MIN ? 'in its first minute' : `at ${ran < 60 * MIN ? `${mins(ran)} min` : total(ran)}`}.`,
+    `Lap ${lap} today stopped ${ran < MIN ? 'in its first minute' : `at ${mins(ran) < 60 ? `${mins(ran)} min` : total(ran)}`}.`,
   undo: 'Undo',
 
   // At the end of an Up next row: how far the task is.
@@ -512,7 +514,7 @@ export const today = {
   saidTicked: 'Ticked:',
   saidSubtasks: (done: number, of: number) => `${done} of ${plural(of, 'subtask', 'subtasks')}.`,
   // The last subtask ticked while the task is not: the whole sentence, so a phone shows it all.
-  allSubtasks: (n: number) => `All ${n} subtasks done. Tick the task to finish it`,
+  allSubtasks: (n: number) => `${n === 1 ? 'Its subtask is' : `All ${n} subtasks`} done. Tick the task to finish it`,
   // A3: a project deleted from the sheet.
   saidProjectGone: 'Deleted project',
   projectKeeps: 'Its tasks stay, with no project.',
@@ -692,22 +694,21 @@ export const progress = {
   aside: 'Lap, not counted',
   running: 'Lap, running',
   paused: 'Lap, paused',
-  span: (start: number, end: number) => `${wall(start)} to ${wall(end)}`,
-  spanNow: (start: number) => `${wall(start)} to now`,
-  ran,
-  // A lap cut at midnight says what it gave this day: "31 minutes today".
-  gave: (ms: number, isToday: boolean) => `${ran(ms)} ${isToday ? 'today' : 'that day'}`,
-  // Under a lap that began the day before: "Began on Friday. Its first 14 minutes count there."
-  began: (day: string, ms: number) => `Began on ${dated(day, { weekday: 'long' })}.${ms < MIN ? '' : ` Its first ${length(ms)} count there.`}`,
-  // Its mirror, under a lap that ran past the day's midnight: the lap is the next day's.
-  ends: (day: string) => `Ended on ${dated(day, { weekday: 'long' })}, where it counts as a lap.`,
-  // The second of two laps that ran at once adds only what the first had not: "25 minutes, 15 of them already counted".
-  shared: (ms: number, already: number) => `${length(ms)}, ${few(already)} of them already counted`,
+  /**
+   * A lap's facts in one line, its clock times already rounded to the minute: "11:03 to 11:19,
+   * 16 minutes"; across midnight "23:46 Fri to 00:31, 31 of 45 minutes today", or "23:46 to
+   * 00:31 Sat, 14 of 45 minutes here"; beside another lap "25 minutes, 15 of them already
+   * counted, ran on two devices"; ", not counted"; a task finished in it ". Task done.". `to`
+   * null is the lap still running; `paused` the one held: "15:48, paused at 16:02, 14 minutes".
+   */
+  facts: (f: { from: number; to: number | null; paused?: boolean; fromDay?: string; toDay?: string; mins: number; part?: number; here?: boolean; already?: number; two?: boolean; aside?: boolean; done?: boolean }) =>
+    `${wall(f.from)}${f.fromDay ? ` ${dated(f.fromDay, { weekday: 'short' })}` : ''}${f.paused ? ', paused at ' : ' to '}${f.to === null ? 'now' : wall(f.to)}${f.toDay ? ` ${dated(f.toDay, { weekday: 'short' })}` : ''}, ` +
+    `${f.part === undefined ? ran(f.mins * MIN) : `${f.part} of ${plural(f.mins, 'minute', 'minutes')} ${f.here ? 'here' : 'today'}`}` +
+    `${f.already ? `, ${f.already} of them already counted` : ''}${f.two ? ', ran on two devices' : ''}${f.aside ? ', not counted' : ''}${f.done ? '. Task done.' : ''}`,
   // The last hour of a whole day: its end, not the next day's start.
   dayEnd: '24:00',
-  // The quiet rows of a day, at their time: "11:19  Done: Morning routine".
-  doneAt: 'Done:',
-  twoDevices: 'ran on two devices',
+  // A task finished outside any lap: a quiet row of its own, "Morning routine done at 11:19".
+  doneAt: (at: number) => `done at ${wall(at)}`,
   setAside: "Don't count it",
   countAgain: 'Count it again',
   forLap: (words: string, start: number) => `${words}, the lap at ${wall(start)}`,

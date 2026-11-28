@@ -7,8 +7,9 @@
   --track: var(--row-track, var(--raised));
 }
 /* The row's own line: its box and words, and what stands at its end. What it opens into goes under. */
-.line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-xs); min-height: var(--layout-touch); }
+.line { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-xs); min-height: var(--layout-touch); }
 .plain { padding-left: var(--space-md); }
+.plain .open { left: calc(var(--space-md) * -1); }
 /* The one to start next. Drawn inside the row, so it takes no room and moves nothing. */
 .next { --row-ring: inset 0 0 0 2px var(--you); box-shadow: var(--row-ring); }
 
@@ -27,7 +28,9 @@
   align-self: stretch;
 }
 /* What opens the task: laid over the whole row, with nothing of a button's look. */
-.open { position: absolute; inset: 0; padding: 0; border: 0; border-radius: var(--radius-md); background: none; cursor: pointer; }
+/* It covers the row's own line and the row's room round it, not what the row opens under it (a
+   band, its subtasks): those are targets of their own. */
+.open { position: absolute; inset: calc(var(--space-sm) * -1) calc(var(--space-md) * -1) calc(var(--space-sm) * -1) calc(var(--space-xs) * -1); padding: 0; border: 0; border-radius: var(--radius-md); background: none; cursor: pointer; }
 /* The title always has its room. It breaks between words and never inside one (a word longer
    than the whole line is the one thing that is cut), and runs to two lines; the sheet shows the
    rest. `break-word`, not `anywhere`: with `anywhere` a title could be squeezed to one letter a
@@ -35,9 +38,7 @@
 .title { display: -webkit-box; flex: 1 1 auto; min-width: 0; overflow: hidden; font: var(--type-body); text-decoration: line-through transparent; transition: color var(--motion-fill) var(--motion-ease), text-decoration-color var(--motion-fill) var(--motion-ease); overflow-wrap: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; text-wrap: pretty; }
 /* With a line under it the title has its own. */
 .lined .title { flex-basis: 100%; }
-/* The line under it: the project and the notes, then the link that opens the row. */
-.below { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 0 var(--space-sm); min-width: 0; }
-/* Its words likewise: two lines at most. */
+/* The line under it likewise: two lines at most. */
 .meta { display: flex; flex: 0 1 auto; flex-wrap: wrap; min-width: 0; align-items: center; gap: var(--space-xs) var(--space-sm); max-height: calc(2lh + var(--space-xs)); overflow: hidden; font: var(--type-label); color: var(--muted); }
 .project { display: inline-flex; align-items: center; gap: var(--space-xs); min-width: 0; color: var(--ink); overflow-wrap: break-word; }
 .project i { flex: none; width: var(--layout-lane); height: var(--layout-lane); }
@@ -50,7 +51,7 @@
 .lead { display: flex; flex: 1 1 auto; align-items: center; gap: var(--space-xs); min-width: 0; background: inherit; }
 .under { display: flex; flex: none; margin-left: auto; }
 /* On the project's line the squares' first line stands on that line, however many lines follow it: the count reads on with the project. */
-.lined .below { align-self: flex-start; }
+.lined .meta { align-self: flex-start; }
 .lined .under { align-self: flex-start; padding-top: var(--space-xs); }
 /* What ends the row: its control, beside the words. */
 .end { position: relative; z-index: 1; pointer-events: none; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-sm) var(--space-md); margin-left: auto; padding-left: var(--space-sm); }

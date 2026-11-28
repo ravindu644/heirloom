@@ -22,7 +22,7 @@ import { say } from '../kit/said.tsx';
 import { Twice } from '../kit/twice.tsx';
 import said from '../kit/said.module.css';
 import { Note } from '../kit/note.tsx';
-import { Opens, Short, Shorts, isOpen } from '../kit/opens.tsx';
+import { Band, Short } from '../kit/opens.tsx';
 import { Sheet } from '../kit/sheet.tsx';
 import { Stepper } from '../kit/stepper.tsx';
 import { cx } from '../kit/cx.ts';
@@ -160,8 +160,11 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     if (!carry || !moving) return { next, later: shownLater, upcoming };
     const rest = open.filter((task) => task !== moving);
     // Before a row, before the edge between today and Upcoming (''), or at the very end (null).
-    const at = carry.before === null ? -1 : rest.findIndex((task) => (carry.before === '' ? task === null : task?.id === carry.before));
-    rest.splice(at < 0 ? rest.length : at, 0, moving);
+    // With no Upcoming there is no edge, and the very end is the end of today's rows: past the
+    // marker, the row would count as Upcoming here and Later would lose its heading and its rows.
+    const end = upcoming.length ? rest.length : rest.indexOf(null);
+    const at = carry.before === null ? end : rest.findIndex((task) => (carry.before === '' ? task === null : task?.id === carry.before));
+    rest.splice(at < 0 ? end : at, 0, moving);
     return { ...upNext(rest.slice(0, rest.indexOf(null)) as TaskView[], lapOn), upcoming: rest.slice(rest.indexOf(null) + 1) };
   })();
 
@@ -204,7 +207,8 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
         };
 
   // An Upcoming row carried up among today's is due today once let go, and says so already.
-  const comingToday = (task: TaskView) => carry?.id === task.id && [shown.next, ...shown.later].includes(task);
+  // Only a row from Upcoming: an overdue row of today keeps its day wherever it is set down.
+  const comingToday = (task: TaskView) => carry?.id === task.id && upcoming.includes(task) && [shown.next, ...shown.later].includes(task);
 
   // A subtask is ticked here and nothing else: its task's own box finishes the task.
   const tickSub = (task: TaskView, sub: SubtaskView, isDone: boolean) => {
@@ -218,15 +222,25 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     say({ lead: s.today.saidTicked, title: sub.title, tail: s.today.saidSubtasks(done, task.subtasks.length), undo });
   };
 
+  // A task's subtasks, to tick: the band that opens them and their rows, on its row and under the strip alike.
+  const subtasks = (task: TaskView) =>
+    task.subtasks.length > 0 && (
+      <Band id={task.id} words={s.today.subtasks(task.subtasks.filter((sub) => sub.done).length, task.subtasks.length)}>
+        {task.subtasks.map((sub) => (
+          <Short key={sub.id} checked={sub.done} struck label={s.today.check(sub.title)} onChange={(isDone) => tickSub(task, sub, isDone)}>
+            <span>{sub.title}</span>
+          </Short>
+        ))}
+      </Band>
+    );
+
   const row = (task: TaskView, list: List, extra: { next?: boolean; end?: ComponentChildren } = {}) => {
-    const subs = task.subtasks;
     return (
     <TaskRow
       key={task.id}
       task={task}
       of={s.today.of(task.estimate)}
       note={[task.due && task.due !== day && !comingToday(task) ? s.today.due(task.due, day) : '', task.time ?? ''].filter(Boolean).join(', ')}
-      opens={subs.length > 0 && <Opens id={task.id}>{s.today.subtasks(subs.filter((sub) => sub.done).length, subs.length)}</Opens>}
       checkLabel={s.today.check(task.title)}
       onDone={(isDone) => setDone(task, isDone)}
       onOpen={() => {
@@ -237,19 +251,7 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
       end={extra.end}
       lift={list !== 'done'}
     >
-      {subs.length > 0 && (
-        <Fold>
-          {isOpen(task.id) && (
-            <Shorts key="subs">
-              {subs.map((sub) => (
-                <Short key={sub.id} checked={sub.done} struck label={s.today.check(sub.title)} onChange={(isDone) => tickSub(task, sub, isDone)}>
-                  <span>{sub.title}</span>
-                </Short>
-              ))}
-            </Shorts>
-          )}
-        </Fold>
-      )}
+      {subtasks(task)}
     </TaskRow>
     );
   };
@@ -288,6 +290,8 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
     : binned
       ? () => setBin(true)
       : null;
+  // While a lap counts on a task, its row is off the list: its subtasks hang under the strip.
+  const tray = running && !isBreak && !rung ? subtasks(running) : false;
   const leftInLater = shown.later.reduce((sum, task) => sum + Math.max(0, (task.estimate ?? 0) - task.laps), 0);
 
   return (
@@ -370,7 +374,8 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
           <QuickAdd key="add" name="task" label={s.today.add} hint={s.today.addHint} example={s.today.addExample} go={s.today.addGo} said onAdd={add} />
 
           {state.phase !== 'idle' && !(isBreak && view.over) && (
-            <div key="bar" class={css.bar}>
+            <div key="bar" class={css.strip}>
+            <div class={cx(css.bar, !!tray && css.trayed)}>
               <i class={isBreak ? css.rest : undefined} />
               {!rung && !isBreak && lapOpens ? (
                 <>
@@ -412,6 +417,9 @@ export function TodayScreen({ engine, focus, today, settings, app, onReminderSet
                   </Button>
                 )
               )}
+            </div>
+            {/* The running task's subtasks hang under the strip while its row is not on the list, paused too. */}
+            {tray && <div class={css.tray}>{tray}</div>}
             </div>
           )}
         </Fold>

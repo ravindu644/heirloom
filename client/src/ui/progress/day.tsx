@@ -26,6 +26,8 @@ type Item = TimelineEntry | Moment;
 const isMoment = (item: Item): item is Moment => 'at' in item;
 const isLap = (item: Item): item is TimelineEntry => item.kind === 'work';
 const counts = (lap: TimelineEntry) => lap.outcome !== 'void' || !!lap.live;
+// To the nearest minute: the clock times this panel shows.
+const round = (ms: number) => Math.round(ms / MIN) * MIN;
 
 // The lap in progress is said as running or paused, whatever the core's outcome for it reads
 // meanwhile; one whose bell has gone and whose row is not written yet is a lap like the others.
@@ -78,12 +80,28 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
     return blocks;
   };
 
+  // A lap's clock times to the nearest minute, and its minutes the difference of the times shown,
+  // less its pause (counted out at its start), so a row never says 15 where the clock says 16.
+  // What it gave the day (across midnight) and what another lap had already covered come from
+  // the core's counts, as the splits do, never from the row's own rounding: a lap that ran
+  // alone must not seem to share a minute.
+  const shape = (lap: TimelineEntry) => {
+    const counted = counts(lap);
+    const from = round(lap.started);
+    const to = round(lap.ended);
+    const mins = Math.max(0, (to - from - round(lap.ended - lap.started - lap.ran_ms)) / MIN);
+    const gave = Math.round(lap.day_ms / MIN);
+    const part = counted && (lap.began || lap.ends) && gave > 0 ? gave : undefined;
+    const already = counted && !lap.began && !lap.ends ? Math.round((lap.ran_ms - lap.day_ms) / MIN) : 0;
+    return { counted, from, to, mins, part, already };
+  };
+
   // The five latest laps stand; the earlier ones, and what happened among them, open in place.
   const laps = items.map((item, i) => (isLap(item) ? i : -1)).filter((i) => i >= 0);
   const cut = laps.length > LATEST && !all ? laps[laps.length - LATEST]! : 0;
   const hidden = laps.filter((i) => i < cut).map((i) => items[i] as TimelineEntry);
   const aside = hidden.filter((lap) => !counts(lap)).length;
-  const earlierMs = hidden.reduce((sum, lap) => sum + lap.day_ms, 0);
+  const earlierMs = hidden.reduce((all, lap) => all + lap.day_ms, 0);
 
   const act = (lap: TimelineEntry) => (lap.outcome === 'void' ? s.progress.countAgain : s.progress.setAside);
   // One line: a new line typed or pasted is a space.
@@ -91,43 +109,63 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
   const figure = s.total(view.focus_ms);
   const live = (items.at(-1) as TimelineEntry | undefined)?.live;
 
+  // A task finished in a lap, or in the break after it, belongs to that lap: a tick on its sliver
+  // and "Task done." in its facts. Finished at any other time, it is a quiet row of its own.
+  const done = new Map<number, number[]>();
+  const owned = new Set<Moment>();
+  for (const item of items) {
+    if (!isMoment(item)) continue;
+    const i = laps.find((at) => (items[at] as TimelineEntry).started <= item.at && item.at <= Math.max(...sliver(at).map((block) => block.end)));
+    if (i === undefined) continue;
+    done.set(i, [...(done.get(i) ?? []), item.at]);
+    owned.add(item);
+  }
+
   const row = (item: Item, i: number) => {
     if (isMoment(item))
       return (
-        <div key={`${item.kind}-${item.id}`} class={css.quiet}>
-          <span>{s.wall(item.at)}</span>
-          <span>
-            <b>{s.progress.doneAt}</b> {item.title}
-          </span>
-        </div>
+        owned.has(item) || (
+          <div key={`${item.kind}-${item.id}`} class={css.quiet}>
+            <b>{item.title}</b> {s.progress.doneAt(round(item.at))}
+          </div>
+        )
       );
     const lap = item;
-    const counted = counts(lap);
+    const { counted, from, to, mins, part, already } = shape(lap);
     // The other day a lap across midnight gives minutes to: where it began, or where it ended.
     const other = lap.began ?? lap.ends ?? undefined;
     // The two-device mark stands on both of a pair while both count.
     const pair = counted && lap.overlap && items.some((o) => o !== lap && isLap(o) && o.overlap && counts(o) && o.started < lap.ended && o.ended > lap.started);
-    // What it gave this day: its own length, unless midnight cut it or a lap beside it had already counted some.
-    const cutAtMidnight = counted && (lap.started < start || lap.ended > end);
-    const already = counted && !cutAtMidnight ? lap.ran_ms - lap.day_ms : 0;
+    const ticks = done.get(i);
     return (
       <div key={lap.id} class={css.lap}>
-        <span class={css.top}>
-          <span>{lap.live === 'running' ? s.progress.spanNow(lap.started) : s.progress.span(lap.started, lap.ended)}</span>
-          <span>{cutAtMidnight ? s.progress.gave(lap.day_ms, isToday) : already >= MIN ? s.progress.shared(lap.ran_ms, already) : s.progress.ran(lap.ran_ms)}</span>
-          {pair && <span>{s.progress.twoDevices}</span>}
-        </span>
         <span class={css.what}>
           <b>{kind(lap)}</b>
           {lap.task && <span>{lap.task.title}</span>}
         </span>
+        <span class={css.split}>{lap.split_ms !== null && s.total(lap.split_ms)}</span>
         <span class={css.sliver}>
-          <Lane window={w} laps={sliver(i)} mine sliver />
+          <Lane window={w} laps={[...sliver(i), ...(ticks ?? []).map((at) => ({ start: at, end: at, kind: 'tick' as const }))]} mine sliver />
         </span>
-        {lap.began && <span class={css.aside}>{s.progress.began(lap.began.day, counted ? lap.began.ms : 0)}</span>}
-        {counted && !lap.live && lap.ends && <span class={css.aside}>{s.progress.ends(lap.ends.day)}</span>}
-        {/* The lap in progress has no row yet: nothing to set aside until it ends. Keyed by its
-            run, it becomes its saved row in place when it does, never two. */}
+        <span class={css.facts}>
+          {s.progress.facts({
+            from,
+            to: lap.live === 'running' ? null : to,
+            paused: lap.live === 'paused',
+            fromDay: lap.began?.day,
+            toDay: lap.ends?.day,
+            mins,
+            part,
+            here: !lap.began || !isToday,
+            already: already >= 1 ? already : undefined,
+            two: pair,
+            aside: !counted,
+            done: !!ticks,
+          })}
+        </span>
+        {/* Always in the one place, under the figure. The lap in progress has no row yet: nothing
+            to set aside until it ends, and its place stays empty. Keyed by its run, it becomes
+            its saved row in place when it does, never two. */}
         {!lap.live && (
           <Button
             kind="link"
@@ -147,7 +185,6 @@ export function Day({ progress, day, today, onToday }: { progress: Progress; day
             {act(lap)}
           </Button>
         )}
-        <span class={css.split}>{lap.split_ms !== null && s.total(lap.split_ms)}</span>
       </div>
     );
   };

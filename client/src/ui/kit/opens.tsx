@@ -1,8 +1,8 @@
 import { signal } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
-import button from './button.module.css';
 import { Check } from './check.tsx';
 import { cx } from './cx.ts';
+import { Fold } from './fold.tsx';
 import css from './opens.module.css';
 
 // Which rows are open, by id: this device's own, never synced, kept while the app is open as the
@@ -18,17 +18,32 @@ export function toggle(id: string) {
 
 /**
  * DESIGN.md, The fold arrow: the one sign for "there is more of this row", opening it in place.
- * With words it is a link in a line ("2 of 4 subtasks"), the arrow after them; without, it is a
- * 48px target of its own in a row's control column, named by `label`. `id` is the row's: what
- * it opens is drawn while `isOpen(id)`.
+ * It always stands in a box column: alone, a 48px target named by `label` (a habit's times);
+ * with words, a band as wide as its row, the words on the words' edge after it. `id` is the
+ * row's: what it opens is drawn while `isOpen(id)`.
  */
 export function Opens({ id, label, children }: { id: string; label?: string; children?: ComponentChildren }) {
   return (
-    // With words it is the kit's link in a line, the arrow after the words.
-    <button type="button" class={cx(css.opens, children ? cx(button.button, button.link, css.line) : css.alone)} aria-expanded={isOpen(id)} aria-label={label} onClick={() => toggle(id)}>
-      {children}
+    <button type="button" class={cx(css.opens, children ? css.band : css.alone)} aria-expanded={isOpen(id)} aria-label={label} onClick={() => toggle(id)}>
       <i aria-hidden="true" />
+      {children}
     </button>
+  );
+}
+
+/**
+ * DESIGN.md, A task with subtasks: the band at a card's foot, under a hair rule, that opens its
+ * subtasks under it. `words` say how many are done ("1 of 3 subtasks"); `children` are its short rows.
+ * The same on a task's row and under Today's strip, and opened by one state, the task's.
+ */
+export function Band({ id, words, children }: { id: string; words: string; children: ComponentChildren }) {
+  return (
+    <div class={css.banded}>
+      <div class={css.bandRow}>
+        <Opens id={id}>{words}</Opens>
+      </div>
+      <Fold>{isOpen(id) && <Shorts key="list">{children}</Shorts>}</Fold>
+    </div>
   );
 }
 

@@ -19,5 +19,7 @@
 .rest { background: var(--rest); }
 /* A lap not counted: its place kept, hollow. */
 .aside { background: none; box-shadow: inset 0 0 0 var(--layout-hair) var(--you); }
+/* A moment in a lap (its task finished): a stroke of ink at its time, standing past the lane. */
+.tick { top: calc(var(--space-xs) * -1); bottom: calc(var(--space-xs) * -1); margin-left: calc(var(--layout-stroke) / -2); background: var(--ink); }
 /* A circle standing in the lane, ringed in the surface so it reads over a block. */
 .mark { position: absolute; top: 0; display: block; line-height: 0; border-radius: var(--radius-full); box-shadow: 0 0 0 var(--layout-stroke) var(--surface); transform: translateX(-50%); }

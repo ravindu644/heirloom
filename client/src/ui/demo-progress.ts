@@ -38,7 +38,7 @@ export interface DemoRecord {
   /** A lap from 23:46 the day before to 00:32 today, on both days' timelines. */
   midnight?: boolean;
   /** Today as one of two written days: the user's own (a lap from before midnight, a break, a stopped lap, a task done) or a full one (nine laps, one not counted, tasks done). */
-  script?: 'real' | 'full' | 'long';
+  script?: 'real' | 'full' | 'long' | 'apart';
 }
 
 // The reference's days: the ones its words talk about are fixed, the rest come from the same
@@ -247,14 +247,16 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   const routine = { task: { id: 'routine', title: 'Morning routine' }, project: null };
   const ttt = { task: { id: 'ttt', title: 'Tic-tac-toe in React' }, project: project('react') };
   const notes = { task: { id: 'notes', title: 'Lecture notes, week 10' }, project: project('uni') };
-  const scripts: Record<'real' | 'full' | 'long', { sessions: Raw[]; moments: Moment[] }> = {
+  const scripts: Record<'real' | 'full' | 'long' | 'apart', { sessions: Raw[]; moments: Moment[] }> = {
     real: {
       sessions: [
-        { ...lap('r1', 0, 0, html), started: at(addDays(DAY, -1), 23, 46), ended: at(DAY, 0, 31), ran_ms: 45 * MIN },
+        // With their seconds, as the phone had them: the times round to the minute and agree with their minutes.
+        { ...lap('r1', 0, 0, html), started: at(addDays(DAY, -1), 23, 46) + 40000, ended: at(DAY, 0, 31) + 10000, ran_ms: 44 * MIN + 30000 },
         rest('r2', 0, 39),
-        lap('r3', 11, 3, { ...routine, outcome: 'stopped', ended: at(DAY, 11, 19), ran_ms: 16 * MIN }),
+        lap('r3', 11, 3, { ...routine, outcome: 'stopped', started: at(DAY, 11, 3) + 20000, ended: at(DAY, 11, 19) + 5000, ran_ms: 15 * MIN + 45000 }),
       ],
-      moments: [{ kind: 'done', id: 'routine', at: at(DAY, 11, 19), title: 'Morning routine' }],
+      // Finished as its lap ended: that lap's.
+      moments: [{ kind: 'done', id: 'routine', at: at(DAY, 11, 19) + 5000, title: 'Morning routine' }],
     },
     full: {
       sessions: [
@@ -269,9 +271,16 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
         lap('f9', 15, 10, notes), rest('f9r', 15, 35),
       ],
       moments: [
+        // A minute after its lap, with no break between: a quiet row of its own.
         { kind: 'done', id: 'ttt', at: at(DAY, 11, 26), title: 'Tic-tac-toe in React' },
+        // In the break after its lap: that lap's, a tick on its sliver.
         { kind: 'done', id: 'notes', at: at(DAY, 15, 36), title: 'Lecture notes, week 10' },
       ],
+    },
+    // Two laps, and a task finished between them, in no lap and no break.
+    apart: {
+      sessions: [lap('a1', 9, 0, routine), rest('a1r', 9, 25), lap('a2', 13, 0, ttt)],
+      moments: [{ kind: 'done', id: 'routine', at: at(DAY, 11, 40), title: 'Morning routine' }],
     },
     // Thirty laps from six, a break after each: 12h 30m, the widest split a day draws.
     long: { sessions: Array.from({ length: 30 }, (_, i) => [lap(`l${i}`, 6, i * 30, ttt), rest(`l${i}r`, 6, i * 30 + 25)]).flat(), moments: [] },

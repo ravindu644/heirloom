@@ -43,7 +43,7 @@ export function ProgressScreen({ focus, progress }: { focus: Focus; progress: Pr
   const view = focus.view();
   const inLap = state.phase === 'work' && !view.over;
   const work = focus.lengths.value.work_ms;
-  const shown = (Math.floor(week.you_ms / MIN) - Math.floor(week.ghost_now_ms / MIN)) * MIN;
+  const shown = (Math.round(week.you_ms / MIN) - Math.round(week.ghost_now_ms / MIN)) * MIN;
   const gap = -(week.split_ms ?? 0);
   const after = gap - (inLap ? view.left_ms : 0);
   const behind = Math.max(1, Math.ceil(gap / work));

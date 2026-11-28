@@ -23,6 +23,13 @@
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-lg); }
 .left { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 
+/* The strip and, for a task with subtasks, its tray: one card, the strip over the tray. */
+.strip { display: grid; grid-template-columns: minmax(0, 1fr); }
+.bar.trayed { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+/* The running task's subtasks: the band and its rows, on the box column and the words' edge as on a row. */
+.tray { padding: 0 var(--space-md) 0 var(--space-xs); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--surface); }
+.tray > div { margin-top: 0; border-top: 0; }
+
 /* The lap in progress: the one dark bar, so it is found at a glance from anywhere on the list. */
 .bar {
   display: flex;
@@ -33,7 +40,9 @@
   background: var(--ink);
   color: var(--ground);
 }
-.bar > i { flex: none; width: var(--space-sm); height: var(--space-sm); border-radius: var(--radius-full); background: var(--you); }
+/* The dot is centred in the box column (28px in) and the time starts on the words' edge (56px),
+   so the running task's subtasks under the strip line up with it. */
+.bar > i { flex: none; width: var(--space-sm); height: var(--space-sm); margin: 0 var(--space-sm); border-radius: var(--radius-full); background: var(--you); }
 .bar > i.rest { background: var(--rest); }
 .bar a { display: flex; flex: 1; align-items: center; gap: var(--space-md); min-width: 0; min-height: var(--layout-touch); }
 .bar b { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }

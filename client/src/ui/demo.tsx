@@ -204,6 +204,8 @@ const TODAY: Record<string, Scene> = {
     ]),
   },
   // Held, not let go: the list as it answers a carried row before the release.
+  'today-carry-end': { ...idleAt2, about: 'The Next card carried under the only Later row, not let go: that row is Next with its outline, "Later today" stands over the card', day: day([TASKS[0]!, { ...TASKS[1]!, due: '2026-11-23' }]), tap: 'demo:carry-end:K&R 5.1' },
+  'today-carry-overdue': { ...idleAt2, about: 'An overdue Later row carried up over the Next card, not let go: it still says "yesterday"', day: day([TASKS[0]!, { ...TASKS[1]!, due: '2026-11-23' }]), tap: 'demo:carry:Exercise 5-3' },
   'today-carry-top': { ...idleAt2, about: 'A Later row carried over the Next card: it wears the outline and Start, and what was Next is the first of Later', day: day(), tap: 'demo:carry:Thinking in React' },
   'today-few-upcoming': { ...idleAt2, about: 'Three tasks today and one tomorrow, all in sight on a phone', day: FEW },
   'today-one-upcoming': { ...idleAt2, about: 'One task today and one tomorrow: no Later today yet', day: ONE },
@@ -260,6 +262,13 @@ const TODAY: Record<string, Scene> = {
   'today-subtask-untick': { ...idleAt2, about: 'Open, a ticked subtask taken back: not done again, nothing said', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', 'Read 5.1 and 5.2'] },
   'today-subtasks-last': { ...idleAt2, about: 'The last subtask ticked, the task not: the bar says so whole, "All 4 subtasks done. Tick the task to finish it."', day: day([...TASKS, ...SUBS.map((sub) => (sub.id === 'k3' ? { ...sub, done: true } : sub))]), tap: ['3 of 4 subtasks', 'Read why a[i]'] },
   'today-subtasks-all': { ...idleAt2, about: 'Every subtask ticked and the task not: "4 of 4 subtasks" beside an empty box, still Next', day: day([...TASKS, ...SUBS.map((sub) => (sub.parent === 'kr' ? { ...sub, done: true } : sub))]) },
+  'today-band-long': { ...idleAt2, about: 'The Next card with a long title and its band: the title keeps its two lines, the band its own row', day: day([...swap('kr', { title: LONG_TITLE }), ...SUBS]) },
+  'today-strip-subtasks': { about: 'A lap on a task with subtasks: the band hangs under the strip, closed', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day([...TASKS, ...SUBS]) },
+  'today-strip-subtasks-open': { about: 'The strip\'s band open: the subtasks on the box column and the words\' edge, as on a row', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day([...TASKS, ...SUBS]), tap: '2 of 4 subtasks' },
+  'today-strip-subtask-tick': { about: 'A subtask ticked under the strip: Today\'s bar and Undo, as on a row', run: onKr, you: 125 * MIN, laps: 5, ghost: tuesday, day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', 'Exercise 5-3 with pointers only'] },
+  'today-strip-paused': { about: 'That lap paused: Resume, and the subtasks stay', run: { ...onKr, paused: true }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day([...TASKS, ...SUBS]), tap: '2 of 4 subtasks' },
+  'today-strip-break': { about: 'A break: the strip holds no subtasks; the task is back on its row, its band there', run: { phase: 'short', lap: 1, left: 3 * MIN + 20000 }, you: 150 * MIN, laps: 6, ghost: tuesday, day: day([...swap('kr', { squares: [1, 1, 1] }), ...SUBS], { done_ms: 150 * MIN, laps: 6 }) },
+  'today-strip-plain': { about: 'A lap on a task with no subtasks: the strip alone, its dot on 28 and its time on 56', run: { ...onKr, task: 'react' }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day([...TASKS, ...SUBS]) },
   'today-subtasks-both': { ...idleAt2, about: 'Two tasks open at once, one in Later: opening one leaves the other open', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', '1 of 3 subtasks'] },
   'today-360': { about: 'Today with a six hour lap on its strip: hours on the strip too', run: { ...onKr, planned: 360 * MIN, left: 360 * MIN - 1000 }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
   'today-99': { about: 'Today with a lap of 99 minutes on its strip: the widest the clock is without hours', run: { ...onKr, planned: 99 * MIN, left: 99 * MIN }, you: 125 * MIN, laps: 5, ghost: tuesday, day: day() },
@@ -334,6 +343,7 @@ const PROGRESS: Record<string, Scene> = {
   'progress-real-day-aside': { ...week, about: 'The lap from 23:46 not counted: its row says only where it began, and the bar what left each day', record: { script: 'real' }, tap: "Don't count it" },
   'progress-full-day': { ...week, about: 'A full day: nine laps, one not counted, two tasks done; the five latest show', record: { script: 'full' } },
   'progress-full-day-open': { ...week, about: 'That day with its earlier laps opened in place', record: { script: 'full' }, tap: '4 earlier laps' },
+  'progress-done-apart': { ...week, about: 'A task finished between two laps, in no lap and no break: a quiet row of its own', record: { script: 'apart' } },
   'progress-long-day': { ...week, about: 'A day of 12h 30m: the widest split there is beside the sliver', record: { script: 'long' } },
   'progress-midnight': { ...week, about: 'A lap from 23:46 to 00:32: today\'s timeline starts at midnight, and its list says the lap\'s real times', record: { midnight: true } },
   'progress-midnight-before': { ...week, about: 'The day before: the same lap at the end of its timeline, drawn up to midnight', record: { midnight: true }, tap: 'demo:day:ArrowUp' },
@@ -849,6 +859,15 @@ const find = <T extends Element>(selector: string, words: string): T => {
     } else if (words === 'demo:untarget') {
       // The day target taken away on another device, while this one has its editor open.
       staged!.today.setTarget(0);
+    } else if (words.startsWith('demo:carry-end:')) {
+      // Pressed on a row, held, and carried under the last row, and not let go.
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-lift]')];
+      const row = rows.find((one) => one.textContent?.includes(words.slice(15)))!;
+      const box = row.getBoundingClientRect();
+      const last = rows.at(-1)!.getBoundingClientRect();
+      const at = (y: number) => ({ bubbles: true, pointerId: 1, isPrimary: true, clientX: box.left + box.width / 2, clientY: y });
+      row.dispatchEvent(new PointerEvent('pointerdown', at(box.top + box.height / 2)));
+      setTimeout(() => dispatchEvent(new PointerEvent('pointermove', at(last.bottom + 8))), 500);
     } else if (words.startsWith('demo:carry:')) {
       // Pressed on a row, held, and carried over the Next card, and not let go.
       const row = [...document.querySelectorAll<HTMLElement>('[data-lift]')].find((one) => one.textContent?.includes(words.slice(11)))!;

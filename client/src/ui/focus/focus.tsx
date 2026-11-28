@@ -36,7 +36,7 @@ function lanes(race: RaceNow, workMs: number, now: number) {
   // The split is between the two totals as they are shown, in whole minutes: a chip that said
   // 18 beside 2h 11m and 2h 30m would be arithmetic nobody can check.
   const MIN = 60000;
-  const split = race.ghost ? (Math.floor(race.you_ms / MIN) - Math.floor(race.ghost.ms / MIN)) * MIN : 0;
+  const split = race.ghost ? (Math.round(race.you_ms / MIN) - Math.round(race.ghost.ms / MIN)) * MIN : 0;
   const text = s.race.split(split);
   return {
     day,
