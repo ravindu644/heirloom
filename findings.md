@@ -112,3 +112,4 @@ when it is done.
 - server/rooms/rooms.go `fill()`: while a lap begun before midnight runs, its part before midnight is in neither yesterday nor `run`, so a friend's week dips until the row lands (server lane, ponytail).
 - Demo: the Focus midnight scenes keep the fixed Tuesday ghost, so 00:10 shows "Last Tue 2h 30m" (design review).
 - Day view: a lap cut at 00:00 or 24:00 has no mark of the cut; ask the user before adding one (design review).
+- iOS 15 Safari: color-mix() with var() is dropped (no sheet scrim, no press tint) and @container rules are ignored; layout is best effort there (code review, pre-existing).

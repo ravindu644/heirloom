@@ -79,5 +79,8 @@ export default defineConfig({
     // heirloomd serves it for real.
     proxy: { '/api': { target: 'http://127.0.0.1:8787', ws: true } },
   },
-  build: { outDir: 'dist', emptyOutDir: true },
+  // A friend's iPhone 7 stops at iOS 15: Safari 15.4 is the floor. Our JS needs no lowering for
+  // it; the CSS does (a ::backdrop out of a shared rule). The one array method it lacks is in
+  // client/src/old-browsers.ts.
+  build: { outDir: 'dist', emptyOutDir: true, target: ['es2022', 'safari15.4'] },
 });

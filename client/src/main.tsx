@@ -1,3 +1,4 @@
+import './old-browsers.ts';
 import { computed, effect, signal, untracked } from '@preact/signals-core';
 import { render } from 'preact';
 import { onFront, startPlatform } from './platform/index.ts';
