@@ -122,3 +122,8 @@ when it is done.
 - Habits: a counted habit keeps its fold arrow at full count while the heading counts it done; A2's filled box would say done there (stranger walk, nit, A1 chosen).
 - Today: the Next card can show two "2 of 4" on one line (subtasks and laps); a task ticked with subtasks open says nothing of them; the sheet never says subtasks move by press and hold (stranger walk, nits).
 - e2e first-hour "reduced motion: Escape or Close on a habit's sheet hands the focus back to its row" fails about once a full run under load and passes alone (flaky).
+- Lift: carrying the running task's card would also close its band under the strip (one open state per task); decide if a running card is ever carried (code review, nit).
+- Lift: after the fold the row can snap from under the finger when the fold shrank a list scrolled to its bottom (code review, nit).
+- Lift: the doubled `[data-gliding]` replaces a row's own transitions while it glides (the sheet subtask's fill fade); fine so far, `.sect.sect` shows the way out (code review, nit).
+- Lift: Alt+Arrow moves an open row without folding it, as DESIGN.md says only a carry by hand folds (code review, nit).
+- Demo sheet-subtask-carry: scrollIntoView then reading the box would miss under smooth scrolling; pass behavior 'instant' (code review, nit).

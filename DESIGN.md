@@ -508,7 +508,9 @@ Built once in `client/src/ui/kit/` and reused.
   next to Habits' arrow). Open, one short row per subtask follows the band on the same two
   edges: its box in the box column, its words on 56, struck through in `muted` when done and
   kept where it stands; tapping the words ticks it too. Only ticking happens there: no field,
-  no editing, no Remove. A task with subtasks is a band taller, closed. **The running task:**
+  no editing, no Remove. A task with subtasks is a band taller, closed. Carried by hand with
+  its subtasks open, a task folds them away as it lifts and is set down closed; so does a habit
+  with its times open. A hold that moves it nowhere opens them again. **The running task:**
   its subtasks hang under Today's strip as the same band and rows (R1), the strip's dot centred
   28px in and its time on 56 so the band lines up under it; paused, they stay; in a break the
   strip is the break's and holds none (they are back on the task's row, open if the strip's
