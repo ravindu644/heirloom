@@ -103,7 +103,7 @@ test('stays put on Today: quick add, a task ticked done and undone, the day targ
   await staysPut(a.page, target, () => button(a.page, 'Done').click());
 });
 
-test('stays put on Habits: a check-in and its Undo', async ({ deviceA: a }) => {
+test('stays put on Habits: a check-in and its take-back, both by the box', async ({ deviceA: a }) => {
   await a.page.setViewportSize(PHONE);
   await signedInto(a, 'puthabits', (node) => {
     for (let i = 0; i < 10; i++) node.engine.write('habit', `h${i}`, { title: `habit ${i + 1}`, days: 127, target: 1, order: `V${String(i).padStart(2, '0')}` });
@@ -113,8 +113,10 @@ test('stays put on Habits: a check-in and its Undo', async ({ deviceA: a }) => {
   await midScreen(box);
   await settle(a.page);
   await staysPut(a.page, box, () => box.click());
-  // The Undo is in the bar; what the finger is near, the row, stays.
-  await staysPut(a.page, box, () => a.page.getByRole('status').filter({ hasText: 'habit 6' }).getByRole('button', { name: 'Undo' }).click());
+  // The box is the way back: no bar, no Undo. Tapped again, it stays where it is.
+  await expect(box).toHaveAttribute('aria-checked', 'true');
+  await staysPut(a.page, box, () => box.click());
+  await expect(box).toHaveAttribute('aria-checked', 'false');
 });
 
 test('stays put in Settings, in a sheet and in a room: a switch, "Add project", and the room\'s leaving lines opening', async ({ deviceA: a }) => {
@@ -254,7 +256,7 @@ test('the Add in a field: absent while it is empty, there from the first charact
   };
   await check(a.page, a.page.getByLabel('Add a task', { exact: true }), (t) => taskRow(a.page, t), 'task');
   const sheet = await openSheet(a.page, 'task 1');
-  await check(sheet, sheet.getByRole('textbox', { name: 'New subtask' }), (t) => sheet.getByRole('checkbox', { name: `Done: ${t}` }), 'sub');
+  await check(sheet, sheet.getByRole('textbox', { name: 'New subtask' }), (t) => sheet.getByRole('button', { name: `Change: ${t}`, exact: true }), 'sub');
 });
 
 // 5. The day target's editor.

@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { inStep, serverCells, signedIn, until } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { accountWith, go, midScreen, ready, settle, signedInto, signIn, startButton, staysPut, username } from './app.ts';
+import { accountWith, go, habitRow, midScreen, ready, settle, signedInto, signIn, startButton, staysPut, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import { e2eServer } from './server.ts';
 
@@ -17,7 +17,6 @@ const DAY = 24 * 60 * MIN;
 const OFF = -new Date().getTimezoneOffset();
 const day = (back: number) => localDay(Date.now() - back * DAY, OFF);
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
-const habitRow = (page: Page, title: string) => page.getByRole('checkbox', { name: `Check in: ${title}`, exact: true }).locator('xpath=..');
 /** Where main and the document are scrolled. */
 const scrolled = (page: Page) => page.locator('main').evaluate((main) => ({ main: main.scrollTop, doc: document.scrollingElement!.scrollTop }));
 

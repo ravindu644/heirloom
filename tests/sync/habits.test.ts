@@ -55,10 +55,11 @@ test('two devices check in offline: both rows kept everywhere, together they rea
   assert.equal(rows.length, 2);
   for (const row of rows) assert.deepEqual([row.habit, row.day, row.deleted ?? null], [id, today, null]);
 
-  // Undo on A: the latest of the two, whichever device made it, and only that one.
+  // Round 2 taken back on A: two taps with no round fill rounds 1 and 2 oldest first, so round 2
+  // is the latest of the two, whichever device made it, and only that one goes.
   // Two taps in one millisecond tie: the app then takes the later id, and so must this.
   const latest = rows.toSorted((x, y) => (y.at as number) - (x.at as number) || ((x.id as string) < (y.id as string) ? 1 : -1))[0]!.id;
-  ha.undo(id);
+  ha.takeBack(id, 2);
   await converge([a, b]);
   for (const h of [ha, hb]) assert.deepEqual([view(h).count, view(h).done], [1, false]);
   rows = [...(await serverRows(server, 'habits1', 'checkin')).values()];

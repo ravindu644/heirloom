@@ -251,3 +251,40 @@ export const selectable = (locator: ReturnType<Page['locator']>) =>
     }
     return true;
   });
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** A habit's row on Habits, by its title: once a day or more often alike. */
+export const habitRow = (page: Page, title: string) => page.locator('[data-habit]').filter({ has: page.locator('[id^="h-"]').getByText(title, { exact: true }) });
+
+/** Opens a habit's sheet as a person does: everything of its row but its controls opens it. */
+export async function openHabit(page: Page, title: string) {
+  // The row's target is named by its words, the title first; a round's box is "<title>, <time>".
+  // Pressed on the title, as a person aiming to open it does: a press on a counted habit's count
+  // ("1 of 3"), which may stand at the row's middle, opens its times instead.
+  const row = habitRow(page, title);
+  const target = row.getByRole('button', { name: new RegExp(`^${escaped(title)}(\\s|$)`) });
+  const [box, words] = [(await target.boundingBox())!, (await row.locator('[id^="h-"]').getByText(title, { exact: true }).boundingBox())!];
+  await target.click({ position: { x: words.x - box.x + Math.min(words.width / 2, 8), y: words.y - box.y + words.height / 2 } });
+  // Exact: a closed "Archived habits" sheet is still sliding out for a moment.
+  const sheet = page.getByRole('dialog', { name: 'Habit', exact: true });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** A habit done more than once a day: its round boxes, in order ("<title>, 08:00", "<title>, 4th time"), opened with its arrow first if they are folded. */
+export async function roundsOf(page: Page, title: string) {
+  const arrow = habitRow(page, title).getByRole('button', { name: /^Today's times, / });
+  if ((await arrow.getAttribute('aria-expanded')) !== 'true') await arrow.click();
+  await expect(arrow).toHaveAttribute('aria-expanded', 'true');
+  return habitRow(page, title).getByRole('checkbox', { name: new RegExp(`^${escaped(title)}, `) });
+}
+
+/** Taps a counted habit's round `round` (1 for the first), as a person does: each round is ticked, and taken back, on its own. */
+export async function checkInRound(page: Page, title: string, round: number) {
+  await (await roundsOf(page, title)).nth(round - 1).click();
+}
+
+/** Which of a counted habit's rounds are ticked, in order. */
+export const roundsTicked = async (page: Page, title: string) =>
+  (await roundsOf(page, title)).evaluateAll((els) => els.map((el) => el.getAttribute('aria-checked') === 'true'));

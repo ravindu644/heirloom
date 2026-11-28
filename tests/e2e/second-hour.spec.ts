@@ -275,7 +275,7 @@ test('with a mouse a press that moves picks the row up at once, as a desktop dra
   await expect.poll(() => byOrder()).toEqual(['alpha', 'charlie', 'delta', 'bravo']);
 
   // A click that does not move still opens the row, and lifts nothing.
-  await taskRow(a.page, 'charlie').getByText('charlie', { exact: true }).click();
+  await taskRow(a.page, 'charlie').getByRole('button', { name: /charlie/ }).click();
   await expect(a.page.locator('dialog[open]')).toHaveCount(1);
   await expect(a.page.locator('[data-lifted]')).toHaveCount(0);
 });
@@ -372,8 +372,9 @@ test('a page that fits is at the top after every tap on Today, Habits and Settin
   await unmoved('adding a habit');
   await a.page.getByRole('checkbox', { name: 'Check in: read', exact: true }).click();
   await unmoved('a check-in');
-  await a.page.getByRole('status').filter({ hasText: 'read' }).getByRole('button', { name: 'Undo' }).click();
-  await unmoved('its Undo');
+  // No bar on Habits: the box is the way back.
+  await a.page.getByRole('checkbox', { name: 'Check in: read', exact: true }).click();
+  await unmoved('its take-back by the box');
 
   await a.page.getByRole('link', { name: /Settings/ }).first().click();
   await expect(a.page.getByRole('checkbox').first()).toBeVisible();
@@ -525,10 +526,19 @@ test('the task sheet at 412x1180, a phone with its keyboard up: every field focu
   // A new project's form open too, so its field is one of them.
   await sheet.getByRole('button', { name: 'New project' }).click();
   await settle(a.page);
-  const fields = await sheet.locator('input:not([type="range"]):not([type="color"]), textarea').all();
+  // A subtask's words are a button until tapped, and the field takes their place, focused: each is reached so.
+  const fields: (ReturnType<Page['locator']> | string)[] = [...(await sheet.locator('input:not([type="range"]):not([type="color"]), textarea').all()), ...[1, 2, 3, 4].map((i) => `piece ${i}`)];
   expect(fields.length).toBeGreaterThanOrEqual(8);
-  for (const field of fields) {
-    await field.focus();
+  for (const one of fields) {
+    let field: ReturnType<Page['locator']>;
+    if (typeof one === 'string') {
+      await sheet.getByRole('button', { name: `Change: ${one}`, exact: true }).click();
+      field = sheet.getByRole('textbox', { name: 'Subtask', exact: true });
+      await expect(field).toBeFocused();
+    } else {
+      field = one;
+      await field.focus();
+    }
     await settle(a.page);
     const room = await field.evaluate((el) => {
       const dialog = el.closest('dialog')!;

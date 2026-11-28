@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import { streakWindow } from '../../client/src/core/streak.ts';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, until } from '../sync/harness.ts';
-import { accountWith, go, onDisk, ready, server, signIn, statusLine, username } from './app.ts';
+import { accountWith, checkInRound, go, habitRow, onDisk, openHabit, ready, roundsOf, roundsTicked, server, signIn, statusLine, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -33,15 +33,18 @@ const add = async (page: Page, title: string) => {
   await expect(box_(page, title)).toBeVisible();
 };
 const box_ = (page: Page, title: string) => page.getByRole('checkbox', { name: `Check in: ${title}`, exact: true });
-const row = (page: Page, title: string) => box_(page, title).locator('xpath=..');
-const open = async (page: Page, title: string) => {
-  await row(page, title).getByRole('button', { name: new RegExp(title) }).click();
-  // Exact: a closed "Archived habits" sheet is still sliding out for a moment.
-  const sheet = page.getByRole('dialog', { name: 'Habit', exact: true });
-  await expect(sheet).toBeVisible();
-  return sheet;
-};
+const row = habitRow;
+const open = openHabit;
 const said = (page: Page, about: string) => page.getByRole('status').filter({ hasText: about }).innerText().then((t) => t.replace(/\s+/g, ' ').trim());
+/** No bar speaks of a check-in or a take-back, and none offers Undo: on Habits the box is the way back. */
+const noBar = async (page: Page) => {
+  await page.waitForTimeout(400);
+  await expect(page.getByRole('status').filter({ hasText: /Checked in|Taken back/ }), 'a bar spoke of a check-in').toHaveCount(0);
+  await expect(page.getByRole('status').getByRole('button', { name: 'Undo' }), 'a bar offers Undo for a check-in').toHaveCount(0);
+};
+/** Today's live check-ins of a habit on the server, oldest first. */
+const live = async (name: string, habit: string) =>
+  [...(await serverRows(server, name, 'checkin')).values()].filter((r) => r.habit === habit && r.day === today() && !r.deleted).sort((x, y) => Number(x.at) - Number(y.at));
 const titles = (page: Page) => page.getByRole('checkbox', { name: /^Check in: / }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')!.slice('Check in: '.length)));
 
 test('a habit added by the quick line, checked in on A, shows on B within a second; the heading counts it', async ({ deviceA: a, deviceB: b }) => {
@@ -58,48 +61,67 @@ test('a habit added by the quick line, checked in on A, shows on B within a seco
   await expect(box_(b.page, 'read 20 pages')).toHaveAttribute('aria-checked', 'true', { timeout: 1000 });
   console.log(`check-in on A, seen on B: ${Date.now() - start} ms`);
   for (const d of [a, b]) await expect(d.page.getByRole('heading', { level: 1 })).toHaveText(/^1 of 1 today\./);
-  await expect.poll(() => said(a.page, 'Checked in')).toBe('Checked in: read 20 pages. Undo');
+  await noBar(a.page);
 });
 
-test('a target of 3 counts up one tap at a time; on a done day the box takes the latest back', async ({ deviceA: a }) => {
-  await onHabits([a], 'htarget');
+test('a target of 3 has the arrow, not one box: each round is ticked on its own, in any order, and a tap on a ticked round takes that round back; no bar', async ({ deviceA: a }) => {
+  const { name } = await onHabits([a], 'htarget');
   await add(a.page, 'water');
   const sheet = await open(a.page, 'water');
   for (let i = 0; i < 2; i++) await sheet.getByRole('button', { name: 'One time more', exact: true }).click();
   await expect(sheet).toContainText('3 times a day');
+  // No way to take one back in the sheet: the box is the way.
+  await expect(sheet.getByRole('button', { name: /take one back/i })).toHaveCount(0);
   await sheet.getByRole('button', { name: 'Close' }).click();
+  await expect(box_(a.page, 'water'), 'a habit of three times a day still has one box').toHaveCount(0);
+  const id = [...(await serverRows(server, name, 'habit')).keys()][0]!;
 
-  for (const n of [1, 2, 3]) {
-    await box_(a.page, 'water').click();
-    await expect(row(a.page, 'water')).toContainText(`${n} of 3`);
-  }
-  await expect(box_(a.page, 'water')).toHaveAttribute('aria-checked', 'true');
-  await box_(a.page, 'water').click();
+  // The third first, then the first: the box tapped is the one ticked.
+  await checkInRound(a.page, 'water', 3);
+  await expect.poll(() => roundsTicked(a.page, 'water')).toEqual([false, false, true]);
+  await expect(row(a.page, 'water')).toContainText('1 of 3');
+  await checkInRound(a.page, 'water', 1);
+  await expect.poll(() => roundsTicked(a.page, 'water')).toEqual([true, false, true]);
   await expect(row(a.page, 'water')).toContainText('2 of 3');
-  await expect(box_(a.page, 'water')).toHaveAttribute('aria-checked', 'false');
+  await expect.poll(async () => (await live(name, id)).map((r) => r.round)).toEqual([3, 1]);
+
+  // A tap on the ticked third takes the third back, not the latest.
+  await checkInRound(a.page, 'water', 3);
+  await expect.poll(() => roundsTicked(a.page, 'water')).toEqual([true, false, false]);
+  await expect(row(a.page, 'water')).toContainText('1 of 3');
+  await expect.poll(async () => (await live(name, id)).map((r) => r.round)).toEqual([1]);
+  await noBar(a.page);
 });
 
-test('two laptops offline check in the same habit: both kept, and together they reach a target of 2', async ({ deviceA: a, deviceB: b }) => {
+test('two laptops offline tick the same round of a habit done twice a day: it counts once, 1 of 2, with both rows kept; then each ticks another and it is 2 of 2', async ({ deviceA: a, deviceB: b }) => {
   const { name } = await onHabits([a, b], 'hoffline');
   await add(a.page, 'stretch');
   const sheet = await open(a.page, 'stretch');
   await sheet.getByRole('button', { name: 'One time more', exact: true }).click();
   await sheet.getByRole('button', { name: 'Close' }).click();
   await expect(row(b.page, 'stretch')).toContainText('0 of 2');
+  const id = [...(await serverRows(server, name, 'habit')).keys()][0]!;
 
   for (const d of [a, b]) await d.setOffline(true);
   for (const d of [a, b]) {
     await expect(statusLine(d.page)).toHaveText(/^No connection/);
-    await box_(d.page, 'stretch').click();
+    await checkInRound(d.page, 'stretch', 1);
     await expect(row(d.page, 'stretch')).toContainText('1 of 2');
   }
   for (const d of [a, b]) await d.setOffline(false);
+  // Both rows reach the server, round 1 each, and the round is filled once.
+  await expect.poll(async () => (await live(name, id)).map((r) => r.round), { timeout: 10000 }).toEqual([1, 1]);
   for (const d of [a, b]) {
-    await expect(row(d.page, 'stretch')).toContainText('2 of 2', { timeout: 5000 });
-    await expect(box_(d.page, 'stretch')).toHaveAttribute('aria-checked', 'true');
+    await expect.poll(() => roundsTicked(d.page, 'stretch'), { timeout: 5000 }).toEqual([true, false]);
+    await expect(row(d.page, 'stretch')).toContainText('1 of 2');
   }
-  const rows = [...(await serverRows(server, name, 'checkin')).values()];
-  expect(rows.filter((r) => r.day === today() && !r.deleted)).toHaveLength(2);
+  // The second round, on B: both devices show it full.
+  await checkInRound(b.page, 'stretch', 2);
+  for (const d of [a, b]) {
+    await expect.poll(() => roundsTicked(d.page, 'stretch'), { timeout: 3000 }).toEqual([true, true]);
+    await expect(row(d.page, 'stretch')).toContainText('2 of 2');
+  }
+  for (const d of [a, b]) await noBar(d.page);
 });
 
 test('a weekdays-only habit shows the weekend as not planned, and its run is a run, never a miss', async ({ deviceA: a }) => {
@@ -121,7 +143,7 @@ test('a weekdays-only habit shows the weekend as not planned, and its run is a r
 
   const rule = streakWindow(today(), kept, 31);
   expect(rule.missed).toBe(false);
-  await expect(row(a.page, 'walk')).toContainText(`Weekdays, ${rule.streak} days running`);
+  await expect(row(a.page, 'walk')).toContainText(`Weekdays, ${rule.streak} days in a row`);
   await expect(row(a.page, 'walk')).not.toContainText('planned days');
   // The week: Saturday and Sunday are not planned, and are drawn as such.
   const week = row(a.page, 'walk').locator('[role="img"] > span');
@@ -200,4 +222,83 @@ test('the sheet saves as typed, B shows it, and a reload with no connection keep
   await a.page.reload();
   await expect(box_(a.page, 'piano scales')).toHaveAttribute('aria-checked', 'true');
   await expect(row(a.page, 'piano scales')).toContainText('Weekdays');
+});
+
+// A habit done more than once a day (DESIGN.md, Habit row): its arrow opens one row per round.
+
+const clock = (ms: number) => {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+test('five times a day: the arrow opens five rounds, three with their times and two named by which they are; 08:00 skipped and 12:00 ticked on the laptop leaves 08:00 empty; the phone\'s tap on the 4th ticks the 4th; "done at" is the real time; a tap on ticked 12:00 takes 12:00 back; the server holds each round; no bar', async ({ deviceA: laptop, phone }) => {
+  const name = username('hrounds');
+  const node = await accountWith(name);
+  node.engine.write('habit', 'water', { title: 'water', days: 127, target: 5, reminds: ['08:00', '12:00', '18:00'], order: 'V' });
+  await until(() => node.engine.unsent.value === 0, 10000, 'not sent');
+  await laptop.page.setViewportSize({ width: 1440, height: 900 });
+  for (const d of [laptop, phone]) {
+    await signIn(d.page, name);
+    await ready(d.page);
+    await go(d.page, 'Habits');
+  }
+  // One habit, more than once a day: the arrow in the box column, no single box.
+  await expect(box_(laptop.page, 'water')).toHaveCount(0);
+  await expect(row(laptop.page, 'water').getByRole('button', { name: "Today's times, 0 of 5 done" })).toHaveAttribute('aria-expanded', 'false');
+  const rounds = await roundsOf(laptop.page, 'water');
+  expect(await rounds.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual(['water, 08:00', 'water, 12:00', 'water, 18:00', 'water, 4th time', 'water, 5th time']);
+  const words = async (page: Page) => (await roundsOf(page, 'water')).evaluateAll((els) => els.map((el) => el.parentElement!.innerText.replace(/\s+/g, ' ').trim()));
+  expect(await words(laptop.page)).toEqual(['08:00', '12:00', '18:00', '4th time', '5th time']);
+  const rounded = async () => (await live(name, 'water')).map((r) => r.round);
+
+  // 08:00 skipped, 12:00 ticked on the laptop: 12:00 is the one ticked, here, on the phone and on the server.
+  const before = Date.now();
+  await rounds.nth(1).click();
+  await expect.poll(rounded).toEqual([2]);
+  const noon = Number((await live(name, 'water'))[0]!.at);
+  expect(noon).toBeGreaterThanOrEqual(before - 5000);
+  for (const d of [laptop, phone]) {
+    await expect.poll(() => roundsTicked(d.page, 'water'), { timeout: 3000 }).toEqual([false, true, false, false, false]);
+    await expect.poll(() => words(d.page)).toEqual(['08:00', `12:00 done at ${clock(noon)}`, '18:00', '4th time', '5th time']);
+    await expect(row(d.page, 'water')).toContainText('1 of 5');
+  }
+
+  // The phone taps the 4th: the 4th is ticked, nothing else.
+  await (await roundsOf(phone.page, 'water')).nth(3).tap();
+  await expect.poll(rounded).toEqual([2, 4]);
+  for (const d of [laptop, phone]) {
+    await expect.poll(() => roundsTicked(d.page, 'water'), { timeout: 3000 }).toEqual([false, true, false, true, false]);
+    await expect(row(d.page, 'water')).toContainText('2 of 5');
+  }
+
+  // A tap on ticked 12:00 takes 12:00 back, not the latest (the 4th).
+  await rounds.nth(1).click();
+  await expect.poll(rounded).toEqual([4]);
+  for (const d of [laptop, phone]) {
+    await expect.poll(() => roundsTicked(d.page, 'water'), { timeout: 3000 }).toEqual([false, false, false, true, false]);
+    await expect(row(d.page, 'water')).toContainText('1 of 5');
+  }
+  for (const d of [laptop, phone]) await noBar(d.page);
+});
+
+test('the run reads "N days in a row" for a habit done once a day and "N full days in a row" for one done three times a day', async ({ deviceA: a }) => {
+  const name = username('hrow');
+  const node = await accountWith(name);
+  node.engine.write('habit', 'read', { title: 'read', days: 127, target: 1, order: 'V' });
+  node.engine.write('habit', 'water', { title: 'water', days: 127, target: 3, order: 'W' });
+  const kept = [3, 2, 1].map((back) => localDay(Date.now() - back * DAY, OFF));
+  kept.forEach((d, i) => {
+    node.engine.write('checkin', `r${i}`, { habit: 'read', day: d, at: Date.parse(`${d}T09:00:00Z`) });
+    for (const k of [0, 1, 2]) node.engine.write('checkin', `w${i}${k}`, { habit: 'water', day: d, at: Date.parse(`${d}T09:00:00Z`) + k * 3600000 });
+  });
+  await until(() => node.engine.unsent.value === 0, 10000, 'not sent');
+  await signIn(a.page, name);
+  await ready(a.page);
+  await go(a.page, 'Habits');
+  const rule = streakWindow(today(), kept, 127);
+  expect(rule.streak, 'three days kept make a run').toBeGreaterThan(1);
+  // Once a day: "days in a row". More often: "full days in a row", every round of each day.
+  await expect(row(a.page, 'read')).toContainText(`Every day, ${rule.streak} days in a row`);
+  await expect(row(a.page, 'water')).toContainText(`Every day, ${rule.streak} full days in a row`);
+  for (const title of ['read', 'water']) await expect(row(a.page, title)).not.toContainText('running');
 });

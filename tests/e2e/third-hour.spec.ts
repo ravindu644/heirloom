@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test';
 import { serverRows } from '../sync/harness.ts';
 import type { Device as Node } from '../sync/harness.ts';
-import { go, lapSaid, list, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, strip, taskRow } from './app.ts';
+import { checkInRound, go, habitRow, lapSaid, list, openHabit, ready, server, settle, signedInto, signIn, startButton, startNow, staysPut, strip, taskRow } from './app.ts';
 import { expect, test } from './devices.ts';
 
 const PHONE = { width: 412, height: 915 };
@@ -67,7 +67,7 @@ test('adding a task or a habit on a phone with its keyboard up lets go of the fi
         const r = ((await bar.count()) ? await bar.boundingBox() : null) ?? { y: -1, height: 0 };
         expect.soft(r.y >= 0 && r.y + r.height <= PHONE.height, `${field}, ${how}: the bar is out of sight`).toBe(true);
       } else {
-        await expect(phone.page.getByRole('dialog', { name: 'Task', exact: true }).getByRole('checkbox', { name: `Done: ${typed}` })).toBeVisible();
+        await expect(phone.page.getByRole('dialog', { name: 'Task', exact: true }).getByRole('button', { name: `Change: ${typed}`, exact: true })).toBeVisible();
         await phone.page.keyboard.press('Escape');
       }
     }
@@ -103,10 +103,7 @@ test('a habit three times a day: two times set out of order stand sorted when it
   await add.press('Enter');
   const open = async (page: Page) => {
     await expect(page.locator('dialog[open]')).toHaveCount(0);
-    await page.getByRole('checkbox', { name: 'Check in: water', exact: true }).locator('xpath=..').getByRole('button', { name: /water/ }).click();
-    const sheet = page.getByRole('dialog', { name: 'Habit', exact: true });
-    await expect(sheet).toBeVisible();
-    return sheet;
+    return openHabit(page, 'water');
   };
   const times = (sheet: ReturnType<Page['locator']>) =>
     sheet.locator('input[type="time"]').evaluateAll((els) => els.map((el) => [(el as HTMLInputElement).labels?.[0]?.textContent?.trim() ?? '', (el as HTMLInputElement).value]));
@@ -405,7 +402,12 @@ test('the two lines over the digits choose the task: a sheet of the open tasks a
 
   await lines('alpha').click();
   await expect(sheet).toBeVisible();
-  const offered = await sheet.getByRole('button').evaluateAll((els) => els.map((el) => el.textContent?.trim() ?? '').filter((t) => t && t !== 'Close'));
+  // Each row's button is named by its words (aria-labelledby), not by text of its own.
+  const offered = await sheet.getByRole('button').evaluateAll((els) =>
+    els
+      .map((el) => (el.getAttribute('aria-labelledby') ? el.getAttribute('aria-labelledby')!.split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join(' ') : (el.textContent ?? '')).trim())
+      .filter((t) => t && t !== 'Close'),
+  );
   expect(offered.map((t) => t.replace(/\d+ of \d+$/, '').trim())).toEqual(['alpha', 'bravo', 'charlie', 'Nothing in particular']);
   await sheet.getByRole('button', { name: /^charlie/ }).click();
   await expect(lines('charlie')).toBeVisible();
@@ -565,9 +567,9 @@ test('a habit\'s times set on A while B, offline, checks it in: the check-in and
   await also(b, name);
   for (const d of [a, b]) await go(d.page, 'Habits');
   await b.setOffline(true);
-  await b.page.getByRole('checkbox', { name: 'Check in: stretch', exact: true }).click();
-  await a.page.getByRole('checkbox', { name: 'Check in: stretch', exact: true }).locator('xpath=..').getByRole('button', { name: /stretch/ }).click();
-  const sheet = a.page.getByRole('dialog', { name: 'Habit', exact: true });
+  // Twice a day: B ticks the first of its rounds.
+  await checkInRound(b.page, 'stretch', 1);
+  const sheet = await openHabit(a.page, 'stretch');
   await sheet.getByLabel('1st reminder', { exact: true }).fill('07:00');
   await sheet.getByLabel('2nd reminder', { exact: true }).fill('19:30');
   await expect.poll(async () => (await rowOf(name, 'habit', 'h'))?.reminds).toEqual(['07:00', '19:30']);
@@ -576,10 +578,9 @@ test('a habit\'s times set on A while B, offline, checks it in: the check-in and
   await expect.poll(async () => [...(await serverRows(server, name, 'checkin')).values()].filter((r) => r.habit === 'h' && !r.deleted).length, { timeout: 10000 }).toBe(1);
   expect((await rowOf(name, 'habit', 'h'))?.reminds).toEqual(['07:00', '19:30']);
   for (const d of [a, b]) {
-    await expect(d.page.getByRole('checkbox', { name: 'Check in: stretch', exact: true }).locator('xpath=..')).toContainText('1 of 2', { timeout: 5000 });
+    await expect(habitRow(d.page, 'stretch')).toContainText('1 of 2', { timeout: 5000 });
   }
-  await b.page.getByRole('checkbox', { name: 'Check in: stretch', exact: true }).locator('xpath=..').getByRole('button', { name: /stretch/ }).click();
-  const other = b.page.getByRole('dialog', { name: 'Habit', exact: true });
+  const other = await openHabit(b.page, 'stretch');
   await expect(other.getByLabel('1st reminder', { exact: true })).toHaveValue('07:00');
   await expect(other.getByLabel('2nd reminder', { exact: true })).toHaveValue('19:30');
 });

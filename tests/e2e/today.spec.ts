@@ -2,7 +2,8 @@
 import type { Page } from '@playwright/test';
 import { localDay } from '../../client/src/core/stats.ts';
 import { serverRows, signedIn } from '../sync/harness.ts';
-import { accountWith, go, list, quickAdd, ready, server, signIn, squaresOf, statusLine, strip, taskRow, titles, username } from './app.ts';
+import type { Device as Node } from '../sync/harness.ts';
+import { accountWith, go, list, midScreen, quickAdd, ready, server, settle, signedInto, signIn, squaresOf, startButton, statusLine, strip, taskRow, titles, username } from './app.ts';
 import { expect, test } from './devices.ts';
 import type { Device } from './devices.ts';
 
@@ -298,8 +299,9 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
   await expect(subtask).toBeFocused();
   await subtask.fill('outline');
   await subtask.press('Enter');
-  await sheet.getByRole('checkbox', { name: 'Done: outline' }).click();
-  await expect(sheet.getByRole('checkbox', { name: 'Done: outline' })).toHaveAttribute('aria-checked', 'true');
+  // In the sheet a subtask is words to change, with no box: it is ticked on Today.
+  await expect(sheet.getByRole('button', { name: 'Change: outline', exact: true })).toBeVisible();
+  await expect(sheet.getByRole('checkbox', { name: /outline/ })).toHaveCount(0);
 
   await sheet.getByRole('button', { name: 'New project' }).click();
   await sheet.getByLabel('Its name').fill('Thesis');
@@ -316,6 +318,10 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
   await expect(sheet).toBeHidden();
   const words = (page: Page) => taskRow(page, 'thesis draft, part one').getByRole('button', { name: /thesis draft, part one/ });
   await expect(words(a.page)).toBeFocused();
+  // The subtask, ticked on Today's opened row.
+  await taskRow(a.page, 'thesis draft, part one').getByRole('button', { name: '0 of 1 subtask' }).click();
+  await taskRow(a.page, 'thesis draft, part one').getByRole('checkbox', { name: 'Done: outline', exact: true }).click();
+  await expect(taskRow(a.page, 'thesis draft, part one').getByRole('button', { name: '1 of 1 subtask' })).toBeVisible();
 
   // Reopened, it is all there. Then a due date of tomorrow, and the browser's back closes it.
   sheet = await open(a.page, 'thesis draft, part one');
@@ -324,7 +330,8 @@ test('the sheet: every field saves as it is typed, with no Save; Escape and back
     await expect(dialog.getByRole('group', { name: 'Estimate' }).last()).toContainText('8 laps');
     await expect(dialog.getByRole('button', { name: 'Thesis' })).toHaveAttribute('aria-pressed', 'true');
     await expect(dialog.getByRole('button', { name: 'Tue', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(dialog.getByRole('checkbox', { name: 'Done: outline' })).toHaveAttribute('aria-checked', 'true');
+    // Ticked on Today, the sheet says so in its words' name.
+    await expect(dialog.getByRole('button', { name: 'Change: outline, ticked', exact: true })).toBeVisible();
   };
   await check(sheet);
   await a.page.goBack();
@@ -417,7 +424,7 @@ test('typed key by key, the spaces stay while typing; the title and a subtask ar
   await subtask.pressSequentially('  outline the argument  ');
   await expect(subtask).toHaveValue('  outline the argument  ');
   await subtask.press('Enter');
-  await expect(sheet.getByRole('checkbox', { name: 'Done: outline the argument' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Change: outline the argument', exact: true })).toBeVisible();
   await sheet.getByRole('button', { name: 'Close' }).click();
 
   await expect(taskRow(a.page, 'thesis draft')).toBeVisible();
@@ -503,7 +510,7 @@ test('a removed subtask says so, and Undo brings it back', async ({ deviceA: a }
   const subtask = sheet.getByRole('textbox', { name: 'New subtask' });
   await subtask.pressSequentially('find sources');
   await subtask.press('Enter');
-  const box = sheet.getByRole('checkbox', { name: 'Done: find sources' });
+  const box = sheet.getByRole('button', { name: 'Change: find sources', exact: true });
   await expect(box).toBeVisible();
   await box.locator('xpath=..').getByRole('button', { name: 'Remove' }).click();
   await expect(box).toHaveCount(0);
@@ -535,4 +542,162 @@ test('at 412 wide, a row that ends in a control keeps its count and its squares,
   const later = taskRow(a.page, 'flashcards');
   await expect(later).toContainText('0 of 3');
   await expect(later.locator('i[style*="--share"]').first()).toBeVisible();
+});
+
+// A task with subtasks (DESIGN.md): ticked on Today's opened row, made and changed in the sheet.
+
+/** A task with four subtasks, the first two done, written from Node. */
+const withSubs = (node: Node) => {
+  node.engine.write('task', 'essay', { title: 'essay', order: 'V' });
+  node.engine.write('task', 'later', { title: 'later one', order: 'W' });
+  ['outline', 'sources', 'draft', 'edit'].forEach((title, i) => node.engine.write('task', `s${i}`, { title, parent: 'essay', order: `V${i}`, ...(i < 2 && { done: Date.now() - 60000 }) }));
+};
+/** A task's subtasks in order on the server, by their `order`. */
+const subsOn = async (name: string, parent: string) =>
+  [...(await serverRows(server, name, 'task')).values()]
+    .filter((r) => r.parent === parent && r.deleted == null)
+    .sort((x, y) => String(x.order).localeCompare(String(y.order)))
+    .map((r) => r.title);
+
+test('on Today, "2 of 4 subtasks" opens the four under the task; ticking the last two leaves the task undone and still Next, "4 of 4 subtasks"; its own box finishes it; Today has no field to add one', async ({ deviceA: a, deviceB: b }) => {
+  const { name } = await signedInto(a, 'subtoday', withSubs);
+  await signIn(b.page, name);
+  await expect(startButton(b.page)).toBeVisible();
+  for (const d of [a, b]) await go(d.page, 'Today');
+  const count = (page: Page, text: string) => taskRow(page, 'essay').getByRole('button', { name: text, exact: true });
+  const sub = (page: Page, title: string) => taskRow(page, 'essay').getByRole('checkbox', { name: `Done: ${title}`, exact: true });
+
+  await expect(count(a.page, '2 of 4 subtasks')).toHaveAttribute('aria-expanded', 'false');
+  await expect(sub(a.page, 'outline')).toHaveCount(0);
+  await count(a.page, '2 of 4 subtasks').click();
+  await expect(count(a.page, '2 of 4 subtasks')).toHaveAttribute('aria-expanded', 'true');
+  // In their order, the done ones ticked.
+  const boxes = taskRow(a.page, 'essay').getByRole('checkbox', { name: /^Done: / });
+  expect(await boxes.evaluateAll((els) => els.map((el) => `${el.getAttribute('aria-label')} ${el.getAttribute('aria-checked')}`))).toEqual(['Done: essay false', 'Done: outline true', 'Done: sources true', 'Done: draft false', 'Done: edit false']);
+  // Only ticking happens there: no field.
+  await expect(a.page.getByRole('main').getByRole('textbox', { name: /subtask/i })).toHaveCount(0);
+  await expect(taskRow(a.page, 'essay').getByRole('textbox')).toHaveCount(0);
+
+  for (const title of ['draft', 'edit']) await sub(a.page, title).click();
+  await expect(count(a.page, '4 of 4 subtasks')).toBeVisible();
+  // The bar says the task is still to tick.
+  await expect(a.page.getByRole('status').filter({ hasText: 'All 4 subtasks done. Tick the task to finish it' })).toHaveCount(1);
+  await expect(count(b.page, '4 of 4 subtasks')).toBeVisible({ timeout: 3000 });
+  // Jira's rule: every subtask ticked finishes nothing but them.
+  await expect(a.page.getByRole('checkbox', { name: 'Done: essay', exact: true })).toHaveAttribute('aria-checked', 'false');
+  await expect(list(a.page, 'Next')).toContainText('essay');
+  await expect.poll(async () => (await serverRows(server, name, 'task')).get('essay')?.done ?? null).toBeNull();
+  expect([...(await serverRows(server, name, 'task')).values()].filter((r) => r.parent === 'essay').every((r) => typeof r.done === 'number')).toBe(true);
+
+  // The task's own box finishes it.
+  await a.page.getByRole('checkbox', { name: 'Done: essay', exact: true }).click();
+  await expect.poll(async () => typeof (await serverRows(server, name, 'task')).get('essay')?.done).toBe('number');
+  await expect(list(b.page, 'Next')).not.toContainText('essay', { timeout: 3000 });
+});
+
+test('in the sheet: a subtask is added, renamed where it stands (and B has the new name), removed with Undo where it stood, and put in order by a press and hold and by a mouse drag', async ({ deviceA: a, deviceB: b }) => {
+  const { name } = await signedInto(a, 'subsheet', withSubs);
+  await signIn(b.page, name);
+  await expect(startButton(b.page)).toBeVisible();
+  for (const d of [a, b]) await go(d.page, 'Today');
+  const sheet = await openSheet(a.page, 'essay');
+  // The subtasks' titles in the sheet, in order; one ticked on Today says so after its title.
+  const named = () => sheet.getByRole('button', { name: /^Change: / }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')!.slice('Change: '.length)));
+  const shown = async () => (await named()).map((title) => title.replace(/, ticked$/, ''));
+  const change = (title: string) => sheet.getByRole('button', { name: new RegExp(`^Change: ${title}(, ticked)?$`) });
+  // Rows of words, no box.
+  expect(await named()).toEqual(['outline, ticked', 'sources, ticked', 'draft', 'edit']);
+  await expect(sheet.getByRole('checkbox', { name: /, done$|^Done: (outline|sources|draft|edit)$/ })).toHaveCount(0);
+
+  // Added at the foot.
+  const field = sheet.getByRole('textbox', { name: 'New subtask' });
+  await field.fill('proofread');
+  await field.press('Enter');
+  await expect.poll(shown).toEqual(['outline', 'sources', 'draft', 'edit', 'proofread']);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['outline', 'sources', 'draft', 'edit', 'proofread']);
+
+  // Renamed where it stands: the words become a field, focused, and every change is kept as typed.
+  await sheet.getByRole('button', { name: 'Change: draft', exact: true }).click();
+  const title = sheet.getByRole('textbox', { name: 'Subtask', exact: true });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('draft');
+  await title.fill('first draft');
+  await title.press('Enter');
+  await expect.poll(shown).toEqual(['outline', 'sources', 'first draft', 'edit', 'proofread']);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['outline', 'sources', 'first draft', 'edit', 'proofread']);
+  await taskRow(b.page, 'essay').getByRole('button', { name: /^\d of 5 subtasks$/ }).click();
+  await expect(taskRow(b.page, 'essay').getByRole('checkbox', { name: 'Done: first draft', exact: true })).toBeVisible({ timeout: 3000 });
+
+  // Removed: said where it stood, and Undo brings it back there.
+  await change('sources').locator('xpath=..').getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect.poll(shown).toEqual(['outline', 'first draft', 'edit', 'proofread']);
+  const removed = sheet.getByText('Removed: sources.');
+  await expect(removed).toBeVisible();
+  const at = async (locator: ReturnType<Page['locator']>) => (await locator.boundingBox())!.y;
+  const y = await at(removed);
+  expect(y > (await at(change('outline'))) && y < (await at(change('first draft'))), 'the removed line is not where sources stood').toBe(true);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['outline', 'first draft', 'edit', 'proofread']);
+  await sheet.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(shown).toEqual(['outline', 'sources', 'first draft', 'edit', 'proofread']);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['outline', 'sources', 'first draft', 'edit', 'proofread']);
+
+  // In order by hand: proofread held, carried over outline; then edit dragged at once below proofread's place.
+  const middle = async (title: string) => {
+    const box = (await change(title).boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2, top: box.y, bottom: box.y + box.height };
+  };
+  // Measured once the list stands still in the middle of the sheet: held near its edge, the sheet scrolls under the row.
+  const centre = async () => {
+    await midScreen(sheet.getByRole('group', { name: 'Subtasks', exact: true }));
+    await settle(a.page);
+  };
+  const carry = async (from: string, to: string, hold: number) => {
+    const toY = (await middle(to)).top - 4;
+    const p = await middle(from);
+    await a.page.mouse.move(p.x, p.y);
+    await a.page.mouse.down();
+    await a.page.waitForTimeout(hold);
+    await a.page.mouse.move(p.x, toY, { steps: 14 });
+    await a.page.waitForTimeout(150);
+    await a.page.mouse.up();
+    await settle(a.page);
+  };
+  await centre();
+  await carry('proofread', 'outline', 500);
+  await expect.poll(shown).toEqual(['proofread', 'outline', 'sources', 'first draft', 'edit']);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['proofread', 'outline', 'sources', 'first draft', 'edit']);
+  // A plain press on the words still edits; carrying one did not.
+  await expect(sheet.getByRole('textbox', { name: 'Subtask', exact: true })).toHaveCount(0);
+  await centre();
+  await carry('edit', 'outline', 100);
+  await expect.poll(shown).toEqual(['proofread', 'edit', 'outline', 'sources', 'first draft']);
+  await expect.poll(() => subsOn(name, 'essay')).toEqual(['proofread', 'edit', 'outline', 'sources', 'first draft']);
+  await expect(sheet.getByRole('textbox', { name: 'Subtask', exact: true })).toHaveCount(0);
+});
+
+test('a click anywhere on a task\'s row but its controls opens the task: on the title of a task with subtasks, and in the middle of the Next card at laptop width', async ({ deviceA: a }) => {
+  await signedInto(a, 'rowclick', (node: Node) => {
+    node.engine.write('task', 'next', { title: 'reading', order: 'U' });
+    node.engine.write('task', 'essay', { title: 'essay', order: 'V' });
+    ['outline', 'sources'].forEach((title, i) => node.engine.write('task', `s${i}`, { title, parent: 'essay', order: `V${i}` }));
+  });
+  const sheet = a.page.getByRole('dialog', { name: 'Task', exact: true });
+  const clickAt = async (x: number, y: number, what: string) => {
+    await a.page.mouse.click(Math.round(x), Math.round(y));
+    await expect(sheet, `${what} opened nothing`).toBeVisible({ timeout: 2000 });
+    await a.page.keyboard.press('Escape');
+    await expect(a.page.locator('dialog[open]')).toHaveCount(0);
+  };
+  for (const width of [412, 1440]) {
+    await a.page.setViewportSize({ width, height: 900 });
+    await go(a.page, 'Today');
+    await settle(a.page);
+    // The title's words, of a task whose line under it holds "0 of 2 subtasks".
+    const title = (await taskRow(a.page, 'essay').getByText('essay', { exact: true }).boundingBox())!;
+    await clickAt(title.x + title.width / 2, title.y + title.height / 2, `at ${width}, the title of a task with subtasks`);
+    await expect(taskRow(a.page, 'essay').getByRole('button', { name: '0 of 2 subtasks' })).toHaveAttribute('aria-expanded', 'false');
+    // The middle of the Next card, between its words and its Start.
+    const row = (await taskRow(a.page, 'reading').boundingBox())!;
+    await clickAt(row.x + row.width / 2, row.y + row.height / 2, `at ${width}, the middle of the Next card`);
+  }
 });
