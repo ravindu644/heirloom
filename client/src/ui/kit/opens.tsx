@@ -10,6 +10,13 @@ import css from './opens.module.css';
 // ponytail: in memory, so a reload opens every row closed; localStorage if people want it kept.
 const opened = signal(new Set<string>());
 export const isOpen = (id: string) => opened.value.has(id);
+/** Closes a row's opened part, if it is open: a row that is carried is carried closed. */
+export function shut(id: string) {
+  if (!opened.value.has(id)) return;
+  const next = new Set(opened.value);
+  next.delete(id);
+  opened.value = next;
+}
 export function toggle(id: string) {
   const next = new Set(opened.value);
   if (!next.delete(id)) next.add(id);

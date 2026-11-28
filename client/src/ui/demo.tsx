@@ -205,6 +205,8 @@ const TODAY: Record<string, Scene> = {
   },
   // Held, not let go: the list as it answers a carried row before the release.
   'today-carry-end': { ...idleAt2, about: 'The Next card carried under the only Later row, not let go: that row is Next with its outline, "Later today" stands over the card', day: day([TASKS[0]!, { ...TASKS[1]!, due: '2026-11-23' }]), tap: 'demo:carry-end:K&R 5.1' },
+  'today-carry-open': { ...idleAt2, about: 'The Next card with its subtasks open, pressed and held: it folds them away as it lifts and is carried closed', day: day([...TASKS, ...SUBS]), tap: ['2 of 4 subtasks', 'demo:carry-end:K&R 5.1'] },
+  'sheet-subtask-carry': { ...idleAt2, about: 'A subtask in the sheet pressed, held and carried under the last: the rows it passes slide up out of its way', day: day([...TASKS, ...SUBS]), tap: ['Exercise 5-3', 'demo:sheet-carry:Write it with array'] },
   'today-carry-overdue': { ...idleAt2, about: 'An overdue Later row carried up over the Next card, not let go: it still says "yesterday"', day: day([TASKS[0]!, { ...TASKS[1]!, due: '2026-11-23' }]), tap: 'demo:carry:Exercise 5-3' },
   'today-carry-top': { ...idleAt2, about: 'A Later row carried over the Next card: it wears the outline and Start, and what was Next is the first of Later', day: day(), tap: 'demo:carry:Thinking in React' },
   'today-few-upcoming': { ...idleAt2, about: 'Three tasks today and one tomorrow, all in sight on a phone', day: FEW },
@@ -859,15 +861,19 @@ const find = <T extends Element>(selector: string, words: string): T => {
     } else if (words === 'demo:untarget') {
       // The day target taken away on another device, while this one has its editor open.
       staged!.today.setTarget(0);
-    } else if (words.startsWith('demo:carry-end:')) {
-      // Pressed on a row, held, and carried under the last row, and not let go.
-      const rows = [...document.querySelectorAll<HTMLElement>('[data-lift]')];
+    } else if (words.startsWith('demo:carry-end:') || words.startsWith('demo:sheet-carry:')) {
+      // Pressed on a row, held, and carried under the last row of its list, and not let go. In
+      // the sheet the list is the subtasks, brought into sight first, as a thumb would scroll there.
+      const sheet = words.startsWith('demo:sheet-carry:');
+      if (sheet) words = words.replace('demo:sheet-carry:', 'demo:carry-end:');
+      const rows = [...document.querySelectorAll<HTMLElement>(sheet ? 'dialog [data-lift]' : '[data-lift]')];
+      if (sheet) rows.at(-1)!.scrollIntoView({ block: 'center' });
       const row = rows.find((one) => one.textContent?.includes(words.slice(15)))!;
       const box = row.getBoundingClientRect();
-      const last = rows.at(-1)!.getBoundingClientRect();
       const at = (y: number) => ({ bubbles: true, pointerId: 1, isPrimary: true, clientX: box.left + box.width / 2, clientY: y });
       row.dispatchEvent(new PointerEvent('pointerdown', at(box.top + box.height / 2)));
-      setTimeout(() => dispatchEvent(new PointerEvent('pointermove', at(last.bottom + 8))), 500);
+      // Once it is up, and anything it had open has folded away: where the last row is then.
+      setTimeout(() => dispatchEvent(new PointerEvent('pointermove', at(rows.at(-1)!.getBoundingClientRect().bottom + 8))), 900);
     } else if (words.startsWith('demo:carry:')) {
       // Pressed on a row, held, and carried over the Next card, and not let go.
       const row = [...document.querySelectorAll<HTMLElement>('[data-lift]')].find((one) => one.textContent?.includes(words.slice(11)))!;

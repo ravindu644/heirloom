@@ -8,10 +8,23 @@ import { holdStill } from './hold.ts';
 // render is one Preact never touches.
 import './lift.css';
 import { motion } from './ms.ts';
+import { isOpen, shut, toggle } from './opens.tsx';
 import { placedByHand } from './parts.ts';
 
 // How long after a row is set down the click that the release makes may still arrive.
 const CLICK = 300;
+// Eats the click a release makes, for CLICK ms. Only a click on the list is the release's: a
+// finger's release makes none, so its next tap elsewhere (the bottom bar) must go through. A mouse
+// that drifted off the list sideways clicks a parent of it (the sheet's dialog, which would
+// close): that is the release's click too.
+function swallowClick(list: HTMLElement | null) {
+  const swallow = (click: MouseEvent) => {
+    const at = click.target as Node;
+    if (list && (list.contains(at) || at.contains(list))) click.stopPropagation(), click.preventDefault();
+  };
+  addEventListener('click', swallow, { capture: true, once: true });
+  setTimeout(() => removeEventListener('click', swallow, { capture: true }), CLICK);
+}
 // Travelled this far before the row has lifted, the press was the start of a swipe.
 const SLOP = 8;
 // Held this near the top or the foot of what scrolls, a lifted row brings the list along, this fast.
@@ -170,6 +183,8 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
       let lift: { list: HTMLElement[]; rects: DOMRect[]; heads: { one: HTMLElement; at: number; top: number }[]; from: number; to: number; most: number; past: boolean; scroller: HTMLElement | null; scrolled: number; placed: { order: HTMLElement[]; tops: number[] } } | null = null;
       // Everything moved while the row is up, headings the screen drew meanwhile among them: all let go of together.
       const touched = new Set<HTMLElement>();
+      // Its open part was folded for the carry: opened again if the row ends where it was.
+      let folded = false;
       const clear = () => {
         ending = null;
         clearTimeout(timer);
@@ -187,6 +202,8 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
         for (const one of touched) one.style.transition = '';
         touched.clear();
         if (lift && lift.to !== lift.from) over.current?.(null);
+        if (folded && (!lift || lift.to === lift.from)) toggle(id);
+        folded = false;
       };
       // How far the list has scrolled under the row since it lifted.
       const scrolledBy = () => (lift?.scroller ? lift.scroller.scrollTop - lift.scrolled : 0);
@@ -264,6 +281,33 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
         const most = last(list, from);
         // Its only place is the one it has: there is nothing to do with it in the hand.
         if (most === 0 && from === 0) return clear();
+        // A row is carried closed: what it had open (a task's subtasks, a habit's times) folds
+        // away as it lifts, and stays closed where it is set down. The row is up at once; the
+        // list is read once the fold has played, so every row is measured at the height it is
+        // carried at. A move of the finger meanwhile is the carry's, not a swipe.
+        if (isOpen(id)) {
+          shut(id);
+          folded = true;
+          up = true;
+          touched.add(row);
+          row.dataset.lifted = '';
+          // A frame for the screen to hear it, one to draw it, then the fold's own time: only the
+          // fold's, as anything else moving in the row must not hold the carry back. Checked on
+          // this press's own signal: `up` may already be a newer press's.
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => setTimeout(() => !away.signal.aborted && !lift && begin(), motion(row, '--motion-fill'))),
+          );
+          return;
+        }
+        begin();
+      };
+      const begin = () => {
+        const list = rows();
+        const from = list.indexOf(row);
+        const most = last(list, from);
+        // The list may have changed during the fold (a sync, another device): gone, or with
+        // nowhere left to go, there is nothing to carry.
+        if (from < 0 || (most === 0 && from === 0)) return clear();
         const scroller = row.closest<HTMLElement>('main, dialog');
         const rects = list.map((one) => one.getBoundingClientRect());
         // A heading stands over the row at its place in the list as it is drawn.
@@ -291,7 +335,7 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
         if (move.pointerId !== event.pointerId) return;
         y = move.clientY;
         if (lift) follow();
-        else if (Math.hypot(move.clientX - event.clientX, move.clientY - event.clientY) > SLOP) {
+        else if (!up && Math.hypot(move.clientX - event.clientX, move.clientY - event.clientY) > SLOP) {
           // A finger that moves first is scrolling. A mouse cannot scroll by dragging: a press
           // that moves picks the row up at once, as a desktop drag does, from anywhere but a
           // control of its own (its box, Start), where a shaky click must stay a click.
@@ -307,7 +351,8 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
       on('pointercancel', (cancel) => cancel.pointerId === event.pointerId && clear());
       on('pointerup', (release) => {
         if (release.pointerId !== event.pointerId) return;
-        if (!lift) return clear();
+        // Let go while it folded: nothing moved, but it was up, so the click is not a tap on it.
+        if (!lift) return folded && swallowClick(root.current), clear();
         cancelAnimationFrame(frame);
         // The rows to where the page will draw them, once more as the hand lets go.
         follow();
@@ -317,10 +362,9 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
         away.abort();
         // The tap that a release would otherwise be: it opened nothing, it set a row down.
         // Not tied to this press: with no glide to wait for, the press is over before the click
-        // comes. It is taken away again shortly, so it cannot eat a click that was really meant.
-        const swallow = (click: MouseEvent) => (click.stopPropagation(), click.preventDefault());
-        addEventListener('click', swallow, { capture: true, once: true });
-        setTimeout(() => removeEventListener('click', swallow, { capture: true }), CLICK);
+        // comes. It is taken away again shortly, and only a click on the list is the release's: a
+        // finger's release makes none, so its next tap elsewhere (the bottom bar) must go through.
+        swallowClick(root.current);
         // The rest already stand where the page will draw them. The row glides the last of the
         // way into the place kept open for it, and only then is the list written.
         row.dataset.gliding = '';

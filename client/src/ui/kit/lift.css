@@ -5,5 +5,7 @@
    Marked in data attributes (see lift.ts). Doubled, so it wins over the row's own shadow
    whichever sheet came first. */
 [data-lifted][data-lifted] { position: relative; z-index: 3; --row: var(--raised); --row-track: var(--line); box-shadow: var(--shadow-float), var(--row-ring, inset 0 0 0 var(--layout-hair) var(--ink)); cursor: grabbing; }
-/* The rows it passes, and the row itself as it is set down, move in time. */
-[data-gliding] { transition: transform var(--motion-fill) var(--motion-ease); }
+/* The rows it passes, and the row itself as it is set down, move in time. Doubled, so it wins
+   over a row's own transition (a sheet's subtask fades its fill) whichever sheet came first:
+   without it those rows jumped. */
+[data-gliding][data-gliding] { transition: transform var(--motion-fill) var(--motion-ease); }
