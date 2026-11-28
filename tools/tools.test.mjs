@@ -13,6 +13,9 @@ test('tokens: DESIGN.md builds, dark values land under the plain names', () => {
   const css = build(design, (f) => fs.existsSync(`design/fonts/${f}`));
   assert.match(css, /:root \{[^}]*--you: #C4321A;/);
   assert.match(css, /prefers-color-scheme: dark[^}]*\{[^}]*--you: #FF6A4D;/);
+  // Picked by hand: dark wins over a light system, and light keeps the system's dark set away.
+  assert.match(css, /:root\[data-theme="dark"\] \{[^}]*--you: #FF6A4D;/);
+  assert.match(css, /:root:not\(\[data-theme="light"\]\) \{[^}]*--you: #FF6A4D;/);
   assert.match(css, /--type-figure-xl: 600 168px\/0\.9 "Barlow Condensed", sans-serif;/);
   assert.match(css, /--motion-press: 100ms;/);
   assert.match(css, /--layout-sidebar: 232px;/);

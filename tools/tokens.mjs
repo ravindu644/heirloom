@@ -1,6 +1,6 @@
 // Usage: node tools/tokens.mjs
 // Writes client/src/ui/tokens.css from the front matter of DESIGN.md: colours (the dark set under
-// prefers-color-scheme), type, spacing, radii, layout sizes, motion, and one @font-face per family and weight.
+// prefers-color-scheme, or data-theme on <html> when picked by hand), type, spacing, radii, layout sizes, motion, and one @font-face per family and weight.
 // Fails on a colour without a dark twin, a reference to a role that does not exist, or a font
 // file missing from design/fonts.
 import fs from 'node:fs';
@@ -52,9 +52,17 @@ ${[...faces.values()].join('\n')}
 ${block([...light, ...type, ...vars('space-', d.spacing), ...vars('radius-', d.rounded), ...vars('layout-', d.layout), ...vars('state-', d.state), ...vars('shadow-', d.shadow), ...vars('motion-', d.motion)])}
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
 ${block(block(dark).split('\n'))}
   }
+}
+/* Picked by hand in Settings, on this device: the other set whatever the system says. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+${block(dark)}
 }
 `;
 }

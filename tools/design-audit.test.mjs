@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { colour, columns, edge, fluid, header, job, press, rhythm, scroll, shape, space, spec, type } from './design-audit.mjs';
+import { audit, colour, columns, edge, fluid, header, job, press, rhythm, scroll, shape, space, spec, type } from './design-audit.mjs';
 
 const s = spec(fs.readFileSync('DESIGN.md', 'utf8'));
 let n = 0;
@@ -43,6 +43,13 @@ test('colour: a palette colour passes in its own theme and fails in the other', 
   assert.deepEqual(colour(you, s, 'light'), []);
   assert.match(colour(you, s, 'dark')[0].what, /dark background-color #C4321A/);
   assert.deepEqual(colour(el({ colours: [['color', 'rgb(255, 106, 77)']] }), s, 'dark'), []);
+});
+
+test('audit: a page set to dark by hand is held to the dark palette in both reads', () => {
+  const dark = [el({ colours: [['color', 'rgb(255, 106, 77)']] })];
+  const colours = (found) => found.filter((f) => f.rule === 'colour');
+  assert.equal(colours(audit(dark, dark, s, 'phone', null)).length, 1, 'unpicked, the first read is light');
+  assert.deepEqual(colours(audit(dark, dark, s, 'phone', null, 'dark')), []);
 });
 
 test('colour: the hover mix of you, the scrim and the shadow pass; a grey does not', () => {

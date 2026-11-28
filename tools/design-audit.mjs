@@ -305,14 +305,16 @@ export function header(byState) {
   });
 }
 
-/** Every rule over one state at one size; `dark` is the same page collected in the dark theme. */
-export function audit(light, dark, s, size, doc) {
+/** Every rule over one state at one size; `dark` is the same page collected in the dark theme.
+ *  `picked` is the theme set by hand on the page (Settings' "Light or dark"): then both reads are
+ *  that theme whatever the system says, and both are held to its palette. */
+export function audit(light, dark, s, size, doc, picked = '') {
   const width = SIZES[size].width;
   const cols = columns(light);
   const inCol = new Set(cols.flatMap((c) => c.blocks.map((b) => b.i)));
   return [
-    ...light.flatMap((el) => [...type(el, s, width), ...colour(el, s, 'light'), ...shape(el, s), ...space(el, s), ...press(el, s), ...job(el, s)]),
-    ...dark.flatMap((el) => colour(el, s, 'dark')),
+    ...light.flatMap((el) => [...type(el, s, width), ...colour(el, s, picked || 'light'), ...shape(el, s), ...space(el, s), ...press(el, s), ...job(el, s)]),
+    ...dark.flatMap((el) => colour(el, s, picked || 'dark')),
     ...cols.flatMap((c) => [...edge(c, s), ...rhythm(c, s, size, !inCol.has(c.box.i) || c.box.root), ...fluid(c, size)]),
     ...(doc ? scroll(doc, size) : []),
   ];
@@ -653,13 +655,14 @@ async function main() {
           // As one string: Playwright checks a returned object field by field, which was most of the run.
           const read = async (colours) => JSON.parse(await page.evaluate(`JSON.stringify((${collect})(${colours}))`));
           const { els, head, doc } = await read(false);
+          const picked = await page.evaluate(() => document.documentElement.dataset.theme ?? '');
           for (const x of await page.evaluate(wobble)) found.push({ ...x, state, size });
           for (const x of await page.evaluate(rowLinks)) found.push({ ...x, state, size });
           for (const x of await page.evaluate(stuck)) found.push({ ...x, state, size });
           await page.emulateMedia({ colorScheme: 'dark' });
           const dark = (await read(true)).els;
           heads[size][state] = head;
-          for (const x of audit(els, dark, s, size, doc)) found.push({ ...x, state, size });
+          for (const x of audit(els, dark, s, size, doc, picked)) found.push({ ...x, state, size });
         } catch (err) {
           found.push({ state, size, rule: 'read', path: '', text: '', what: `could not be read: ${err.message.split('\n')[0]}`, allowed: '' });
         } finally {
