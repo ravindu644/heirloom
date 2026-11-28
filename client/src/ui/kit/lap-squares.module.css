@@ -11,3 +11,8 @@
   transform-origin: left;
   transition: transform var(--motion-fill) var(--motion-ease);
 }
+
+/* One lap alone, at the size of a dot: filled as far as it ran, or hollow when not counted. */
+.one, .hollow { position: relative; display: block; width: var(--layout-dot); height: var(--layout-dot); overflow: hidden; background: var(--track, var(--line)); }
+.one::after { content: ""; position: absolute; inset: 0; background: var(--you); transform: scaleX(var(--share)); transform-origin: left; }
+.hollow { background: none; box-shadow: inset 0 0 0 var(--layout-hair) var(--you); }

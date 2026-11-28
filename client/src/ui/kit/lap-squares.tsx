@@ -10,6 +10,11 @@ import css from './lap-squares.module.css';
 const LINE = 8;
 const LINES = 4;
 
+/** One lap alone, 12px: filled as far as it ran (`share`), hollow in `you` when it is not counted. */
+export function LapSquare({ share, hollow }: { share: number; hollow?: boolean }) {
+  return <i class={hollow ? css.hollow : css.one} style={`--share:${Math.min(1, share)}`} aria-hidden="true" />;
+}
+
 export function LapSquares({ squares, estimate }: { squares: number[]; estimate: number | null }) {
   const count = Math.max(squares.length, estimate ?? 0);
   if (!count || count > LINE * LINES) return null;

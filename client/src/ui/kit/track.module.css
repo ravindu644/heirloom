@@ -10,7 +10,7 @@
 .after { right: 0; height: var(--layout-hair); background: var(--line); }
 
 /* A lane: one grey across the whole stretch, a filled block for each lap that ran. Square ended. */
-.lane { position: relative; height: var(--layout-lane-set); background: var(--raised); }
+.lane { position: relative; height: var(--layout-lane-set); background: var(--lane-track, var(--raised)); }
 .lap { position: absolute; top: 0; bottom: 0; background: var(--muted); }
 .mine { background: var(--you); }
 /* Cut into rows, each row's own sliver of the hours; a block of a minute is still seen. */

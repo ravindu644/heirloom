@@ -5,6 +5,7 @@
 
 import { computed, signal } from '@preact/signals';
 import { addDays, bests, since, streakView, weekRace } from '../core/progress.ts';
+import { fill } from '../core/stats.ts';
 import type { Days } from '../core/progress.ts';
 import type { DayView, Estimates, Moment, Progress, ProjectShare, TimelineEntry } from '../sync/progress.ts';
 import type { ProjectView } from '../sync/today.ts';
@@ -38,7 +39,7 @@ export interface DemoRecord {
   /** A lap from 23:46 the day before to 00:32 today, on both days' timelines. */
   midnight?: boolean;
   /** Today as one of two written days: the user's own (a lap from before midnight, a break, a stopped lap, a task done) or a full one (nine laps, one not counted, tasks done). */
-  script?: 'real' | 'full' | 'long' | 'apart';
+  script?: 'real' | 'full' | 'long' | 'apart' | 'seven';
 }
 
 // The reference's days: the ones its words talk about are fixed, the rest come from the same
@@ -73,7 +74,7 @@ function history(from = '2026-09-07', first = '2026-09-14'): Record<string, numb
 }
 
 // A session as the demo writes it; what it gave the day is worked out by `dayOf`.
-type Raw = Omit<TimelineEntry, 'day_ms' | 'split_ms' | 'off_ms' | 'began' | 'ends'>;
+type Raw = Omit<TimelineEntry, 'day_ms' | 'split_ms' | 'off_ms' | 'began' | 'ends' | 'fill'>;
 
 /**
  * A day as the core's `day()` gives it, from its sessions and moments: each counted lap's part
@@ -102,7 +103,8 @@ function dayOf(day: string, raw: Raw[], moments: Moment[]): DayView {
     .sort((a, b) => a.started - b.started)
     .map((entry): TimelineEntry => {
       const counts = entry.kind === 'work' && entry.outcome !== 'void';
-      const from = Math.max(entry.started, start, covered);
+      // Its counted part starts after its pause, as the core counts it.
+      const from = Math.max(entry.started + (entry.ended - entry.started - entry.ran_ms), start, covered);
       const to = Math.min(entry.ended, end);
       const day_ms = counts ? Math.max(0, to - from) : 0;
       if (counts) {
@@ -112,6 +114,8 @@ function dayOf(day: string, raw: Raw[], moments: Moment[]): DayView {
       }
       return {
         ...entry,
+        // As full as it ran, by the core's own rule; the demo's laps are planned at 25 minutes.
+        fill: entry.kind !== 'work' ? 0 : fill({ outcome: entry.outcome, started: entry.started, ended: entry.ended, paused_ms: entry.ended - entry.started - entry.ran_ms, planned_ms: LAP }),
         day_ms,
         split_ms: counts ? split : null,
         off_ms: counts ? union(all) - union(all.filter((one) => one !== entry)) : 0,
@@ -247,16 +251,56 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
   const routine = { task: { id: 'routine', title: 'Morning routine' }, project: null };
   const ttt = { task: { id: 'ttt', title: 'Tic-tac-toe in React' }, project: project('react') };
   const notes = { task: { id: 'notes', title: 'Lecture notes, week 10' }, project: project('uni') };
-  const scripts: Record<'real' | 'full' | 'long' | 'apart', { sessions: Raw[]; moments: Moment[] }> = {
+  const refining = { task: { id: 'refining', title: "Refining Heirloom's Habits and Subtasks UI" }, project: null };
+  const pointers = { task: { id: 'pointers', title: 'Pointers, chapter 5' }, project: project('c') };
+  const email = { task: { id: 'email', title: 'Email the TA about the quiz' }, project: project('uni') };
+  const scripts: Record<'real' | 'full' | 'long' | 'apart' | 'seven', { sessions: Raw[]; moments: Moment[] }> = {
+    // The user's own day, from their screenshot: three tasks, eight laps, 2h 41m.
     real: {
       sessions: [
         // With their seconds, as the phone had them: the times round to the minute and agree with their minutes.
-        { ...lap('r1', 0, 0, html), started: at(addDays(DAY, -1), 23, 46) + 40000, ended: at(DAY, 0, 31) + 10000, ran_ms: 44 * MIN + 30000 },
+        { ...lap('r1', 0, 0, html), started: at(addDays(DAY, -1), 23, 45) + 40000, ended: at(DAY, 0, 31) + 10000, ran_ms: 45 * MIN + 30000 },
         rest('r2', 0, 39),
         lap('r3', 11, 3, { ...routine, outcome: 'stopped', started: at(DAY, 11, 3) + 20000, ended: at(DAY, 11, 19) + 5000, ran_ms: 15 * MIN + 45000 }),
+        lap('r4', 15, 48, { ...html, outcome: 'stopped', ended: at(DAY, 16, 10), ran_ms: 22 * MIN }),
+        lap('r5', 16, 19, { ...refining, ended: at(DAY, 16, 54), ran_ms: 35 * MIN }),
+        rest('r6', 16, 54),
+        lap('r7', 17, 3, { ...refining, outcome: 'stopped', ended: at(DAY, 17, 17), ran_ms: 14 * MIN }),
+        lap('r8', 17, 20, { ...html, outcome: 'stopped', ended: at(DAY, 17, 22), ran_ms: 2 * MIN }),
+        lap('r9', 17, 24, refining),
+        rest('r10', 17, 49),
+        lap('r11', 17, 57, { ...refining, outcome: 'stopped', ended: at(DAY, 18, 14), ran_ms: 17 * MIN }),
       ],
-      // Finished as its lap ended: that lap's.
-      moments: [{ kind: 'done', id: 'routine', at: at(DAY, 11, 19) + 5000, title: 'Morning routine' }],
+      moments: [
+        { kind: 'done', id: 'routine', at: at(DAY, 11, 19) + 5000, title: 'Morning routine' },
+        { kind: 'done', id: 'refining', at: at(DAY, 18, 14), title: refining.task.title },
+      ],
+    },
+    // A long day of seven tasks, the drawing's: the two earliest fold behind one link.
+    seven: {
+      sessions: [
+        lap('s1', 7, 30, { ...routine, outcome: 'stopped', ended: at(DAY, 7, 46), ran_ms: 16 * MIN }),
+        lap('s2', 8, 15, pointers), rest('s2r', 8, 40),
+        lap('s3', 8, 45, pointers),
+        // Held for six minutes on the way: its line says so.
+        lap('s4', 10, 0, { ...notes, ended: at(DAY, 10, 31), ran_ms: LAP }),
+        lap('s5', 10, 50, ttt), rest('s5r', 11, 15),
+        lap('s6', 11, 20, ttt),
+        lap('s7', 13, 0, html), rest('s7r', 13, 25),
+        lap('s8', 15, 0, { ...html, outcome: 'stopped', ended: at(DAY, 15, 21), ran_ms: 21 * MIN }),
+        lap('s9', 16, 19, { ...refining, ended: at(DAY, 16, 54), ran_ms: 35 * MIN }),
+        lap('s10', 17, 3, { ...refining, outcome: 'stopped', ended: at(DAY, 17, 17), ran_ms: 14 * MIN }),
+        lap('s11', 17, 24, refining),
+        lap('s12', 17, 57, { ...refining, outcome: 'stopped', ended: at(DAY, 18, 14), ran_ms: 17 * MIN }),
+        lap('s13', 18, 31, { ...email, outcome: 'stopped', ended: at(DAY, 18, 43), ran_ms: 12 * MIN }),
+      ],
+      moments: [
+        { kind: 'done', id: 'routine', at: at(DAY, 7, 46), title: 'Morning routine' },
+        { kind: 'done', id: 'pointers', at: at(DAY, 9, 6), title: pointers.task.title },
+        { kind: 'done', id: 'ttt', at: at(DAY, 11, 46), title: ttt.task.title },
+        { kind: 'done', id: 'refining', at: at(DAY, 18, 14), title: refining.task.title },
+        { kind: 'done', id: 'email', at: at(DAY, 18, 43), title: email.task.title },
+      ],
     },
     full: {
       sessions: [
@@ -277,10 +321,13 @@ export function demoProgress(record: DemoRecord, lapNow: () => number): Progress
         { kind: 'done', id: 'notes', at: at(DAY, 15, 36), title: 'Lecture notes, week 10' },
       ],
     },
-    // Two laps, and a task finished between them, in no lap and no break.
+    // Two laps, a task finished between them, and one finished with no lap at all: a card with only its tick.
     apart: {
-      sessions: [lap('a1', 9, 0, routine), rest('a1r', 9, 25), lap('a2', 13, 0, ttt)],
-      moments: [{ kind: 'done', id: 'routine', at: at(DAY, 11, 40), title: 'Morning routine' }],
+      sessions: [lap('a1', 9, 30, routine), rest('a1r', 9, 55), lap('a2', 13, 0, ttt)],
+      moments: [
+        { kind: 'done', id: 'bank', at: at(DAY, 9, 10), title: 'Call the bank about the card' },
+        { kind: 'done', id: 'routine', at: at(DAY, 11, 40), title: 'Morning routine' },
+      ],
     },
     // Thirty laps from six, a break after each: 12h 30m, the widest split a day draws.
     long: { sessions: Array.from({ length: 30 }, (_, i) => [lap(`l${i}`, 6, i * 30, ttt), rest(`l${i}r`, 6, i * 30 + 25)]).flat(), moments: [] },

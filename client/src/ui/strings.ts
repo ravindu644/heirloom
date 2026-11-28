@@ -683,32 +683,44 @@ export const progress = {
   // Beside the day's focus: "focused today, in 2 laps".
   // The lap in progress is in the figure and not yet in the count, so it is said: "in 7 laps, and one running".
   focused: (laps: number, isToday: boolean, live?: string) => `focused ${isToday ? 'today' : 'that day'}, in ${plural(laps, 'lap', 'laps')}${live ? `, and one ${live}` : ''}`,
-  // Over the column of running totals, and the figure at a lap's end.
-  soFar: (isToday: boolean) => (isToday ? 'Day so far' : "Day's total"),
-  // Over a day's laps when it holds more than its latest few: how many more and what they gave, and the way back.
-  // The laps not counted are named, so the count adds up with the one at the top: "4 earlier laps, 1 not counted, 1h 15m".
-  earlier: (n: number, aside: number, ms: number) => `${plural(n, 'earlier lap', 'earlier laps')}${aside ? `, ${aside} not counted` : ''}${ms < MIN ? '' : `, ${total(ms)}`}`,
-  latest: (n: number) => `Show only the latest ${n} laps`,
-  lap: 'Lap',
-  stopped: 'Stopped lap',
-  aside: 'Lap, not counted',
-  running: 'Lap, running',
-  paused: 'Lap, paused',
+  // Over a day's cards when it holds more than its latest few: how many more, the laps they hold and
+  // what they gave, naming the laps not counted, and the way back. "3 earlier tasks, 5 laps, 1h 15m".
+  earlier: (tasks: number, laps: number, aside: number, ms: number) =>
+    `${plural(tasks, 'earlier task', 'earlier tasks')}, ${plural(laps, 'lap', 'laps')}${aside ? `, ${aside} not counted` : ''}${ms < MIN ? '' : `, ${total(ms)}`}`,
+  latest: (n: number) => `Show only the latest ${n} tasks`,
+  // The card of the laps run for no task.
+  noTask: 'Nothing in particular',
+  /**
+   * The line under a task's sliver: its laps in one sum, where it began if that was the day
+   * before, and when it was done. "4 laps, 2 stopped. Done at 18:14.", "1 stopped lap.",
+   * "3 laps, 2 stopped, from 23:45 Fri.", "2 laps, 1 not counted.", "No lap today. Done at 09:10."
+   */
+  // `laps` leaves out the lap in progress, as "in 7 laps, and one running" does: it is said apart.
+  taskSum: (f: { laps: number; stopped: number; aside: number; live?: string; from?: { at: number; day: string }; done?: number; isToday?: boolean }) =>
+    `${
+      [
+        f.laps === 1 && f.stopped === 1 ? '1 stopped lap' : f.laps ? plural(f.laps, 'lap', 'laps') : '',
+        f.stopped && !(f.laps === 1 && f.stopped === 1) ? `${f.stopped} stopped` : '',
+        f.aside ? `${f.aside} not counted` : '',
+        f.live ? (f.laps ? `1 ${f.live}` : `1 lap ${f.live}`) : '',
+      ]
+        .filter(Boolean)
+        .join(', ') || (f.isToday === false ? 'No lap that day' : 'No lap today')
+    }${f.from ? `, from ${wall(f.from.at)} ${dated(f.from.day, { weekday: 'short' })}` : ''}.${f.done === undefined ? '' : ` Done at ${wall(f.done)}.`}`,
   /**
    * A lap's facts in one line, its clock times already rounded to the minute: "11:03 to 11:19,
-   * 16 minutes"; across midnight "23:46 Fri to 00:31, 31 of 45 minutes today", or "23:46 to
-   * 00:31 Sat, 14 of 45 minutes here"; beside another lap "25 minutes, 15 of them already
-   * counted, ran on two devices"; ", not counted"; a task finished in it ". Task done.". `to`
-   * null is the lap still running; `paused` the one held: "15:48, paused at 16:02, 14 minutes".
+   * 16 minutes"; "17:03 to 17:17, stopped, 14 minutes"; across midnight "23:46 Fri to 00:31, 31 of
+   * 45 minutes today", or "23:46 to 00:31 Sat, 14 of 45 minutes here"; beside another lap "25
+   * minutes, 15 of them already counted, ran on two devices"; "14:00 to 14:31, 25 minutes, paused
+   * 6 minutes"; ", not counted". `to` null is the lap still running ("15:48 to now"); `held` the
+   * one paused now: "15:48, paused at 16:02, 14 minutes".
    */
-  facts: (f: { from: number; to: number | null; paused?: boolean; fromDay?: string; toDay?: string; mins: number; part?: number; here?: boolean; already?: number; two?: boolean; aside?: boolean; done?: boolean }) =>
-    `${wall(f.from)}${f.fromDay ? ` ${dated(f.fromDay, { weekday: 'short' })}` : ''}${f.paused ? ', paused at ' : ' to '}${f.to === null ? 'now' : wall(f.to)}${f.toDay ? ` ${dated(f.toDay, { weekday: 'short' })}` : ''}, ` +
-    `${f.part === undefined ? ran(f.mins * MIN) : `${f.part} of ${plural(f.mins, 'minute', 'minutes')} ${f.here ? 'here' : 'today'}`}` +
-    `${f.already ? `, ${f.already} of them already counted` : ''}${f.two ? ', ran on two devices' : ''}${f.aside ? ', not counted' : ''}${f.done ? '. Task done.' : ''}`,
+  facts: (f: { from: number; to: number | null; held?: boolean; fromDay?: string; toDay?: string; stopped?: boolean; mins: number; part?: number; here?: boolean; paused?: number; already?: number; two?: boolean; aside?: boolean }) =>
+    `${wall(f.from)}${f.fromDay ? ` ${dated(f.fromDay, { weekday: 'short' })}` : ''}${f.held ? ', paused at ' : ' to '}${f.to === null ? 'now' : wall(f.to)}${f.toDay ? ` ${dated(f.toDay, { weekday: 'short' })}` : ''}` +
+    `${f.stopped ? ', stopped' : ''}, ${f.part === undefined ? ran(f.mins * MIN) : `${f.part} of ${plural(f.mins, 'minute', 'minutes')} ${f.here ? 'here' : 'today'}`}` +
+    `${f.paused ? `, paused ${length(f.paused * MIN)}` : ''}${f.already ? `, ${f.already} of them already counted` : ''}${f.two ? ', ran on two devices' : ''}${f.aside ? ', not counted' : ''}`,
   // The last hour of a whole day: its end, not the next day's start.
   dayEnd: '24:00',
-  // A task finished outside any lap: a quiet row of its own, "Morning routine done at 11:19".
-  doneAt: (at: number) => `done at ${wall(at)}`,
   setAside: "Don't count it",
   countAgain: 'Count it again',
   forLap: (words: string, start: number) => `${words}, the lap at ${wall(start)}`,

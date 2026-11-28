@@ -52,9 +52,10 @@ test('setting a lap aside says what left which day, and the fold counts as the h
   assert.equal(progress.off(20000, '2026-11-24', '2026-11-24', { ms: 30000, day: '2026-11-23' }), 'Under a minute off today');
   assert.equal(progress.off(32 * 60000, '2026-11-24', '2026-11-24', { ms: 14 * 60000, day: '2026-11-23' }), '32 minutes off today, 14 off Monday');
   assert.equal(progress.off(14 * 60000, '2026-11-23', '2026-11-24', { ms: 32 * 60000, day: '2026-11-24' }), '14 minutes off Monday, 32 off today');
-  assert.equal(progress.earlier(4, 1, 75 * 60000), '4 earlier laps, 1 not counted, 1h 15m');
-  assert.equal(progress.earlier(4, 0, 100 * 60000), '4 earlier laps, 1h 40m');
-  assert.equal(progress.earlier(2, 2, 0), '2 earlier laps, 2 not counted');
+  assert.equal(progress.earlier(3, 5, 0, 75 * 60000), '3 earlier tasks, 5 laps, 1h 15m');
+  assert.equal(progress.earlier(1, 2, 1, 25 * 60000), '1 earlier task, 2 laps, 1 not counted, 25m');
+  assert.equal(progress.earlier(1, 1, 1, 0), '1 earlier task, 1 lap, 1 not counted');
+  assert.equal(progress.latest(5), 'Show only the latest 5 tasks');
   assert.equal(progress.focused(7, true, 'running'), 'focused today, in 7 laps, and one running');
 });
 
@@ -74,8 +75,23 @@ test('a lap row says its facts in one line, every count the difference of the ti
   assert.equal(progress.facts({ from: t(23, 46), to: t(0, 31), toDay: '2026-11-29', mins: 45, part: 14, here: true }), '23:46 to 00:31 Sun, 14 of 45 minutes here');
   assert.equal(progress.facts({ from: t(15, 40), to: t(16, 5), mins: 25, already: 15, two: true }), '15:40 to 16:05, 25 minutes, 15 of them already counted, ran on two devices');
   assert.equal(progress.facts({ from: t(12, 40), to: t(12, 52), mins: 12, aside: true }), '12:40 to 12:52, 12 minutes, not counted');
-  assert.equal(progress.facts({ from: t(11, 3), to: t(11, 19), mins: 16, done: true }), '11:03 to 11:19, 16 minutes. Task done.');
+  assert.equal(progress.facts({ from: t(17, 3), to: t(17, 17), stopped: true, mins: 14 }), '17:03 to 17:17, stopped, 14 minutes');
+  assert.equal(progress.facts({ from: t(14, 0), to: t(14, 31), mins: 25, paused: 6 }), '14:00 to 14:31, 25 minutes, paused 6 minutes');
   assert.equal(progress.facts({ from: t(15, 48), to: null, mins: 8 }), '15:48 to now, 8 minutes');
-  assert.equal(progress.facts({ from: t(15, 48), to: t(16, 2), paused: true, mins: 14 }), '15:48, paused at 16:02, 14 minutes');
+  assert.equal(progress.facts({ from: t(15, 48), to: t(16, 2), held: true, mins: 14 }), '15:48, paused at 16:02, 14 minutes');
   assert.equal(progress.facts({ from: t(23, 59), to: t(0, 1), fromDay: '2026-11-27', mins: 1, part: 1 }), '23:59 Fri to 00:01, 1 of 1 minute today');
+});
+
+test('a task card sums its laps in one line: how many, how many stopped or not counted, where it began, when it was done', () => {
+  const t = (h: number, m: number) => new Date(2026, 10, 28, h, m).getTime();
+  assert.equal(progress.taskSum({ laps: 4, stopped: 2, aside: 0, done: t(18, 14) }), '4 laps, 2 stopped. Done at 18:14.');
+  assert.equal(progress.taskSum({ laps: 1, stopped: 1, aside: 0, done: t(11, 19) }), '1 stopped lap. Done at 11:19.');
+  assert.equal(progress.taskSum({ laps: 3, stopped: 2, aside: 0, from: { at: t(23, 45), day: '2026-11-27' } }), '3 laps, 2 stopped, from 23:45 Fri.');
+  assert.equal(progress.taskSum({ laps: 2, stopped: 0, aside: 1 }), '2 laps, 1 not counted.');
+  assert.equal(progress.taskSum({ laps: 0, stopped: 0, aside: 0, done: t(9, 10) }), 'No lap today. Done at 09:10.');
+  assert.equal(progress.taskSum({ laps: 1, stopped: 0, aside: 0 }), '1 lap.');
+  assert.equal(progress.taskSum({ laps: 3, stopped: 0, aside: 0, live: 'running' }), '3 laps, 1 running.');
+  assert.equal(progress.taskSum({ laps: 0, stopped: 0, aside: 0, live: 'paused' }), '1 lap paused.');
+  assert.equal(progress.taskSum({ laps: 0, stopped: 0, aside: 0, done: t(9, 10), isToday: false }), 'No lap that day. Done at 09:10.');
+  assert.equal(progress.taskSum({ laps: 2, stopped: 1, aside: 1 }), '2 laps, 1 stopped, 1 not counted.');
 });
