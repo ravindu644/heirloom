@@ -115,7 +115,7 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | Feature | Why |
 |---|---|
 | Works fully offline; syncs when it can; a quiet indicator says which | User requirement |
-| Light and dark, following the system | Comfort at night |
+| Light and dark, following the system, or set to one of them on each device in Settings | Comfort at night; the user asked to pick it by hand |
 | On a laptop, Chrome or Edge can install the web app: its own window, an icon in the taskbar or dock, the bell through Web Push as before. No native build | A desktop app without a second codebase; the user chose it over Tauri, which wants a Windows signing certificate and a native bell of its own |
 | Export everything as JSON; import it back | Your data is yours; Focus To-Do users lost theirs |
 | Invite-only accounts on the user's own server | Free, private |
@@ -165,3 +165,4 @@ noise, app blocking during focus, a companion character, widgets, a public read-
 | 2026-11-27 | Rest days can be pinned: the user wants a whole Sunday to be a rest day by plan. Still two a week; a pinned day holds its place, the rest stay automatic so a bad day is still covered, and a pinned day kept gives its place back. Only the focus streak: habits rest on the days they are not planned, and a room keeps its own automatic two |
 | 2026-11-27 | The phone stays in step while heirloom is closed: a foreground service holds its own connection to the server, so a lap started or paused on the web updates the phone's countdown and bell within a second, and room notes and called laps notify. The user chose it over UnifiedPush (an extra app for every friend) and Firebase (a Google project tied to every self-hosted server), as self-hosted apps like Home Assistant and Gotify do. A silent notification says it is running; a Settings switch turns it off |
 | 2026-11-28 | The web app is installable (a manifest and icons): the user asked what native Linux and Windows builds would cost, and took the installable web app over Tauri. Tauri stays under "Later, maybe" for a bell with the browser closed or a tray icon |
+| 2026-11-28 | Light or dark can be picked by hand in Settings, kept on each device and not synced: the user asked for it; a laptop and a phone are often lit differently, so one choice for both would be wrong half the time |

@@ -272,7 +272,8 @@ and a screen disagree, this file wins and the screen is changed.
 ## Colors
 
 Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` writes both into
-`tokens.css`, the dark set under `prefers-color-scheme: dark`.
+`tokens.css`: the dark set under `prefers-color-scheme: dark` unless the page is set to light
+(`data-theme="light"` on `<html>`), and always when it is set to dark (`data-theme="dark"`).
 
 - **ground:** the chalk of a lane line, one step off white, so white surfaces read as lanes on it.
   In dark, a true neutral near-black, never navy.
@@ -672,9 +673,12 @@ Built once in `client/src/ui/kit/` and reused.
     today and the week in `label`, the task only if shared, who cheered, and the lane.
     **Upright phone (under 720px):** the words make the panel's top lines and the lane runs its
     full width under them; the window is six hours with now 5/8 across, the hours sliding under
-    it, but never starting before today's 00:00 (in the day's first hours now sits further left). **Sideways and laptop (720px up):** the words stand in a column at the panel's left, 220px
-    under 1100px wide (the time left under the name) and 280px above, and the lane takes the rest
-    of the row; the window is 08:00 to 20:00, widened to the hour of an earlier lap.
+    it, but never starting before today's 00:00 (in the day's first hours now sits further left). **Sideways and laptop (720px up):** the window is 08:00 to 20:00, widened to the hour of an
+    earlier lap. **From 980px** the words stand in a column at the panel's left, 280px, as the
+    phone's top row (the name and what they are doing, the week under it, the time at the end),
+    and the lane takes the rest of the row; under 980px a panel stacks as on a phone, so the lane (340px or more beside the words)
+    is never crushed. (The time once sat on its own line under the name at 220px, sunk beside
+    its label and pushing the week to the panel's edge.)
     **The lane** is one grey (`raised`) across its window. A lap that ran is a filled block, yours
     `you` and everyone else's `muted`; the lap running is filled as far as now. A break is a gap.
     Nothing else is drawn in a lane. **The hours carry now:** one row of hours over the first
@@ -803,6 +807,12 @@ Built once in `client/src/ui/kit/` and reused.
   ms, a 200 ms rest, 400 ms, 200 ms, 150 ms. The phone plays the bell itself, as an alarm when
   "Ring even on silent" is on, so a phone on Mute still rings; the bell's notification makes no
   sound of its own.
+- **Light or dark** (Settings' own panel, on a laptop in the right column under the account): three
+  choices as one row, like the bell's: "System" (the default, following the device), "Light" and "Dark". Kept on
+  each device, like "Ring here": a laptop can stay dark while the phone follows its system. The
+  choice holds from the first frame, with no flash of the other theme; in the phone app the whole
+  app follows it, the status bar's icons included. Only the splash at launch, drawn before the app
+  has read anything, follows the system.
 - **A bell you can answer:** after a lap, its notification holds "Take five" (the break's own
   length, as Focus words it) and "Done for now"; after a break, "Start the next lap" and "Done
   for now". A called lap's holds "I'm in"; once in, it reads "You're in. It starts at 15:00."

@@ -128,3 +128,4 @@ when it is done.
 - Lift: Alt+Arrow moves an open row without folding it, as DESIGN.md says only a carry by hand folds (code review, nit).
 - Demo sheet-subtask-carry: scrollIntoView then reading the box would miss under smooth scrolling; pass behavior 'instant' (code review, nit).
 - Day cards: laps of a purged task (task null) join the "Nothing in particular" card beside laps run for no task; key by the session's own task id if it shows up (code review, nit).
+- Theme: another open tab or the installed window keeps its old light or dark until reloaded; a 'storage' listener on heirloom-theme would carry a new pick across (code review, nit).
