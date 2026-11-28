@@ -194,7 +194,7 @@ kept.
 |---|---|
 | Server memory | under 50 MB RSS with 20 connected devices; `GOMEMLIMIT=64MiB` |
 | Server binary | under 25 MB, web app embedded |
-| Web app, first load | under 90 KB of JS gzipped, under 20 KB of CSS, at most 2 font files preloaded (the other three load after first paint) |
+| Web app, first load | under 100 KB of JS gzipped, under 20 KB of CSS, at most 2 font files preloaded (the other three load after first paint) |
 | Tap to visible change | under 100 ms on the user's phone |
 | Motion | state changes under 250 ms; the reward moment under 1.2 s and skippable; all of it off under `prefers-reduced-motion` |
 | Live timer arrival | under 1 s from one device to the other on the home network |
@@ -271,3 +271,4 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-27 | Measured on the user's phone (Samsung, release build 10000240), a lap driven from the laptop: with the screen off, in forced deep Doze, swiped from Recents, and after a reboot (the service came back at the first unlock without the app being opened), the countdown was drawn, paused, resumed and cleared as the laptop acted; a room note and a call from another account showed with the app closed; no bell or call alarm was left after a stop. The battery cost overnight is still to measure | The section's gate; the wakelock is the cost to watch (`dumpsys power` flags it LONG) |
 | 2026-11-28 | A lap's minutes are cut at local midnight and the lap itself counts on the day it ended (its bell). Supersedes "a lap's day is the day it started" | A 23:46 lap that rang at 00:32 left today empty and the room strip blank after midnight; the user asked for the split Focus To-Do makes, and the bell is where a lap is earned |
 | 2026-11-28 | How far an account has read a room's notes is kept by the server (`member.notes_read`, `POST /api/rooms/read`), not by each device | A note read on the phone stayed unread on the laptop; read once, read everywhere, as a messaging app does |
+| 2026-11-28 | The first load's JS budget is 100 KB gzipped, was 90 | The day lap by lap, the Habits fold and Today's subtasks did not fit in 90; the user chose 100 over trimming each feature to fit |
