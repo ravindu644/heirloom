@@ -48,6 +48,12 @@ test('stays put in Progress: "Don\'t count it" and "Count it again" with the wee
     lap(node, 'two', start + 30 * MIN);
   });
   await go(a.page, 'Progress');
+  // Laps for no task are one card, closed: its lap lines show once it is open.
+  const card = a.page.getByRole('button', { name: /^Nothing in particular(, |$)/ });
+  await midScreen(card);
+  await card.click();
+  await expect(card).toHaveAttribute('aria-expanded', 'true');
+  await settle(a.page);
   const at = wall(start + 30 * MIN);
   const dont = a.page.getByRole('button', { name: `Don't count it, the lap at ${at}` });
   const again = a.page.getByRole('button', { name: `Count it again, the lap at ${at}` });

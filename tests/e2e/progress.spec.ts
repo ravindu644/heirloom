@@ -61,10 +61,28 @@ async function seeded(devices: Device[], tag: string, seed: (node: Node) => void
 const heading = (page: Page) => page.getByRole('heading', { level: 1 });
 const panel = (page: Page, title: string | RegExp) => page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 2 }) });
 const words = (locator: ReturnType<Page['locator']>) => locator.innerText().then((text) => text.replace(/\s+/g, ' ').trim());
-/** A lap's row in a day, lap by lap: every lap's row has a "Day so far" cell, empty when it is not counted; a task done has none. */
-const lapRows = (day: ReturnType<Page['locator']>) => day.getByRole('listitem').filter({ has: day.page().locator('[class*="_split_"]') });
-/** The "Day so far" of each lap row shown, top to bottom: '' for a lap not counted. */
-const splits = (day: ReturnType<Page['locator']>) => lapRows(day).locator('[class*="_split_"]').allInnerTexts().then((all) => all.map((t) => t.trim()));
+type Loc = ReturnType<Page['locator']>;
+/** The day's cards, one per task, in the order of each task's first lap. */
+const cards = (day: Loc) => day.getByRole('listitem');
+/** A task's card, by the task's title as it stands on the card. */
+const cardOf = (day: Loc, title: string) => cards(day).filter({ has: day.page().locator('[class*="_title_"]').getByText(title, { exact: true }) });
+/** What a card says: its title, its time today ('' with nothing counted), and the line under its sliver. */
+const cardSays = async (card: Loc) => ({
+  title: (await card.locator('[class*="_title_"]').first().innerText()).trim(),
+  time: (await card.locator('[class*="_time_"]').count()) ? (await card.locator('[class*="_time_"]').innerText()).trim() : '',
+  sum: (await card.locator('[class*="_sum_"]').innerText()).trim(),
+});
+/** A card's arrow, named by its task (and its time). */
+const arrowOf = (card: Loc, title: string) => card.getByRole('button', { name: new RegExp(`^${title}(, |$)`) });
+/** Opens a card with its arrow, as a tap or a click. */
+async function openCard(card: Loc, title: string, touch = false) {
+  const arrow = arrowOf(card, title);
+  await expect(arrow).toHaveAttribute('aria-expanded', 'false');
+  await (touch ? arrow.tap() : arrow.click());
+  await expect(arrow).toHaveAttribute('aria-expanded', 'true');
+}
+/** The facts of each lap line of an opened card, top to bottom. */
+const facts = (card: Loc) => card.locator('[class*="_facts_"]').allInnerTexts().then((all) => all.map((t) => t.replace(/\s+/g, ' ').trim()));
 /** The day's focus at the top of the panel. */
 const figure = (day: ReturnType<Page['locator']>) => day.locator('[class*="_big_"] b');
 /** To the nearest minute, as the day panel shows a clock time. */
@@ -170,7 +188,9 @@ test('the year: a seeded day\'s square says its time and laps; the keyboard and 
   for (let i = 0; i < daysBack % 7; i++) await a.page.keyboard.press('ArrowUp');
   await expect(year).toHaveAttribute('aria-valuetext', say(four, '1h 40m, 4 laps'));
   await expect(a.page.getByRole('heading', { name: `${long(four)}, lap by lap` })).toBeVisible();
-  await expect(lapRows(panel(a.page, `${long(four)}, lap by lap`))).toHaveCount(4);
+  // Four laps for no task: one card, "Nothing in particular", that says four laps.
+  await expect(cards(panel(a.page, `${long(four)}, lap by lap`))).toHaveCount(1);
+  await expect(cardOf(panel(a.page, `${long(four)}, lap by lap`), 'Nothing in particular')).toContainText('4 laps.');
 
   // A tap on the other day's square.
   const cells = year.locator('i[class*="level"]');
@@ -196,99 +216,95 @@ test('live: with Progress open on A, a lap that rings on B moves A\'s figures wi
   await expect(b.page.getByRole('button', { name: 'Start 1 min break' })).toBeVisible({ timeout: 8000 });
   await expect(since).toContainText('of focus, 1 lap', { timeout: 3000 });
   await expect(since).toContainText('One square so far. Every day with a lap adds the next.');
-  await expect(lapRows(panel(a.page, 'Today, lap by lap'))).toHaveCount(1);
+  await expect(cards(panel(a.page, 'Today, lap by lap'))).toHaveCount(1);
 });
 
-test('today, lap by lap: each counted lap\'s Day so far is the running total and the last is the figure at the top; a lap not counted has none; a task done between laps is a quiet row, one done in a lap or in its break is that lap\'s "Task done."; no habit check-in; Don\'t count it and Count it again move the splits on both laptops', async ({ deviceA: a, deviceB: b }) => {
-  test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
-  const start = Date.now() - 2 * HOUR;
-  let pair: string[] = [];
-  const { name } = await seeded([a, b], 'pday', (node) => {
-    laps(node, [{ started: start, outcome: 'void' }]);
-    laps(node, [{ started: start + 30 * MIN, ms: 12 * MIN, outcome: 'stopped' }]);
-    // Between the stopped lap and the pair, in no lap and no break: a task done.
-    node.engine.write('task', 'essay', { title: 'essay outline', order: 'V', done: start + 45 * MIN });
-    // The same 25 minutes, 10 of them shared, on this device and another.
-    pair = laps(node, [{ started: start + 50 * MIN }, { started: start + 65 * MIN, device: 'abcdef0123456789' }]);
-    // One task finished inside the first of the pair, another in the break after the second.
-    node.engine.write('task', 'notes', { title: 'reading notes', order: 'W', done: start + 55 * MIN });
-    laps(node, [{ started: start + 90 * MIN, ms: 5 * MIN, kind: 'short' }]);
-    node.engine.write('task', 'mail', { title: 'reply to Sam', order: 'X', done: start + 92 * MIN });
-    // After the pair: a habit checked in.
-    node.engine.write('habit', 'walk', { title: 'walk after lunch', days: 127, target: 1, order: 'V' });
-    node.engine.write('checkin', 'c1', { habit: 'walk', day: today(), at: start + 100 * MIN });
+for (const [how, touch] of [['a finger at 412', true], ['a mouse at 1440', false]] as const) {
+  test(`${how}: today, one card per task in the order of its first lap, each with its own time; done is "Done at" in its card, a task done with no lap is a card of its own; open, Don't count it drops the card's time and the figure, Count it again brings both back, on both devices`, async ({ deviceA, deviceB: b, phone }) => {
+    test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
+    const a = touch ? phone : deviceA;
+    if (!touch) await a.page.setViewportSize({ width: 1440, height: 900 });
+    const start = Date.now() - 2 * HOUR;
+    let second: string[] = [];
+    const { name } = await seeded([a, b], touch ? 'pcardt' : 'pcardm', (node) => {
+      node.engine.write('task', 'essay', { title: 'essay', order: 'V', done: start + 80 * MIN });
+      node.engine.write('task', 'reading', { title: 'reading', order: 'W' });
+      node.engine.write('task', 'mail', { title: 'reply to Sam', order: 'X', done: start + 85 * MIN });
+      laps(node, [{ started: start, task: 'essay' }]);
+      laps(node, [{ started: start + 30 * MIN, ms: 12 * MIN, outcome: 'stopped', task: 'reading' }]);
+      second = laps(node, [{ started: start + 50 * MIN, task: 'essay' }]);
+    });
+    const day = (page: Page) => panel(page, 'Today, lap by lap');
+    await expect(a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 })).toBeVisible();
+
+    // Three cards and nothing else: no row of its own for a task done.
+    await expect(cards(day(a.page))).toHaveCount(3);
+    const all = await Promise.all([0, 1, 2].map((i) => cardSays(cards(day(a.page)).nth(i))));
+    expect(all).toEqual([
+      { title: 'essay', time: '50m', sum: `2 laps. Done at ${wall(near(start + 80 * MIN))}.` },
+      { title: 'reading', time: '12m', sum: '1 stopped lap.' },
+      { title: 'reply to Sam', time: '', sum: `No lap today. Done at ${wall(near(start + 85 * MIN))}.` },
+    ]);
+    for (const p of [a.page, b.page]) {
+      await expect(figure(day(p))).toHaveText('1h 2m');
+      await expect(day(p)).toContainText('focused today, in 3 laps');
+    }
+    // Closed, no lap line shows.
+    expect(await facts(day(a.page))).toEqual([]);
+
+    // Opened: one line per lap, in order.
+    const essay = cardOf(day(a.page), 'essay');
+    await openCard(essay, 'essay', touch);
+    await expect.poll(() => facts(essay)).toEqual([
+      `${wall(near(start))} to ${wall(near(start + 25 * MIN))}, 25 minutes`,
+      `${wall(near(start + 50 * MIN))} to ${wall(near(start + 75 * MIN))}, 25 minutes`,
+    ]);
+
+    // Don't count the second: the card's time and the figure drop, here and on B.
+    const at = wall(start + 50 * MIN);
+    const notCount = essay.getByRole('button', { name: `Don't count it, the lap at ${at}` });
+    await (touch ? notCount.tap() : notCount.click());
+    await expect(a.page.getByRole('status').filter({ hasText: 'off today' })).toContainText('25 minutes off today');
+    await expect.poll(() => facts(essay)).toEqual([
+      `${wall(near(start))} to ${wall(near(start + 25 * MIN))}, 25 minutes`,
+      `${wall(near(start + 50 * MIN))} to ${wall(near(start + 75 * MIN))}, 25 minutes, not counted`,
+    ]);
+    await expect(essay.getByRole('button', { name: `Count it again, the lap at ${at}` })).toBeVisible();
+    await expect.poll(() => cardSays(essay)).toEqual({ title: 'essay', time: '25m', sum: `2 laps, 1 not counted. Done at ${wall(near(start + 80 * MIN))}.` });
+    for (const p of [a.page, b.page]) {
+      await expect(figure(day(p))).toHaveText('37m');
+      await expect(day(p)).toContainText('focused today, in 2 laps');
+    }
+    await expect(cardOf(day(b.page), 'essay').locator('[class*="_time_"]')).toHaveText('25m');
+    const outcome = async () => (await serverRows(server, name, 'session')).get(second[0]!)?.outcome;
+    await expect.poll(outcome).toBe('void');
+
+    // The way back stays on the line: Count it again, and both come back.
+    const again = essay.getByRole('button', { name: `Count it again, the lap at ${at}` });
+    await (touch ? again.tap() : again.click());
+    await expect.poll(outcome).toBe('rang');
+    await expect.poll(() => cardSays(essay)).toEqual({ title: 'essay', time: '50m', sum: `2 laps. Done at ${wall(near(start + 80 * MIN))}.` });
+    for (const p of [a.page, b.page]) await expect(figure(day(p))).toHaveText('1h 2m');
   });
-  const day = (page: Page) => panel(page, 'Today, lap by lap');
-  await expect(a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 })).toBeVisible();
+}
 
-  // In the order the day ran: the laps and the task done between them. The habit checked in after is not there.
-  const rows = day(a.page).getByRole('listitem');
-  await expect(rows).toHaveCount(5);
-  const texts = (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
-  expect(texts[0]).toContain('Lap, not counted');
-  expect(texts[0]).toContain('25 minutes');
-  expect(texts[1]).toContain('Stopped lap');
-  expect(texts[1]).toContain('12 minutes');
-  // Done outside any lap: a quiet row, at its time to the nearest minute.
-  expect(texts[2]).toBe(`essay outline done at ${wall(near(start + 45 * MIN))}`);
-  for (const i of [3, 4]) expect(texts[i]).toContain('ran on two devices');
-  // Done in a lap, or in the break after it: that lap's, at the end of its facts, and no row of its own.
-  for (const i of [3, 4]) expect(texts[i]).toMatch(/\. Task done\.( |$)/);
-  for (const i of [0, 1]) expect(texts[i]).not.toContain('Task done.');
-  await expect(day(a.page).getByText(/reading notes|reply to Sam/)).toHaveCount(0);
-  await expect(day(a.page).getByText('walk after lunch')).toHaveCount(0);
-
-  // Day so far: none for the lap not counted, then 12, 12 + 25, and the second of the pair adds
-  // only its 15 minutes not shared. The last is the figure at the top. A stopped lap is a lap: three.
-  for (const page of [a.page, b.page]) {
-    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '52m']);
-    await expect(figure(day(page))).toHaveText('52m');
-    await expect(day(page)).toContainText('focused today, in 3 laps');
-  }
-
-  const at = wall(start + 65 * MIN);
-  await day(a.page).getByRole('button', { name: `Don't count it, the lap at ${at}` }).click();
-  // What it did is said on the bar, with its Undo.
-  const bar = a.page.getByRole('status').filter({ hasText: 'off today' });
-  await expect(bar).toContainText('15 minutes off today.');
-  await expect(bar.getByRole('button', { name: 'Undo' })).toBeVisible();
-  for (const page of [a.page, b.page]) {
-    await expect(day(page).getByText('ran on two devices')).toHaveCount(0, { timeout: 2000 });
-    await expect(lapRows(day(page)).nth(3)).toContainText('Lap, not counted');
-    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '']);
-    await expect(figure(day(page))).toHaveText('37m');
-    await expect(day(page)).toContainText('focused today, in 2 laps');
-  }
-  const outcome = async () => (await serverRows(server, name, 'session')).get(pair[1]!)?.outcome;
-  await expect.poll(outcome).toBe('void');
-
-  // The way back is offered at once, and stays: Count it again, never a passing Undo. Its split comes back.
-  await day(a.page).getByRole('button', { name: `Count it again, the lap at ${at}` }).click();
-  await expect.poll(outcome).toBe('rang');
-  for (const page of [a.page, b.page]) {
-    await expect.poll(() => splits(day(page))).toEqual(['', '12m', '37m', '52m']);
-    await expect(figure(day(page))).toHaveText('52m');
-  }
-  await expect(day(b.page).getByText('ran on two devices')).toHaveCount(2);
-});
-
-test('a lap across midnight: today shows only its part after 00:00, its facts "23:50 <weekday> to 00:15, 15 of 25 minutes today"', async ({ deviceA: a }) => {
+test('a lap across midnight: its card holds today\'s part, and open, its facts read "23:50 <weekday> to 00:15, 15 of 25 minutes today"', async ({ deviceA: a }) => {
   const since = Date.now() - midnight(today());
   test.skip(since < 30 * MIN, 'the lap across midnight must have ended before now');
   // From 23:50 last night to 00:15: ten minutes yesterday, fifteen today.
   const started = midnight(today()) - 10 * MIN;
   await seeded([a], 'pmidnight', (node) => laps(node, [{ started }]));
   const day = panel(a.page, 'Today, lap by lap');
-  const row = lapRows(day);
-  await expect(row).toHaveCount(1);
+  await expect(cards(day)).toHaveCount(1);
+  const card = cardOf(day, 'Nothing in particular');
   const weekday = new Date(`${back(1)}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
-  await expect(row).toContainText(`${wall(started)} ${weekday} to ${wall(started + LAP)}, 15 of 25 minutes today`);
-  await expect(row).not.toContainText('Began on');
-  await expect.poll(() => splits(day)).toEqual(['15m']);
+  await expect.poll(() => cardSays(card)).toEqual({ title: 'Nothing in particular', time: '15m', sum: `1 lap, from ${wall(started)} ${weekday}.` });
   await expect(figure(day)).toHaveText('15m');
+  await openCard(card, 'Nothing in particular');
+  await expect.poll(() => facts(card)).toEqual([`${wall(started)} ${weekday} to ${wall(started + LAP)}, 15 of 25 minutes today`]);
 });
 
-test('a lap\'s minutes, its step in Day so far and the figure at the top agree: 15 m 30 s from hh:mm:20 shows hh:mm to hh:mm+16, 16 minutes, and the next lap of 10 adds 10', async ({ deviceA: a }) => {
+test('a lap of 15 m 30 s from hh:mm:20 reads hh:mm to hh:mm+16, 16 minutes, and with a lap of 10 after it the card\'s time and the figure at the top say 26m', async ({ deviceA: a }) => {
   test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
   // A whole minute an hour back, then 20 s into it: the start rounds down, the end (at :50) up.
   const minute = Math.floor((Date.now() - HOUR) / MIN) * MIN;
@@ -296,12 +312,79 @@ test('a lap\'s minutes, its step in Day so far and the figure at the top agree: 
   const second = minute + 30 * MIN + 40 * 1000;
   await seeded([a], 'pround', (node) => laps(node, [{ started: first, ms: 15.5 * MIN }, { started: second, ms: 10 * MIN }]));
   const day = panel(a.page, 'Today, lap by lap');
-  await expect(lapRows(day)).toHaveCount(2);
-  await expect(lapRows(day).nth(0)).toContainText(`${wall(minute)} to ${wall(minute + 16 * MIN)}, 16 minutes`);
-  await expect(lapRows(day).nth(1)).toContainText(`${wall(minute + 31 * MIN)} to ${wall(minute + 41 * MIN)}, 10 minutes`);
-  // Each split is the day's focus so far rounded to the nearest minute, as the row's own minutes are, and the figure is the last.
-  await expect.poll(() => splits(day)).toEqual(['16m', '26m']);
+  const card = cardOf(day, 'Nothing in particular');
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('[class*="_time_"]')).toHaveText('26m');
   await expect(figure(day)).toHaveText('26m');
+  await openCard(card, 'Nothing in particular');
+  await expect.poll(() => facts(card)).toEqual([
+    `${wall(minute)} to ${wall(minute + 16 * MIN)}, 16 minutes`,
+    `${wall(minute + 31 * MIN)} to ${wall(minute + 41 * MIN)}, 10 minutes`,
+  ]);
+});
+
+test('two tasks overlapping on two devices: each card is its laps\' own minutes, as its open line says (30m and 15m), and the figure at the top is the union, 35m', async ({ deviceA: a }) => {
+  test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
+  // As 10:00 to 10:30 for A on this device and 10:20 to 10:35 for B on another, two hours back.
+  const t = Math.floor((Date.now() - 2 * HOUR) / MIN) * MIN;
+  await seeded([a], 'poverlap', (node) => {
+    node.engine.write('task', 'ta', { title: 'task A', order: 'V' });
+    node.engine.write('task', 'tb', { title: 'task B', order: 'W' });
+    laps(node, [{ started: t, ms: 30 * MIN, task: 'ta' }]);
+    laps(node, [{ started: t + 20 * MIN, ms: 15 * MIN, task: 'tb', device: 'abcdef0123456789' }]);
+  });
+  const day = panel(a.page, 'Today, lap by lap');
+  await expect(cards(day)).toHaveCount(2);
+  const A = cardOf(day, 'task A');
+  const B = cardOf(day, 'task B');
+  await expect(A.locator('[class*="_time_"]')).toHaveText('30m');
+  await expect(B.locator('[class*="_time_"]')).toHaveText('15m');
+  await expect(figure(day)).toHaveText('35m');
+  // Open, each line says the same minutes as its card.
+  await openCard(A, 'task A');
+  await expect.poll(() => facts(A)).toEqual([expect.stringMatching(new RegExp(`^${wall(t)} to ${wall(t + 30 * MIN)}, 30 minutes`))]);
+  await openCard(B, 'task B');
+  await expect.poll(() => facts(B)).toEqual([expect.stringMatching(new RegExp(`^${wall(t + 20 * MIN)} to ${wall(t + 35 * MIN)}, 15 minutes`))]);
+});
+
+test('a task done with no lap today is a card with nothing to open: no arrow, and a tap on its title opens nothing', async ({ deviceA: a }) => {
+  test.skip(!roomToday(), 'within 2.5 hours after local midnight or 2 before it, today cannot hold the seeded laps');
+  const done = Date.now() - HOUR;
+  await seeded([a], 'pdoneonly', (node) => {
+    node.engine.write('task', 'lap', { title: 'reading', order: 'V' });
+    laps(node, [{ started: Date.now() - 2 * HOUR, task: 'lap' }]);
+    node.engine.write('task', 'mail', { title: 'reply to Sam', order: 'W', done });
+  });
+  const day = panel(a.page, 'Today, lap by lap');
+  const card = cardOf(day, 'reply to Sam');
+  await expect.poll(() => cardSays(card)).toEqual({ title: 'reply to Sam', time: '', sum: `No lap today. Done at ${wall(near(done))}.` });
+  await expect(card.locator('[aria-expanded]'), 'a card with no lap has an arrow').toHaveCount(0);
+  await expect(card.getByRole('button')).toHaveCount(0);
+  await card.locator('[class*="_title_"]').getByText('reply to Sam', { exact: true }).click();
+  await a.page.waitForTimeout(300);
+  await expect(a.page.locator('dialog[open]')).toHaveCount(0);
+  expect(await facts(card)).toEqual([]);
+  // The card with a lap still opens.
+  await openCard(cardOf(day, 'reading'), 'reading');
+});
+
+test('a past day opened from the year with a task done and no lap: its card reads "No lap that day. Done at HH:MM."', async ({ deviceA: a }) => {
+  const first = back(9);
+  const quiet = back(5);
+  const done = noon(quiet) + 37 * MIN;
+  await seeded([a], 'ppastdone', (node) => {
+    laps(node, [{ started: noon(first) }]);
+    node.engine.write('task', 'mail', { title: 'reply to Sam', order: 'V', done });
+  });
+  const year = a.page.getByRole('slider', { name: 'The days since your first lap. Arrow keys choose a day.' });
+  const long = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).replace(',', '');
+  const cells = year.locator('i[class*="level"]');
+  await cells.nth(Math.round((Date.parse(`${quiet}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`)) / DAY)).click();
+  const day = panel(a.page, `${long(quiet)}, lap by lap`);
+  await expect(a.page.getByRole('heading', { name: `${long(quiet)}, lap by lap`, level: 2 })).toBeVisible();
+  const card = cardOf(day, 'reply to Sam');
+  await expect.poll(() => cardSays(card)).toEqual({ title: 'reply to Sam', time: '', sum: `No lap that day. Done at ${wall(near(done))}.` });
+  await expect(card.locator('[aria-expanded]')).toHaveCount(0);
 });
 
 test('the look back: a line typed key by key is saved with no button, shows on B, and is there after a reload offline', async ({ deviceA: a, deviceB: b }) => {

@@ -381,39 +381,76 @@ test('a daily task carried in from tomorrow and done today: the first of a serie
   await expect(list(a.page, 'Upcoming')).toContainText('read');
 });
 
-// 4. Today, lap by lap: the five latest.
+// 4. Today, lap by lap: the five latest cards.
 
-test('the day\'s laps: with twelve the list shows the five latest in the day\'s order under "7 earlier laps, 14m", which opens all twelve in place and stays under the pointer; with five there is no link', async ({ deviceA: a, deviceB: b }) => {
+test('the day\'s cards: with seven tasks the five latest show in the order of their first laps under "2 earlier tasks, 3 laps, 6m", which opens all seven in place and stays under the pointer, then reads "Show only the latest 5 tasks"; with five there is no link', async ({ deviceA: a, deviceB: b }) => {
   const since = Date.now() - (Date.parse(`${today()}T00:00:00Z`) - OFF * MIN);
   test.skip(since < 45 * MIN, 'within 45 minutes after local midnight, today cannot hold the seeded laps');
+  // One 2 minute lap for each task, four minutes apart; the first task has a second lap at the end.
   const seed = (n: number) => (node: Node) => {
-    // Twelve short tries in the last forty minutes, three minutes apart.
     const start = Date.now() - 40 * MIN;
-    for (let k = 0; k < n; k++) node.engine.write('session', `s${k}`, { kind: 'work', task: null, started: start + k * 3 * MIN, ended: start + k * 3 * MIN + 2 * MIN, planned_ms: 25 * MIN, paused_ms: 0, outcome: 'stopped', device: node.engine.device });
+    const lap = (id: string, task: string, at: number) =>
+      node.engine.write('session', id, { kind: 'work', task, started: at, ended: at + 2 * MIN, planned_ms: 25 * MIN, paused_ms: 0, outcome: 'stopped', device: node.engine.device });
+    for (let k = 1; k <= n; k++) {
+      node.engine.write('task', `t${k}`, { title: `task ${k}`, order: `V${k}` });
+      lap(`s${k}`, `t${k}`, start + (k - 1) * 4 * MIN);
+    }
+    lap('again', 't1', start + 32 * MIN);
   };
-  await signedInto(a, 'twelve', seed(12));
+  const names = (day: ReturnType<Page['locator']>) => day.getByRole('listitem').evaluateAll((els) => els.map((el) => el.querySelector('[class*="_title_"]')?.textContent?.trim() ?? ''));
+  await signedInto(a, 'seven', seed(7));
   await go(a.page, 'Progress');
   const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
-  // A lap's row has a Day so far; a task done or a check-in, which are list items too, has none.
-  const rows = day.getByRole('listitem').filter({ has: a.page.locator('[class*="_split_"]') });
-  await expect(rows).toHaveCount(5);
-  const starts = await rows.evaluateAll((els) => els.map((el) => el.textContent?.match(/\d\d:\d\d/)?.[0] ?? ''));
-  expect([...starts].sort(), 'the five are not in the day\'s order').toEqual(starts);
-  // Seven 2 minute laps: how many, and what they gave the day.
-  const more = day.getByRole('button', { name: '7 earlier laps, 14m' });
+  await expect.poll(() => names(day)).toEqual(['task 3', 'task 4', 'task 5', 'task 6', 'task 7']);
+  // The two folded: task 1 with its two laps and task 2 with one, six minutes.
+  const more = day.getByRole('button', { name: '2 earlier tasks, 3 laps, 6m', exact: true });
   await expect(more).toBeVisible();
   // On the screen before it is tapped, as a person's finger finds it.
   await more.scrollIntoViewIfNeeded();
   await settle(a.page);
-  await staysPut(a.page, more, () => more.click(), day.getByRole('button', { name: 'Show only the latest 5 laps' }));
-  await expect(rows).toHaveCount(12);
-  const all = await rows.evaluateAll((els) => els.map((el) => el.textContent?.match(/\d\d:\d\d/)?.[0] ?? ''));
-  expect(all.slice(-5), 'the five latest are not the end of the twelve').toEqual(starts);
+  await staysPut(a.page, more, () => more.click(), day.getByRole('button', { name: 'Show only the latest 5 tasks', exact: true }));
+  await expect.poll(() => names(day)).toEqual(['task 1', 'task 2', 'task 3', 'task 4', 'task 5', 'task 6', 'task 7']);
+  await day.getByRole('button', { name: 'Show only the latest 5 tasks', exact: true }).click();
+  await expect.poll(() => names(day)).toEqual(['task 3', 'task 4', 'task 5', 'task 6', 'task 7']);
 
   await signedInto(b, 'five', seed(5));
   await go(b.page, 'Progress');
   const five = b.page.locator('section').filter({ has: b.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
-  await expect(five.getByRole('listitem').filter({ has: b.page.locator('[class*="_split_"]') })).toHaveCount(5);
-  await expect(five.getByRole('button', { name: /earlier laps?|Show only the latest/ })).toHaveCount(0);
+  await expect.poll(() => names(five)).toEqual(['task 1', 'task 2', 'task 3', 'task 4', 'task 5']);
+  await expect(five.getByRole('button', { name: /earlier tasks?|Show only the latest/ })).toHaveCount(0);
+});
+
+test('the day\'s cards with a lap running on the first task of the day: its card stands last and in sight while the rest fold, and the fold link counts only the saved laps of the cards it hides, its minutes the sum of their times once opened', async ({ deviceA: a }) => {
+  const since = Date.now() - (Date.parse(`${today()}T00:00:00Z`) - OFF * MIN);
+  test.skip(since < 70 * MIN, 'within 70 minutes after local midnight, today cannot hold the seeded laps');
+  // Seven tasks, task k with one lap of k minutes, eight minutes apart: task 1's lap is the day's first.
+  await signedInto(a, 'livefold', (node) => {
+    const start = Date.now() - 60 * MIN;
+    for (let k = 1; k <= 7; k++) {
+      node.engine.write('task', `t${k}`, { title: `task ${k}`, order: `V${k}` });
+      const at = start + (k - 1) * 8 * MIN;
+      node.engine.write('session', `s${k}`, { kind: 'work', task: `t${k}`, started: at, ended: at + k * MIN, planned_ms: 25 * MIN, paused_ms: 0, outcome: 'stopped', device: node.engine.device });
+    }
+  });
+  // A new lap on task 1, the Next card, from Today.
+  await go(a.page, 'Today');
+  await taskRow(a.page, 'task 1').getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(strip(a.page)).toContainText('task 1');
+  await go(a.page, 'Progress');
+  const day = a.page.locator('section').filter({ has: a.page.getByRole('heading', { name: 'Today, lap by lap', level: 2 }) });
+  const names = () => day.getByRole('listitem').evaluateAll((els) => els.map((el) => el.querySelector('[class*="_title_"]')?.textContent?.trim() ?? ''));
+  // The running card last, in sight; tasks 2 and 3 folded.
+  await expect.poll(names).toEqual(['task 4', 'task 5', 'task 6', 'task 7', 'task 1']);
+  await expect(day.getByRole('listitem').last()).toBeVisible();
+  // The fold counts the two hidden cards' saved laps, 2 and 3 minutes: not task 1's running one.
+  const more = day.getByRole('button', { name: /^2 earlier tasks, / });
+  await expect(more).toHaveText('2 earlier tasks, 2 laps, 5m');
+  await more.click();
+  await expect.poll(names).toEqual(['task 2', 'task 3', 'task 4', 'task 5', 'task 6', 'task 7', 'task 1']);
+  const timeOf = async (title: string) => {
+    const card = day.getByRole('listitem').filter({ has: a.page.locator('[class*="_title_"]').getByText(title, { exact: true }) });
+    return Number((await card.locator('[class*="_time_"]').innerText()).replace(/m$/, ''));
+  };
+  expect((await timeOf('task 2')) + (await timeOf('task 3')), 'the link\'s minutes are not the hidden cards\' times').toBe(5);
 });
 
