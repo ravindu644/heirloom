@@ -211,6 +211,8 @@ layout:
   lane: 8px
   lane-set: 24px
   lane-result: 40px
+  day-sliver: 240px
+  day-split: 96px
   chart: 192px
   heat-cell: 12px
   heat-cell-lg: 24px
@@ -460,7 +462,9 @@ Built once in `client/src/ui/kit/` and reused.
   line of `ink`); an empty lap square on it takes `line`, since `raised` is what an empty square is made of;
   it then follows the finger or the mouse up and down, the rows it passes glide
   out of its way, and letting go sets it down. A short tap still opens the row and a swipe still
-  scrolls the page: only a hold that has not moved picks a row up. With a keyboard, Alt and the
+  scrolls the page: only a hold that has not moved picks a row up. A mouse cannot scroll by
+  dragging, so with a mouse a press that moves picks the row up at once, as a desktop drag does
+  (a held mouse that did not move fast enough did nothing at all). With a keyboard, Alt and the
   arrow keys move the row that has the focus, and a screen reader hears where it now stands.
   No mode, no link, no handle to find first. (It was a link, "Change the order", that turned the
   list into another screen with Up and Down on every row.) Today's open tasks are one list to
@@ -546,15 +550,36 @@ Built once in `client/src/ui/kit/` and reused.
 - **The row of days:** fourteen `dot`s, `xs` apart: a kept day filled in `you`, a rest day the
   hollow `rest` ring, an empty day an empty-track dot, today open until it has a lap. The
   states differ by shape as well as colour.
-- **A day's timeline:** a `lane-set` lane on an hour axis, each hour's label centred on its hour
-  (only a label at the lane's very end is pulled in): laps in `you`, breaks in `rest`, a
-  lap set aside hollow. The axis runs inside the day, never before its 00:00 or past its 24:00;
-  a lap across midnight is drawn on each day only where it ran that day, and its row keeps its
-  real times ("23:46 to 00:32"). Two laps that ran on two devices at once sit on two rows and say so
-  in words. Under it the same sessions as rows, because a block is too small to press: the
-  five latest, in the order of the day, and over them one link that says how many more there
-  are ("7 earlier today") and opens them in place; open, it says "Show the latest 5". A day
-  of twelve short tries was a wall of rows before the first figure.
+- **The day, lap by lap** (one panel; it replaced the hour lane drawn over its own rows and
+  "Looking back on today", which showed the day twice): "Today, lap by lap" ("Friday 27
+  November, lap by lap" for a past day), then the day's focus in `figure-lg` in `you` beside
+  "focused today, in 2 laps" (with one in progress, "in 7 laps, and one running"). Then one list in the order the day ran. A lap's row: its real
+  times and what it gave the day ("23:46 to 00:31  31 minutes today"), "Lap", "Stopped lap" or
+  "Lap, not counted" with its task, and under the words an 8px sliver of the day's hours
+  (`lane` track) holding only that lap (`you`; hollow when not counted) and the break that
+  followed it (`rest`): read down, the slivers make the day's lane, so it is never drawn a
+  second time. The hours are named once, over the sliver column, inside the day (never before
+  00:00 or past 24:00), trimmed to whole hours around what ran, at least 4 hours, at most 4
+  steps on a phone. "Don't count it" / "Count it again" stand under the lap's words. At the
+  row's end, "Day so far" ("Day's total" on a past day) in `figure-md`: the running total after that lap, so the last one is
+  the figure at the top (a lap not counted has none; two laps that ran at once add only what
+  the second added). A lap across midnight says, under its words, "Began on Friday. Its first
+  14 minutes count there." (not counted, only "Began on Friday."). Breaks are only on the slivers. Quiet one-line `label` rows at their
+  time: "11:19  Done: Morning routine", "13:05  Checked in: Walk after lunch". The lap in
+  progress is the last row, its split and sliver growing. Five latest laps show; one link over them says how many more and what
+  they gave, naming any not counted ("4 earlier laps, 1 not counted, 1h 15m"), and opens them in
+  place, then reads "Show only the latest 5 laps".
+  Last, the day's note: "A line about today". Nothing run: "Nothing has run today yet.
+  The first lap starts on Focus." At 600px of panel and up, the sliver takes a `day-sliver` column
+  of its own between the words and the split; the split's column is `day-split` wide, enough
+  for "12h 30m". The last hour label of a whole day reads "24:00". A lap not counted says its
+  length once ("12 minutes"), its words say "not counted". A lap that ran beside another says
+  what it added ("25 minutes, 15 of them already counted"); both laps of a pair say "ran on two devices"
+  while both count. "Don't count it" says on its bar what left
+  which day, short enough for a phone: "31 minutes off today, 14 off Monday" (minutes another
+  lap shares stay counted and are not in it). A lap that ends after the day's midnight
+  says so under its words ("Ended on Tuesday, where it counts as a lap."), the mirror of
+  "Began on".
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
 - **A person's circle** carries their picture where they set one, and otherwise their colour and

@@ -65,10 +65,9 @@ Each of these is something a competitor does well. Leaving them out is why this 
 | This week against last week, per day and in total | You against past you (Gürel 2020) |
 | Time per project, this week and all time | The most praised Focus To-Do report |
 | Estimate accuracy over time | Cirillo's record of over- and under-estimation |
-| A day timeline of sessions, with interrupted and "ran on two devices" marks | The honest record |
+| The day, lap by lap: each lap in the order it ran with what it added to the day and the day's running total, drawn on its own sliver of the day's hours; breaks, tasks done and habits checked in at their times; interrupted, "not counted" and "ran on two devices" marks; one line to note | The honest record that adds up where you read it (the user's pick, 2026-11-28: one list, nothing shown twice) |
 | A forgiving streak: a day counts with one pomodoro that rang; two rest days a week (Monday to Sunday) do not break it, and either or both can be pinned to a weekday in Settings (a Sunday off), the rest coming on the first days missed; after a miss it shows days kept ("41 of the last 45") | Streaks help while intact and people quit when they break (Silverman & Barasch); slack keeps them going (Sharif & Shu) |
 | Personal bests: best day, best week | Achievement, not activity |
-| A short end-of-day look back: what got done, one line to note | Cirillo's daily record, at most one pomodoro long |
 
 ### 4. Habits (the routine)
 

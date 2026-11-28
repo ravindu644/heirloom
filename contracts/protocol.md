@@ -592,15 +592,20 @@ such task has no ratio.
 
 **A day's timeline.** Every session whose time touches the day, breaks and set-aside laps
 included, oldest first, drawn only inside the day (00:00 to 24:00), each with its kind, times, outcome, task, and whether it is one of a pair that ran
-on two devices at once (the `overlaps` of section 7).
+on two devices at once (the `overlaps` of section 7). Each counted lap also carries `day_ms`,
+what it added to the day's focus (its counted interval cut to the day, less what earlier laps of
+the day already covered, so two at once count once), and `split_ms`, the day's focus once it is
+added: the last `split_ms` is the day's `focus_ms`. A lap not counted and a break carry 0 for
+`day_ms` and no `split_ms`. The lap in progress is the last entry, counted to now. With the
+sessions come the day's moments, each with its time: a task done (its `done` that day, not
+deleted) and a habit check-in (live, its `at` that day), in time order among the sessions.
 
 **Setting a lap aside from the timeline** writes `outcome: void` on its row. Counting it again
 writes back what it was, which the row itself says: `rang` if it ran its whole plan
 (`ended - started - paused_ms >= planned_ms`), `stopped` if not.
 
-**The look back.** For today: the focus and laps, the tasks done today, and the day's note. The
-note is the `note` field of the `day` row whose id is the local day. Writing an empty note writes
-an empty string.
+**The day's note.** The `note` field of the `day` row whose id is the local day, under the
+timeline. Writing an empty note writes an empty string.
 
 These are checked by the core lane's own tests; `stats.json` and `streak.json` hold the parts the
 server will share for rooms.
