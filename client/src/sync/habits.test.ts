@@ -38,6 +38,123 @@ async function one() {
   return { w, d, h: d.habits };
 }
 
+describe('rounds', () => {
+  // Three times a day, 08:00, 12:00 and 16:00. Now is 10:00 on Tuesday.
+  async function three() {
+    const all = await one();
+    const id = all.h.add('Glass of water', EVERY_DAY, 3)!;
+    all.h.edit(id, { reminds: ['08:00', '12:00', '16:00'] });
+    return { ...all, id };
+  }
+  const filled = (d: Device, id: string) => view(d, id).today.rounds.map((r) => r.checkin !== null);
+
+  it('a round can be skipped: 12:00 ticked before 08:00 fills round 2 and leaves round 1, and its reminder, for later', async () => {
+    const { d, h, id } = await three();
+    const noon = h.checkIn(id, 2)!;
+    assert.deepEqual(view(d, id).today.rounds, [
+      { round: 1, at: null, checkin: null },
+      { round: 2, at: T0, checkin: noon },
+      { round: 3, at: null, checkin: null },
+    ]);
+    assert.deepEqual([view(d, id).today.count, view(d, id).today.at], [1, [T0]]);
+    // The 08:00 reminder is shown while round 1 is empty; 12:00's is not.
+    assert.deepEqual(view(d, id).reminds.filter((_, k) => view(d, id).today.rounds[k]!.checkin === null), ['08:00', '16:00']);
+    // Round 2 again is no second row; a round that is not one of the day's is a plain check-in, into the lowest empty round.
+    assert.equal(h.checkIn(id, 2), null);
+    h.checkIn(id, 7);
+    assert.deepEqual([filled(d, id), rows(d).length], [[true, true, false], 2]);
+  });
+
+  it('two devices tick round 2 offline: two rows, and the round counts once', async () => {
+    const w = world();
+    const a = await w.device('a');
+    const b = await w.device('b');
+    const id = a.habits.add('Glass of water', EVERY_DAY, 3)!;
+    w.exchange(a, b);
+    a.disconnect();
+    b.disconnect();
+    a.habits.checkIn(id, 2);
+    w.time.advance(MIN);
+    b.habits.checkIn(id, 2);
+    w.exchange(a, b);
+    for (const d of [a, b]) assert.deepEqual([view(d, id).today.count, filled(d, id), view(d, id).today.rounds[1]!.at, rows(d).length], [1, [false, true, false], T0, 2]);
+  });
+
+  it('a check-in from an older build, with no round, fills the lowest round still empty, oldest first', async () => {
+    const { d, h, id } = await three();
+    h.checkIn(id, 1);
+    past(d, id, TODAY, 9);
+    past(d, id, TODAY, 7);
+    // 07:00 fills round 2 and 09:00 round 3: a ticked round comes first, then the rest by time.
+    assert.deepEqual(view(d, id).today.rounds.map((r) => r.at), [T0, at(TODAY, 7), at(TODAY, 9)]);
+    assert.deepEqual(view(d, id).today.at, [at(TODAY, 7), at(TODAY, 9), T0]);
+  });
+
+  it('taking a round back takes every check-in filling it, on both devices, and the round can be ticked again', async () => {
+    const w2 = world();
+    const a = await w2.device('a');
+    const b = await w2.device('b');
+    const id = a.habits.add('Glass of water', EVERY_DAY, 3)!;
+    a.habits.checkIn(id, 1);
+    w2.exchange(a, b);
+    a.disconnect();
+    b.disconnect();
+    const one = a.habits.checkIn(id, 2)!;
+    b.habits.checkIn(id, 2);
+    w2.exchange(a, b);
+    w2.time.advance(HOUR);
+    const gone = a.habits.takeBack(id, 2);
+    assert.equal(gone.length, 2, 'both ticks of round 2, or it stays filled');
+    assert.deepEqual([filled(a, id), a.habits.takeBack(id, 2), a.habits.takeBack(id, 3)], [[true, false, false], [], []]);
+    w2.exchange(a, b);
+    assert.deepEqual(filled(b, id), [true, false, false]);
+    // Marked, not removed: the rows are all there, and the round is ticked again at its new time.
+    assert.deepEqual([rows(a).length, gone.includes(one)], [3, true]);
+    a.habits.checkIn(id, 2);
+    assert.deepEqual([filled(a, id), view(a, id).today.rounds[1]!.at], [[true, true, false], T0 + HOUR]);
+    // A round filled by one with no round is taken back the same way.
+    past(a, id, TODAY, 7);
+    assert.deepEqual(filled(a, id), [true, true, true]);
+    assert.equal(a.habits.takeBack(id, 3).length, 1);
+    assert.deepEqual(filled(a, id), [true, true, false]);
+  });
+
+  it('one tap empties the round: a check-in with no round does not move down into it, and the other rounds stay as they were', async () => {
+    const { d, h, id } = await three();
+    // An older build's 07:00, and round 1 ticked on this build's other device: 07:00 fills round 2.
+    const old = past(d, id, TODAY, 7);
+    const first = 'ticked';
+    d.engine.write('checkin', first, { habit: id, day: TODAY, at: T0, round: 1 });
+    assert.deepEqual(filled(d, id), [true, true, false]);
+    assert.deepEqual(h.takeBack(id, 1), [first]);
+    assert.deepEqual([filled(d, id), view(d, id).today.rounds[1]!.checkin], [[false, true, false], old]);
+    // Round 2 itself goes in one tap too.
+    assert.deepEqual(h.takeBack(id, 2), [old]);
+    assert.deepEqual(filled(d, id), [false, false, false]);
+  });
+
+  it('a once-a-day habit with a check-in from an older build and one from this: one tap takes both, and the day is open again', async () => {
+    const { d, h } = await one();
+    const id = h.add('Read', EVERY_DAY, 1)!;
+    // The two devices of the two builds, each on its own.
+    const old = past(d, id, TODAY, 7);
+    const ticked = 'ticked';
+    d.engine.write('checkin', ticked, { habit: id, day: TODAY, at: T0, round: 1 });
+    assert.deepEqual([view(d, id).today.count, view(d, id).today.rounds[0]!.checkin], [1, ticked]);
+    assert.deepEqual(h.takeBack(id, 1).sort(), [old, ticked].sort());
+    assert.deepEqual([view(d, id).today.count, view(d, id).today.done, rows(d).length], [0, false, 2]);
+  });
+
+  it('the streak and the days count filled rounds: a round ticked twice is one, and a day short of its rounds is not done', async () => {
+    const { d, h } = await one();
+    const id = h.add('Stretch', EVERY_DAY, 2)!;
+    // Sunday: round 2 on two devices, nothing else. Monday: both rounds.
+    for (const [day, round] of [['2026-11-22', 2], ['2026-11-22', 2], ['2026-11-23', 1], ['2026-11-23', 2]] as const) d.engine.write('checkin', `r${++made}`, { habit: id, day, at: at(day, 8), round });
+    assert.deepEqual(view(d, id).record.map((day) => [day.day, day.count, day.done]), [['2026-11-22', 1, false], ['2026-11-23', 2, true], ['2026-11-24', 0, false]]);
+    assert.equal(view(d, id).streak, 1);
+  });
+});
+
 describe('checking in', () => {
   it('one tap is one row: the habit, the day and the moment, written together under an id of its own', async () => {
     const w = world();
@@ -51,7 +168,7 @@ describe('checking in', () => {
     assert.deepEqual(rows(d), [{ id: row, habit: id, day: TODAY, at: T0 }]);
     assert.equal(log.length, 1);
     assert.deepEqual(log[0]!.cells!.map((c) => c.field), ['habit', 'day', 'at']);
-    assert.deepEqual(view(d, id).today, { day: TODAY, planned: true, count: 1, done: true, rest: false });
+    assert.deepEqual(view(d, id).today, { day: TODAY, planned: true, count: 1, done: true, rest: false, at: [T0], rounds: [{ round: 1, at: T0, checkin: row }] });
     // Not one cell of the habit itself was touched: a check-in never changes a number.
     assert.equal(log[0]!.cells!.every((c) => c.dataset === 'checkin'), true);
   });
@@ -67,30 +184,43 @@ describe('checking in', () => {
     h.checkIn(id);
     assert.deepEqual([view(d, id).today.count, view(d, id).today.done], [3, true]);
     assert.deepEqual(h.today.value, { done: 1, planned: 1 });
-    // More than the target is still done, and still counted.
+    // More than the target is still done: it fills no round, and its row is kept.
     h.checkIn(id);
-    assert.deepEqual([view(d, id).today.count, view(d, id).today.done], [4, true]);
+    assert.deepEqual([view(d, id).today.count, view(d, id).today.done], [3, true]);
     assert.equal(rows(d).length, 4);
   });
 
-  it('undo takes back the latest of today, by marking it: no row is removed, and yesterday\'s is never touched', async () => {
+  it('each round of today says when it was done, oldest first, one per check-in: one taken back is gone, yesterday\'s is not today\'s', async () => {
     const { w, d, h } = await one();
-    const id = h.add('Read', EVERY_DAY, 1)!;
+    const id = h.add('Glass of water', EVERY_DAY, 3)!;
+    past(d, id, '2026-11-23');
+    h.checkIn(id);
+    w.time.advance(12 * 60000);
+    h.checkIn(id);
+    w.time.advance(60000);
+    h.checkIn(id);
+    assert.deepEqual(view(d, id).today.at, [T0, T0 + 12 * 60000, T0 + 13 * 60000]);
+    h.takeBack(id, 3);
+    assert.deepEqual([view(d, id).today.count, view(d, id).today.at], [2, [T0, T0 + 12 * 60000]]);
+  });
+
+  it('taking back marks the row: none is removed, and yesterday\'s is never touched', async () => {
+    const { w, d, h } = await one();
+    const id = h.add('Read', EVERY_DAY, 2)!;
     const yesterday = past(d, id, '2026-11-23');
     const first = h.checkIn(id)!;
     w.time.advance(MIN);
     const second = h.checkIn(id)!;
-    h.undo(id);
+    assert.deepEqual(h.takeBack(id, 2), [second]);
     assert.equal(typeof d.engine.rows('checkin').value.get(second)?.deleted, 'number');
     assert.equal(d.engine.rows('checkin').value.get(first)?.deleted, undefined);
     assert.equal(view(d, id).today.count, 1);
-    h.undo(id);
+    h.takeBack(id, 1);
     assert.equal(view(d, id).today.count, 0);
     assert.equal(rows(d).length, 3, 'all three rows are still there');
-    // Nothing left of today: undo does nothing, and yesterday stands.
+    // Nothing left of today: taking back does nothing, and yesterday stands.
     const cells = d.engine.cells();
-    h.undo(id);
-    h.undo('nobody');
+    assert.deepEqual([h.takeBack(id, 1), h.takeBack('nobody', 1)], [[], []]);
     assert.deepEqual(d.engine.cells(), cells);
     assert.equal(d.engine.rows('checkin').value.get(yesterday)?.deleted, undefined);
     assert.equal(view(d, id).record[0]!.count, 1);
@@ -116,7 +246,7 @@ describe('checking in', () => {
     assert.deepEqual(w.sorted(a.engine), w.sorted(b.engine));
   });
 
-  it('two devices check in when one more would have reached the target: it ends done with one to spare, and neither tap is lost', async () => {
+  it('two devices check in when one more would have reached the target: it ends done, and neither tap is lost', async () => {
     const w = world();
     const a = await w.device('a');
     const b = await w.device('b');
@@ -130,7 +260,7 @@ describe('checking in', () => {
     a.habits.checkIn(id);
     b.habits.checkIn(id);
     w.exchange(a, b);
-    assert.deepEqual([view(a, id).today.count, view(a, id).today.done], [4, true]);
+    assert.deepEqual([view(a, id).today.count, view(a, id).today.done], [3, true]);
     assert.deepEqual(view(b, id).today, view(a, id).today);
     assert.equal(rows(b).length, 4);
   });
@@ -158,8 +288,8 @@ describe('a habit\'s days', () => {
     assert.deepEqual(h.today.value, { done: 0, planned: 1 });
     // A Monday habit, tapped today, a Tuesday: shown on today, and not one of today's planned habits.
     const mondays = h.add('Plan the week', 1, 1)!;
-    h.checkIn(mondays);
-    assert.deepEqual(view(d, mondays).today, { day: TODAY, planned: false, count: 1, done: true, rest: false });
+    const tapped = h.checkIn(mondays);
+    assert.deepEqual(view(d, mondays).today, { day: TODAY, planned: false, count: 1, done: true, rest: false, at: [d.engine.now()], rounds: [{ round: 1, at: d.engine.now(), checkin: tapped }] });
     assert.equal(view(d, mondays).streak, 0);
     assert.deepEqual(h.today.value, { done: 0, planned: 1 });
   });
@@ -204,7 +334,7 @@ describe('a habit\'s days', () => {
     assert.deepEqual(view(d, id).record.map((day) => day.done), [true, true, true, false]);
     assert.equal(view(d, id).streak, 3);
     h.edit(id, { target: 2 });
-    assert.deepEqual(view(d, id).record.map((day) => [day.count, day.done]), [[1, false], [2, true], [3, true], [0, false]]);
+    assert.deepEqual(view(d, id).record.map((day) => [day.count, day.done]), [[1, false], [2, true], [2, true], [0, false]]);
     assert.equal(view(d, id).streak, 2);
     h.edit(id, { target: 3 });
     assert.deepEqual(view(d, id).record.map((day) => day.done), [false, false, true, false]);
@@ -257,7 +387,7 @@ describe('a habit\'s days', () => {
     const habit = view(d, id);
     assert.deepEqual(habit.record, []);
     assert.deepEqual([habit.streak, habit.kept, habit.of, habit.missed], [0, 0, 0, false]);
-    assert.deepEqual(habit.today, { day: TODAY, planned: true, count: 0, done: false, rest: false });
+    assert.deepEqual(habit.today, { day: TODAY, planned: true, count: 0, done: false, rest: false, at: [], rounds: [{ round: 1, at: null, checkin: null }] });
   });
 
   it('at local midnight today rolls over with nobody tapping: the count starts again and yesterday is in the record', async () => {
@@ -316,7 +446,7 @@ describe('this week against last', () => {
     w.time.advance(HOUR + MIN);
     assert.deepEqual(h.week(), { now: 3, before: 4 });
     // One taken back is not counted; one for a habit put away is not either.
-    h.undo(water);
+    h.takeBack(water, 1);
     assert.deepEqual(h.week(), { now: 2, before: 4 });
     h.edit(water, { archived: true });
     assert.deepEqual(h.week(), { now: 2, before: 2 });
@@ -487,14 +617,18 @@ describe('the list', () => {
     const id = d.habits.add('brush teeth', EVERY_DAY, 2)!;
     d.habits.edit(id, { reminds: ['06:00', '22:00'] });
     // Which places are still to be shown today, as main.tsx works it out.
-    const due = () => view(d, id).reminds.filter((_, place) => view(d, id).today.count < place + 1);
+    const due = () => view(d, id).reminds.filter((_, place) => view(d, id).today.rounds[place]!.checkin === null);
     assert.deepEqual(due(), ['06:00', '22:00']);
     d.habits.checkIn(id);
     assert.deepEqual([view(d, id).today.count, due()], [1, ['22:00']]);
     d.habits.checkIn(id);
     assert.deepEqual([view(d, id).today.count, due()], [2, []]);
-    d.habits.undo(id);
+    d.habits.takeBack(id, 2);
     assert.deepEqual(due(), ['22:00']);
+    // Round 2 ticked first: the 06:00 one is still to come.
+    d.habits.takeBack(id, 1);
+    d.habits.checkIn(id, 2);
+    assert.deepEqual(due(), ['06:00']);
   });
 
   // A build that knows only `remind`: it writes that one cell, and reads nothing else.

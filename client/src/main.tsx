@@ -131,7 +131,7 @@ async function start() {
   effect(() =>
     notifier.reminders([
       ...app.habits.list.value.flatMap((habit) =>
-        habit.reminds.map((time, place) => ({ habit: `${habit.id}#${place}`, title: habit.title, body: ring.remindBody, time, days: habit.days, doneToday: habit.today.count > place })),
+        habit.reminds.map((time, place) => ({ habit: `${habit.id}#${place}`, title: habit.title, body: ring.remindBody, time, days: habit.days, doneToday: habit.today.rounds[place]?.checkin != null })),
       ),
       ...app.today.timed.value.map((task) => ({ habit: task.id, title: task.title, body: ring.taskBody(task.time), time: task.time, days: 127, day: task.day, doneToday: false })),
     ]),

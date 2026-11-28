@@ -29,6 +29,8 @@ export interface CheckIn {
   habit: string;
   day: string;
   at: number;
+  /** Which of the day's rounds was ticked, 1 for the first. Absent: it fills the lowest round still empty. */
+  round?: number;
 }
 
 export interface HabitDay {
@@ -83,7 +85,29 @@ export function asCheckIn(id: string, row: Readonly<Record<string, unknown>>): C
   // The day must be a real one: the record walks from the first check-in day by day, and a day
   // that is not on the calendar, or decades back, would break or bury it.
   if (typeof habit !== 'string' || !isDay(day) || !isMoment(at) || typeof row.deleted === 'number') return null;
-  return { id, habit, day, at };
+  // A round that is no whole number from 1 reads as none: the check-in still counts.
+  return whole(row.round, 1) ? { id, habit, day, at, round: row.round } : { id, habit, day, at };
+}
+
+/**
+ * A day's rounds, 1 to `target`, each the check-in that fills it or null (section 14, Rounds).
+ * One with a round fills it, the oldest of two for the same round; then those without (an older
+ * build's, a habit done once a day), and those whose round a lowered target has taken away, fill
+ * the lowest empty rounds, oldest first. Past `target` they fill nothing more.
+ */
+export function fillRounds(checkins: readonly CheckIn[], target: number): (CheckIn | null)[] {
+  const rounds: (CheckIn | null)[] = Array(target).fill(null);
+  const loose: CheckIn[] = [];
+  for (const c of checkins.toSorted((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+    if (c.round !== undefined && c.round <= target) rounds[c.round - 1] ??= c;
+    else loose.push(c);
+  }
+  for (const c of loose) {
+    const empty = rounds.indexOf(null);
+    if (empty < 0) break;
+    rounds[empty] = c;
+  }
+  return rounds;
 }
 
 /**

@@ -4,7 +4,7 @@
 
 import { batch, computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { asCheckIn, asDays, asHabit, asRemind, asReminds, asTarget, habitDays, weekAgainst } from '../core/habits.ts';
+import { asCheckIn, asDays, asHabit, asRemind, asReminds, asTarget, fillRounds, habitDays, weekAgainst } from '../core/habits.ts';
 import type { CheckIn, Habit, HabitDay } from '../core/habits.ts';
 import { stampMs } from '../core/hlc.ts';
 import { newer } from '../core/merge.ts';
@@ -26,14 +26,18 @@ export interface HabitView {
   target: number;
   /**
    * The reminder times, `07:30`, sorted, at most `target` of them. Place k (the first is 1) is
-   * for the k-th check-in of the day: it is shown on a planned day only while `today.count` is
-   * under k.
+   * for round k of the day: it is shown on a planned day only while `today.rounds[k - 1]` is
+   * empty.
    */
   reminds: string[];
   /** The first of `reminds`, or null. Kept for what still reads one time: `main.tsx` and the habit sheet. */
   remind: string | null;
-  /** Today's check-ins (`count`) and whether today is planned and done. */
-  today: HabitDay;
+  /**
+   * Today: its filled rounds (`count`, never over `target`) and whether it is planned and done.
+   * `rounds` is 1 to `target`, each with the check-in filling it and when, or nulls while empty.
+   * `at`: when each filled round was done, oldest first, one per `count`.
+   */
+  today: HabitDay & { at: number[]; rounds: { round: number; at: number | null; checkin: string | null }[] };
   /** This week, Monday first. Days after today have count 0 and are not done. */
   week: HabitDay[];
   /** From the first check-in to today, oldest first, for the small heatmap. Empty before any. */
@@ -76,10 +80,14 @@ export interface Habits {
   /** A new habit at the end of the list. Returns its id, or null for an empty title. */
   add(title: string, days: number, target: number): string | null;
   edit(id: string, fields: HabitEdit): void;
-  /** One check-in for today: one row, never a number changed. Returns the row's id. */
-  checkIn(id: string): string | null;
-  /** Takes back the latest check-in of today for this habit. */
-  undo(id: string): void;
+  /**
+   * One check-in for today: one row, never a number changed. `round` (1 to `target`) ticks that
+   * one of the day's times; without it the check-in fills the lowest round still empty. Returns
+   * the row's id, or null for a habit that is gone or a round already filled today.
+   */
+  checkIn(id: string, round?: number): string | null;
+  /** Takes back round `round` of today: sets `deleted` on every live check-in filling it, removing no row. Returns their ids. */
+  takeBack(id: string, round: number): string[];
   /** To `deleted`, the shelf, for 30 days. */
   remove(id: string): void;
   restore(id: string): void;
@@ -115,19 +123,16 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
   let passes = 0;
   const checkins = computed(() => {
     passes += 1;
-    const counts = new Map<string, Map<string, number>>();
+    const lists = new Map<string, Map<string, CheckIn[]>>();
     const byDay = new Map<string, CheckIn[]>();
     for (const [id, row] of checkinRows.value) {
       const checkin = asCheckIn(id, row);
       if (!checkin) continue;
-      let days = counts.get(checkin.habit);
-      if (!days) counts.set(checkin.habit, (days = new Map()));
-      days.set(checkin.day, (days.get(checkin.day) ?? 0) + 1);
-      const list = byDay.get(checkin.day);
-      if (list) list.push(checkin);
-      else byDay.set(checkin.day, [checkin]);
+      const days = lists.get(checkin.habit) ?? lists.set(checkin.habit, new Map()).get(checkin.habit)!;
+      (days.get(checkin.day) ?? days.set(checkin.day, []).get(checkin.day)!).push(checkin);
+      (byDay.get(checkin.day) ?? byDay.set(checkin.day, []).get(checkin.day)!).push(checkin);
     }
-    return { counts, byDay };
+    return { lists, byDay };
   });
 
   const habits = computed(() => {
@@ -138,7 +143,9 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
     }
     return all;
   });
-  const empty: ReadonlyMap<string, number> = new Map();
+  const none: ReadonlyMap<string, CheckIn[]> = new Map();
+  // Each day's rounds of a habit, from its live check-ins, at today's target for every day (the rule).
+  const roundsOf = (habit: Habit, day: string) => fillRounds(checkins.value.lists.get(habit.id)?.get(day) ?? [], habit.target);
 
   // A build that knows only `remind` leaves the list alone when its person changes the time. So
   // a `remind` cell stamped after the `reminds` cell is that later edit, and is read in the
@@ -159,16 +166,23 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
   const model = computed(() => {
     const today = clock.day.value;
     const now = engine.now();
-    const show = (habit: Habit): HabitView => ({
-      id: habit.id,
-      title: habit.title,
-      days: habit.days,
-      target: habit.target,
-      reminds: reminds(habit),
-      remind: reminds(habit)[0] ?? null,
-      deleted: habit.deleted,
-      ...habitDays(habit, checkins.value.counts.get(habit.id) ?? empty, today, made(habit.id)),
-    });
+    const show = (habit: Habit): HabitView => {
+      // A day's count is its filled rounds: a check-in past the target, or a second for the same round, adds nothing.
+      const counts = new Map([...(checkins.value.lists.get(habit.id) ?? none).keys()].map((day) => [day, roundsOf(habit, day).filter(Boolean).length]));
+      const days = habitDays(habit, counts, today, made(habit.id));
+      const rounds = roundsOf(habit, today).map((checkin, i) => ({ round: i + 1, at: checkin?.at ?? null, checkin: checkin?.id ?? null }));
+      return {
+        id: habit.id,
+        title: habit.title,
+        days: habit.days,
+        target: habit.target,
+        reminds: reminds(habit),
+        remind: reminds(habit)[0] ?? null,
+        deleted: habit.deleted,
+        ...days,
+        today: { ...days.today, at: rounds.flatMap((r) => (r.at === null ? [] : [r.at])).sort((a, b) => a - b), rounds },
+      };
+    };
     const all = [...habits.value.values()];
     const alive = all.filter((habit) => habit.deleted === null).sort(byOrder);
     const list = alive.filter((habit) => habit.archived === null).map(show);
@@ -201,8 +215,9 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       const mine = new Map<string, CheckIn[]>();
       for (let back = 0; back < 14; back++) {
         const day = addDays(today, -back);
-        const list = checkins.value.byDay.get(day);
-        if (list) mine.set(day, list.filter((checkin) => listed.has(checkin.habit)));
+        // The check-ins filling a round: a second tick of the same round is not one more.
+        const list = [...habits.value.values()].filter((habit) => listed.has(habit.id)).flatMap((habit) => roundsOf(habit, day).filter((c): c is CheckIn => c !== null));
+        if (list.length) mine.set(day, list);
       }
       return weekAgainst(mine, today, now);
     },
@@ -240,19 +255,37 @@ export function createHabits(engine: Engine, env: HabitsEnv): Habits & { close()
       if (Object.keys(write).length) engine.write('habit', id, write);
     },
 
-    checkIn(id) {
+    checkIn(id, round) {
       const held = habit(id);
       if (!held || held.deleted !== null) return null;
-      // Its own row, under an id of its own: two devices that tap at once make two, and both count.
+      const ticked = asTarget(round) !== null && round! <= held.target ? round! : undefined;
+      if (ticked !== undefined && roundsOf(held, clock.now())[ticked - 1]) return null;
+      // Its own row, under an id of its own: two devices that tap at once make two, and both count
+      // (two for one round fill it once).
       const row = env.id();
-      engine.write('checkin', row, { habit: id, day: clock.now(), at: engine.now() });
+      engine.write('checkin', row, { habit: id, day: clock.now(), at: engine.now(), ...(ticked !== undefined && { round: ticked }) });
       return row;
     },
 
-    undo(id) {
-      const today = (checkins.peek().byDay.get(clock.now()) ?? []).filter((checkin) => checkin.habit === id);
-      const latest = today.sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
-      if (latest) engine.write('checkin', latest.id, { deleted: engine.now() });
+    takeBack(id, round) {
+      const held = habit(id);
+      const live = checkins.peek().lists.get(id)?.get(clock.now()) ?? [];
+      if (!held || !fillRounds(live, held.target)[round - 1]) return [];
+      // A check-in with no round sits wherever the lowest empty round is, so emptying this round
+      // would pull one down into it and empty another. Those filling the other rounds are pinned
+      // where they are first; then whatever fills this one is taken, again and again, until it is
+      // empty: what moves in then is one that filled nothing (past the target).
+      const pin = fillRounds(live, held.target).flatMap((c, i) => (c && c.round !== i + 1 && i + 1 !== round ? [[c, i + 1] as const] : []));
+      const pinned = live.map((c) => ({ ...c, round: pin.find(([p]) => p === c)?.[1] ?? c.round }));
+      const gone: CheckIn[] = [];
+      for (let filler = fillRounds(pinned, held.target)[round - 1]; filler; filler = fillRounds(pinned.filter((c) => !gone.includes(c)), held.target)[round - 1]) {
+        gone.push(...pinned.filter((c) => !gone.includes(c) && (c === filler || c.round === round)));
+      }
+      batch(() => {
+        for (const [c, k] of pin) engine.write('checkin', c.id, { round: k });
+        for (const c of gone) engine.write('checkin', c.id, { deleted: engine.now() });
+      });
+      return gone.map((c) => c.id);
     },
 
     remove(id) {

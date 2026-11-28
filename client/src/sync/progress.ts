@@ -10,7 +10,8 @@ import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
-import { asCheckIn, asHabit } from '../core/habits.ts';
+import { asCheckIn, asHabit, fillRounds } from '../core/habits.ts';
+import type { CheckIn } from '../core/habits.ts';
 import { asTask, squares } from '../core/today.ts';
 import { IDLE } from '../core/timer.ts';
 import type { Task } from '../core/today.ts';
@@ -186,12 +187,20 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const byDay = new Map<string, Moment[]>();
     const add = (moment: Moment, day = localDay(moment.at, offset())) => (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(moment);
     for (const t of tasks.value.values()) if (t.parent === null && t.deleted === null && t.done !== null) add({ kind: 'done', id: t.id, at: t.done, title: t.title });
+    // A check-in shows as Habits counts it, on the day it counts for and only when it fills a
+    // round, so a round ticked on two devices, or a tap past the target, is not said twice.
     const habits = engine.rows('habit').value;
+    const live = new Map<string, CheckIn[]>();
     for (const [id, row] of engine.rows('checkin').value) {
-      const checkin = asCheckIn(id, row);
-      const held = habits.get(checkin?.habit ?? '');
-      const habit = checkin && held && asHabit(checkin.habit, held);
-      if (habit && habit.deleted === null) add({ kind: 'checkin', id, habit: habit.id, at: checkin.at, title: habit.title }, checkin.day); // the day Habits counts it on
+      const c = asCheckIn(id, row);
+      const key = c && `${c.habit} ${c.day}`;
+      if (c && key) (live.get(key) ?? live.set(key, []).get(key)!).push(c);
+    }
+    for (const list of live.values()) {
+      const held = habits.get(list[0]!.habit);
+      const habit = held && asHabit(list[0]!.habit, held);
+      if (habit && habit.deleted === null)
+        for (const c of fillRounds(list, habit.target)) if (c) add({ kind: 'checkin', id: c.id, habit: habit.id, at: c.at, title: habit.title }, c.day);
     }
     return byDay;
   });

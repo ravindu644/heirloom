@@ -614,6 +614,8 @@ describe('a day\'s timeline', () => {
     d.engine.write('checkin', 'k1', { habit: 'walk', day: '2026-11-23', at: at('2026-11-23', 9, 27) });
     d.engine.write('checkin', 'k2', { habit: 'walk', day: '2026-11-23', at: at('2026-11-23', 9, 28), deleted: at('2026-11-23', 9, 29) });
     d.engine.write('checkin', 'k3', { habit: 'old', day: '2026-11-23', at: at('2026-11-23', 9, 29) });
+    // A second tap of the walk, done once a day, fills no round: it is not said again.
+    d.engine.write('checkin', 'k4', { habit: 'walk', day: '2026-11-23', at: at('2026-11-23', 9, 45) });
     const view = p.day('2026-11-23');
     assert.deepEqual(
       view.items.map((item) => ('day_ms' in item ? [item.id, item.day_ms, item.split_ms] : [item.kind, item.title, item.at])),
