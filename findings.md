@@ -127,3 +127,4 @@ when it is done.
 - Lift: the doubled `[data-gliding]` replaces a row's own transitions while it glides (the sheet subtask's fill fade); fine so far, `.sect.sect` shows the way out (code review, nit).
 - Lift: Alt+Arrow moves an open row without folding it, as DESIGN.md says only a carry by hand folds (code review, nit).
 - Demo sheet-subtask-carry: scrollIntoView then reading the box would miss under smooth scrolling; pass behavior 'instant' (code review, nit).
+- Day cards: laps of a purged task (task null) join the "Nothing in particular" card beside laps run for no task; key by the session's own task id if it shows up (code review, nit).

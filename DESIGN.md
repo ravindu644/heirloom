@@ -21,6 +21,8 @@ colors:
   key: "#E4E7E2"
   key-edge: "#121412"
   key-quiet: "#E4E7E2"
+  card: "#E4E7E2"
+  card-track: "#D5D9D3"
   amber: "#A46700"
   olive: "#6B7A1E"
   teal: "#0F7B7F"
@@ -46,6 +48,8 @@ colors:
   dark-key: "#343934"
   dark-key-edge: "#343934"
   dark-key-quiet: "#232623"
+  dark-card: "#343934"
+  dark-card-track: "#181A18"
   dark-amber: "#E3A63A"
   dark-olive: "#B3C255"
   dark-teal: "#4FC3C0"
@@ -273,6 +277,9 @@ Light tokens have plain names; each has a `dark-` twin. `tools/tokens.mjs` write
 - **ground:** the chalk of a lane line, one step off white, so white surfaces read as lanes on it.
   In dark, a true neutral near-black, never navy.
 - **surface / raised:** lanes and the active nav pill, separated by tone, not by shadow.
+- **card / card-track:** a rectangle that groups rows inside a surface panel (a task's card in the
+  day), and the empty track of a sliver or square on it. Light it is `raised` (1.25:1 on surface);
+  dark `raised` on `surface` is 1.12:1, too faint to see as a shape, so it steps to `key`'s grey (1.48:1).
 - **ink / muted:** text. Muted passes 4.5:1 on ground and surface in both themes. Text smaller than
   16px uses ink or muted only, never ghost.
 - **line:** dividers, and the empty part of a lane that sits on the ground. On a white surface the
@@ -593,37 +600,45 @@ Built once in `client/src/ui/kit/` and reused.
   "Looking back on today", which showed the day twice): "Today, lap by lap" ("Friday 27
   November, lap by lap" for a past day), then the day's focus in `figure-lg` in `you` beside
   "focused today, in 2 laps" (with one in progress, "in 7 laps, and one running"). Then one list
-  in the order the day ran, each entry between `hair` rules. **Every lap row is one grid, in one
-  order, nothing ever between** (the user's pick, after the asides, links and moments stacked
-  in a different order on every card): line 1, "Lap", "Stopped lap", "Lap, running" or "Lap, not
-  counted" in `strong` with its task, and at the right "Day so far" in `figure-md` ("Day's
-  total" on a past day; a lap not counted has none); line 2, an 8px sliver of the day's hours
-  (`lane` track) holding only that lap (`you`; hollow when not counted) and the break that
-  followed it (`rest`), so read down the slivers make the day's lane; line 3, the facts in
-  `label` `muted`, and at that line's right end, under the figure, "Don't count it" or "Count it
-  again" as a link, always in that one place (the running lap leaves it empty). The facts are
-  one sentence: "11:03 to 11:19, 16 minutes"; across midnight "23:46 Fri to 00:31, 31 of 45
-  minutes today" (it ended after the shown day: "23:46 to 00:31 Sat, 14 of 45 minutes here");
-  beside another lap "25 minutes, 15 of them already counted, ran on two devices"; set aside ",
-  not counted". A task finished in its lap (its `done` inside the lap, or within its break
-  after) is that lap's: a 2px `ink` tick on the sliver at that time and the facts end "Task
-  done."; a task finished at any other time is a quiet row of its own, one `label` line between
-  the same rules ("Morning routine done at 11:19"), no sliver, no figure. Clock times here are
-  rounded to the nearest minute, and every minute count is the difference of the shown times,
-  so a row never says 15 where its split moved 16 (everywhere in the app a duration is said to
-  the nearest minute, never cut down: the splits and the figure at the top are the day's focus
-  said that way, so they agree with the year grid and Focus). "already counted" is said only
-  where another lap really covered minutes. The hours are named once, over the sliver
-  column, inside the day (never before 00:00 or past 24:00), trimmed to whole hours around
-  what ran, at least 4 hours, at most 4 steps on a phone; the last label of a whole day reads
-  "24:00". "Don't count it" says on its bar what left which day, short enough for a phone: "31
-  minutes off today, 14 off Monday" (minutes another lap shares stay counted and are not in
-  it). Five latest laps show; one link over them says how many more and what they gave, naming
-  any not counted ("4 earlier laps, 1 not counted, 1h 15m"), and opens them in place, then
-  reads "Show only the latest 5 laps". Last, the day's note: "A line about today". Nothing run:
+  of cards, **one per task** (the user's pick, after a list of lap rows split one task's day
+  over many rows and a "done at" row of its own). Each card is a `card` rectangle, `radius-md`,
+  `sm` apart, and nothing inside it draws a line: the gap between two cards is the only divider.
+  Inside, a card is a habit row: its top row is the target, `touch` tall, the fold arrow in the
+  box column (centre 28px from the card's left), the task in `strong` on 56px, and at the right
+  the task's time today in `figure-md`. Under it on 56px, the task's sliver of the day's hours
+  (8px, `card-track`) holding every lap of the task (`you`; hollow when not counted), the break
+  each lap earned right after it (`rest`), and a 2px `ink` tick where the task was done; then
+  one `label` `muted` line that sums it up: "4 laps, 2 stopped. Done at 18:14.", "3 laps, 2
+  stopped, from 23:45 Fri.", "2 laps, 1 not counted.", "No lap today. Done at 09:10." (a task
+  done today with no lap is a card too, the tick its only mark). Laps for no task are one card,
+  "Nothing in particular". Cards stand in the order of each task's first lap, so read down the
+  slivers still make the day's lane; the card of a lap in progress stands last, where the day is
+  now, so the fold never hides it. Every card opens closed; open, one line per lap follows on
+  the same edges, `touch` tall: a 12px square in the box column filled as far as the lap ran
+  (hollow when not counted), the facts, and at the line's right end "Don't count it" or "Count
+  it again" (a running lap: "15:48 to now", no link). A task ticked more than once shows only
+  the tick that stands. The task's time is its laps' counted minutes today; the figure at the
+  top stays the day's focus, which counts two devices running at once only once, so the cards
+  can add to a minute or an overlap more than it. A lap's facts are one sentence: "11:03 to
+  11:19, 16 minutes"; stopped, "17:03 to 17:17, stopped, 14 minutes"; across midnight "23:46 Fri
+  to 00:31, 31 of 45 minutes today" (it ended after the shown day: "23:46 to 00:31 Sat, 14 of 45
+  minutes here"); beside another lap "25 minutes, 15 of them already counted, ran on two
+  devices"; paused, "14:00 to 14:31, 25 minutes, paused 6 minutes" (the sliver draws it whole:
+  only the pause's length is kept); set aside ", not counted". Clock times are rounded to the
+  nearest minute, and a lap's minutes are the difference of its shown times (everywhere in the
+  app a duration is said to the nearest minute, never cut down). "already counted" is said only
+  where another lap really covered minutes. The hours are named once, over the slivers on 56px, over a `hair` rule in `line` (the one line in the list),
+  inside the day (never before 00:00 or past 24:00), trimmed to whole hours around what ran, at
+  least 4 hours, at most 4 steps on a phone; the last label of a whole day reads "24:00". "Don't
+  count it" says on its bar what left which day, short enough for a phone: "31 minutes off
+  today, 14 off Monday" (minutes another lap shares stay counted and are not in it). **Five
+  cards show**, the last five in that order (the folded ones are the day's start, in one piece over
+  them); one link over them says how many more and what
+  they gave ("3 earlier tasks, 5 laps, 1h 15m", naming any lap not counted), opens every card of
+  the day in place, then reads "Show only the latest 5 tasks". Last, the day's note: "A line about today". Nothing run:
   "Nothing has run today yet. The first lap starts on Focus." At 600px of panel and up, the
-  sliver takes a `day-sliver` column of its own between the words and the split; the split's
-  column is `day-split` wide, enough for "12h 30m".
+  sliver takes a `day-sliver` column of its own between the task and its time, on the top row;
+  the time's column is `day-split` wide, enough for "12h 30m".
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
 - **A person's circle** carries their picture where they set one, and otherwise their colour and
