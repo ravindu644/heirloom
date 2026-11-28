@@ -439,8 +439,8 @@ describe('estimates', () => {
     assert.deepEqual(p.estimates.value, {
       ratio: 5 / 6,
       tasks: [
-        { id: under, title: 'under', estimate: 4, laps: 2 },
-        { id: over, title: 'over', estimate: 2, laps: 3 },
+        { id: under, title: 'under', estimate: 4, laps: 2, day: '2026-11-24', squares: [1, 1] },
+        { id: over, title: 'over', estimate: 2, laps: 3, day: '2026-11-24', squares: [1, 1, 1] },
       ],
       weeks: [...['10-05', '10-12', '10-19', '10-26', '11-02', '11-09', '11-16'].map((monday) => ({ monday: `2026-${monday}`, ratio: null })), { monday: '2026-11-23', ratio: 5 / 6 }],
     });
@@ -455,8 +455,18 @@ describe('estimates', () => {
     lap(d, '2026-11-23', 9, 0, { task, outcome: 'void' });
     d.today.setDone(task, true);
     assert.equal(p.estimates.value.ratio, 3 / 2);
-    assert.deepEqual(p.estimates.value.tasks, [{ id: task, title: 'pointers', estimate: 2, laps: 3 }]);
-    assert.deepEqual(p.lookBack().done, [{ id: task, title: 'pointers', estimate: 2, laps: 3 }]);
+    const squares = [1, 10 / 25, 1 / 25];
+    assert.deepEqual(p.estimates.value.tasks, [{ id: task, title: 'pointers', estimate: 2, laps: 3, day: '2026-11-24', squares }]);
+    assert.deepEqual(p.lookBack().done, [{ id: task, title: 'pointers', estimate: 2, laps: 3, squares }]);
+  });
+
+  it('a stopped lap is drawn as full as it ran: 15.5 of 25 minutes is a square 0.62 full, in the look back and in the estimates', async () => {
+    const { d, p } = await one();
+    const task = d.today.add('Morning Routine ~1')!;
+    lap(d, '2026-11-24', 8, 0, { task, ended: at('2026-11-24', 8, 15) + 30000, outcome: 'stopped' });
+    d.today.setDone(task, true);
+    assert.deepEqual(p.lookBack().done.map((t) => [t.laps, t.squares]), [[1, [0.62]]]);
+    assert.deepEqual(p.estimates.value.tasks.map((t) => [t.laps, t.squares, t.day]), [[1, [0.62], '2026-11-24']]);
   });
 
   it('no task done with an estimate: no ratio', async () => {
@@ -733,8 +743,8 @@ describe('the look back', () => {
       focus_ms: 59 * MIN,
       laps: 2,
       done: [
-        { id: second, title: 'arrays', estimate: null, laps: 1 },
-        { id: first, title: 'pointers', estimate: 2, laps: 2 },
+        { id: second, title: 'arrays', estimate: null, laps: 1, squares: [1] },
+        { id: first, title: 'pointers', estimate: 2, laps: 2, squares: [1, 1] },
       ],
       note: 'Pointers finally clicked.',
     });

@@ -10,7 +10,8 @@ import { KEPT_MS, isDay } from '../core/real.ts';
 import { focusOn, lapDay, localDay, stats, touches } from '../core/stats.ts';
 import type { Session } from '../core/stats.ts';
 import { pinnedDays } from '../core/streak.ts';
-import { asTask } from '../core/today.ts';
+import { asTask, squares } from '../core/today.ts';
+import { IDLE } from '../core/timer.ts';
 import type { Task } from '../core/today.ts';
 import { createCounts } from './counts.ts';
 import { createDay } from './day.ts';
@@ -33,8 +34,8 @@ export interface ProjectShare {
 export interface Estimates {
   /** Laps run for each lap guessed, over tasks done in the last 28 days. Null with no such task. */
   ratio: number | null;
-  /** The eight done most recently, newest first. */
-  tasks: { id: string; title: string; estimate: number; laps: number }[];
+  /** The eight done most recently, newest first. `day` is the local day it was done; `squares` one fill per counted lap, oldest first, each as full as it ran. */
+  tasks: { id: string; title: string; estimate: number; laps: number; day: string; squares: number[] }[];
   /** The same ratio for each of the last eight Monday to Sunday weeks, oldest first, this week last. Null for a week with no such task. */
   weeks: { monday: string; ratio: number | null }[];
 }
@@ -66,7 +67,8 @@ export interface LookBack {
   focus_ms: number;
   laps: number;
   /** Tasks done today, in the order they were done. */
-  done: { id: string; title: string; estimate: number | null; laps: number }[];
+  /** `squares`: one fill per counted lap, oldest first, each as full as it ran (section 7). */
+  done: { id: string; title: string; estimate: number | null; laps: number; squares: number[] }[];
   note: string;
 }
 
@@ -129,25 +131,26 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     passes += 1;
     const sessions = counts.sessions.value;
     const { days, overlaps } = stats(sessions, offset());
-    const taskLaps = new Map<string, number>();
     const ofTask = new Map<string | null, Session[]>();
     // The days a streak keeps: what is earned needs the bell, so a day of stopped laps has laps and is not kept.
     const kept = new Set<string>();
     for (const session of sessions) {
       if (session.kind === 'work' && session.outcome === 'rang') kept.add(lapDay(session, offset()));
-      // A task's laps are counted as the task shows them: rang or stopped.
-      if (session.task !== null && session.kind === 'work' && session.outcome !== 'void') taskLaps.set(session.task, (taskLaps.get(session.task) ?? 0) + 1);
       const list = ofTask.get(session.task);
       if (list) list.push(session);
       else ofTask.set(session.task, [session]);
     }
     // All the focus there has ever been on each task, and on no task: counted as a day is, the
     // minutes two devices ran at once on the one task counted once.
+    // And each task's laps as its row draws them, rang or stopped, from its rows alone: one fill
+    // per lap, so the count is the length.
     const taskFocus = new Map<string | null, number>();
+    const taskFills = new Map<string, number[]>();
     for (const [task, list] of ofTask) {
       taskFocus.set(task, Object.values(stats(list, offset()).days).reduce((sum, day) => sum + day.focus_ms, 0));
+      if (task !== null) taskFills.set(task, squares(list, IDLE, 0, task).squares);
     }
-    return { days, kept, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskLaps, taskFocus };
+    return { days, kept, overlapping: new Set(overlaps.flat()), byDay: counts.byDay.value, taskFills, taskFocus };
   });
 
   const tasks = computed(() => {
@@ -171,6 +174,8 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     const project = task === null ? null : tasks.value.get(task)?.project;
     return (project && projects.value.get(project)) || null;
   };
+
+  const fillsOf = (task: string): number[] => history.value.taskFills.get(task) ?? [];
 
   // All time per project: its tasks' totals added up. Worked out again when a task moves project
   // or a session changes, from the totals the one pass already made, not from the sessions.
@@ -234,7 +239,7 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
         day,
         focus_ms: counts.race().you_ms,
         laps: counts.lapsToday(),
-        done: done.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate, laps: history.value.taskLaps.get(t.id) ?? 0 })),
+        done: done.map((t) => ({ id: t.id, title: t.title, estimate: t.estimate, laps: fillsOf(t.id).length, squares: fillsOf(t.id) })),
         note: typeof note === 'string' ? note : '',
       };
     },
@@ -242,7 +247,10 @@ export function createProgress(engine: Engine, env: ProgressEnv): Progress & { c
     streak: computed(() => streakView(history.value.kept, clock.day.value, restDays.value)),
     since: computed(() => since(history.value.days, history.value.kept, clock.day.value, restDays.value)),
     bests: computed(() => bests(history.value.days)),
-    estimates: computed(() => estimates([...tasks.value.values()], (id) => history.value.taskLaps.get(id) ?? 0, clock.day.value, offset())),
+    estimates: computed(() => {
+      const made = estimates([...tasks.value.values()], (id) => fillsOf(id).length, clock.day.value, offset());
+      return { ...made, tasks: made.tasks.map((t) => ({ ...t, squares: fillsOf(t.id) })) };
+    }),
 
     today: clock.day,
 

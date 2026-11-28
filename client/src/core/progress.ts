@@ -219,7 +219,7 @@ export function projectShares(
 /**
  * How the guesses have held, over tasks that are done, have an estimate and are not deleted:
  * laps run for each lap guessed over the last 28 days, the eight done most recently (newest
- * first), and the same ratio for each of the last eight Monday to Sunday weeks, oldest first,
+ * first, each with the local day it was done), and the same ratio for each of the last eight Monday to Sunday weeks, oldest first,
  * this week last. A week with no such task has no ratio.
  */
 export function estimates(
@@ -227,7 +227,7 @@ export function estimates(
   lapsOf: (task: string) => number,
   today: string,
   utcOffsetMin: number,
-): { ratio: number | null; tasks: { id: string; title: string; estimate: number; laps: number }[]; weeks: { monday: string; ratio: number | null }[] } {
+): { ratio: number | null; tasks: { id: string; title: string; estimate: number; laps: number; day: string }[]; weeks: { monday: string; ratio: number | null }[] } {
   // Laps run over laps guessed, for a set of tasks. None, no ratio.
   const ratio = (list: readonly { estimate: number; laps: number }[]) => {
     const guessed = list.reduce((sum, t) => sum + t.estimate, 0);
@@ -242,7 +242,7 @@ export function estimates(
     const monday = addDays(mondayOf(today), (i - 7) * 7);
     return { monday, ratio: ratio(guessed.filter((t) => t.day >= monday && t.day < addDays(monday, 7))) };
   });
-  return { ratio: ratio(recent), tasks: recent.slice(0, 8).map(({ id, title, estimate, laps }) => ({ id, title, estimate, laps })), weeks };
+  return { ratio: ratio(recent), tasks: recent.slice(0, 8), weeks };
 }
 
 /** What a lap that was set aside goes back to when it is counted again: the row itself says. */
