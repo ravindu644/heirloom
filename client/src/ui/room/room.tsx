@@ -24,7 +24,7 @@ import { Hours, Lane, Mark } from '../kit/track.tsx';
 import type { Window } from '../kit/track.tsx';
 import { WeekChart } from '../kit/week.tsx';
 import { SplitChip } from '../kit/race.tsx';
-import { useSidebar } from '../kit/wide.ts';
+import { useMedia, useSidebar } from '../kit/wide.ts';
 import { motion } from '../kit/ms.ts';
 import { Fold, Kept } from '../kit/fold.tsx';
 import { burst } from '../kit/burst.ts';
@@ -472,6 +472,9 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
   // Set by the tap that opens the picker: only that opening brings it into view.
   const reveal = useRef(false);
   const wide = useSidebar();
+  // A person's words beside their lane need 280px and the lane needs room to read: from 980px (a lane of 340px or more). Under
+  // it, with a sidebar or without, a panel stacks as on a phone (the same width in room.module.css).
+  const side = useMedia('(min-width: 980px)');
   const base = useId();
   const reporting = useReport();
   const room = list.find((one) => one.id === at) ?? list[0];
@@ -629,10 +632,10 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
     const who = m.last?.cheerers.filter((one) => !m.you || !arriving.includes(cheerKey(room.id, m.last!.run, one.id))).map((one) => (one.id === me?.id ? s.room.you : one.name)) ?? [];
     return who.length > 0 && <p key="cheered" class={css.small}>{s.room.cheeredBy(who, m.you)}</p>;
   };
-  const named = (m: MemberView, withPhase = true) => (
+  const named = (m: MemberView) => (
     <p class={css.name}>
       <b>{m.you ? s.room.you : m.name}</b>
-      {withPhase && <span> {phase(m)}</span>}
+      <span> {phase(m)}</span>
     </p>
   );
   // The panel is one target: a button that covers it, named for the report it opens. Cheer stands over it.
@@ -647,21 +650,20 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
       </div>
       <Fold list gap="sm" class={css.rows}>
         {order.map((id) => room.members.find((m) => m.id === id)!).map((m) => (
-          <article key={m.id} data-member={m.id} class={cx(css.person, wide && css.side)}>
+          <article key={m.id} data-member={m.id} class={cx(css.person, side && css.side)}>
             {cover(m)}
-            {wide ? (
+            {side ? (
               <div class={css.words}>
+                {/* The phone's top row: the name and what they are doing, the week under it, the time at the end. */}
                 <div class={css.top}>
                   {face(m.name, m.picture)}
                   <div>
-                    {named(m, false)}
-                    <p class={css.phaseLeft}>
-                      <span>{phase(m)}</span> {left(m)}
-                    </p>
+                    {named(m)}
+                    <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
                   </div>
                   {cheer(m)}
+                  {left(m)}
                 </div>
-                <p class={css.small}>{s.room.todayWeek(m.today_ms, m.week_ms)}</p>
                 {/* What comes and goes with a lap opens in time, and the panels under it glide. */}
                 <Fold gap="xs" within="xs">
                   {task(m)}
@@ -685,7 +687,7 @@ export function RoomScreen({ engine, rooms, lapMs }: { engine: Engine; rooms: Ro
             <Lane window={w} laps={lapsOf(m, now)} mine={m.you}>
               {callFaces(m)}
             </Lane>
-            {!wide && <Fold within="sm">{cheered(m)}</Fold>}
+            {!side && <Fold within="sm">{cheered(m)}</Fold>}
           </article>
         ))}
       </Fold>

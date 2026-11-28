@@ -10,7 +10,7 @@ export const useWide = () => useMedia('(min-width: 1280px)');
 /** True from the width where the bottom bar becomes the sidebar. */
 export const useSidebar = () => useMedia('(min-width: 720px)');
 
-function useMedia(media: string) {
+export function useMedia(media: string) {
   const query = matchMedia(media);
   const [matches, setMatches] = useState(query.matches);
   useEffect(() => {

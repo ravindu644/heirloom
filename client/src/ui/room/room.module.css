@@ -71,7 +71,6 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
 .left { font: var(--type-figure-md); font-feature-settings: var(--feature-figure-md); }
 /* A break is the green of the calyx, here as everywhere. */
 .left.rest { color: var(--rest); }
-.phaseLeft { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-sm); font: var(--type-label); color: var(--muted); }
 /* Three lines hold any title a person would share, as on a task's own row. */
 .task { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 /* Cheer: a 40px circle whose target reaches 48px. */
@@ -142,17 +141,16 @@ a.link { display: flex; align-items: center; min-height: var(--layout-touch); fo
   .room:has(> .dock .call)::after { content: none; }
   .call { padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface); }
   .call::before { content: none; }
-  /* Words in a column at the panel's left, 220px, the lane the rest of the row. */
-  .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) - var(--space-md) + var(--space-xs)) minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
-  .hoursRow > span { display: block; }
-  .words { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
-  .side .top { grid-template-columns: auto minmax(0, 1fr) auto; }
   .weekPanel { max-width: calc(var(--layout-canvas) * 2 / 3); }
   .notes, .tab > .panel:only-child { max-width: calc(var(--layout-canvas) * 2 / 3); }
 }
-@media (min-width: 1100px) {
-  /* Wider, 280px of words. */
-  .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) + var(--space-xl) + var(--space-sm)) minmax(0, 1fr); }
+@media (min-width: 980px) {
+  /* Words in a column at the panel's left, 280px (the phone's top row needs it: at 220 the name,
+     the week and the time broke into short lines), the lane the rest of the row. Under 980px the
+     lane would be crushed, so a panel stacks as on a phone (room.tsx's `side`). */
+  .person.side, .hoursRow { grid-template-columns: calc(var(--layout-sidebar) + var(--space-xl) + var(--space-sm)) minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
+  .hoursRow > span { display: block; }
+  .words { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
 }
 @media (min-width: 1280px) {
   /* The chart takes eight of twelve columns, the streak and your part the other four. */
