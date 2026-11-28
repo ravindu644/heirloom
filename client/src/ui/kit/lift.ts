@@ -73,6 +73,8 @@ export type Carry = { id: string; before: string | null } | null;
  * column of parts). Press and hold one and it lifts and follows the finger or the mouse; the rows
  * it passes glide to where they will stand; letting go sets it down and calls `onPlace`. A tap
  * that did not hold still opens the row, and a press that moved first is a swipe and scrolls.
+ * With a mouse a press that moves picks the row up at once, as a desktop drag does, when it
+ * starts on the row itself or on its one control marked `data-grip` (the words that open it).
  * With a keyboard, Alt and the up or down arrow move the row that holds the focus by one place.
  *
  * An element marked `data-lift-edge` (a heading between two lists) has a place in the order too:
@@ -256,7 +258,7 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
         arrange(order, tops, fresh);
         shift(row, at);
       };
-      const timer = setTimeout(() => {
+      const pick = () => {
         const list = rows();
         const from = list.indexOf(row);
         const most = last(list, from);
@@ -280,15 +282,25 @@ export function useLift(root: RefObject<HTMLElement | null>, onPlace: Placed, on
           frame = requestAnimationFrame(edge);
         };
         frame = requestAnimationFrame(edge);
-        // How long a finger rests before a row lifts is DESIGN.md's, as every time is: `motion.hold`.
-      }, motion(row, '--motion-hold'));
+      };
+      // How long a finger rests before a row lifts is DESIGN.md's, as every time is: `motion.hold`.
+      const timer = setTimeout(pick, motion(row, '--motion-hold'));
 
       ending = clear;
       on('pointermove', (move) => {
         if (move.pointerId !== event.pointerId) return;
         y = move.clientY;
         if (lift) follow();
-        else if (Math.hypot(move.clientX - event.clientX, move.clientY - event.clientY) > SLOP) clear();
+        else if (Math.hypot(move.clientX - event.clientX, move.clientY - event.clientY) > SLOP) {
+          // A finger that moves first is scrolling. A mouse cannot scroll by dragging: a press
+          // that moves picks the row up at once, as a desktop drag does, from anywhere but a
+          // control of its own (its box, Start), where a shaky click must stay a click.
+          const control = (event.target as Element).closest('button, a');
+          if (event.pointerType !== 'mouse' || (control && !control.hasAttribute('data-grip'))) return clear();
+          clearTimeout(timer);
+          pick();
+          follow();
+        }
       });
       // A long press must not bring up the browser's own menu over the row.
       on('contextmenu', (menu) => menu.preventDefault());

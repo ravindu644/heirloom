@@ -124,7 +124,7 @@ export function HabitsScreen({ focus, habits, onReminderSet, app }: { focus: Foc
                   <div key={habit.id} class={css.row} data-habit={habit.id} data-lift={habit.id}>
                     <Check checked={habit.today.done} label={s.habits.check(habit.title)} onChange={() => check(habit)} />
                     {/* Everything of the row but its box and its count is one target: it opens the habit. */}
-                    <button type="button" class={css.open} onClick={() => setOpen(habit.id)}>
+                    <button type="button" class={css.open} data-grip onClick={() => setOpen(habit.id)}>
                       <span class={css.words}>
                         <span class={css.title}>{habit.title}</span>
                         <span class={css.meta}>{[s.habits.plan(habit.days), run(habit)].filter(Boolean).join(', ')}</span>

@@ -61,7 +61,7 @@ export function TaskRow({ task, of, note, next, end, links, checkLabel, onDone, 
       <div class={css.lead}>
         {onDone && <Check checked={task.done} label={checkLabel ?? task.title} onChange={onDone} />}
         {onOpen ? (
-          <button type="button" class={css.words} data-task={task.id} onClick={onOpen}>
+          <button type="button" class={css.words} data-task={task.id} data-grip onClick={onOpen}>
             {words}
           </button>
         ) : (
