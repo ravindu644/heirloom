@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -244,22 +245,132 @@ func TestCallingALapTogether(t *testing.T) {
 	sees("the caller left", nil)
 }
 
-func TestSixCallsADay(t *testing.T) {
+// calls makes a call in the room for the next whole minute but one.
+func (p *person) calls(t *testing.T, room, what string) {
+	t.Helper()
+	p.ask("call", map[string]any{"room": room, "at": p.w.wholeMinute() + 60000}).ok(t, what)
+}
+
+func (p *person) takesBack(t *testing.T, room, what string) {
+	t.Helper()
+	p.ask("call", map[string]any{"room": room, "at": nil}).ok(t, what)
+}
+
+// over lets a call run its course: a minute to its start and one past it.
+func (w *world) over() { w.pass(2 * time.Minute) }
+
+// slowed asks for a call the limit refuses, and checks the wait runs to a day after began.
+func (p *person) slowed(t *testing.T, room string, began int64, what string) {
+	t.Helper()
+	var refused struct{ Error string }
+	status, header := p.w.post("/api/rooms/call", map[string]any{"token": p.Token, "device": p.id, "room": room, "at": p.w.wholeMinute() + 60000}, &refused)
+	if want := (began + 24*3600*1000 - p.w.ms.Load()) / 1000; status != 429 || refused.Error != "slow_down" || header.Get("Retry-After") != itoa(want) {
+		t.Errorf("%s = %d %s, Retry-After %q; want 429 slow_down, %d", what, status, refused.Error, header.Get("Retry-After"), want)
+	}
+}
+
+// Twenty calls a day for a member, a call taken back before it starts not among them.
+func TestTwentyCallsADay(t *testing.T) {
+	w := start(t)
+	ravi, sachi := w.person("ravi", phone, 0), w.person("sachi", laptop, 0)
+	room, _ := together(t, "Calls", ravi, sachi) // ravi keeps it
+
+	sachi.calls(t, room, "a call she takes back")
+	sachi.takesBack(t, room, "taken back")
+	began := w.wholeMinute()
+	for n := range 19 {
+		sachi.calls(t, room, fmt.Sprint("call ", n+1))
+		w.over()
+	}
+	sachi.calls(t, room, "the 20th")
+	sachi.takesBack(t, room, "the 20th taken back")
+	sachi.calls(t, room, "the 20th again: the one taken back freed its place")
+	w.over()
+	sachi.slowed(t, room, began, "a 21st call")
+
+	// In a room of her own she is its keeper, her 20 spent elsewhere.
+	theirs := sachi.ask("create", map[string]any{"name": "Mine"}).ok(t, "create").Room
+	sachi.calls(t, theirs, "sachi in the room she keeps")
+}
+
+// Calling and taking back on a loop stops at 40 a day.
+func TestFortyCallsWithTakeBacks(t *testing.T) {
 	w := start(t)
 	ravi, sachi := w.person("ravi", phone, 0), w.person("sachi", laptop, 0)
 	room, _ := together(t, "Calls", ravi, sachi)
 	began := w.wholeMinute()
-	for range 6 {
-		ravi.ask("call", map[string]any{"room": room, "at": w.ms.Load() + 60000}).ok(t, "a call")
-		ravi.ask("call", map[string]any{"room": room, "at": nil}).ok(t, "taken back")
-		w.pass(time.Minute)
+	for n := range 40 {
+		sachi.calls(t, room, fmt.Sprint("call ", n+1))
+		sachi.takesBack(t, room, fmt.Sprint("taken back ", n+1))
 	}
-	var refused struct{ Error string }
-	status, header := w.post("/api/rooms/call", map[string]any{"token": ravi.Token, "device": ravi.id, "room": room, "at": w.ms.Load() + 60000}, &refused)
-	if want := (began + 24*3600*1000 - w.ms.Load()) / 1000; status != 429 || refused.Error != "slow_down" || header.Get("Retry-After") != itoa(want) {
-		t.Errorf("a seventh call = %d %s, Retry-After %q; want 429 slow_down, %d", status, refused.Error, header.Get("Retry-After"), want)
+	sachi.slowed(t, room, began, "a 41st call, none of the 40 standing")
+}
+
+// From its start on, a call taken back ends as it always did, and it still counts.
+func TestATakeBackAfterTheStartStillCounts(t *testing.T) {
+	w := start(t)
+	ravi, sachi := w.person("ravi", phone, 0), w.person("sachi", laptop, 0)
+	room, _ := together(t, "Calls", ravi, sachi)
+	began := w.wholeMinute()
+	for n := range 19 {
+		sachi.calls(t, room, fmt.Sprint("call ", n+1))
+		w.over()
 	}
-	sachi.ask("call", map[string]any{"room": room, "at": w.ms.Load() + 60000}).ok(t, "sachi has her own six")
+	sachi.calls(t, room, "the 20th")
+	w.pass(time.Minute) // at its start
+	sachi.takesBack(t, room, "taken back once it had started")
+	if m := look(sachi); m.Call != nil {
+		t.Errorf("the call taken back at its start still stands: %+v", m.Call)
+	}
+	sachi.slowed(t, room, began, "a call after one taken back too late to free its place")
+}
+
+// A call is the keeper's or not when it is made. When the room passes to someone else,
+// nothing that was counted stops being counted, and nothing free starts to be.
+func TestCallsStayWhoseTheyWere(t *testing.T) {
+	w := start(t)
+	ravi, sachi, nimal := w.person("ravi", phone, 0), w.person("sachi", laptop, 0), w.person("nimal", tablet, 0)
+	room, _ := together(t, "Ravi's", ravi, sachi)
+	other, _ := together(t, "Nimal's", nimal, ravi, sachi)
+	for n := range 20 {
+		ravi.calls(t, room, fmt.Sprint("the keeper's call ", n+1))
+		w.over()
+	}
+	began := w.wholeMinute()
+	for n := range 20 {
+		sachi.calls(t, room, fmt.Sprint("sachi's call ", n+1))
+		w.over()
+	}
+	ravi.ask("leave", map[string]any{"room": room}).ok(t, "ravi leaves, and sachi keeps the room")
+	if m := look(nimal); len(m.Members) != 3 {
+		t.Fatalf("nimal's room = %s", names(m))
+	}
+	ravi.calls(t, other, "ravi elsewhere: his 20 as the keeper were free, and still are")
+	w.over()
+	sachi.slowed(t, other, began, "sachi elsewhere: her 20 still count, though she keeps the room now")
+	sachi.calls(t, room, "sachi in the room she keeps now: her old calls there are not the keeper's")
+}
+
+// A keeper calls freely in their room, up to 100 a day: anyone can make a room.
+func TestAKeeperHasAHundred(t *testing.T) {
+	w := start(t)
+	ravi, sachi := w.person("ravi", phone, 0), w.person("sachi", laptop, 0)
+	room, _ := together(t, "Ravi's", ravi, sachi)
+	began := w.wholeMinute()
+	for n := range 100 {
+		ravi.calls(t, room, fmt.Sprint("the keeper's call ", n+1))
+		w.over()
+	}
+	ravi.slowed(t, room, began, "a 101st call in his own room")
+	theirs := sachi.ask("create", map[string]any{"name": "Sachi's"}).ok(t, "create").Room
+	var code string
+	for _, m := range sachi.settle() {
+		if m.Room == theirs {
+			code = m.Code
+		}
+	}
+	ravi.ask("join", map[string]any{"code": code}).ok(t, "join")
+	ravi.calls(t, theirs, "ravi in sachi's room: his 100 took nothing from his 20")
 }
 
 // Everybody says they are in at once, twice each, while the caller takes the call back.

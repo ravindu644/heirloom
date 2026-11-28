@@ -20,16 +20,21 @@ import (
 // member out, and pictures.
 
 const (
-	callLasts    = 60 * 1000 // a call stands one minute past its start, then it is over
-	callSoonest  = 60 * 1000
-	callLatest   = 30 * 60 * 1000
-	maxCalls     = 6  // an account's calls in a day, taken back or not
-	maxNotes     = 30 // an account's notes in one room in a day
-	maxNote      = 200
-	keepNotes    = 7 * dayMs
-	maxPicture   = 12000
-	maxPictures  = 20                 // changes of an account's picture in a day: each one is sent to every room it is in
-	noteBreakers = "\r\n\v\f\u0085  " // whatever a screen would start a new line at
+	callLasts   = 60 * 1000 // a call stands one minute past its start, then it is over
+	callSoonest = 60 * 1000
+	callLatest  = 30 * 60 * 1000
+	// An account's calls in a day: 20 that stood, 40 with those taken back before they
+	// started, so calling and taking back on a loop stops too. A call made by the room's
+	// keeper is in neither; a keeper has 100 a day in their room, which anyone can make.
+	maxCalls       = 20
+	maxCallsAll    = 40
+	maxKeeperCalls = 100
+	maxNotes       = 30 // an account's notes in one room in a day
+	maxNote        = 200
+	keepNotes      = 7 * dayMs
+	maxPicture     = 12000
+	maxPictures    = 20                 // changes of an account's picture in a day: each one is sent to every room it is in
+	noteBreakers   = "\r\n\v\f\u0085  " // whatever a screen would start a new line at
 )
 
 var (
@@ -187,7 +192,10 @@ func (s *Service) Call(account int64, public string, at *int64) (id string, room
 	}
 	now := s.now().UnixMilli()
 	if at == nil {
-		res, err := tx.Exec("update call set ended = ? where room = ? and account = ? and ended is null and at + ? > ?", now, room, account, callLasts, now)
+		// Taken back before it starts, it is not one of the day's 20. From its start on it
+		// ends as it always did and still counts, as does one its caller ended by leaving.
+		res, err := tx.Exec("update call set ended = ?3, taken_back = at > ?3 where room = ?1 and account = ?2 and ended is null and at + ?4 > ?3",
+			room, account, now, callLasts)
 		if err != nil {
 			return "", 0, fmt.Errorf("take call back: %w", err)
 		}
@@ -208,16 +216,38 @@ func (s *Service) Call(account int64, public string, at *int64) (id string, room
 	if _, err := tx.Exec("delete from call where made <= ?", now-dayMs); err != nil {
 		return "", 0, fmt.Errorf("drop old calls: %w", err)
 	}
-	var made int
-	var oldest sql.NullInt64
-	if err := tx.QueryRow("select count(*), min(made) from call where account = ?", account).Scan(&made, &oldest); err != nil {
-		return "", 0, fmt.Errorf("count calls: %w", err)
+	// Whether a call is the keeper's is decided once, here: a call does not move in or out
+	// of a count when the room later passes to someone else.
+	var free bool
+	if err := tx.QueryRow("select keeper is ? from room where id = ?", account, room).Scan(&free); err != nil {
+		return "", 0, fmt.Errorf("read keeper: %w", err)
 	}
-	if made >= maxCalls {
-		return "", 0, slowDown(oldest.Int64, now)
+	type ceiling struct {
+		max   int
+		where string
+		args  []any
+	}
+	ceilings := []ceiling{{maxCalls, "free = 0 and taken_back = 0", nil}, {maxCallsAll, "free = 0", nil}}
+	if free {
+		ceilings = []ceiling{{maxKeeperCalls, "free = 1", nil}}
+	}
+	// Over more than one, the wait is the longest: until every one has room again.
+	var until int64 // the oldest call counted by the ceiling hit, 0 when none is
+	for _, c := range ceilings {
+		var made int
+		var oldest sql.NullInt64
+		if err := tx.QueryRow("select count(*), min(made) from call where account = ? and "+c.where, append([]any{account}, c.args...)...).Scan(&made, &oldest); err != nil {
+			return "", 0, fmt.Errorf("count calls: %w", err)
+		}
+		if made >= c.max {
+			until = max(until, oldest.Int64)
+		}
+	}
+	if until != 0 {
+		return "", 0, slowDown(until, now)
 	}
 	id = rand.Text()
-	res, err := tx.Exec("insert into call (public_id, room, account, at, made) values (?, ?, ?, ?, ?)", id, room, account, *at, now)
+	res, err := tx.Exec("insert into call (public_id, room, account, at, made, free) values (?, ?, ?, ?, ?, ?)", id, room, account, *at, now, free)
 	if err != nil {
 		return "", 0, fmt.Errorf("store call: %w", err)
 	}

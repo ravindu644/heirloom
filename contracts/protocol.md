@@ -680,7 +680,7 @@ errors as section 10, and these of their own:
 | 404 | `call` | No such call open in that room |
 | 409 | `call` | The room has an open call already; one at a time |
 | 400 | `bad_request` | A note empty, too long or with a line break; `at` not a whole minute 1 to 30 minutes ahead; a picture too large or not WebP or JPEG |
-| 429 | `slow_down` | More than 30 notes from one account in a room in a day, or more than 6 calls in a day. `Retry-After` carries the seconds |
+| 429 | `slow_down` | More than 30 notes from one account in a room in a day, or more than 20 calls in a day not taken back, or 40 counting those taken back (a call taken back before it starts does not use one of the 20; one ended by its caller leaving does). In a room they keep, the keeper's calls count toward neither, only toward 100 a day across every room they keep; whether a call was the keeper's is fixed when it is made. `Retry-After` carries the seconds |
 
 **Pictures.** An account's picture is kept by the server as it was sent and named by the sha-256
 of its bytes (`hash`, hex). Members carry `picture` (that hash, or `null` for the initial).
@@ -793,8 +793,8 @@ set when you say you are in and taken off if you take it back. The call ends one
 taken out of the call; the caller leaving ends it.
 
 **Small rules.** The caller takes a call back with `at: null` (`in` from the caller is 400); `in`
-from `at` on is 404 `call`; removing a member already gone is `{}`; the 30 notes and 6 calls are
-counted over the last 24 hours, and `Retry-After` counts to when the oldest of them is a day old;
+from `at` on is 404 `call`; removing a member already gone is `{}`; the 30 notes and the calls are
+counted over the last 24 hours (a call taken back from its `at` on still counts), and `Retry-After` counts to when the oldest call in the limit reached is a day old;
 `last_at_ms` is true when the message is built and a screen does not move it. An account may fetch
 its own picture whether or not it shares a room; a picture's squareness is the device's to make.
 `/api/me/picture` takes at most 20 changes a day (429 `slow_down` past that, counted by the

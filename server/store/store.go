@@ -242,6 +242,12 @@ create table call_in (
 `, `
 -- How far an account has read a room's notes, server ms: read on one device, read on all.
 alter table member add column notes_read integer not null default 0;
+`, `
+-- The limits on calls. taken_back: the caller took it back before it started, so it is
+-- not one of their day's 20 (it is one of the 40). free: the caller kept the room when
+-- they made it, so it counts only toward the keeper's 100 in that room, whoever keeps it later.
+alter table call add column taken_back integer not null default 0;
+alter table call add column free integer not null default 0;
 `}
 
 func migrate(db *sql.DB) error {
