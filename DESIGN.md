@@ -500,17 +500,24 @@ Built once in `client/src/ui/kit/` and reused.
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
   to secondary.
 - **A task with subtasks:** its own box stays at the left and finishes the task, open subtasks
-  and all (Jira's rule: ticking every subtask finishes nothing but them, so "4 of 4 subtasks"
-  beside an empty box is a task still to finish, still Next). On the line under the title, after
-  the project, the count with its noun is a link with the fold arrow after it, a `touch` target
-  made by padding: "2 of 4 subtasks". Open, one short row per subtask under the task: its box in
-  the box column, its words on the title's edge, struck through in `muted` when done and kept
-  where it stands. Only ticking happens there: no field, no editing, no Remove. Making,
-  renaming, removing and ordering subtasks is the task's sheet's: there they are rows of words
-  with no box (tap a title and it is a field where it stands, each change kept as typed, an
-  empty one keeping the last; "Remove" at the row's end, and where it stood the sheet says
-  "Removed: <title>." with Undo for ten seconds, since a bar would be under the sheet; press and
-  hold to move one among its own), and "Add a subtask" at the foot.
+  and all (Jira's rule: ticking every subtask finishes nothing but them, so "3 of 3 subtasks"
+  beside an empty box is a task still to finish, still Next). The opener is a band at the
+  card's foot, a row of its own under a `hair` rule, `touch` tall: the fold arrow in the box
+  column (centre 28px), "1 of 3 subtasks" in body on the words' edge (56px), and the whole band
+  is the target (the user found a small link with a tiny arrow on the project's line too weak
+  next to Habits' arrow). Open, one short row per subtask follows the band on the same two
+  edges: its box in the box column, its words on 56, struck through in `muted` when done and
+  kept where it stands; tapping the words ticks it too. Only ticking happens there: no field,
+  no editing, no Remove. A task with subtasks is a band taller, closed. **The running task:**
+  its subtasks hang under Today's strip as the same band and rows (R1), the strip's dot centred
+  28px in and its time on 56 so the band lines up under it; paused, they stay; in a break the
+  strip is the break's and holds none (they are back on the task's row, open if the strip's
+  was); a task with no subtasks changes nothing. Focus does not show them. Making, renaming,
+  removing and ordering subtasks is the task's sheet's: there they are rows of words with no box
+  (tap a title and it is a field where it stands, each change kept as typed, an empty one
+  keeping the last; "Remove" at the row's end, and where it stood the sheet says "Removed:
+  <title>." with Undo for ten seconds, since a bar would be under the sheet; press and hold to
+  move one among its own; done ones struck through), and "Add a subtask" at the foot.
 - **Habit row:** two edges and only two: the control column (a `touch` target, its mark
   centred 28px from the row's left) and the words' edge, 56px in, where the title, the line under
   it, a round's words and (under 720px) the week all start; from 720px the week has its own
@@ -534,7 +541,8 @@ Built once in `client/src/ui/kit/` and reused.
   would move the one just tapped. Everything but the controls opens the habit.
 - **The fold arrow:** two strokes, drawn as the tick is, `stroke` wide in `ink`: down is
   closed, up is open, turning on `motion.fill`. It opens rows in place and is the one sign for
-  "there is more of this row" (a habit's rounds, a task's subtasks).
+  "there is more of this row" (a habit's rounds, a task's subtasks). It always stands in the
+  box column of a row of its own: a habit's row, a task's band, the strip's band.
 - **A choice** (a weekday, one room of several, a project's square): off is `surface` with a
   `hair` `edge` border; on is `ink` with `ground` text. On and off must differ by more than a
   border, and neither may look like a quiet button. The seven weekdays always share one row:
@@ -582,33 +590,38 @@ Built once in `client/src/ui/kit/` and reused.
 - **The day, lap by lap** (one panel; it replaced the hour lane drawn over its own rows and
   "Looking back on today", which showed the day twice): "Today, lap by lap" ("Friday 27
   November, lap by lap" for a past day), then the day's focus in `figure-lg` in `you` beside
-  "focused today, in 2 laps" (with one in progress, "in 7 laps, and one running"). Then one list in the order the day ran. A lap's row: its real
-  times and what it gave the day ("23:46 to 00:31  31 minutes today"), "Lap", "Stopped lap" or
-  "Lap, not counted" with its task, and under the words an 8px sliver of the day's hours
+  "focused today, in 2 laps" (with one in progress, "in 7 laps, and one running"). Then one list
+  in the order the day ran, each entry between `hair` rules. **Every lap row is one grid, in one
+  order, nothing ever between** (the user's pick, after the asides, links and moments stacked
+  in a different order on every card): line 1, "Lap", "Stopped lap", "Lap, running" or "Lap, not
+  counted" in `strong` with its task, and at the right "Day so far" in `figure-md` ("Day's
+  total" on a past day; a lap not counted has none); line 2, an 8px sliver of the day's hours
   (`lane` track) holding only that lap (`you`; hollow when not counted) and the break that
-  followed it (`rest`): read down, the slivers make the day's lane, so it is never drawn a
-  second time. The hours are named once, over the sliver column, inside the day (never before
-  00:00 or past 24:00), trimmed to whole hours around what ran, at least 4 hours, at most 4
-  steps on a phone. "Don't count it" / "Count it again" stand under the lap's words. At the
-  row's end, "Day so far" ("Day's total" on a past day) in `figure-md`: the running total after that lap, so the last one is
-  the figure at the top (a lap not counted has none; two laps that ran at once add only what
-  the second added). A lap across midnight says, under its words, "Began on Friday. Its first
-  14 minutes count there." (not counted, only "Began on Friday."). Breaks are only on the slivers. Quiet one-line `label` rows at their
-  time: "11:19  Done: Morning routine" (habits are not here: a day of laps is not a log of check-ins). The lap in
-  progress is the last row, its split and sliver growing. Five latest laps show; one link over them says how many more and what
-  they gave, naming any not counted ("4 earlier laps, 1 not counted, 1h 15m"), and opens them in
-  place, then reads "Show only the latest 5 laps".
-  Last, the day's note: "A line about today". Nothing run: "Nothing has run today yet.
-  The first lap starts on Focus." At 600px of panel and up, the sliver takes a `day-sliver` column
-  of its own between the words and the split; the split's column is `day-split` wide, enough
-  for "12h 30m". The last hour label of a whole day reads "24:00". A lap not counted says its
-  length once ("12 minutes"), its words say "not counted". A lap that ran beside another says
-  what it added ("25 minutes, 15 of them already counted"); both laps of a pair say "ran on two devices"
-  while both count. "Don't count it" says on its bar what left
-  which day, short enough for a phone: "31 minutes off today, 14 off Monday" (minutes another
-  lap shares stay counted and are not in it). A lap that ends after the day's midnight
-  says so under its words ("Ended on Tuesday, where it counts as a lap."), the mirror of
-  "Began on".
+  followed it (`rest`), so read down the slivers make the day's lane; line 3, the facts in
+  `label` `muted`, and at that line's right end, under the figure, "Don't count it" or "Count it
+  again" as a link, always in that one place (the running lap leaves it empty). The facts are
+  one sentence: "11:03 to 11:19, 16 minutes"; across midnight "23:46 Fri to 00:31, 31 of 45
+  minutes today" (it ended after the shown day: "23:46 to 00:31 Sat, 14 of 45 minutes here");
+  beside another lap "25 minutes, 15 of them already counted, ran on two devices"; set aside ",
+  not counted". A task finished in its lap (its `done` inside the lap, or within its break
+  after) is that lap's: a 2px `ink` tick on the sliver at that time and the facts end "Task
+  done."; a task finished at any other time is a quiet row of its own, one `label` line between
+  the same rules ("Morning routine done at 11:19"), no sliver, no figure. Clock times here are
+  rounded to the nearest minute, and every minute count is the difference of the shown times,
+  so a row never says 15 where its split moved 16 (everywhere in the app a duration is said to
+  the nearest minute, never cut down: the splits and the figure at the top are the day's focus
+  said that way, so they agree with the year grid and Focus). "already counted" is said only
+  where another lap really covered minutes. The hours are named once, over the sliver
+  column, inside the day (never before 00:00 or past 24:00), trimmed to whole hours around
+  what ran, at least 4 hours, at most 4 steps on a phone; the last label of a whole day reads
+  "24:00". "Don't count it" says on its bar what left which day, short enough for a phone: "31
+  minutes off today, 14 off Monday" (minutes another lap shares stay counted and are not in
+  it). Five latest laps show; one link over them says how many more and what they gave, naming
+  any not counted ("4 earlier laps, 1 not counted, 1h 15m"), and opens them in place, then
+  reads "Show only the latest 5 laps". Last, the day's note: "A line about today". Nothing run:
+  "Nothing has run today yet. The first lap starts on Focus." At 600px of panel and up, the
+  sliver takes a `day-sliver` column of its own between the words and the split; the split's
+  column is `day-split` wide, enough for "12h 30m".
 - **A project's bar:** a `lane` in `ink` (never the project's colour), with a dashed `ghost`
   mark for the seven days before.
 - **A person's circle** carries their picture where they set one, and otherwise their colour and

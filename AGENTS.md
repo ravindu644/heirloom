@@ -44,7 +44,10 @@ A lane that needs a change outside its folder asks the lead in its report; it ne
    is ruled out, the check that proves done, the skills to load. From the second section on,
    resume a lane's agent with SendMessage: it keeps its code in context.
 3. **Build.** Lanes do not commit. A lane ends every process it started (dev servers, emulators,
-   browsers) before it reports. A failing check caused by another lane's half-written file: re-run
+   browsers, and every background shell, wait loop or queued run) before it reports. Never leave
+   a loop that waits for port 8788 to free and then starts a run: it fires after the lane is gone
+   and collides with the lead's `make check`. Port busy: wait in the foreground, or report and
+   let the lead run it. A failing check caused by another lane's half-written file: re-run
    once before calling it a bug.
 4. **Gate a section.**
    - Re-run every check yourself: `make check`. An agent's report is a lead, not proof.
