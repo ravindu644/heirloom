@@ -35,7 +35,6 @@ reviews/*/device/
 .env.*
 
 # other people's work, kept locally for re-checking, never committed
-design/refs/*
-!design/refs/README.md
+design/refs/
 docs/research/pages/
 .claude/worktrees/

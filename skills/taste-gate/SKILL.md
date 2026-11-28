@@ -34,7 +34,7 @@ and the longest string it can hold. Open every picture.
 | Across the desk: the phone picture at 30% size | you cannot read the time left and the phase |
 | Squint | you cannot say what the one main thing is, or two things tie |
 | One action | there is more than one primary (you-filled) button |
-| Side by side with the reference in `design/routes/b-pacer/screens/` | it drifted: a new colour, a rounded lane, a shadow, a different rhythm |
+| Side by side with the same demo state before the change, and a neighbouring screen | it drifted: a new colour, a rounded lane, a shadow, a different rhythm |
 | Logo test | another productivity app's name could go on it and nothing would feel wrong |
 | Empty state | it shows an illustration and "Nothing here yet!" instead of the first thing to do |
 | Thumb | the main action on the phone is out of reach in the top third |

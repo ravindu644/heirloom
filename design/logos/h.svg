@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="heirloom, h">
-    <rect width="512" height="512" rx="112" fill="#0E100E"/>
-    <path d="M119 396 V108 M119 286 A61 64 0 0 1 241 286" fill="none" stroke="#7C827B" stroke-width="26" stroke-dasharray="30 18"/>
-    <path d="M241 396 V108 M241 286 A64 64 0 0 1 369 286 V396" fill="none" stroke="#FF6A4D" stroke-width="58"/>
-</svg>

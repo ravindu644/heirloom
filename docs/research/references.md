@@ -1,8 +1,8 @@
 # References and fact-check
 
-All fetched 2026-11-24. The full per-claim source lists, with dates and saved file names, are in
-the raw agent reports: [raw/](raw/). Saved page copies are kept outside the repository (they are
-other people's work); `docs/research/raw/README.md` says where.
+All fetched 2026-11-24. The full per-claim source lists, with dates and saved file names, were in
+the raw agent reports, now in git history (docs/research/raw/). Saved page copies are kept outside
+the repository (they are other people's work).
 
 ## Primary sources
 

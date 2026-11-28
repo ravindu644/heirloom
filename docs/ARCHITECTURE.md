@@ -239,8 +239,8 @@ docs/          this file, PRODUCT.md, research/
 | 2026-11-24 | Preact + Vite, Capacitor 8, Go + bundled SQLite 3.51.3+, IndexedDB | [stack.md](research/stack.md) |
 | 2026-11-24 | Rooms share presence and time, not tasks; no global leaderboard | [focus-todo.md](research/focus-todo.md), [motivation.md](research/motivation.md) |
 | 2026-11-24 | The two-offline-devices rule in section 4, approved by the user | Nothing really done is lost; overlaps counted once |
-| 2026-11-24 | Name: heirloom. Server binary: heirloomd | [design/names.md](../design/names.md) |
-| 2026-11-24 | Design language: route B, Pacer | [design/](../design/README.md); `DESIGN.md` |
+| 2026-11-24 | Name: heirloom. Server binary: heirloomd | the name's notes, in git history (design/names.md) |
+| 2026-11-24 | Design language: route B, Pacer | `DESIGN.md`; the three routes are in git history (design/routes/) |
 | 2026-11-24 | Exposure through a Cloudflare named Tunnel | User's choice; [stack.md](research/stack.md) §5 |
 | 2026-11-24 | Session outcomes are `rang`, `stopped`, `void`; a replaced offline interval closes as `stopped` | The user's call: minutes really worked are kept, a lap is only a lap when it rings |
 | 2026-11-24 | Ringing does not write the timer cell | The phone rings with the app asleep; nobody is there to write |

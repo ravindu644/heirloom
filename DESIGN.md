@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: heirloom
-description: Past you is a ghost who runs beside you on every screen. A pomodoro is a lap, a set is four laps, and the day is a race against your usual day, told in splits. Chosen 2026-11-24 from three routes; the screens in design/routes/b-pacer/screens/ are the visual reference.
+description: Past you is a ghost who runs beside you on every screen. A pomodoro is a lap, a set is four laps, and the day is a race against your usual day, told in splits. Chosen 2026-11-24 from three routes; the demo states in client/demo.html are the visual reference.
 colors:
   ground: "#EEF0EC"
   surface: "#FFFFFF"
@@ -265,9 +265,9 @@ there is no texture and no hand wobble. Warmth comes from the words, not from de
 You are always tomato. The ghost is always grey, hollow and dashed: past you has no colour because
 it is only a memory. Being behind is never red. Red means you.
 
-The rendered screens in `design/routes/b-pacer/screens/` (phone 412x915, laptop 1440x900, light and
-dark) are the reference for every screen. Where this file and a screen disagree, this file wins and
-the screen is redrawn.
+The demo states in `client/demo.html` (every screen and state, at phone and laptop sizes, light and
+dark, as `tools/design-audit.mjs` opens them) are the reference for every screen. Where this file
+and a screen disagree, this file wins and the screen is changed.
 
 ## Colors
 
@@ -651,7 +651,7 @@ Built once in `client/src/ui/kit/` and reused.
   circle (`label` at 24px, `body-strong` at 40 and 48, `title` at 56), the same for two letters;
   in `on-you` on every hue but heat-2, which takes `ink`, so each stands 4.5:1 or more in both
   themes (light amber was darkened to #A46700 for it).
-- **The Room screen** (chosen from drawn options, `reviews/22/`): the line that names the room
+- **The Room screen** (chosen from drawn options): the line that names the room
   ("Study club, kept by lina", with "Code and settings" at its right end), the finding ("1 of 4
   focusing now."), then **tabs**: People, Notes, Week. The call strip stands outside the tabs.
   - **Tabs** are the bottom bar's rule one level down: three labels in `body-strong`, 48px tall,
@@ -858,7 +858,7 @@ Built once in `client/src/ui/kit/` and reused.
     welcome and nothing else. The address the app holds stays in the server field and stays
     the server until "Use this server" chooses another; leaving by Back changes nothing. 
   - **The browser's sign-in (and join, and set up) from 720px** is two halves (chosen from three
-    drawn, `reviews/23/signin-options.html`, S1): signed out, the shell draws no sidebar column;
+    drawn, S1): signed out, the shell draws no sidebar column;
     the mark stands alone at the top left. The left half, on the ground, holds the drawing, its
     squares scaled to the half (56px at 1440, 40px at 1024, about 36px at 720), then the title in
     `headline-lg` and the sentence, all on the drawing's left edge, without the button. The right
@@ -900,7 +900,7 @@ Built once in `client/src/ui/kit/` and reused.
   line, so it never makes the header taller; at that size the ring's line is a little heavier and
   has six dashes, or it fades on a screen of one pixel to the point. Where only one colour is allowed (the status bar, a themed icon) the
   upper is filled and the lower dashed: eight dashes, six under 24dp, where eight run together.
-  Chosen 2026-11-25 from five; the others are kept in `design/logos/`.
+  Chosen 2026-11-25 from five; it is drawn in `design/logos/colon.svg`.
 - **The person:** their circle (A person's circle) and the username beside it, in `body` in a
   list or a panel and in `label` in the header's chip. Which side the circle is on: see The header.
 - **The server step:** the phone app's first screen, and what "Change" on the sign-in screen
