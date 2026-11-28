@@ -30,14 +30,16 @@ No friend with a server? [Run your own](docs/DEPLOY.md): one file for Linux on x
 
 <table>
   <tr>
-    <td width="33%" align="center"><img src="docs/resources/readme/01-focus.png" width="100%"><br>Focus</td>
-    <td width="33%" align="center"><img src="docs/resources/readme/02-today.png" width="100%"><br>Today</td>
-    <td width="33%" align="center"><img src="docs/resources/readme/03-progress.png" width="100%"><br>Progress</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/01-focus.png" width="100%"><br>Focus</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/02-today.png" width="100%"><br>Today, with subtasks</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/03-progress.png" width="100%"><br>Progress</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/03b-progress-day.png" width="100%"><br>A day, task by task</td>
   </tr>
   <tr>
-    <td width="33%" align="center"><img src="docs/resources/readme/04-habits.png" width="100%"><br>Habits</td>
-    <td width="33%" align="center"><img src="docs/resources/readme/05-room.png" width="100%"><br>Room</td>
-    <td width="33%" align="center"><img src="docs/resources/readme/06-welcome.png" width="100%"><br>Welcome</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/04-habits.png" width="100%"><br>Habits, a few times a day</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/05-room.png" width="100%"><br>Room</td>
+    <td width="25%" align="center"><img src="docs/resources/readme/06-welcome.png" width="100%"><br>Welcome</td>
+    <td width="25%"></td>
   </tr>
 </table>
 
