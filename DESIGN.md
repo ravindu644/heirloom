@@ -499,13 +499,42 @@ Built once in `client/src/ui/kit/` and reused.
   and so is its button. (A grey `key` button on it could not be told from the strip.) When the lap has rung, its button to
   start the break takes the `you` fill and is the screen's primary; the list's Start steps down
   to secondary.
-- **Habit row:** the task row's box at the left (the same job, so the same control: on a day
-  already done it takes the latest check-in back), the title, under it the plan and the run in
-  `label` ("Every day, 9 days running"), a count on its way in `figure-sm` beside the words
-  ("2 of 3"), and the week: seven lanes `lane-set` tall and `xs` apart under M T W T F S S, each
-  letter centred on its lane. Done is filled in `you`, a count is filled that far, a rest day
-  carries the ring, a day not planned is a `stroke` line and never a miss, today has a `hair`
-  outline. Everything but the box opens the habit.
+- **A task with subtasks:** its own box stays at the left and finishes the task, open subtasks
+  and all (Jira's rule: ticking every subtask finishes nothing but them, so "4 of 4 subtasks"
+  beside an empty box is a task still to finish, still Next). On the line under the title, after
+  the project, the count with its noun is a link with the fold arrow after it, a `touch` target
+  made by padding: "2 of 4 subtasks". Open, one short row per subtask under the task: its box in
+  the box column, its words on the title's edge, struck through in `muted` when done and kept
+  where it stands. Only ticking happens there: no field, no editing, no Remove. Making,
+  renaming, removing and ordering subtasks is the task's sheet's: there they are rows of words
+  with no box (tap a title and it is a field where it stands, each change kept as typed, an
+  empty one keeping the last; "Remove" at the row's end, and where it stood the sheet says
+  "Removed: <title>." with Undo for ten seconds, since a bar would be under the sheet; press and
+  hold to move one among its own), and "Add a subtask" at the foot.
+- **Habit row:** two edges and only two: the control column (a `touch` target, its mark
+  centred 28px from the row's left) and the words' edge, 56px in, where the title, the line under
+  it, a round's words and (under 720px) the week all start; from 720px the week has its own
+  column at the row's right end; every habit lines up down the list. Under the
+  title, the plan and the run in `label` ("Every day, 9 days in a row"; "9 full days in a row" for a
+  habit done more than once a day, since a part-done day does not add; after a miss "9 of the
+  last 14 days"; nothing while the run is 1). The week: seven lanes `lane-set` tall and `xs`
+  apart under M T W T F S S, each letter centred on its lane, at the row's foot. Done is filled
+  in `you`, a count is filled that far, a rest day carries the ring, a day not planned is a
+  `stroke` line and never a miss, today has a `hair` outline. A habit done once a day has the
+  stock box in the control column (on a day done it takes the check-in back). A habit done
+  more often has the fold arrow there instead, and at the end of the title's line its count in
+  squares and `figure-sm`, as a task's laps ("3 of 5"). Open, one short row per round under the
+  title, its box in the control column and its words on the words' edge: the round's reminder
+  time in body with tabular figures ("08:00"), "No time set" in `muted` where it has none, and
+  when ticked "done at 08:12" in `label`. A tap on a box ticks that round or takes that round back,
+  in any order (the user's rule: skip 08:00, do 12:00, and 12:00 is what is ticked). An untimed
+  round says which one it is ("4th time"). On Habits the box is the only undo: a check-in or a
+  take-back raises no bar and no Undo, and the habit's sheet has no "Take one back" (the user:
+  one way, the one you can see, beats three). Today keeps its bar and Undo. Opening one leaves the others open: closing a row above
+  would move the one just tapped. Everything but the controls opens the habit.
+- **The fold arrow:** two strokes, drawn as the tick is, `stroke` wide in `ink`: down is
+  closed, up is open, turning on `motion.fill`. It opens rows in place and is the one sign for
+  "there is more of this row" (a habit's rounds, a task's subtasks).
 - **A choice** (a weekday, one room of several, a project's square): off is `surface` with a
   `hair` `edge` border; on is `ink` with `ground` text. On and off must differ by more than a
   border, and neither may look like a quiet button. The seven weekdays always share one row:

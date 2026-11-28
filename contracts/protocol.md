@@ -616,10 +616,20 @@ Worked out on the device from `habit` and `checkin` rows.
 
 - A habit is planned on the weekdays in `days` (bit 0 Monday to bit 6 Sunday) and is done for a
   day when that day's live check-ins reach `target`. A check-in is live while its `deleted` is unset.
-- **Checking in** makes one `checkin` row: `habit`, `day` (the local day of the tap) and `at`,
-  written together. It never changes a number. Two devices checking in offline make two rows.
-- **Undo** sets `deleted` on the latest live check-in of that habit for today. It never removes a
-  row and never touches another day.
+- **Checking in** makes one `checkin` row: `habit`, `day` (the local day of the tap), `at`, and
+  `round` when a particular one of the day's times was ticked (1 for the first), written together.
+  It never changes a number. Two devices checking in offline make two rows.
+- **Rounds.** A day's rounds are 1 to `target`. A live check-in with a `round` fills that round;
+  two for the same round fill it once (the older is the one shown). One whose `round` is above
+  today's `target` (the target was lowered since) is read as one without a round. Then each live check-in without one (an older build's, or
+  a habit done once a day) fills the lowest round still empty, oldest `at` first; past `target`
+  they fill nothing more. A day's count is its filled rounds, and it is done when they reach
+  `target`. Any round may be ticked in any order: 12:00 before 08:00.
+- **Taking a round back** empties it and moves no other: first each live check-in without a
+  `round` that fills another round has its place written as its `round`, then `deleted` is set
+  on every live check-in that would fill this round (one past `target` that would move in
+  included). A round is a place in the day's sorted `reminds`, not a
+  time: changing a time moves what the boxes say, not which rounds are filled. Nothing removes a row or touches another day.
 - A check-in on a day the habit is not planned for is kept and shown on that day, and counts for
   nothing else.
 - **The streak** is section 8's function with the habit's `days` as the mask and its done days as
@@ -632,7 +642,7 @@ Worked out on the device from `habit` and `checkin` rows.
 - `reminds` is a list of local times of day, sorted, `["06:00", "22:00"]`: at most one for each
   time a day the habit is done (`target`), and fewer is fine. The first is for the first
   check-in of the day, the second for the second, and so on: the reminder at place k is shown
-  on a planned day only while that day has fewer than k check-ins. A habit done twice by noon is
+  on a planned day only while round k is empty. A habit done twice by noon is
   not reminded at 22:00; one done once is. A device writes the whole list in one cell, and with
   it `remind`, the list's first time or `null`, so a build that knows only `remind` still
   reminds once. It writes `remind` first, so the list's stamp is the later of the two. A device
